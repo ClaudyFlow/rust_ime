@@ -101,10 +101,10 @@ impl Processor {
         };
     }
 
-    pub fn toggle(&mut self) -> bool {
+    pub fn toggle(&mut self) -> Action {
         self.chinese_enabled = !self.chinese_enabled;
         self.reset();
-        self.chinese_enabled
+        Action::Consume
     }
 
     pub fn reset(&mut self) {
@@ -168,6 +168,13 @@ impl Processor {
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
+                // 现在空格作为手动分词符，且 buffer 中存入真实空格
+                self.buffer.push(' ');
+                self.lookup();
+                self.update_phantom_action()
+            }
+            Key::KEY_ENTER => { 
+                // 现在回车作为确认上屏键
                 if let Some(word) = self.candidates.get(self.selected) { 
                     self.commit_candidate(word.clone())
                 } else if !self.buffer.is_empty() { 
@@ -175,11 +182,15 @@ impl Processor {
                     self.commit_candidate(out)
                 } else { Action::Consume }
             }
-            Key::KEY_ENTER => { let out = self.buffer.clone(); self.commit_candidate(out) }
             Key::KEY_ESC => { 
                 let del = self.phantom_text.chars().count();
                 self.reset(); 
                 if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
+            }
+            Key::KEY_DELETE => {
+                let del = self.phantom_text.chars().count();
+                self.reset();
+                Action::DeleteAndEmit { delete: del, insert: "".into() }
             }
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
@@ -247,137 +258,99 @@ impl Processor {
             filter_string = self.buffer.get(idx..).unwrap_or("").to_lowercase();
         }
         let pinyin_stripped = strip_tones(&pinyin_search).to_lowercase();
+        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('\'', "").replace('`', "");
 
-        let mut candidate_map: HashMap<String, (u32, Vec<String>)> = HashMap::new(); 
-        let mut word_to_hint: HashMap<String, String> = HashMap::new();
+        let mut final_candidates: Vec<(String, String)> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
 
-        let all_segmentations = self.segmenter.segment_all(&pinyin_stripped, dict);
-        let min_segments = all_segmentations.iter().map(|v| v.len()).min().unwrap_or(0);
-
-        for (idx, segments) in all_segmentations.into_iter().enumerate() {
-            if idx >= 5 { break; } 
-            if segments.is_empty() { continue; } 
-            
-            let mut path_score = 0u32;
-            let mut valid_count = 0;
-            for s in &segments {
-                if self.segmenter.syllable_set.contains(s) { 
-                    path_score += (s.len() as u32).pow(3) * 1000;
-                    valid_count += 1;
-                }
-            }
-            if segments.len() == min_segments { path_score += 2000000; }
-            else { path_score /= 10; }
-            if valid_count < segments.len() { path_score /= 5; }
-
-            let first_segment = &segments[0];
-            let first_chars = if first_segment.len() == 1 { dict.search_bfs(first_segment, 10) } else { dict.get_all_exact(first_segment).unwrap_or_default() };
-            let mut current_paths: Vec<(String, u32)> = Vec::with_capacity(5);
-            for (c, h) in first_chars {
-                current_paths.push((c.clone(), path_score));
-                word_to_hint.entry(c).or_insert(h);
-            }
-
-            for i in 1..segments.len() {
-                let next_segment = &segments[i];
-                let next_chars = if next_segment.len() == 1 { dict.search_bfs(next_segment, 10) } else { dict.get_all_exact(next_segment).unwrap_or_default() };
-                let mut next_paths = Vec::with_capacity(20);
-                let ngram_model = self.ngrams.get(&self.current_profile.to_lowercase());
-
-                for (prev_word, prev_score) in &current_paths {
-                    let prev_score_val = *prev_score;
-                    for (next_char_str, next_hint) in &next_chars {
-                        word_to_hint.entry(next_char_str.clone()).or_insert(next_hint.clone());
-                        let mut new_word = prev_word.clone();
-                        new_word.push_str(next_char_str);
-                        let mut new_score = prev_score_val;
-                        
-                        let combined_pinyin = segments[0..=i].join("");
-                        if let Some(matches) = dict.get_all_exact(&combined_pinyin) {
-                            for (w, _) in matches { if &w == &new_word { new_score += 1000000; break; } } 
-                        }
-
-                        if let Some(model) = ngram_model {
-                            let context_chars: Vec<char> = prev_word.chars().collect();
-                            let score = model.get_score(&context_chars, next_char_str);
-                            new_score += score;
-                        }
-                        next_paths.push((new_word, new_score));
-                    }
-                }
-                next_paths.sort_by(|a, b| b.1.cmp(&a.1));
-                next_paths.truncate(5);
-                current_paths = next_paths;
-            }
-            for (word, score) in current_paths {
-                let entry = candidate_map.entry(word).or_insert((0, vec![]));
-                if score > entry.0 { *entry = (score, segments.clone()); }
-            }
-        }
-
-        if let Some(exact_matches) = dict.get_all_exact(&pinyin_stripped) {
-            for (pos, (cand, hint)) in exact_matches.into_iter().enumerate() {
-                word_to_hint.insert(cand.clone(), hint);
-                let entry = candidate_map.entry(cand).or_insert((0, vec![pinyin_stripped.clone()]));
-                entry.0 += 50000000 - (pos as u32 * 100);
-            }
-        }
-
-        let mut final_list: Vec<(String, u32, Vec<String>)> = candidate_map.into_iter().map(|(w, (s, p))| (w, s, p)).collect();
-        
-        // --- 语义输入注入 (English Semantic Match) ---
+        // 1. 语义映射优先 (English Semantic)
         let buf_lower = self.buffer.to_lowercase();
         if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
-            for (idx, zh) in zh_words.iter().enumerate() {
-                // 给予极高的基础权重 (80000000)，确保语义匹配排在最前
-                // 且根据在词库中的顺序微调
-                let score = 80000000 - (idx as u32 * 10);
-                // 如果已经存在（拼音也命中了），更新其权重
-                if let Some(existing) = final_list.iter_mut().find(|(w, _, _)| w == zh) {
-                    if existing.1 < score { existing.1 = score; }
-                } else {
-                    final_list.push((zh.clone(), score, vec![buf_lower.clone()]));
-                    word_to_hint.insert(zh.clone(), format!("[{}]", buf_lower));
+            for zh in zh_words {
+                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
+            }
+        }
+
+        // 2. 词典全量匹配 (高优先级)
+        if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
+            let mut matches = exact_matches;
+            // 按照权重排序 (如果 hint 是数字)
+            matches.sort_by(|a, b| {
+                let wa = a.1.parse::<u32>().unwrap_or(0);
+                let wb = b.1.parse::<u32>().unwrap_or(0);
+                wb.cmp(&wa)
+            });
+            for (word, hint) in matches {
+                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+            }
+        }
+
+        // 3. 分段稳定查找逻辑
+        let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
+        if parts.len() > 1 {
+            // 有空格：执行“锁定前缀”逻辑
+            let mut stable_prefix = String::new();
+            for i in 0..parts.len() - 1 {
+                let part = parts[i].replace('\'', "").replace('`', "");
+                // 取该段的最佳候选
+                let matches = if part.len() == 1 { dict.search_bfs(&part, 1) } else { dict.get_all_exact(&part).unwrap_or_default() };
+                if let Some((word, _)) = matches.first() { stable_prefix.push_str(word); }
+                else { stable_prefix.push_str(&part); }
+            }
+
+            let last_part = parts.last().unwrap().replace('\'', "").replace('`', "");
+            let last_options = if last_part.len() == 1 { dict.search_bfs(&last_part, 10) } else { dict.get_all_exact(&last_part).unwrap_or_default() };
+            
+            for (word, hint) in last_options {
+                let mut full = stable_prefix.clone();
+                full.push_str(&word);
+                if seen.insert(full.clone()) { final_candidates.push((full, hint)); }
+            }
+        } else {
+            // 无空格：执行 Viterbi 全量寻径
+            let all_segmentations = self.segmenter.segment_all(&pinyin_stripped, dict);
+            let ngram_model = self.ngrams.get(&self.current_profile.to_lowercase());
+
+            for segments in all_segmentations {
+                if segments.len() <= 1 { continue; }
+                let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
+                for seg in segments {
+                    let options = if seg.len() == 1 { dict.search_bfs(&seg, 5) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                    let mut next_paths = Vec::new();
+                    for (prev_text, prev_score) in &current_paths {
+                        for (opt_word, hint) in &options {
+                            let mut score = *prev_score;
+                            if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
+                            if let Some(model) = ngram_model {
+                                let context: Vec<char> = prev_text.chars().collect();
+                                score += model.get_score(&context, opt_word);
+                            }
+                            let mut new_text = prev_text.clone();
+                            new_text.push_str(opt_word);
+                            next_paths.push((new_text, score));
+                        }
+                    }
+                    next_paths.sort_by(|a, b| b.1.cmp(&a.1));
+                    next_paths.truncate(10);
+                    current_paths = next_paths;
+                }
+                for (w, _) in current_paths {
+                    if seen.insert(w.clone()) { final_candidates.push((w, String::new())); }
                 }
             }
         }
 
-        for (cand, score, _) in &mut final_list {
-            if cand.chars().count() >= 2 { *score += 10000; }
-            if let Some(hint) = word_to_hint.get(cand) {
-                if let Ok(weight) = hint.parse::<u32>() { *score += weight; }
-            }
-        }
-
+        // 4. 辅助过滤 (仅在有大写辅码时触发)
         if !filter_string.is_empty() {
-            final_list.retain(|(cand, _, _)| {
-                if let Some(h) = word_to_hint.get(cand) { h.to_lowercase().starts_with(&filter_string) }
-                else if let Some(fc) = cand.chars().next() { word_to_hint.get(&fc.to_string()).map_or(false, |h| h.to_lowercase().starts_with(&filter_string)) }
-                else { false }
-            });
+            final_candidates.retain(|(_, hint)| hint.to_lowercase().starts_with(&filter_string));
         }
 
-        final_list.sort_by(|a, b| {
-            let res = b.1.cmp(&a.1);
-            if res != std::cmp::Ordering::Equal { return res; }
-            let res = b.0.chars().count().cmp(&a.0.chars().count());
-            if res != std::cmp::Ordering::Equal { return res; }
-            a.0.cmp(&b.0)
-        });
-        
         self.candidates.clear();
         self.candidate_hints.clear();
-        if let Some(best) = final_list.first() { self.best_segmentation = best.2.clone(); }
-
-        for (cand, _, _) in final_list {
-            self.candidates.push(cand.clone());
-            let hint = word_to_hint.get(&cand).cloned().unwrap_or_default();
-            // 如果 hint 全是数字，则不显示它（仅用于权重）
-            if !hint.is_empty() && hint.chars().all(|c| c.is_ascii_digit()) {
-                self.candidate_hints.push(String::new());
-            } else {
-                self.candidate_hints.push(hint);
-            }
+        for (cand, hint) in final_candidates {
+            self.candidates.push(cand);
+            if !hint.is_empty() && hint.chars().all(|c| c.is_ascii_digit()) { self.candidate_hints.push(String::new()); }
+            else { self.candidate_hints.push(hint); }
         }
 
         if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }

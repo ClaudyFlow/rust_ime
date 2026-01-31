@@ -31,7 +31,7 @@ impl Segmenter {
         if remaining.is_empty() { results.push(current.clone()); return; }
         if results.len() >= 15 { return; }
 
-        let has_apostrophe = remaining.starts_with('`');
+        let has_apostrophe = remaining.starts_with('`') || remaining.starts_with('\'') || remaining.starts_with(' ');
         if has_apostrophe {
             let actual = &remaining[1..];
             let max_len = actual.len().min(6);
@@ -47,7 +47,11 @@ impl Segmenter {
             return;
         }
 
-        let max_len = remaining.len().min(6);
+        // 核心改进：计算到下一个分隔符的距离，限制最大探测长度
+        let sep_pos = remaining.find(|c| c == ' ' || c == '\'' || c == '`');
+        let limit = sep_pos.unwrap_or(remaining.len());
+        let max_len = limit.min(6);
+
         for len in (2..=max_len).rev() {
             let sub = &remaining[..len];
             if self.syllable_set.contains(sub) || dict.contains(sub) {
@@ -71,8 +75,13 @@ impl Segmenter {
         while current_offset < pinyin.len() {
             let mut found_len = 0;
             let current_str = &pinyin[current_offset..];
-            if current_str.starts_with('`') { current_offset += 1; continue; }
-            for len in (1..=current_str.len().min(6)).rev() {
+            if current_str.starts_with('`') || current_str.starts_with('\'') || current_str.starts_with(' ') { current_offset += 1; continue; }
+            
+            let sep_pos = current_str.find(|c| c == ' ' || c == '\'' || c == '`');
+            let limit = sep_pos.unwrap_or(current_str.len());
+            let max_match_len = limit.min(6);
+
+            for len in (1..=max_match_len).rev() {
                 let sub = &current_str[..len];
                 if dict.contains(sub) || self.syllable_set.contains(sub) { found_len = len; break; }
             }

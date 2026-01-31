@@ -80,6 +80,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = find_project_root();
     env::set_current_dir(&root)?;
 
+    // 0. 自动检查并增量编译词库
+    if let Err(e) = engine::compiler::check_and_compile_all() {
+        eprintln!("[Main] 词库自动编译失败: {}", e);
+    }
+
     let config = Arc::new(RwLock::new(load_config()));
     let (gui_tx, gui_rx) = std::sync::mpsc::channel();
     let (tray_tx, tray_rx) = std::sync::mpsc::channel();
@@ -202,8 +207,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui::tray::TrayEvent::ToggleIme => {
                     let (profile, enabled) = {
                         let mut p = processor_clone.lock().unwrap();
-                        let e = p.toggle();
-                        (p.current_profile.clone(), e)
+                        let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
+                        (p.current_profile.clone(), p.chinese_enabled)
                     };
                     let msg = if enabled { "中文模式" } else { "英文模式" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));

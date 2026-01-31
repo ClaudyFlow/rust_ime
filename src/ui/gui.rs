@@ -123,8 +123,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 box-shadow: none;
             }}
             #modern-pinyin {{
-                display: none;
-                opacity: 0;
+                margin-bottom: 0;
+                padding-bottom: 0;
             }}
             .modern-item {{
                 padding: 10px 18px;

@@ -86,10 +86,27 @@ impl InputMethodHost for EvdevHost {
                         // 1. 中英切换
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
                             let mut p = self.processor.lock().unwrap();
-                            let enabled = p.toggle();
+                            let action = p.toggle();
+                            let enabled = p.chinese_enabled;
                             let msg = if enabled { "中文模式" } else { "英文模式" };
                             let summary = p.current_profile.clone();
+                            
+                            // 发送新通知的同时，确保之前的候选列表通知已关闭
+                            let _ = self.notify_tx.send(NotifyEvent::Close);
                             let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                            
+                            // 执行切换产生的动作（目前 toggle 返回 Consume，此处保留结构以防万一）
+                            match action {
+                                Action::DeleteAndEmit { delete, insert } => {
+                                    if let Ok(mut vkbd) = self.vkbd.lock() {
+                                        if delete > 0 { vkbd.backspace(delete); }
+                                        if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                                    }
+                                }
+                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                _ => {}
+                            }
+
                             drop(p); self.update_gui(); continue;
                         }
 
@@ -242,6 +259,20 @@ impl EvdevHost {
 
             let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join("'") };
             
+            // 打印到终端 (前台模式)
+            if !p.candidates.is_empty() {
+                print!("\r\x1b[K[Console] {} | ", pinyin);
+                let start = p.page;
+                let end = (start + 5).min(p.candidates.len());
+                for (i, cand) in p.candidates[start..end].iter().enumerate() {
+                    let abs_idx = start + i;
+                    if abs_idx == p.selected { print!("\x1b[1;32m{}.{}\x1b[0m ", i+1, cand); }
+                    else { print!("{}.{} ", i+1, cand); }
+                }
+                use std::io::Write;
+                std::io::stdout().flush().unwrap();
+            }
+
             // 如果开启了候选框显示，发送完整数据
             if p.show_candidates {
                 let _ = tx.send(GuiEvent::Update { pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), selected: p.selected });
