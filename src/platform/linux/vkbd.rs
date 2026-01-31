@@ -173,8 +173,13 @@ impl Vkbd {
             },
             PasteMode::ShiftInsert => {
                 println!("[Vkbd] Injecting via Shift+Insert");
-                // 关键点：在物理模拟前留出一点时间让 Firefox 反应
-                thread::sleep(Duration::from_millis(10));
+                // 关键改进：先发送一次 ESC，强行关闭 Firefox 等浏览器的自动补全建议
+                // 这样后续的 Backspace 就能准确删掉拼音字符，而不是删掉自动补全的后缀
+                self.tap(Key::KEY_ESC);
+                thread::sleep(Duration::from_millis(5));
+
+                // 粘贴前增加同步延迟
+                thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTSHIFT, true);
                 thread::sleep(Duration::from_millis(30));
                 self.tap(Key::KEY_INSERT);
@@ -190,12 +195,18 @@ impl Vkbd {
     pub fn backspace(&mut self, count: usize) {
         if count == 0 { return; }
         
+        // HACK: 发送一个空格再补一个退格
+        // 这在 Firefox 搜索框中能强行打断自动补全建议，确保后续退格能删掉真实的字符
+        self.tap(Key::KEY_SPACE);
+        self.tap(Key::KEY_BACKSPACE);
+        thread::sleep(Duration::from_millis(2));
+
         for _ in 0..count {
             self.tap(Key::KEY_BACKSPACE);
-            // 增加物理间隔，解决 Firefox 搜索框“吞吐”退格的问题
-            thread::sleep(Duration::from_millis(3));
+            // 物理间隔
+            thread::sleep(Duration::from_millis(2));
         }
-        // 沉淀期
+        // 关键同步
         thread::sleep(Duration::from_millis(15));
     }
 
