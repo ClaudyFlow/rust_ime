@@ -1,5 +1,5 @@
 use fst::MapBuilder;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write, BufRead, BufReader};
 use std::path::Path;

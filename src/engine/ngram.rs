@@ -77,6 +77,7 @@ impl NgramModel {
         }
     }
 
+    #[allow(dead_code)]
     pub fn tokenize(&self, text: &str) -> Vec<String> {
         let mut result = Vec::new();
         let chars: Vec<char> = text.chars().collect();
@@ -101,6 +102,7 @@ impl NgramModel {
         result
     }
 
+    #[allow(dead_code)]
     pub fn train(&mut self, text: &str) {
         let sections = text.split(|c: char| {
             c == '\n' || c == '\r' || c == '。' || c == '，' || c == '！' || c == '？' || c == '；' || c == '：' || c == '“' || c == '”' || c == '（' || c == '）' || c == '、'
@@ -202,6 +204,7 @@ impl NgramModel {
         0
     }
 
+    #[allow(dead_code)]
     pub fn save<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         let file = File::create(path)?;
         let writer = io::BufWriter::new(file);
@@ -213,6 +216,7 @@ impl NgramModel {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn load_user_adapter<P: AsRef<Path>>(&mut self, path: P) {
         if let Ok(file) = File::open(path) {
             let reader = BufReader::new(file);
@@ -224,6 +228,7 @@ impl NgramModel {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct UserAdapter {
     transitions: HashMap<String, HashMap<String, u32>>,

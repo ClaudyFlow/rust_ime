@@ -14,9 +14,12 @@ pub enum GuiEvent {
         hints: Vec<String>,
         selected: usize,
     },
+    #[allow(dead_code)]
     MoveTo { x: i32, y: i32 },
     Keystroke(String),
+    #[allow(dead_code)]
     ShowLearning(String, String), // 汉字, 提示
+    #[allow(dead_code)]
     ClearKeystrokes,
     ApplyConfig(Config),
     #[allow(dead_code)]

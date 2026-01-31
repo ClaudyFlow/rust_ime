@@ -4,9 +4,11 @@ use crate::ui::GuiEvent;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
+#[allow(dead_code)]
 pub struct WaylandHost {}
 
 impl WaylandHost {
+    #[allow(dead_code)]
     pub fn new(_processor: Arc<Mutex<Processor>>, _gui_tx: Option<Sender<GuiEvent>>) -> Self { Self {} }
 }
 

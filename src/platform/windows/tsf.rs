@@ -1,5 +1,6 @@
 use crate::platform::traits::{InputMethodHost, Rect};
 
+#[allow(dead_code)]
 pub struct TsfHost {
 }
 

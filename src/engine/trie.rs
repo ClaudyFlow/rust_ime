@@ -52,6 +52,7 @@ impl Trie {
         results
     }
 
+    #[allow(dead_code)]
     pub fn get_random_entry(&self) -> Option<(String, String)> {
         let len = self.index.len();
         if len == 0 { return None; }
