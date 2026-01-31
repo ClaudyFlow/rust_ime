@@ -217,23 +217,10 @@ impl Processor {
         let target = self.buffer.clone();
         if target == self.phantom_text { return Action::Consume; }
         
-        let old_phantom = self.phantom_text.clone();
+        let del = self.phantom_text.chars().count();
         self.phantom_text = target.clone();
-
-        // 1. 如果是追加 (例如从 "w" 变成 "wo")
-        if target.starts_with(&old_phantom) {
-            let added = &target[old_phantom.len()..];
-            return Action::Emit(added.to_string());
-        }
         
-        // 2. 如果是简单的退格 (例如从 "wo" 变成 "w")
-        if old_phantom.starts_with(&target) {
-            let count = old_phantom.chars().count() - target.chars().count();
-            return Action::DeleteAndEmit { delete: count, insert: "".into() };
-        }
-
-        // 3. 复杂变更 (例如全选删除或粘贴，这种情况极少)
-        Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target }
+        Action::DeleteAndEmit { delete: del, insert: target }
     }
 
     pub fn lookup(&mut self) {

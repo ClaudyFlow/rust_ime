@@ -1,7 +1,7 @@
 use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
 use evdev::{AttributeSet, InputEvent, Key, Device, EventType};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::process::Command;
 
 
@@ -19,9 +19,6 @@ pub enum PasteMode {
 pub struct Vkbd {
     pub dev: VirtualDevice,
     pub paste_mode: PasteMode,
-    pub auto_mode: bool,
-    last_mode_check: Instant,
-    cached_class: String,
 }
 
 impl Vkbd {
@@ -58,83 +55,81 @@ impl Vkbd {
 
         Ok(Self { 
             dev,
-            paste_mode: PasteMode::ShiftInsert, // Changed default to ShiftInsert for best compatibility
-            auto_mode: true,
-            last_mode_check: Instant::now() - Duration::from_secs(10),
-            cached_class: String::new(),
+            paste_mode: PasteMode::ShiftInsert, // Standard universal mode
         })
     }
 
-    fn check_and_update_mode(&mut self) {
-        if !self.auto_mode { return; }
+    #[allow(dead_code)]
+    pub fn cycle_paste_mode(&mut self) -> String {
+        self.paste_mode = match self.paste_mode {
+            PasteMode::ShiftInsert => PasteMode::CtrlV,
+            PasteMode::CtrlV => PasteMode::CtrlShiftV,
+            PasteMode::CtrlShiftV => PasteMode::UnicodeHex,
+            PasteMode::UnicodeHex => PasteMode::ShiftInsert,
+        };
         
-        // Cache for 1 second to avoid excessive command execution
-        if self.last_mode_check.elapsed() < Duration::from_secs(1) {
+        println!("[Vkbd] Manually switched paste mode to: {:?}", self.paste_mode);
+        
+        match self.paste_mode {
+            PasteMode::ShiftInsert => "通用模式 (Shift+Insert)".to_string(),
+            PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
+            PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
+            PasteMode::UnicodeHex => "Unicode编码输入 (Ctrl+Shift+U)".to_string(),
+        }
+    }
+
+    pub fn send_text(&mut self, text: &str) {
+        self.send_text_internal(text, false);
+    }
+
+    #[allow(dead_code)]
+    pub fn send_text_highlighted(&mut self, text: &str) {
+        self.send_text_internal(text, true);
+    }
+
+    fn send_text_internal(&mut self, text: &str, highlight: bool) {
+        if text.is_empty() { return; }
+
+        // FAST PATH: If string is pure ASCII and no highlight is needed, type directly
+        if !highlight && text.chars().all(|c| c.is_ascii()) {
+            for c in text.chars() {
+                if let Some(key) = char_to_key(c) {
+                    self.tap(key);
+                    // 极小延迟防止粘连
+                    thread::sleep(Duration::from_micros(200));
+                }
+            }
             return;
         }
-        self.last_mode_check = Instant::now();
-        
-        let mut class_name = String::new();
 
-        // 1. 尝试 Hyprland (Wayland)
-        if let Ok(out) = Command::new("hyprctl").args(["activewindow", "-j"]).output() {
-            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-                if let Some(c) = v["class"].as_str() {
-                    class_name = c.to_lowercase();
-                }
+        println!("[IME] Emitting text via heavy path: {} (highlight={})", text, highlight);
+
+        // If using UnicodeHex mode, skip clipboard and type directly
+        if self.paste_mode == PasteMode::UnicodeHex {
+            for c in text.chars() {
+                self.send_char_via_unicode(c);
             }
+            return;
         }
 
-        // 2. 如果没结果，尝试 Sway (Wayland)
-        if class_name.trim().is_empty() {
-            if let Ok(out) = Command::new("swaymsg").args(["-t", "get_tree"]).output() {
-                if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-                    fn find_focused(node: &serde_json::Value) -> Option<String> {
-                        if node["focused"].as_bool().unwrap_or(false) {
-                            return node["window_properties"]["class"].as_str().map(|s| s.to_string());
-                        }
-                        if let Some(nodes) = node["nodes"].as_array() {
-                            for n in nodes { if let Some(c) = find_focused(n) { return Some(c); } }
-                        }
-                        None
-                    }
-                    if let Some(c) = find_focused(&v) { class_name = c.to_lowercase(); }
+        // 1. 优先尝试剪贴板
+        if self.send_via_clipboard(text) {
+            if highlight {
+                let count = text.chars().count();
+                thread::sleep(Duration::from_millis(150));
+                self.emit(Key::KEY_LEFTSHIFT, true);
+                for _ in 0..count {
+                    self.tap(Key::KEY_LEFT);
+                    thread::sleep(Duration::from_millis(2));
                 }
+                self.emit(Key::KEY_LEFTSHIFT, false);
             }
+            return;
         }
 
-        // 3. 如果还没结果，尝试 KDE Plasma (Wayland) via DBus
-        if class_name.trim().is_empty() {
-            if let Ok(out) = Command::new("qdbus").args(["org.kde.KWin", "/KWin", "org.kde.KWin.activeWindow"]).output() {
-                let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !path.is_empty() {
-                    if let Ok(out2) = Command::new("qdbus").args(["org.kde.KWin", &path, "org.kde.KWin.Window.resourceClass"]).output() {
-                        class_name = String::from_utf8_lossy(&out2.stdout).trim().to_lowercase();
-                    }
-                }
-            }
-        }
-
-        if class_name.trim().is_empty() { return; }
-        
-        let is_terminal = class_name.contains("terminal") || 
-                          class_name.contains("alacritty") || 
-                          class_name.contains("kitty") || 
-                          class_name.contains("konsole") ||
-                          class_name.contains("wezterm") ||
-                          class_name.contains("foot") ||
-                          class_name.contains("tmux");
-        
-        if is_terminal {
-            if self.paste_mode != PasteMode::CtrlShiftV {
-                self.paste_mode = PasteMode::CtrlShiftV;
-                println!("[Vkbd] Detected Terminal ({}), using Ctrl+Shift+V", class_name.trim());
-            }
-        } else {
-            if self.paste_mode != PasteMode::CtrlV {
-                self.paste_mode = PasteMode::CtrlV;
-                println!("[Vkbd] Detected App ({}), using Ctrl+V", class_name.trim());
-            }
+        // 2. 失败处理 (ydotool)
+        if self.send_via_ydotool(text) {
+             return;
         }
     }
 
@@ -178,93 +173,18 @@ impl Vkbd {
             },
             PasteMode::ShiftInsert => {
                 println!("[Vkbd] Injecting via Shift+Insert");
+                // 关键点：在物理模拟前留出一点时间让 Firefox 反应
+                thread::sleep(Duration::from_millis(10));
                 self.emit(Key::KEY_LEFTSHIFT, true);
                 thread::sleep(Duration::from_millis(30));
                 self.tap(Key::KEY_INSERT);
                 thread::sleep(Duration::from_millis(30));
                 self.emit(Key::KEY_LEFTSHIFT, false);
             },
-            PasteMode::UnicodeHex => {}
+            PasteMode::UnicodeHex => {} // No-op
         }
         
         true
-    }
-    
-    #[allow(dead_code)]
-    pub fn cycle_paste_mode(&mut self) -> String {
-        self.auto_mode = false; // Disable auto mode if user manually cycles
-        self.paste_mode = match self.paste_mode {
-            PasteMode::CtrlV => PasteMode::CtrlShiftV,
-            PasteMode::CtrlShiftV => PasteMode::ShiftInsert,
-            PasteMode::ShiftInsert => PasteMode::UnicodeHex,
-            PasteMode::UnicodeHex => PasteMode::CtrlV,
-        };
-        
-        println!("[Vkbd] Switched paste mode to: {:?} (Auto-mode disabled)", self.paste_mode);
-        
-        match self.paste_mode {
-            PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
-            PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
-            PasteMode::ShiftInsert => "X11模式 (Shift+Insert)".to_string(),
-            PasteMode::UnicodeHex => "Unicode编码输入 (Ctrl+Shift+U)".to_string(),
-        }
-    }
-
-    pub fn send_text(&mut self, text: &str) {
-        self.check_and_update_mode();
-        self.send_text_internal(text, false);
-    }
-
-    #[allow(dead_code)]
-    pub fn send_text_highlighted(&mut self, text: &str) {
-        self.check_and_update_mode();
-        self.send_text_internal(text, true);
-    }
-
-    fn send_text_internal(&mut self, text: &str, highlight: bool) {
-        if text.is_empty() { return; }
-
-        // FAST PATH: If string is pure ASCII and no highlight is needed, type directly
-        if !highlight && text.chars().all(|c| c.is_ascii()) {
-            for c in text.chars() {
-                if let Some(key) = char_to_key(c) {
-                    self.tap(key);
-                    // 增加极小延迟，防止某些应用连击失效
-                    thread::sleep(Duration::from_micros(200));
-                }
-            }
-            return;
-        }
-
-        println!("[IME] Emitting text via heavy path: {} (highlight={})", text, highlight);
-
-        // If using UnicodeHex mode, skip clipboard and type directly
-        if self.paste_mode == PasteMode::UnicodeHex {
-            for c in text.chars() {
-                self.send_char_via_unicode(c);
-            }
-            return;
-        }
-
-        // 1. 优先尝试剪贴板
-        if self.send_via_clipboard(text) {
-            if highlight {
-                let count = text.chars().count();
-                thread::sleep(Duration::from_millis(150));
-                self.emit(Key::KEY_LEFTSHIFT, true);
-                for _ in 0..count {
-                    self.tap(Key::KEY_LEFT);
-                    thread::sleep(Duration::from_millis(2));
-                }
-                self.emit(Key::KEY_LEFTSHIFT, false);
-            }
-            return;
-        }
-
-        // 2. 失败处理 (ydotool)
-        if self.send_via_ydotool(text) {
-             return;
-        }
     }
     
     pub fn backspace(&mut self, count: usize) {
@@ -272,9 +192,11 @@ impl Vkbd {
         
         for _ in 0..count {
             self.tap(Key::KEY_BACKSPACE);
+            // 增加物理间隔，解决 Firefox 搜索框“吞吐”退格的问题
+            thread::sleep(Duration::from_millis(3));
         }
-        // 仅在退格结束后留出极短的同步时间给应用
-        thread::sleep(Duration::from_millis(2));
+        // 沉淀期
+        thread::sleep(Duration::from_millis(15));
     }
 
     fn send_via_ydotool(&self, text: &str) -> bool {
@@ -289,14 +211,12 @@ impl Vkbd {
     }
 
     fn send_char_via_unicode(&mut self, ch: char) -> bool {
-        // GTK Unicode Entry Sequence: Ctrl+Shift+U, then Hex, then Enter
         self.emit(Key::KEY_LEFTCTRL, true);
         self.emit(Key::KEY_LEFTSHIFT, true);
         self.tap(Key::KEY_U);
         self.emit(Key::KEY_LEFTCTRL, false);
         self.emit(Key::KEY_LEFTSHIFT, false);
 
-        // Many apps need a moment to open the unicode entry buffer
         thread::sleep(Duration::from_millis(40));
 
         let hex_str = format!("{:x}", ch as u32);
@@ -309,7 +229,6 @@ impl Vkbd {
              }
         }
 
-        // Finalize entry
         self.tap(Key::KEY_ENTER);
         thread::sleep(Duration::from_millis(20));
         true
@@ -317,7 +236,10 @@ impl Vkbd {
 
     pub fn tap(&mut self, key: Key) {
         self.emit(key, true);
+        // 保持 1ms 按下，这是 Firefox 捕获信号的生命线
+        thread::sleep(Duration::from_millis(1));
         self.emit(key, false);
+        thread::sleep(Duration::from_micros(500));
     }
 
     #[allow(dead_code)]
@@ -329,7 +251,6 @@ impl Vkbd {
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
         let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
         let _ = self.dev.emit(&[ev, syn]);
-        // 同步时间从 100us 增加到 300us，提高物理层稳定性
         thread::sleep(Duration::from_micros(300));
     }
 
@@ -340,7 +261,6 @@ impl Vkbd {
 
     #[allow(dead_code)]
     pub fn release_all(&mut self) {
-        // 释放常见的修饰键，防止切换模式时状态卡死
         let modifiers = [
             Key::KEY_LEFTSHIFT, Key::KEY_RIGHTSHIFT,
             Key::KEY_LEFTCTRL, Key::KEY_RIGHTCTRL,
@@ -357,7 +277,7 @@ impl Vkbd {
         self.emit(Key::KEY_LEFTCTRL, true);
         self.tap(Key::KEY_C);
         self.emit(Key::KEY_LEFTCTRL, false);
-        thread::sleep(Duration::from_millis(150)); // Wait for app to copy
+        thread::sleep(Duration::from_millis(150)); 
     }
 
     #[allow(dead_code)]

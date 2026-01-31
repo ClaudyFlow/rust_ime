@@ -53,7 +53,7 @@ impl InputMethodHost for EvdevHost {
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(mut dev) = self.dev.lock() { let _ = dev.grab(); }
         let mut held_keys = HashSet::new();
-        println!("[EvdevHost] 启动硬件拦截模式...");
+        println!("[EvdevHost] 启动硬件拦截模式 (无感知窗口检测已停用)...");
 
         while !self.should_exit.load(Ordering::Relaxed) {
             let events: Vec<_> = if let Ok(mut dev) = self.dev.lock() {
