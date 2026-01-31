@@ -1,7 +1,9 @@
 use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
 use evdev::{AttributeSet, InputEvent, Key, Device, EventType};
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::{Duration, Instant};
 use std::process::Command;
+
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PasteMode {
@@ -18,6 +20,8 @@ pub struct Vkbd {
     pub dev: VirtualDevice,
     pub paste_mode: PasteMode,
     pub auto_mode: bool,
+    last_mode_check: Instant,
+    cached_class: String,
 }
 
 impl Vkbd {
@@ -37,6 +41,7 @@ impl Vkbd {
         keys.insert(Key::KEY_INSERT); 
         keys.insert(Key::KEY_U); 
         keys.insert(Key::KEY_ENTER);
+        keys.insert(Key::KEY_BACKSPACE);
         
         // Digits and hex letters for unicode input
         keys.insert(Key::KEY_0); keys.insert(Key::KEY_1); keys.insert(Key::KEY_2);
@@ -55,41 +60,35 @@ impl Vkbd {
             dev,
             paste_mode: PasteMode::CtrlV, // Default standard
             auto_mode: true,
+            last_mode_check: Instant::now() - Duration::from_secs(10),
+            cached_class: String::new(),
         })
-    }
-
-    #[allow(dead_code)]
-    pub fn set_paste_mode(&mut self, mode: PasteMode) {
-        self.paste_mode = mode;
-        println!("[Vkbd] Paste mode set to: {:?}", mode);
     }
 
     fn check_and_update_mode(&mut self) {
         if !self.auto_mode { return; }
         
+        // Cache for 1 second to avoid excessive command execution
+        if self.last_mode_check.elapsed() < Duration::from_secs(1) {
+            return;
+        }
+        self.last_mode_check = Instant::now();
+        
         let mut class_name = String::new();
 
-        // 1. 尝试 xdotool (适用于 X11 和 XWayland 窗口)
-        if let Ok(out) = Command::new("xdotool").args(["getactivewindow", "getwindowclassname"]).output() {
-            class_name = String::from_utf8_lossy(&out.stdout).to_lowercase();
-        }
-
-        // 2. 如果没结果，尝试 Hyprland (Wayland)
-        if class_name.trim().is_empty() {
-            if let Ok(out) = Command::new("hyprctl").args(["activewindow", "-j"]).output() {
-                if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-                    if let Some(c) = v["class"].as_str() {
-                        class_name = c.to_lowercase();
-                    }
+        // 1. 尝试 Hyprland (Wayland)
+        if let Ok(out) = Command::new("hyprctl").args(["activewindow", "-j"]).output() {
+            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                if let Some(c) = v["class"].as_str() {
+                    class_name = c.to_lowercase();
                 }
             }
         }
 
-        // 3. 如果还没结果，尝试 Sway (Wayland)
+        // 2. 如果没结果，尝试 Sway (Wayland)
         if class_name.trim().is_empty() {
             if let Ok(out) = Command::new("swaymsg").args(["-t", "get_tree"]).output() {
                 if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-                    // 递归寻找 focused 节点
                     fn find_focused(node: &serde_json::Value) -> Option<String> {
                         if node["focused"].as_bool().unwrap_or(false) {
                             return node["window_properties"]["class"].as_str().map(|s| s.to_string());
@@ -100,6 +99,18 @@ impl Vkbd {
                         None
                     }
                     if let Some(c) = find_focused(&v) { class_name = c.to_lowercase(); }
+                }
+            }
+        }
+
+        // 3. 如果还没结果，尝试 KDE Plasma (Wayland) via DBus
+        if class_name.trim().is_empty() {
+            if let Ok(out) = Command::new("qdbus").args(["org.kde.KWin", "/KWin", "org.kde.KWin.activeWindow"]).output() {
+                let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !path.is_empty() {
+                    if let Ok(out2) = Command::new("qdbus").args(["org.kde.KWin", &path, "org.kde.KWin.Window.resourceClass"]).output() {
+                        class_name = String::from_utf8_lossy(&out2.stdout).trim().to_lowercase();
+                    }
                 }
             }
         }
@@ -211,19 +222,19 @@ impl Vkbd {
     }
 
     fn send_text_internal(&mut self, text: &str, highlight: bool) {
-        if text.is_empty() { return; } //
+        if text.is_empty() { return; }
 
-        // Fast path: for single ASCII characters without highlight, use direct key taps
-        if !highlight && text.len() == 1 {
-            if let Some(c) = text.chars().next() {
+        // FAST PATH: If string is pure ASCII and no highlight is needed, type directly
+        if !highlight && text.chars().all(|c| c.is_ascii()) {
+            for c in text.chars() {
                 if let Some(key) = char_to_key(c) {
                     self.tap(key);
-                    return;
                 }
             }
+            return;
         }
 
-        println!("[IME] Emitting text: {} (highlight={})", text, highlight);
+        println!("[IME] Emitting text via heavy path: {} (highlight={})", text, highlight);
 
         // If using UnicodeHex mode, skip clipboard and type directly
         if self.paste_mode == PasteMode::UnicodeHex {

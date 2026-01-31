@@ -193,17 +193,28 @@ impl Processor {
         let target = self.buffer.clone();
         if target == self.phantom_text { return Action::Consume; }
         
-        // 如果是追加
-        if target.starts_with(&self.phantom_text) && !self.phantom_text.is_empty() {
-            let added = target[self.phantom_text.len()..].to_string();
-            self.phantom_text = target;
-            return Action::Emit(added);
-        } 
-        
-        // 否则执行删除并重打
-        let del = self.phantom_text.chars().count();
+        // Find longest common prefix
+        let mut common_prefix_len = 0;
+        for (c1, c2) in self.phantom_text.chars().zip(target.chars()) {
+            if c1 == c2 { common_prefix_len += 1; }
+            else { break; }
+        }
+
+        let old_phantom = self.phantom_text.clone();
         self.phantom_text = target.clone();
-        Action::DeleteAndEmit { delete: del, insert: target }
+
+        let del_count = old_phantom.chars().count() - common_prefix_len;
+        let insert_text = if target.chars().count() > common_prefix_len {
+            target.chars().skip(common_prefix_len).collect::<String>()
+        } else {
+            "".to_string()
+        };
+
+        if del_count == 0 && !insert_text.is_empty() {
+            Action::Emit(insert_text)
+        } else {
+            Action::DeleteAndEmit { delete: del_count, insert: insert_text }
+        }
     }
 
     pub fn lookup(&mut self) {
