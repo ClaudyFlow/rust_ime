@@ -34,6 +34,7 @@ pub struct Processor {
     pub ngrams: HashMap<String, NgramModel>,
     pub current_profile: String,
     pub punctuation: HashMap<String, String>,
+    pub en_to_zh: HashMap<String, Vec<String>>, // English -> Chinese words
     pub candidates: Vec<String>,
     pub candidate_hints: Vec<String>, 
     pub selected: usize,
@@ -56,9 +57,30 @@ impl Processor {
         initial_profile: String, 
         punctuation: HashMap<String, String>, 
     ) -> Self {
+        let mut en_to_zh: HashMap<String, Vec<String>> = HashMap::new();
+        // 尝试从 chars.json 加载语义映射
+        if let Ok(file) = std::fs::File::open("dicts/chinese/chars.json") {
+            let reader = std::io::BufReader::new(file);
+            if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(reader) {
+                if let Some(obj) = json.as_object() {
+                    for (_, val) in obj {
+                        if let Some(arr) = val.as_array() {
+                            for item in arr {
+                                if let (Some(zh), Some(en)) = (item.get("char").and_then(|v| v.as_str()), item.get("en").and_then(|v| v.as_str())) {
+                                    if en.len() > 0 {
+                                        en_to_zh.entry(en.to_lowercase()).or_default().push(zh.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
-            punctuation, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
+            punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
             show_candidates: true, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
@@ -306,6 +328,24 @@ impl Processor {
         }
 
         let mut final_list: Vec<(String, u32, Vec<String>)> = candidate_map.into_iter().map(|(w, (s, p))| (w, s, p)).collect();
+        
+        // --- 语义输入注入 (English Semantic Match) ---
+        let buf_lower = self.buffer.to_lowercase();
+        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
+            for (idx, zh) in zh_words.iter().enumerate() {
+                // 给予极高的基础权重 (80000000)，确保语义匹配排在最前
+                // 且根据在词库中的顺序微调
+                let score = 80000000 - (idx as u32 * 10);
+                // 如果已经存在（拼音也命中了），更新其权重
+                if let Some(existing) = final_list.iter_mut().find(|(w, _, _)| w == zh) {
+                    if existing.1 < score { existing.1 = score; }
+                } else {
+                    final_list.push((zh.clone(), score, vec![buf_lower.clone()]));
+                    word_to_hint.insert(zh.clone(), format!("[{}]", buf_lower));
+                }
+            }
+        }
+
         for (cand, score, _) in &mut final_list {
             if cand.chars().count() >= 2 { *score += 10000; }
             if let Some(hint) = word_to_hint.get(cand) {
