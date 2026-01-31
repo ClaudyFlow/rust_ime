@@ -44,6 +44,7 @@ pub struct Processor {
     pub best_segmentation: Vec<String>,
     
     pub show_candidates: bool,
+    pub show_modern_candidates: bool,
     pub show_notifications: bool,
     pub show_keystrokes: bool,
     pub phantom_mode: PhantomMode,
@@ -82,7 +83,7 @@ impl Processor {
             state: ImeState::Direct, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
-            show_candidates: true, show_notifications: true, show_keystrokes: true,
+            show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
         }
@@ -90,6 +91,7 @@ impl Processor {
 
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
         self.show_candidates = conf.appearance.show_candidates;
+        self.show_modern_candidates = conf.appearance.show_modern_candidates;
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.current_profile = conf.input.default_profile.to_lowercase();
@@ -205,7 +207,6 @@ impl Processor {
 
     fn commit_candidate(&mut self, cand: String) -> Action {
         let del = self.phantom_text.chars().count();
-        println!("[Processor] Committing: '{}', deleting phantom length: {}", cand, del);
         self.reset();
         Action::DeleteAndEmit { delete: del, insert: cand }
     }
@@ -216,28 +217,23 @@ impl Processor {
         let target = self.buffer.clone();
         if target == self.phantom_text { return Action::Consume; }
         
-        // Find longest common prefix
-        let mut common_prefix_len = 0;
-        for (c1, c2) in self.phantom_text.chars().zip(target.chars()) {
-            if c1 == c2 { common_prefix_len += 1; }
-            else { break; }
-        }
-
         let old_phantom = self.phantom_text.clone();
         self.phantom_text = target.clone();
 
-        let del_count = old_phantom.chars().count() - common_prefix_len;
-        let insert_text = if target.chars().count() > common_prefix_len {
-            target.chars().skip(common_prefix_len).collect::<String>()
-        } else {
-            "".to_string()
-        };
-
-        if del_count == 0 && !insert_text.is_empty() {
-            Action::Emit(insert_text)
-        } else {
-            Action::DeleteAndEmit { delete: del_count, insert: insert_text }
+        // 1. 如果是追加 (例如从 "w" 变成 "wo")
+        if target.starts_with(&old_phantom) {
+            let added = &target[old_phantom.len()..];
+            return Action::Emit(added.to_string());
         }
+        
+        // 2. 如果是简单的退格 (例如从 "wo" 变成 "w")
+        if old_phantom.starts_with(&target) {
+            let count = old_phantom.chars().count() - target.chars().count();
+            return Action::DeleteAndEmit { delete: count, insert: "".into() };
+        }
+
+        // 3. 复杂变更 (例如全选删除或粘贴，这种情况极少)
+        Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target }
     }
 
     pub fn lookup(&mut self) {
@@ -415,7 +411,7 @@ pub fn is_digit(key: Key) -> bool {
 pub fn key_to_digit(key: Key) -> Option<usize> { match key { Key::KEY_1 => Some(1), Key::KEY_2 => Some(2), Key::KEY_3 => Some(3), Key::KEY_4 => Some(4), Key::KEY_5 => Some(5), Key::KEY_6 => Some(6), Key::KEY_7 => Some(7), Key::KEY_8 => Some(8), Key::KEY_9 => Some(9), Key::KEY_0 => Some(0), _ => None } }
 pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
     let c = match key {
-        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('a'), _ => None
+        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('\''), _ => None
     };
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }

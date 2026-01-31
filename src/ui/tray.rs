@@ -11,6 +11,7 @@ pub enum TrayEvent {
     Restart,
     Exit,
     ToggleGui,
+    ToggleModernGui,
     ToggleNotify,
     ToggleKeystroke,
     ToggleLearning,
@@ -22,6 +23,7 @@ pub struct ImeTray {
     pub chinese_enabled: bool,
     pub active_profile: String,
     pub show_candidates: bool,
+    pub show_modern_candidates: bool,
     pub show_notifications: bool,
     pub show_keystrokes: bool,
     pub learning_mode: bool,
@@ -142,6 +144,11 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
+                label: format!("卡片式候选词: {}", if self.show_modern_candidates { "显示" } else { "隐藏" }),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleModernGui); }),
+                ..Default::default()
+            }.into(),
+            StandardItem {
                 label: format!("拼音预览: {}", if self.preview_mode == "pinyin" { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::CyclePreview); }),
                 ..Default::default()
@@ -189,11 +196,12 @@ impl Tray for ImeTray {
 
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
+    show_modern_candidates: bool,
     show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
     preview_mode: String,
     event_tx: Sender<TrayEvent>
 ) -> Handle<ImeTray> {
-    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_notifications, show_keystrokes, learning_mode, preview_mode, tx: event_tx };
+    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_modern_candidates, show_notifications, show_keystrokes, learning_mode, preview_mode, tx: event_tx };
     let tray_service = TrayService::new(service);
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });

@@ -69,7 +69,7 @@ impl InputMethodHost for EvdevHost {
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod) = {
                             let conf = self.config.read().unwrap();
                             (
                                 parse_key(&conf.hotkeys.switch_language.key),
@@ -78,6 +78,8 @@ impl InputMethodHost for EvdevHost {
                                 parse_key(&conf.hotkeys.cycle_preview_mode.key),
                                 parse_key(&conf.hotkeys.toggle_notifications.key),
                                 parse_key(&conf.hotkeys.cycle_paste_method.key),
+                                parse_key(&conf.hotkeys.toggle_traditional_gui.key),
+                                parse_key(&conf.hotkeys.toggle_modern_gui.key),
                             )
                         };
                         
@@ -147,6 +149,40 @@ impl InputMethodHost for EvdevHost {
                             let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg));
                             drop(p); continue;
                         }
+
+                        // 6. 切换传统候选窗 (Ctrl+Alt+G)
+                        if is_combo(&held_keys, &toggle_trad) {
+                            let enabled = {
+                                let mut p = self.processor.lock().unwrap();
+                                p.show_candidates = !p.show_candidates;
+                                p.show_candidates
+                            };
+                            if let Ok(mut w) = self.config.write() {
+                                w.appearance.show_candidates = enabled;
+                                let _ = crate::save_config(&w);
+                                let _ = self.gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::ApplyConfig(w.clone()));
+                            }
+                            let msg = if enabled { "显示传统候选窗" } else { "隐藏传统候选窗" };
+                            let _ = self.notify_tx.send(NotifyEvent::Message("UI切换".into(), msg.into()));
+                            continue;
+                        }
+
+                        // 7. 切换卡片式候选词 (Ctrl+Alt+H)
+                        if is_combo(&held_keys, &toggle_mod) {
+                            let enabled = {
+                                let mut p = self.processor.lock().unwrap();
+                                p.show_modern_candidates = !p.show_modern_candidates;
+                                p.show_modern_candidates
+                            };
+                            if let Ok(mut w) = self.config.write() {
+                                w.appearance.show_modern_candidates = enabled;
+                                let _ = crate::save_config(&w);
+                                let _ = self.gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::ApplyConfig(w.clone()));
+                            }
+                            let msg = if enabled { "显示卡片候选词" } else { "隐藏卡片候选词" };
+                            let _ = self.notify_tx.send(NotifyEvent::Message("UI切换".into(), msg.into()));
+                            continue;
+                        }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
@@ -166,8 +202,10 @@ impl InputMethodHost for EvdevHost {
                             Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
                         }
                         drop(p);
-                        self.update_gui();
-                        self.notify_preview();
+                        if val != 0 {
+                            self.update_gui();
+                            self.notify_preview();
+                        }
                     } else {
                         drop(p);
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }

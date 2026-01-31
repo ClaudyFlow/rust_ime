@@ -272,9 +272,9 @@ impl Vkbd {
         
         for _ in 0..count {
             self.tap(Key::KEY_BACKSPACE);
-            // 针对 Firefox 等复杂应用，将延迟从 2ms 增加到 5ms，解决 "w我" 这类残留问题
-            thread::sleep(Duration::from_millis(5));
         }
+        // 仅在退格结束后留出极短的同步时间给应用
+        thread::sleep(Duration::from_millis(2));
     }
 
     fn send_via_ydotool(&self, text: &str) -> bool {
@@ -329,8 +329,8 @@ impl Vkbd {
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
         let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
         let _ = self.dev.emit(&[ev, syn]);
-        // 稍微缩短同步时间，提高响应速度
-        thread::sleep(Duration::from_micros(100));
+        // 同步时间从 100us 增加到 300us，提高物理层稳定性
+        thread::sleep(Duration::from_micros(300));
     }
 
     pub fn emit(&mut self, key: Key, down: bool) {

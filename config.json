@@ -4,12 +4,19 @@
     "show_notifications": true,
     "preview_mode": "pinyin",
     "show_candidates": false,
+    "show_modern_candidates": false,
     "show_keystrokes": false,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
     "candidate_margin_y": 120,
     "candidate_bg_color": "rgba(20, 20, 20, 0.85)",
     "candidate_font_size": 14,
+    "modern_cand_anchor": "bottom_left",
+    "modern_cand_margin_x": 40,
+    "modern_cand_margin_y": 200,
+    "modern_cand_bg_color": "rgba(10, 10, 10, 0.95)",
+    "modern_cand_text_color": "#2ecc71",
+    "modern_cand_font_size": 16,
     "keystroke_anchor": "bottom_right",
     "keystroke_margin_x": 40,
     "keystroke_margin_y": 120,
@@ -23,7 +30,7 @@
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "rime-ice",
+    "default_profile": "chinese",
     "paste_method": "ctrl_v"
   },
   "hotkeys": {
@@ -54,6 +61,14 @@
     "trigger_caps_lock": {
       "key": "caps_lock+tab",
       "description": "高级: 发送真实的 CapsLock 键 (因 CapsLock 被占用于切换输入法)"
+    },
+    "toggle_traditional_gui": {
+      "key": "ctrl+alt+g",
+      "description": "功能: 显示/隐藏 传统候选窗"
+    },
+    "toggle_modern_gui": {
+      "key": "ctrl+alt+h",
+      "description": "功能: 显示/隐藏 卡片式候选词"
     }
   },
   "files": {

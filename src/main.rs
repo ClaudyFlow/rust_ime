@@ -188,7 +188,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.appearance.preview_mode.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_modern_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.appearance.preview_mode.clone(), tray_tx);
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -225,7 +225,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         p.show_candidates
                     };
                     tray_handle.update(|t| t.show_candidates = enabled);
-                    if let Ok(mut w) = config_tray.write() { w.appearance.show_candidates = enabled; let _ = save_config(&w); }
+                    if let Ok(mut w) = config_tray.write() { 
+                        w.appearance.show_candidates = enabled; 
+                        let _ = save_config(&w); 
+                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                    }
+                }
+                ui::tray::TrayEvent::ToggleModernGui => {
+                    let enabled = {
+                        let mut p = processor_clone.lock().unwrap();
+                        p.show_modern_candidates = !p.show_modern_candidates;
+                        p.show_modern_candidates
+                    };
+                    tray_handle.update(|t| t.show_modern_candidates = enabled);
+                    if let Ok(mut w) = config_tray.write() { 
+                        w.appearance.show_modern_candidates = enabled; 
+                        let _ = save_config(&w); 
+                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                    }
                 }
                 ui::tray::TrayEvent::ToggleNotify => {
                     let enabled = {

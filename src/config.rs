@@ -10,12 +10,14 @@ pub struct Appearance {
     pub preview_mode: String,
     #[serde(default = "default_show_candidates")]
     pub show_candidates: bool,
+    #[serde(default = "default_show_modern_candidates")]
+    pub show_modern_candidates: bool,
     #[serde(default = "default_show_keystrokes")]
     pub show_keystrokes: bool,
 
-    // 候选词窗口样式
+    // 1. 传统候选词窗口样式
     #[serde(default = "default_cand_anchor")]
-    pub candidate_anchor: String, // bottom, top, center
+    pub candidate_anchor: String,
     #[serde(default = "default_cand_margin_x")]
     pub candidate_margin_x: i32,
     #[serde(default = "default_cand_margin_y")]
@@ -24,6 +26,20 @@ pub struct Appearance {
     pub candidate_bg_color: String,
     #[serde(default = "default_cand_font_size")]
     pub candidate_font_size: i32,
+
+    // 2. 极客(Modern)候选词窗口样式
+    #[serde(default = "default_modern_cand_anchor")]
+    pub modern_cand_anchor: String,
+    #[serde(default = "default_modern_cand_margin_x")]
+    pub modern_cand_margin_x: i32,
+    #[serde(default = "default_modern_cand_margin_y")]
+    pub modern_cand_margin_y: i32,
+    #[serde(default = "default_modern_cand_bg")]
+    pub modern_cand_bg_color: String,
+    #[serde(default = "default_modern_cand_text_color")]
+    pub modern_cand_text_color: String,
+    #[serde(default = "default_modern_cand_font_size")]
+    pub modern_cand_font_size: i32,
 
     // 按键回显窗口样式
     #[serde(default = "default_key_anchor")]
@@ -53,13 +69,20 @@ impl Default for Appearance {
         Appearance {
             show_notifications: true,
             preview_mode: "pinyin".to_string(),
-            show_candidates: false,
-            show_keystrokes: false,
+            show_candidates: default_show_candidates(),
+            show_modern_candidates: default_show_modern_candidates(),
+            show_keystrokes: default_show_keystrokes(),
             candidate_anchor: default_cand_anchor(),
             candidate_margin_x: default_cand_margin_x(),
             candidate_margin_y: default_cand_margin_y(),
             candidate_bg_color: default_cand_bg(),
             candidate_font_size: default_cand_font_size(),
+            modern_cand_anchor: default_modern_cand_anchor(),
+            modern_cand_margin_x: default_modern_cand_margin_x(),
+            modern_cand_margin_y: default_modern_cand_margin_y(),
+            modern_cand_bg_color: default_modern_cand_bg(),
+            modern_cand_text_color: default_modern_cand_text_color(),
+            modern_cand_font_size: default_modern_cand_font_size(),
             keystroke_anchor: default_key_anchor(),
             keystroke_margin_x: default_key_margin_x(),
             keystroke_margin_y: default_key_margin_y(),
@@ -142,6 +165,10 @@ pub struct Hotkeys {
     pub cycle_paste_method: Shortcut,
     #[serde(default = "default_caps_lock_toggle")]
     pub trigger_caps_lock: Shortcut,
+    #[serde(default = "default_trad_gui_toggle")]
+    pub toggle_traditional_gui: Shortcut,
+    #[serde(default = "default_modern_gui_toggle")]
+    pub toggle_modern_gui: Shortcut,
 }
 
 impl Default for Hotkeys {
@@ -154,6 +181,8 @@ impl Default for Hotkeys {
             switch_dictionary: default_profile_next(),
             cycle_paste_method: default_paste_cycle(),
             trigger_caps_lock: default_caps_lock_toggle(),
+            toggle_traditional_gui: default_trad_gui_toggle(),
+            toggle_modern_gui: default_modern_gui_toggle(),
         }
     }
 }
@@ -248,6 +277,10 @@ fn default_enable_notifications() -> bool {
 }
 
 fn default_show_candidates() -> bool {
+    true
+}
+
+fn default_show_modern_candidates() -> bool {
     false
 }
 
@@ -256,8 +289,6 @@ fn default_show_keystrokes() -> bool {
 }
 
 fn default_phantom_mode() -> String { "pinyin".to_string() }
-
-
 
 fn default_cand_anchor() -> String {
     "bottom".to_string()
@@ -277,6 +308,30 @@ fn default_cand_bg() -> String {
 
 fn default_cand_font_size() -> i32 {
     14
+}
+
+fn default_modern_cand_anchor() -> String {
+    "bottom_left".to_string()
+}
+
+fn default_modern_cand_margin_x() -> i32 {
+    40
+}
+
+fn default_modern_cand_margin_y() -> i32 {
+    200
+}
+
+fn default_modern_cand_bg() -> String {
+    "rgba(10, 10, 10, 0.95)".to_string()
+}
+
+fn default_modern_cand_text_color() -> String {
+    "#2ecc71".to_string() // Manjaro Green
+}
+
+fn default_modern_cand_font_size() -> i32 {
+    16
 }
 
 fn default_key_anchor() -> String {
@@ -377,6 +432,12 @@ fn default_caps_lock_toggle() -> Shortcut {
         "caps_lock+tab",
         "高级: 发送真实的 CapsLock 键 (因 CapsLock 被占用于切换输入法)",
     )
+}
+fn default_trad_gui_toggle() -> Shortcut {
+    Shortcut::new("ctrl+alt+g", "功能: 显示/隐藏 传统候选窗")
+}
+fn default_modern_gui_toggle() -> Shortcut {
+    Shortcut::new("ctrl+alt+h", "功能: 显示/隐藏 卡片式候选词")
 }
 
 // Helper for parse (unchanged)
