@@ -324,7 +324,7 @@ fn default_active_profile() -> String {
 }
 
 fn default_paste_behavior() -> String {
-    "ctrl_v".to_string()
+    "shift_insert".to_string()
 }
 
 fn default_profiles() -> Vec<Profile> {

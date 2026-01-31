@@ -65,18 +65,11 @@ impl InputMethodHost for EvdevHost {
                     let val = ev.value();
                     if val == 1 { 
                         held_keys.insert(key); 
-                        let show_ks = self.processor.lock().unwrap().show_keystrokes;
-                        if show_ks {
-                            if let Some(ref tx) = self.gui_tx {
-                                let name = format!("{:?}", key).replace("KEY_", "");
-                                let _ = tx.send(GuiEvent::Keystroke(name));
-                            }
-                        }
                     } else if val == 0 { held_keys.remove(&key); }
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste) = {
                             let conf = self.config.read().unwrap();
                             (
                                 parse_key(&conf.hotkeys.switch_language.key),
@@ -84,6 +77,7 @@ impl InputMethodHost for EvdevHost {
                                 parse_key(&conf.hotkeys.switch_dictionary.key),
                                 parse_key(&conf.hotkeys.cycle_preview_mode.key),
                                 parse_key(&conf.hotkeys.toggle_notifications.key),
+                                parse_key(&conf.hotkeys.cycle_paste_method.key),
                             )
                         };
                         
@@ -144,6 +138,15 @@ impl InputMethodHost for EvdevHost {
                             }
                             drop(p); continue;
                         }
+
+                        // 5. 粘贴模式切换 (Ctrl+Alt+V)
+                        if is_combo(&held_keys, &cycle_paste) {
+                            let msg = if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.cycle_paste_mode() } else { "切换失败".to_string() };
+                            let p = self.processor.lock().unwrap();
+                            let summary = p.current_profile.clone();
+                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg));
+                            drop(p); continue;
+                        }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
@@ -168,6 +171,17 @@ impl InputMethodHost for EvdevHost {
                     } else {
                         drop(p);
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                    }
+
+                    // --- UI 回显移动到逻辑处理之后 ---
+                    if val == 1 {
+                        let show_ks = self.processor.lock().unwrap().show_keystrokes;
+                        if show_ks {
+                            if let Some(ref tx) = self.gui_tx {
+                                let name = format!("{:?}", key).replace("KEY_", "");
+                                let _ = tx.send(GuiEvent::Keystroke(name));
+                            }
+                        }
                     }
                 }
             }

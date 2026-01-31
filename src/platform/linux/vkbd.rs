@@ -58,7 +58,7 @@ impl Vkbd {
 
         Ok(Self { 
             dev,
-            paste_mode: PasteMode::CtrlV, // Default standard
+            paste_mode: PasteMode::ShiftInsert, // Changed default to ShiftInsert for best compatibility
             auto_mode: true,
             last_mode_check: Instant::now() - Duration::from_secs(10),
             cached_class: String::new(),
@@ -229,6 +229,8 @@ impl Vkbd {
             for c in text.chars() {
                 if let Some(key) = char_to_key(c) {
                     self.tap(key);
+                    // 增加极小延迟，防止某些应用连击失效
+                    thread::sleep(Duration::from_micros(200));
                 }
             }
             return;
@@ -241,7 +243,6 @@ impl Vkbd {
             for c in text.chars() {
                 self.send_char_via_unicode(c);
             }
-            // UnicodeHex mode doesn't support selection highlight easily
             return;
         }
 
@@ -264,17 +265,15 @@ impl Vkbd {
         if self.send_via_ydotool(text) {
              return;
         }
-        
-        eprintln!("[Error] All emission methods failed for text: {}", text);
     }
     
     pub fn backspace(&mut self, count: usize) {
-        if count == 0 { return; } //
+        if count == 0 { return; }
         
-        // Fallback or GUI mode: use uinput Key::KEY_BACKSPACE
         for _ in 0..count {
             self.tap(Key::KEY_BACKSPACE);
-            thread::sleep(Duration::from_millis(2));
+            // 针对 Firefox 等复杂应用，将延迟从 2ms 增加到 5ms，解决 "w我" 这类残留问题
+            thread::sleep(Duration::from_millis(5));
         }
     }
 
@@ -290,26 +289,29 @@ impl Vkbd {
     }
 
     fn send_char_via_unicode(&mut self, ch: char) -> bool {
-        // ... (保留代码备用) ...
+        // GTK Unicode Entry Sequence: Ctrl+Shift+U, then Hex, then Enter
         self.emit(Key::KEY_LEFTCTRL, true);
         self.emit(Key::KEY_LEFTSHIFT, true);
         self.tap(Key::KEY_U);
         self.emit(Key::KEY_LEFTCTRL, false);
         self.emit(Key::KEY_LEFTSHIFT, false);
 
-        thread::sleep(Duration::from_millis(20));
+        // Many apps need a moment to open the unicode entry buffer
+        thread::sleep(Duration::from_millis(40));
 
         let hex_str = format!("{:x}", ch as u32);
         for hex_char in hex_str.chars() {
              if let Some(key) = hex_char_to_key(hex_char) {
                  self.tap(key);
+                 thread::sleep(Duration::from_millis(2));
              } else {
                  return false;
              }
         }
 
+        // Finalize entry
         self.tap(Key::KEY_ENTER);
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(20));
         true
     }
 

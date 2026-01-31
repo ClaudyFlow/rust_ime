@@ -183,6 +183,7 @@ impl Processor {
 
     fn commit_candidate(&mut self, cand: String) -> Action {
         let del = self.phantom_text.chars().count();
+        println!("[Processor] Committing: '{}', deleting phantom length: {}", cand, del);
         self.reset();
         Action::DeleteAndEmit { delete: del, insert: cand }
     }
