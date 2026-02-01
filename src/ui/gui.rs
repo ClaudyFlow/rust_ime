@@ -474,10 +474,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             GuiEvent::ApplyConfig(conf) => {
                 apply_style(&conf, &css_p_c, &window_c, &modern_window_c, &ks_c.window, &learn_c.window);
                 ks_c.update_config(conf.appearance.keystroke_timeout_ms);
-                if !conf.appearance.learning_mode {
+                current_config = conf;
+                if !current_config.appearance.learning_mode {
                     learn_c.clear();
                 }
-                current_config = conf;
             }
             GuiEvent::ShowLearning(word, hint) => {
                 if current_config.appearance.learning_mode {
