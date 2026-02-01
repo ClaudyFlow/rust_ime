@@ -173,9 +173,10 @@ impl Processor {
                         else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
                     }
                     self.page = (self.selected / 5) * 5;
-                    self.update_phantom_action();
+                    self.update_phantom_action()
+                } else {
+                    Action::Consume
                 }
-                Action::Consume
             }
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
