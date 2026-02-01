@@ -5,6 +5,7 @@ use crate::platform::linux::vkbd::Vkbd;
 use crate::config::Config;
 use crate::ui::GuiEvent;
 use evdev::{Device, InputEventKind, Key};
+use std::os::unix::io::AsRawFd;
 use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
@@ -30,6 +31,11 @@ impl EvdevHost {
         notify_tx: Sender<NotifyEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
+        let fd = dev.as_raw_fd();
+        unsafe {
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+        }
         let vkbd = Vkbd::new(&dev)?;
         Ok(Self {
             processor,
@@ -337,11 +343,12 @@ impl EvdevHost {
         }
         let mut body = String::new();
         let start = p.page;
-        let end = (start + 3).min(p.candidates.len());
+        let end = (start + 10).min(p.candidates.len());
         for (i, cand) in p.candidates[start..end].iter().enumerate() {
             let abs_idx = start + i;
-            if abs_idx == p.selected { body.push_str(&format!("【{}.{}】", i+1, cand)); }
-            else { body.push_str(&format!("{}.{} ", i+1, cand)); }
+            let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
+            if abs_idx == p.selected { body.push_str(&format!("【{}.{} {}】", (i % 10)+1, cand, hint)); }
+            else { body.push_str(&format!("{}.{}{} ", (i % 10)+1, cand, hint)); }
         }
         let summary = format!("{}: {}", p.current_profile, p.joined_sentence);
         let _ = self.notify_tx.send(NotifyEvent::Update(summary, body));

@@ -130,6 +130,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
             .candidate-selected {{ background-color: #0071e3; }}
             .candidate-text {{ color: #ffffff; font-size: {cand_font}pt; font-weight: 500; }}
+            .hint-text {{ color: rgba(255, 255, 255, 0.4); font-size: 10pt; margin-left: 8px; }}
             .index {{ font-size: 10pt; color: rgba(255, 255, 255, 0.4); margin-right: 6px; }}
 
             /* 极客(Modern)卡片样式 */

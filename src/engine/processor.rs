@@ -27,8 +27,15 @@ pub enum PhantomMode {
     Pinyin,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputMode {
+    Single,
+    Long,
+}
+
 pub struct Processor {
     pub state: ImeState,
+    pub input_mode: InputMode,
     pub buffer: String,
     pub tries: HashMap<String, Trie>, 
     pub ngrams: HashMap<String, NgramModel>,
@@ -92,7 +99,7 @@ impl Processor {
         }
 
         Self {
-            state: ImeState::Direct, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
+            state: ImeState::Direct, input_mode: InputMode::Single, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
             joined_sentence: String::new(),
@@ -133,6 +140,7 @@ impl Processor {
         self.selected = 0;
         self.page = 0;
         self.state = ImeState::Direct;
+        self.input_mode = InputMode::Single;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
     }
@@ -328,24 +336,19 @@ impl Processor {
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
         let pinyin_stripped = strip_tones(&self.buffer).to_lowercase();
+        // 如果包含空格、分号或者是较长拼音，进入长句模式
+        self.input_mode = if pinyin_stripped.contains(' ') || pinyin_stripped.contains('\'') || pinyin_stripped.len() > 7 {
+            InputMode::Long
+        } else {
+            InputMode::Single
+        };
         
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
         let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('\'', "").replace('`', "");
-        if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
-            for (word, hint) in exact_matches {
-                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-            }
-        }
-
-        let buf_lower = self.buffer.to_lowercase();
-        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
-            for zh in zh_words {
-                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
-            }
-        }
-
+        
+        // --- 1. 计算 Greedy 结果 (总是需要，作为长句模式首选) ---
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
         let mut all_segments = Vec::new();
         let mut greedy_word = String::new();
@@ -364,15 +367,43 @@ impl Processor {
                 }
             }
         }
-        
         self.best_segmentation = all_segments;
         self.joined_sentence = greedy_word.clone();
 
-        if seen.insert(greedy_word.clone()) {
-            final_candidates.push((greedy_word, String::new()));
+        // --- 2. 填充候选词 ---
+        if self.input_mode == InputMode::Long {
+            // 长句模式：Greedy 结果排第一
+            if seen.insert(greedy_word.clone()) {
+                final_candidates.push((greedy_word, String::new()));
+            }
+            // 之后是精确匹配
+            if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
+                for (word, hint) in exact_matches {
+                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                }
+            }
+        } else {
+            // 单词模式：精确匹配排第一
+            if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
+                for (word, hint) in exact_matches {
+                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                }
+            }
+            // 之后是 Greedy
+            if seen.insert(greedy_word.clone()) {
+                final_candidates.push((greedy_word, String::new()));
+            }
         }
 
-        // 增加对最后一个分词的候选词（满足用户：在进入第二个词拼音时，看到第二个词的候选词）
+        // 英语语义映射 (English to Chinese)
+        let buf_lower = self.buffer.to_lowercase();
+        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
+            for zh in zh_words {
+                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
+            }
+        }
+
+        // 增加对最后一个分词的候选词
         if self.best_segmentation.len() > 1 {
             if let Some(last_seg) = self.best_segmentation.last() {
                 let last_seg_clean = last_seg.trim_start_matches('/');
