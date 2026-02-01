@@ -25,6 +25,13 @@ pub enum PhantomMode {
     Pinyin,
 }
 
+struct ParsedPart {
+    pinyin: String,
+    aux_code: Option<String>,
+    specified_idx: Option<usize>,
+    raw: String,
+}
+
 pub struct Processor {
     pub state: ImeState,
     pub buffer: String,
@@ -49,6 +56,42 @@ pub struct Processor {
 }
 
 impl Processor {
+    fn parse_buffer(&self) -> Vec<ParsedPart> {
+        let buffer_normalized = strip_tones(&self.buffer);
+        let parts: Vec<&str> = buffer_normalized.split(' ').filter(|s| !s.is_empty()).collect();
+        let mut result = Vec::new();
+
+        for part in parts {
+            let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
+            
+            let (pinyin, aux, idx) = if let Some(pos) = split_pos {
+                let (p, suffix) = part.split_at(pos);
+                let digit_start = suffix.find(|c: char| c.is_ascii_digit());
+                
+                let (a, d) = if let Some(ds) = digit_start {
+                    let (alpha, digits) = suffix.split_at(ds);
+                    let aux_str = if alpha.is_empty() { None } else { Some(alpha.to_string()) };
+                    let end_of_digits = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
+                    let idx_val = digits[..end_of_digits].parse::<usize>().ok();
+                    (aux_str, idx_val)
+                } else {
+                    (Some(suffix.to_string()), None)
+                };
+                (p.to_lowercase(), a, d)
+            } else {
+                (part.to_lowercase(), None, None)
+            };
+
+            result.push(ParsedPart {
+                pinyin,
+                aux_code: aux,
+                specified_idx: idx,
+                raw: part.to_string(),
+            });
+        }
+        result
+    }
+
     pub fn new(
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
@@ -275,53 +318,21 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
-        let buffer_normalized = strip_tones(&self.buffer);
-        
-        let mut final_candidates: Vec<(String, String)> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
+        let parsed_parts = self.parse_buffer();
+        let mut greedy_sentence = String::new();
+        let mut all_raw_segments = Vec::new();
+        let mut last_matches: Vec<(String, String)> = Vec::new();
 
-        // 精准模式判定：包含空格或数字或大写字母
-        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
-
-        // --- 1. 计算精准组合结果 (原子分词) ---
-        let parts: Vec<&str> = buffer_normalized.split(' ').filter(|s| !s.is_empty()).collect();
-        let mut greedy_word = String::new();
-        let mut all_segments = Vec::new();
-        
-        for part in &parts {
-            let part = *part;
-            let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
+        for (i, part) in parsed_parts.iter().enumerate() {
+            all_raw_segments.push(part.raw.clone());
             
-            let (pinyin_part, specified_idx, aux_code) = if let Some(pos) = split_pos {
-                let (p, suffix) = part.split_at(pos);
-                let digit_start = suffix.find(|c: char| c.is_ascii_digit());
-                let (a, d) = if let Some(ds) = digit_start {
-                    let (alpha, digits) = suffix.split_at(ds);
-                    let aux = if alpha.is_empty() { None } else { Some(alpha) };
-                    let end_of_digits = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
-                    let idx = digits[..end_of_digits].parse::<usize>().ok();
-                    (aux, idx)
-                } else {
-                    (Some(suffix), None)
-                };
-                (p, d, a)
-            } else {
-                (part, None, None)
-            };
+            // Atomic Lookup: Exact match only
+            let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
 
-            let part_clean = pinyin_part.to_lowercase().replace('\'', "").replace('`', "");
-            all_segments.push(part.to_string());
-
-            let mut seg_matches = if part_clean.len() == 1 {
-                dict.search_bfs(&part_clean, 15)
-            } else {
-                dict.get_all_exact(&part_clean).unwrap_or_default()
-            };
-
-            // 应用辅码过滤
-            if let Some(code) = aux_code {
+            // Filter by Auxiliary Code
+            if let Some(ref code) = part.aux_code {
                 let code_lower = code.to_lowercase();
-                seg_matches.retain(|(_, hint)| {
+                matches.retain(|(_, hint)| {
                     let hint_lower = hint.to_lowercase();
                     if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
                         hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
@@ -331,18 +342,28 @@ impl Processor {
                 });
             }
 
-            let idx = specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _)) = seg_matches.get(idx) {
-                greedy_word.push_str(w);
+            // Select by Index
+            let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
+            if let Some((w, _)) = matches.get(idx) {
+                greedy_sentence.push_str(w);
             } else {
-                greedy_word.push_str(&part_clean);
+                greedy_sentence.push_str(&part.raw);
+            }
+
+            if i == parsed_parts.len() - 1 {
+                last_matches = matches;
             }
         }
-        
-        self.best_segmentation = all_segments;
-        self.joined_sentence = greedy_word;
+
+        self.joined_sentence = greedy_sentence;
+        self.best_segmentation = all_raw_segments;
 
         // --- 2. 填充候选词列表 ---
+        let mut final_candidates: Vec<(String, String)> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let buffer_normalized = strip_tones(&self.buffer);
+        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+
         if !is_precise_mode {
             let full_pinyin = buffer_normalized.to_lowercase();
             if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
@@ -352,40 +373,8 @@ impl Processor {
             }
         } else {
             // 精准模式：候选词列表显示最后一部分经过辅码过滤后的候选
-            if let Some(last_part) = parts.last() {
-                let split_pos = last_part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
-                let (pinyin_part, aux_code) = if let Some(pos) = split_pos {
-                    let (p, suffix) = last_part.split_at(pos);
-                    let digit_start = suffix.find(|c: char| c.is_ascii_digit());
-                    let a = if let Some(ds) = digit_start {
-                        let alpha = &suffix[..ds];
-                        if alpha.is_empty() { None } else { Some(alpha) }
-                    } else { Some(suffix) };
-                    (p, a)
-                } else { (*last_part, None) };
-
-                let part_clean = pinyin_part.to_lowercase().replace('\'', "").replace('`', "");
-                let mut matches = if part_clean.len() == 1 {
-                    dict.search_bfs(&part_clean, 15)
-                } else {
-                    dict.get_all_exact(&part_clean).unwrap_or_default()
-                };
-
-                if let Some(code) = aux_code {
-                    let code_lower = code.to_lowercase();
-                    matches.retain(|(_, hint)| {
-                        let hint_lower = hint.to_lowercase();
-                        if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                            hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
-                        } else {
-                            hint_lower.contains(&code_lower)
-                        }
-                    });
-                }
-
-                for (word, hint) in matches {
-                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                }
+            for (word, hint) in last_matches {
+                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
         }
 
