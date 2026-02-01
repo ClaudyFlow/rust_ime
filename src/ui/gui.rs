@@ -31,12 +31,18 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use glib::SourceId;
 
+#[derive(Debug)]
+struct DisplayedKey {
+    label: Label,
+    last_active: std::time::Instant,
+}
+
 struct KeystrokeController {
     box_: Box,
     window: Window,
+    displayed_keys: RefCell<Vec<DisplayedKey>>,
     timeout_ms: RefCell<u64>,
-    last_activity: RefCell<std::time::Instant>,
-    idle_timer: RefCell<Option<SourceId>>,
+    max_keys: usize,
 }
 
 impl KeystrokeController {
@@ -44,13 +50,13 @@ impl KeystrokeController {
         let controller = Rc::new(Self {
             box_,
             window,
+            displayed_keys: RefCell::new(Vec::new()),
             timeout_ms: RefCell::new(initial_timeout),
-            last_activity: RefCell::new(std::time::Instant::now()),
-            idle_timer: RefCell::new(None),
+            max_keys: 15,
         });
         
-        // 启动全局空闲检查定时器
-        controller.start_idle_timer();
+        // 启动全局清理定时器
+        controller.clone().start_cleanup_timer();
         
         controller
     }
@@ -61,81 +67,71 @@ impl KeystrokeController {
             return;
         }
         
-        // 更新最后活动时间
-        *self.last_activity.borrow_mut() = std::time::Instant::now();
+        let mut keys = self.displayed_keys.borrow_mut();
         
-        // 确保窗口可见
-        self.window.set_opacity(1.0);
-        
-        // 检查是否已经有太多标签（防止内存泄漏）
-        let mut count = 0;
-        let mut next = self.box_.first_child();
-        while let Some(child) = next {
-            count += 1;
-            next = child.next_sibling();
-        }
-        
-        // 如果超过限制，清空重新开始
-        if count > 20 {
-            self.clear_display_only();
-            // 重新计数
-            count = 0;
-        }
-        
+        // 创建新的按键显示
         let label = Label::new(Some(key));
         label.add_css_class("key-label");
         self.box_.append(&label);
         
-        // 保持最多15个按键显示
-        if count >= 15 {
-            if let Some(first) = self.box_.first_child() {
-                self.box_.remove(&first);
+        let displayed = DisplayedKey {
+            label,
+            last_active: std::time::Instant::now(),
+        };
+        
+        keys.push(displayed);
+        
+        // 保持最多max_keys个按键
+        while keys.len() > self.max_keys {
+            let old = keys.remove(0);
+            self.box_.remove(&old.label);
+        }
+        
+        // 确保窗口可见
+        self.window.set_opacity(1.0);
+    }
+
+    fn remove_expired(&self) {
+        let mut keys = self.displayed_keys.borrow_mut();
+        let timeout_ms = *self.timeout_ms.borrow();
+        let now = std::time::Instant::now();
+        
+        // 收集过期的索引（从后往前，避免索引错位）
+        let mut expired_indices = Vec::new();
+        for (i, key) in keys.iter().enumerate() {
+            if now.duration_since(key.last_active) > std::time::Duration::from_millis(timeout_ms) {
+                expired_indices.push(i);
             }
         }
-    }
-
-    fn clear_display_only(&self) {
-        // 只清除显示内容，不涉及定时器
-        while let Some(child) = self.box_.first_child() {
-            self.box_.remove(&child);
-        }
-        self.window.set_opacity(0.0);
-    }
-
-    fn start_idle_timer(&self) {
-        let box_weak = self.box_.downgrade();
-        let win_weak = self.window.downgrade();
-        let last_activity = self.last_activity.clone();
-        let timeout_ms = *self.timeout_ms.borrow();
         
-        let id = glib::timeout_add_local(
-            std::time::Duration::from_millis(100), // 每100ms检查一次
-            move || {
-                // 检查是否需要清理
-                if let (Some(b), Some(w)) = (box_weak.upgrade(), win_weak.upgrade()) {
-                    // 计算空闲时间
-                    let idle_time = std::time::Instant::now().duration_since(*last_activity.borrow());
-                    if idle_time >= std::time::Duration::from_millis(timeout_ms) {
-                        // 空闲超时，清理显示
-                        while let Some(child) = b.first_child() {
-                            b.remove(&child);
-                        }
-                        w.set_opacity(0.0);
-                    }
-                }
-                glib::Continue(true) // 保持定时器运行
-            },
-        );
-        *self.idle_timer.borrow_mut() = Some(id);
+        // 移除过期的按键（从后往前）
+        for i in expired_indices.into_iter().rev() {
+            let removed = keys.remove(i);
+            self.box_.remove(&removed.label);
+        }
+        
+        // 如果没有按键了，隐藏窗口
+        if keys.is_empty() {
+            self.window.set_opacity(0.0);
+        }
     }
 
     fn clear(&self) {
-        self.clear_display_only();
-        // 全局定时器不停止，继续运行
+        self.window.set_opacity(0.0);
     }
 
     fn update_config(&self, timeout_ms: u64) {
         *self.timeout_ms.borrow_mut() = timeout_ms;
+    }
+    
+    fn start_cleanup_timer(self: Rc<Self>) {
+        glib::timeout_add_local(
+            std::time::Duration::from_millis(100),
+            move || {
+                self.remove_expired();
+                glib::Continue(true)
+            },
+        );
     }
 }
 
