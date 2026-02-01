@@ -276,8 +276,8 @@ impl EvdevHost {
                 let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
             
             // 打印到终端 (前台模式)
-            if !p.candidates.is_empty() {
-                print!("\r\x1b[K[Console] {} | ", pinyin);
+            if !p.candidates.is_empty() || !p.joined_sentence.is_empty() {
+                print!("\r\x1b[K[Console] {} | {} | ", pinyin, p.joined_sentence);
                 let start = p.page;
                 let end = (start + 10).min(p.candidates.len());
                 for (i, cand) in p.candidates[start..end].iter().enumerate() {

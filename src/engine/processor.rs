@@ -201,14 +201,14 @@ impl Processor {
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(10); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 10 < self.candidates.len() { self.page += 10; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
-                if self.preview_selected_candidate || self.buffer.ends_with(' ') {
+                if self.preview_selected_candidate {
                      if let Some(word) = self.candidates.get(self.selected) {
-                        let out = if self.buffer.ends_with(' ') { word.trim_end().to_string() } else { word.clone() };
-                        self.commit_candidate(out)
+                        self.commit_candidate(word.clone())
                      } else {
-                        let out = self.buffer.trim_end().to_string();
-                        self.commit_candidate(out)
+                        self.commit_candidate(self.joined_sentence.clone())
                      }
+                } else if !self.joined_sentence.is_empty() {
+                    self.commit_candidate(self.joined_sentence.clone())
                 } else {
                     self.buffer.push(' ');
                     self.preview_selected_candidate = false;
@@ -217,12 +217,17 @@ impl Processor {
                 }
             }
             Key::KEY_ENTER => { 
-                if let Some(word) = self.candidates.get(self.selected) { 
-                    self.commit_candidate(word.clone())
-                } else if !self.buffer.is_empty() { 
+                if self.preview_selected_candidate {
+                    if let Some(word) = self.candidates.get(self.selected) { 
+                        return self.commit_candidate(word.clone());
+                    }
+                }
+                if !self.joined_sentence.is_empty() {
+                    self.commit_candidate(self.joined_sentence.clone())
+                } else {
                     let out = self.buffer.clone(); 
                     self.commit_candidate(out)
-                } else { Action::Consume }
+                }
             }
             Key::KEY_ESC => { 
                 let del = self.phantom_text.chars().count();
@@ -355,26 +360,12 @@ impl Processor {
         self.best_segmentation = all_segments;
         self.joined_sentence = greedy_word.clone();
 
-        // --- 2. 组装候选词 ---
+        // --- 2. 填充候选词 (不再将 greedy_word 加入 candidates，它仅在 sentence_label 显示) ---
         let pinyin_for_dict = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
         
-        if self.input_mode == InputMode::Long {
-            if seen.insert(greedy_word.clone()) {
-                final_candidates.push((greedy_word, String::new()));
-            }
-            if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
-                for (word, hint) in exact_matches {
-                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                }
-            }
-        } else {
-            if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
-                for (word, hint) in exact_matches {
-                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                }
-            }
-            if seen.insert(greedy_word.clone()) {
-                final_candidates.push((greedy_word, String::new()));
+        if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
+            for (word, hint) in exact_matches {
+                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
         }
 

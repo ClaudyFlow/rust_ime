@@ -263,7 +263,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 if show_trad {
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
+                    
+                    // 如果 sentence 和第一个候选词一样，或者 sentence 为空，可以考虑隐藏或显示
+                    // 按照用户需求，sentence 应该始终作为“组合预览”显示在拼音旁
                     sentence_label_c.set_text(&sentence);
+                    if sentence.is_empty() { sentence_label_c.set_opacity(0.0); } else { sentence_label_c.set_opacity(1.0); }
+
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
                     let start = (selected / 10) * 10;
                     let end = (start + 10).min(candidates.len());
