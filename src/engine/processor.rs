@@ -49,6 +49,7 @@ pub struct Processor {
     pub show_keystrokes: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
+    pub preview_selected_candidate: bool,
 }
 
 impl Processor {
@@ -86,6 +87,7 @@ impl Processor {
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
+            preview_selected_candidate: false,
         }
     }
 
@@ -116,6 +118,7 @@ impl Processor {
         self.page = 0;
         self.state = ImeState::Direct;
         self.phantom_text.clear();
+        self.preview_selected_candidate = false;
     }
 
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
@@ -160,18 +163,36 @@ impl Processor {
             }
             Key::KEY_TAB => {
                 if !self.candidates.is_empty() {
-                    if shift_pressed { if self.selected > 0 { self.selected -= 1; self.page = (self.selected / 5) * 5; } }
-                    else { if self.selected + 1 < self.candidates.len() { self.selected += 1; self.page = (self.selected / 5) * 5; } }
+                    if !self.preview_selected_candidate {
+                        // First Tab press: Enter preview mode, select 0
+                        self.preview_selected_candidate = true;
+                        self.selected = 0;
+                    } else {
+                        // Subsequent Tab press: Cycle
+                        if shift_pressed { if self.selected > 0 { self.selected -= 1; } }
+                        else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
+                    }
+                    self.page = (self.selected / 5) * 5;
+                    self.update_phantom_action();
                 }
                 Action::Consume
             }
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
-                // 现在空格作为手动分词符，且 buffer 中存入真实空格
-                self.buffer.push(' ');
-                self.lookup();
-                self.update_phantom_action()
+                if self.buffer.ends_with(' ') {
+                     if let Some(word) = self.candidates.get(self.selected) {
+                        self.commit_candidate(word.clone())
+                     } else {
+                        let out = self.buffer.clone();
+                        self.commit_candidate(out)
+                     }
+                } else {
+                    self.buffer.push(' ');
+                    self.preview_selected_candidate = false;
+                    self.lookup();
+                    self.update_phantom_action()
+                }
             }
             Key::KEY_ENTER => { 
                 // 现在回车作为确认上屏键
@@ -204,7 +225,9 @@ impl Processor {
             }
             _ if is_letter(key) => {
                 if let Some(c) = key_to_char(key, shift_pressed) {
-                    self.buffer.push(c); self.lookup();
+                    self.buffer.push(c); 
+                    self.preview_selected_candidate = false;
+                    self.lookup();
                     let has_filter = self.buffer.char_indices().skip(1).any(|(_, c)| c.is_ascii_uppercase());
                     if has_filter && self.candidates.len() == 1 { 
                         return self.commit_candidate(self.candidates[0].clone());
@@ -225,7 +248,12 @@ impl Processor {
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
         
-        let target = self.buffer.clone();
+        let target = if self.preview_selected_candidate && !self.candidates.is_empty() {
+             self.candidates[self.selected].clone()
+        } else {
+             self.buffer.clone()
+        };
+
         if target == self.phantom_text { return Action::Consume; }
         
         let old_phantom = self.phantom_text.clone();
