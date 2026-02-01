@@ -47,8 +47,17 @@ impl Segmenter {
             return;
         }
 
+        if remaining.starts_with('/') {
+            let end = remaining[1..].find(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(remaining.len());
+            let sub = &remaining[..end];
+            current.push(sub.to_string());
+            self.segment_recursive(&remaining[end..], dict, current, results);
+            current.pop();
+            return;
+        }
+
         // 核心改进：计算到下一个分隔符的距离，限制最大探测长度
-        let sep_pos = remaining.find(|c| c == ' ' || c == '\'' || c == '`');
+        let sep_pos = remaining.find(|c| c == ' ' || c == '\'' || c == '`' || c == '/');
         let limit = sep_pos.unwrap_or(remaining.len());
         let max_len = limit.min(6);
 
@@ -77,7 +86,14 @@ impl Segmenter {
             let current_str = &pinyin[current_offset..];
             if current_str.starts_with('`') || current_str.starts_with('\'') || current_str.starts_with(' ') { current_offset += 1; continue; }
             
-            let sep_pos = current_str.find(|c| c == ' ' || c == '\'' || c == '`');
+            if current_str.starts_with('/') {
+                let end = current_str[1..].find(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(current_str.len());
+                segments.push(current_str[..end].to_string());
+                current_offset += end;
+                continue;
+            }
+
+            let sep_pos = current_str.find(|c| c == ' ' || c == '\'' || c == '`' || c == '/');
             let limit = sep_pos.unwrap_or(current_str.len());
             let max_match_len = limit.min(6);
 
