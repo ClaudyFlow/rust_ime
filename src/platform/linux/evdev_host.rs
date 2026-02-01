@@ -300,7 +300,7 @@ impl InputMethodHost for EvdevHost {
                             continue;
                         }
 
-// 8. 切换 按键屏幕显示 (Ctrl+Alt+K)
+// 8. 切换 按键显示 (Ctrl+Alt+K)
                         if is_combo(&held_keys, &toggle_ks) {
                             let enabled = {
                                 let mut p = self.processor.lock().unwrap();
@@ -311,10 +311,10 @@ impl InputMethodHost for EvdevHost {
                                 w.appearance.show_keystrokes = enabled;
                                 let _ = crate::save_config(&w);
                             }
-                            let msg = if enabled { "开启 按键屏幕显示" } else { "关闭 按键屏幕显示" };
+                            let msg = if enabled { "开启 按键显示" } else { "关闭 按键显示" };
                             let _ = self.notify_tx.send(NotifyEvent::Message("功能切换".into(), msg.into()));
                             
-                            // 如果关闭按键屏幕显示，清除当前的按键显示
+                            // 如果关闭按键显示，清除当前的按键显示
                             if !enabled {
                                 if let Some(ref tx) = self.gui_tx {
                                     let _ = tx.send(GuiEvent::ClearKeystrokes);
@@ -365,7 +365,7 @@ impl InputMethodHost for EvdevHost {
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
 
-                    // --- UI 回显 (按键屏幕显示) 移动到逻辑处理之后 ---
+                    // --- UI 回显 (按键显示) 移动到逻辑处理之后 ---
                     if val == 1 {
                         let show_ks = self.processor.lock().unwrap().show_keystrokes;
                         if show_ks {

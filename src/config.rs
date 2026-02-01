@@ -443,7 +443,7 @@ fn default_modern_gui_toggle() -> Shortcut {
     Shortcut::new("ctrl+alt+h", "功能: 显示/隐藏 卡片式候选词")
 }
 fn default_keystroke_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+k", "功能: 显示/隐藏 按键屏幕显示")
+    Shortcut::new("ctrl+alt+k", "功能: 显示/隐藏 按键显示")
 }
 
 // Helper for parse (unchanged)
