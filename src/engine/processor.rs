@@ -33,7 +33,7 @@ pub struct Processor {
     pub tries: HashMap<String, Trie>, 
     pub ngrams: HashMap<String, NgramModel>,
     pub current_profile: String,
-    pub punctuation: HashMap<String, String>,
+    pub punctuation: HashMap<String, Vec<String>>,
     pub en_to_zh: HashMap<String, Vec<String>>, // English -> Chinese words
     pub candidates: Vec<String>,
     pub candidate_hints: Vec<String>, 
@@ -57,7 +57,7 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         ngrams: HashMap<String, NgramModel>,
         initial_profile: String, 
-        punctuation: HashMap<String, String>, 
+        punctuation_raw: HashMap<String, serde_json::Value>, 
     ) -> Self {
         let mut en_to_zh: HashMap<String, Vec<String>> = HashMap::new();
         // 尝试从 chars.json 加载语义映射
@@ -77,6 +77,14 @@ impl Processor {
                         }
                     }
                 }
+            }
+        }
+
+        let mut punctuation = HashMap::new();
+        for (k, v) in punctuation_raw {
+            if let Some(arr) = v.as_array() {
+                let chars: Vec<String> = arr.iter().filter_map(|item| item.get("char").and_then(|c| c.as_str())).map(|s| s.to_string()).collect();
+                punctuation.insert(k, chars);
             }
         }
 
@@ -144,7 +152,12 @@ impl Processor {
             self.lookup();
             self.update_phantom_action()
         } else if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
-            if let Some(zh_punc) = self.punctuation.get(punc_key) { Action::Emit(zh_punc.clone()) } else { Action::PassThrough }
+            if let Some(zh_puncs) = self.punctuation.get(punc_key) { 
+                if let Some(first) = zh_puncs.first() {
+                    return Action::Emit(first.clone());
+                }
+            }
+            Action::PassThrough
         } else { Action::PassThrough }
     }
 
@@ -230,6 +243,15 @@ impl Processor {
                     self.lookup();
                     self.update_phantom_action()
                 } else { Action::Consume }
+            }
+            _ if get_punctuation_key(key, shift_pressed).is_some() => {
+                let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
+                let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
+                
+                let word = if let Some(w) = self.candidates.get(self.selected) { w.clone() } else { self.buffer.clone() };
+                let del = self.phantom_text.chars().count();
+                self.reset();
+                Action::DeleteAndEmit { delete: del, insert: format!("{}{}", word, zh_punc) }
             }
             _ => Action::PassThrough,
         }

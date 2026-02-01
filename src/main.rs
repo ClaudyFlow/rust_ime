@@ -60,15 +60,13 @@ fn load_config() -> Config {
     Config::default_config()
 }
 
-pub fn load_punctuation_dict(p: &str) -> HashMap<String, String> {
+pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
     let mut m = HashMap::new();
     if let Ok(f) = File::open(p) { 
         if let Ok(v) = serde_json::from_reader::<_, Value>(BufReader::new(f)) {
             if let Some(obj) = v.as_object() { 
                 for (k, val) in obj { 
-                    if let Ok(es) = serde_json::from_value::<Vec<PunctuationEntry>>(val.clone()) { 
-                        if let Some(first) = es.first() { m.insert(k.clone(), first.char.clone()); } 
-                    } 
+                    m.insert(k.clone(), val.clone());
                 } 
             }
         } 
