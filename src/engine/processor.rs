@@ -275,13 +275,14 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
-        let pinyin_stripped = strip_tones(&self.buffer).to_lowercase();
+        // 不要在这里直接 to_lowercase，否则无法识别大写辅码
+        let buffer_normalized = strip_tones(&self.buffer);
         
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
         // --- 1. 计算精准组合结果 (原子分词) ---
-        let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = buffer_normalized.split(' ').filter(|s| !s.is_empty()).collect();
         let mut greedy_word = String::new();
         let mut all_segments = Vec::new();
         
@@ -314,7 +315,7 @@ impl Processor {
                 (part, None, None)
             };
 
-            let part_clean = pinyin_part.replace('\'', "").replace('`', "");
+            let part_clean = pinyin_part.to_lowercase().replace('\'', "").replace('`', "");
             all_segments.push(part.to_string());
 
             let mut matches = if part_clean.len() == 1 {
@@ -350,10 +351,10 @@ impl Processor {
         self.joined_sentence = greedy_word;
 
         // --- 2. 填充候选词列表 ---
-        let full_pinyin = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+        let full_pinyin = buffer_normalized.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_lowercase();
 
-        // 精准模式判定：包含空格或数字
-        let is_precise_mode = pinyin_stripped.contains(' ') || pinyin_stripped.chars().any(|c| c.is_ascii_digit());
+        // 精准模式判定：包含空格或数字或大写字母
+        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
 
         if !is_precise_mode {
             // 单词模式：显示整词匹配
@@ -377,7 +378,7 @@ impl Processor {
                     (*last_part, None)
                 };
 
-                let last_clean = last_pinyin.replace('\'', "").replace('`', "").chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+                let last_clean = last_pinyin.to_lowercase().replace('\'', "").replace('`', "").chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
                 if !last_clean.is_empty() {
                     let mut matches = if last_clean.len() == 1 {
                         dict.search_bfs(&last_clean, 15)
@@ -526,13 +527,14 @@ mod tests {
         let mut p = setup_mock_processor();
         if p.tries.is_empty() { return; }
         
-        // 假设 'li' 有多个候选，比如 '1.里Inside 2.力Power'
-        // 输入 'liI' 应该只剩下 '里'
-        p.buffer = "liI".to_string();
+        // 测试 haoC -> 过滤出 "号" (Call)
+        p.buffer = "haoC".to_string();
         p.lookup();
         
-        // 检查 joined_sentence 是否包含 '里' (或者是过滤后的首选)
-        // 注意：这取决于真实词库内容，但在逻辑上应能运行
-        assert!(!p.joined_sentence.is_empty());
+        // 验证第一个候选词是否满足辅码 (C 开头单词)
+        if !p.candidates.is_empty() {
+            let hint = &p.candidate_hints[0];
+            assert!(hint.to_lowercase().split_whitespace().any(|w| w.starts_with('c')));
+        }
     }
 }
