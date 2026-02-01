@@ -82,9 +82,16 @@ impl InputMethodHost for EvdevHost {
                         }
                         drop(p);
                         self.update_gui();
+                        self.notify_preview();
                     }
                     _ => {
+                        // 如果 digit_buffer 不为空，可能还在等待输入，但我们需要更新 GUI 以显示当前的累加选择效果
+                        let needs_update = !p.digit_buffer.is_empty();
                         drop(p);
+                        if needs_update {
+                            self.update_gui();
+                            self.notify_preview();
+                        }
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_millis(10));

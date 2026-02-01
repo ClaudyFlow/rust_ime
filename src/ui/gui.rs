@@ -48,17 +48,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     main_box.set_widget_name("main-container");
     window.set_child(Some(&main_box));
 
-    // 左侧垂直容器：上方拼音，下方完整句子
-    let left_box = Box::new(Orientation::Vertical, 2);
-    main_box.append(&left_box);
-
     let pinyin_label = Label::new(None);
     pinyin_label.set_widget_name("pinyin-label");
-    left_box.append(&pinyin_label);
+    main_box.append(&pinyin_label);
 
     let sentence_label = Label::new(None);
     sentence_label.set_widget_name("sentence-label");
-    left_box.append(&sentence_label);
+    main_box.append(&sentence_label);
 
     let candidates_box = Box::new(Orientation::Horizontal, 12);
     candidates_box.set_widget_name("candidates-box");
@@ -120,12 +116,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 color: #0071e3;
                 font-size: {cand_font}pt;
                 font-weight: 700;
+                margin-right: 4px;
             }}
             #sentence-label {{
                 color: rgba(255, 255, 255, 0.7);
                 font-size: {s_font}pt;
                 font-weight: 400;
-                margin-top: 2px;
+                margin-right: 12px;
+                padding-right: 12px;
+                border-right: 1px solid rgba(255, 255, 255, 0.1);
             }}
             .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
             .candidate-selected {{ background-color: #0071e3; }}

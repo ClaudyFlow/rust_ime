@@ -243,8 +243,6 @@ impl Processor {
                 let digit = key_to_digit(key).unwrap_or(0);
                 let now = std::time::Instant::now();
                 
-                // 如果距离上次按数字超过 500ms，且当前已经有数字在 buffer，先处理之前的（或者直接覆盖）
-                // 这里我们采用累加逻辑：如果有数字输入，就加入 digit_buffer
                 if !self.digit_buffer.is_empty() && now.duration_since(self.last_digit_time).as_millis() > 500 {
                     self.digit_buffer.clear();
                 }
@@ -257,15 +255,7 @@ impl Processor {
                     let idx = self.page + (val - 1);
                     if idx < self.candidates.len() {
                         self.selected = idx;
-                        // 如果当前累加的数字已经让候选词范围缩小到不可能有更多位（比如只有10个候选词，输入了2，后面如果是21就超了）
-                        // 或者简单点：如果当前数字 > 1，且 candidates 长度没那么多，直接 commit
-                        // 或者是用户按得很快，我们等一下 update_gui 里的逻辑或者在此处直接 commit
-                        // 为了满足 "shuo10" 这种，我们需要等待一段时间或者直到数字组合唯一
-                        
-                        // 逻辑：如果 val * 10 > self.candidates.len()，说明不可能再输入下一位了，直接 commit
-                        if val * 10 > self.candidates.len() {
-                             return self.commit_candidate(self.candidates[idx].clone());
-                        }
+                        self.preview_selected_candidate = true;
                     }
                 }
                 Action::Consume
@@ -438,13 +428,6 @@ impl Processor {
     pub fn check_digit_timeout(&mut self) -> Action {
         if self.digit_buffer.is_empty() { return Action::Consume; }
         if std::time::Instant::now().duration_since(self.last_digit_time).as_millis() > 400 {
-            let val = self.digit_buffer.parse::<usize>().unwrap_or(0);
-            if val > 0 {
-                let idx = self.page + (val - 1);
-                if let Some(word) = self.candidates.get(idx).cloned() {
-                    return self.commit_candidate(word);
-                }
-            }
             self.digit_buffer.clear();
         }
         Action::Consume
