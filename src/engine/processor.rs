@@ -315,23 +315,19 @@ impl Processor {
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
         let pinyin_stripped = strip_tones(&self.buffer).to_lowercase();
-        // 含有空格、数字或分号，或者是较长拼音，进入长句/精准模式
-        self.input_mode = if pinyin_stripped.contains(' ') || pinyin_stripped.contains('\'') || pinyin_stripped.chars().any(|c| c.is_ascii_digit()) || pinyin_stripped.len() > 7 {
-            InputMode::Long
-        } else {
-            InputMode::Single
-        };
         
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        // --- 1. 计算精准 Greedy 结果 ---
+        // --- 1. 计算精准组合结果 (绝对禁止自动分词) ---
+        // 每个由空格分隔的部分都是一个独立的原子查找单元。
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
-        let mut all_segments = Vec::new();
         let mut greedy_word = String::new();
+        let mut all_segments = Vec::new();
         
-        for part in parts {
-            // 解析 part，提取末尾数字索引
+        for part in &parts {
+            let part = *part;
+            // 解析数字索引，例如 "hui3"
             let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
                 let p = &part[..first_digit_idx];
                 let d = part[first_digit_idx..].parse::<usize>().unwrap_or(1);
@@ -341,75 +337,58 @@ impl Processor {
             };
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
-            
-            // 精准模式：绝对禁止自动分词
-            // 如果用户输入 zheyang 作为一个 part，且词库没有 zheyang 这个词，它必须保持 zheyang，而不是拆成 zhe yang
-            if self.input_mode == InputMode::Long {
-                let matches = if part_clean.len() == 1 {
-                    dict.search_bfs(&part_clean, 10)
-                } else {
-                    dict.get_all_exact(&part_clean).unwrap_or_default()
-                };
+            all_segments.push(part_clean.clone());
 
-                let idx = specified_idx.unwrap_or(1).saturating_sub(1);
-                let word = if let Some((w, _)) = matches.get(idx) {
-                    w.clone()
-                } else {
-                    // 没有精准匹配，保持拼音原文
-                    part_clean.clone()
-                };
-                greedy_word.push_str(&word);
-                all_segments.push(part_clean);
-                continue;
-            }
+            // 严格匹配整个 part_clean，绝不进行分割
+            let matches = if part_clean.len() == 1 {
+                dict.search_bfs(&part_clean, 10)
+            } else {
+                dict.get_all_exact(&part_clean).unwrap_or_default()
+            };
 
-            // 备选：非精准模式（单词录入模式），使用贪婪分割
-            let segments = self.segmenter.segment_greedy(&part_clean, dict);
-            for (i, seg) in segments.iter().enumerate() {
-                all_segments.push(seg.clone());
-                if seg.starts_with('/') {
-                    greedy_word.push_str(&seg[1..]);
-                } else {
-                    let matches = if seg.chars().count() == 1 { dict.search_bfs(seg, 10) } else { dict.get_all_exact(seg).unwrap_or_default() };
-                    let word = if i == segments.len() - 1 && specified_idx.is_some() {
-                        let idx = specified_idx.unwrap().saturating_sub(1);
-                        matches.get(idx).map(|(w, _)| w.clone()).unwrap_or_else(|| matches.first().map(|(w, _)| w.clone()).unwrap_or_else(|| seg.clone()))
-                    } else {
-                        matches.first().map(|(w, _)| w.clone()).unwrap_or_else(|| seg.clone())
-                    };
-                    greedy_word.push_str(&word);
-                }
+            let idx = specified_idx.unwrap_or(1).saturating_sub(1);
+            if let Some((w, _)) = matches.get(idx) {
+                greedy_word.push_str(w);
+            } else {
+                // 没匹配到，保持拼音原文
+                greedy_word.push_str(&part_clean);
             }
         }
-        self.best_segmentation = all_segments;
-        self.joined_sentence = greedy_word.clone();
-
-        // --- 2. 填充候选词 (不再将 greedy_word 加入 candidates，它仅在 sentence_label 显示) ---
-        let pinyin_for_dict = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
         
-        if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
+        self.best_segmentation = all_segments;
+        self.joined_sentence = greedy_word;
+
+        // --- 2. 填充候选词列表 ---
+        let full_pinyin = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+
+        // (A) 整个输入的精确匹配
+        if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
             for (word, hint) in exact_matches {
                 if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
         }
 
-        // 语义映射
-        let buf_lower = self.buffer.to_lowercase().chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
-        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
-            for zh in zh_words {
-                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
+        // (B) 英语语义映射
+        if !full_pinyin.is_empty() {
+            if let Some(zh_words) = self.en_to_zh.get(&full_pinyin) {
+                for zh in zh_words {
+                    if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", full_pinyin))); }
+                }
             }
         }
 
-        // 最后分词候选
-        if self.best_segmentation.len() > 1 {
-            if let Some(last_seg) = self.best_segmentation.last() {
-                let last_seg_clean = last_seg.trim_start_matches('/').chars().filter(|c| !c.is_ascii_digit()).collect::<String>();
-                if !last_seg_clean.is_empty() {
-                    if let Some(last_matches) = dict.get_all_exact(&last_seg_clean) {
-                        for (word, hint) in last_matches {
-                            if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                        }
+        // (C) 最后一部分的精确候选词
+        if parts.len() > 1 {
+            if let Some(last_part) = parts.last() {
+                let last_clean = last_part.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+                if !last_clean.is_empty() && last_clean != full_pinyin {
+                    let matches = if last_clean.len() == 1 {
+                        dict.search_bfs(&last_clean, 10)
+                    } else {
+                        dict.get_all_exact(&last_clean).unwrap_or_default()
+                    };
+                    for (word, hint) in matches {
+                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
                 }
             }
@@ -422,7 +401,10 @@ impl Processor {
             self.candidate_hints.push(hint);
         }
 
-        if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
+        if self.candidates.is_empty() { 
+            self.candidates.push(self.buffer.clone()); 
+            self.candidate_hints.push(String::new()); 
+        }
         self.selected = 0; self.page = 0;
         self.update_state();
     }
