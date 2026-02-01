@@ -79,8 +79,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     modern_candidates_box.set_widget_name("modern-candidates-box");
     modern_main_box.append(&modern_candidates_box);
 
-    // --- 3. GhostEcho (灵动回显) 窗口 ---
-    let key_window = Window::builder().title("GhostEcho (灵动回显)").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    // --- 3. On-Screen Keystrokes (按键屏幕显示) 窗口 ---
+    let key_window = Window::builder().title("On-Screen Keystrokes (按键屏幕显示)").decorated(false).can_focus(false).focusable(false).resizable(false).build();
     if is_layer_supported {
         key_window.init_layer_shell();
         key_window.set_namespace("rust-ime-keystrokes");
