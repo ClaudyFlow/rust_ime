@@ -226,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let msg = if enabled { "中文模式" } else { "英文模式" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0 });
+                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });
                 }
                 ui::tray::TrayEvent::NextProfile => {
                     let profile = {

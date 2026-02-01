@@ -29505,11 +29505,6 @@
   ],
   "yao": [
     {
-      "char": "么",
-      "en": "Particle",
-      "category": "level-1"
-    },
-    {
       "char": "要",
       "en": "Want",
       "category": "level-1"
@@ -29742,48 +29737,8 @@
       "category": "level-1"
     },
     {
-      "char": "离",
-      "en": "Depart",
-      "category": "level-1"
-    },
-    {
-      "char": "喜",
-      "en": "Joy",
-      "category": "level-1"
-    },
-    {
-      "char": "提",
-      "en": "Lift",
-      "category": "level-1"
-    },
-    {
-      "char": "持",
-      "en": "Hold",
-      "category": "level-1"
-    },
-    {
-      "char": "治",
-      "en": "Govern",
-      "category": "level-1"
-    },
-    {
-      "char": "抬",
-      "en": "Lift",
-      "category": "level-1"
-    },
-    {
-      "char": "移",
-      "en": "Move",
-      "category": "level-1"
-    },
-    {
       "char": "迟",
       "en": "Late",
-      "category": "level-1"
-    },
-    {
-      "char": "莉",
-      "en": "Jasmine",
       "category": "level-1"
     },
     {
@@ -29827,6 +29782,11 @@
       "category": "level-1"
     },
     {
+      "char": "持",
+      "en": "Hold",
+      "category": "level-1"
+    },
+    {
       "char": "驰",
       "en": "Speed",
       "category": "level-1"
@@ -29842,15 +29802,11 @@
       "category": "level-1"
     },
     {
-      "char": "拆",
-      "en": "Apart",
-      "category": "level-1"
-    },
-    {
       "char": "匙",
       "en": "Key",
       "category": "level-1"
     },
+
     {
       "char": "哆",
       "en": "Tremble",
@@ -29864,11 +29820,6 @@
     {
       "char": "茬",
       "en": "Stubble",
-      "category": "level-1"
-    },
-    {
-      "char": "弛",
-      "en": "Relax",
       "category": "level-1"
     },
     {

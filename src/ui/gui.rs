@@ -13,6 +13,7 @@ pub enum GuiEvent {
         candidates: Vec<String>,
         hints: Vec<String>,
         selected: usize,
+        sentence: String,
     },
     #[allow(dead_code)]
     MoveTo { x: i32, y: i32 },
@@ -46,9 +47,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     let main_box = Box::new(Orientation::Horizontal, 8);
     main_box.set_widget_name("main-container");
     window.set_child(Some(&main_box));
+
+    // 左侧垂直容器：上方拼音，下方完整句子
+    let left_box = Box::new(Orientation::Vertical, 2);
+    main_box.append(&left_box);
+
     let pinyin_label = Label::new(None);
     pinyin_label.set_widget_name("pinyin-label");
-    main_box.append(&pinyin_label);
+    left_box.append(&pinyin_label);
+
+    let sentence_label = Label::new(None);
+    sentence_label.set_widget_name("sentence-label");
+    left_box.append(&sentence_label);
+
     let candidates_box = Box::new(Orientation::Horizontal, 12);
     candidates_box.set_widget_name("candidates-box");
     main_box.append(&candidates_box);
@@ -109,9 +120,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 color: #0071e3;
                 font-size: {cand_font}pt;
                 font-weight: 700;
-                margin-right: 6px;
-                padding-right: 12px;
-                border-right: 1px solid rgba(255, 255, 255, 0.1);
+            }}
+            #sentence-label {{
+                color: rgba(255, 255, 255, 0.7);
+                font-size: {s_font}pt;
+                font-weight: 400;
+                margin-top: 2px;
             }}
             .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
             .candidate-selected {{ background-color: #0071e3; }}
@@ -165,6 +179,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         "#, 
         cand_bg = app.candidate_bg_color,
         cand_font = app.candidate_font_size,
+        s_font = app.candidate_font_size - 2,
         m_bg = app.modern_cand_bg_color,
         m_text = app.modern_cand_text_color,
         m_font = app.modern_cand_font_size,
@@ -221,6 +236,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     let modern_window_c = modern_window.clone();
     let key_window_c = key_window.clone();
     let pinyin_label_c = pinyin_label.clone();
+    let sentence_label_c = sentence_label.clone();
     let candidates_box_c = candidates_box.clone();
     let modern_pinyin_c = modern_pinyin_label.clone();
     let modern_candidates_c = modern_candidates_box.clone();
@@ -234,7 +250,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 apply_style(&conf, &css_p_c, &window_c, &modern_window_c, &key_window_c);
                 current_config = conf;
             }
-            GuiEvent::Update { pinyin, candidates, hints, selected } => {
+            GuiEvent::Update { pinyin, candidates, hints, selected, sentence } => {
                 let show_trad = current_config.appearance.show_candidates;
                 let show_modern = current_config.appearance.show_modern_candidates;
 
@@ -247,6 +263,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 if show_trad {
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
+                    sentence_label_c.set_text(&sentence);
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
                     let start = (selected / 5) * 5;
                     let end = (start + 5).min(candidates.len());

@@ -268,7 +268,7 @@ impl EvdevHost {
             
             // 如果不显示候选框，且没有 buffer，清空并返回
             if p.buffer.is_empty() || !p.chinese_enabled {
-                let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0 });
+                let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });
                 return;
             }
 
@@ -290,10 +290,16 @@ impl EvdevHost {
 
             // 如果开启了候选框显示，发送完整数据
             if p.show_candidates {
-                let _ = tx.send(GuiEvent::Update { pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), selected: p.selected });
+                let _ = tx.send(GuiEvent::Update { 
+                    pinyin, 
+                    candidates: p.candidates.clone(), 
+                    hints: p.candidate_hints.clone(), 
+                    selected: p.selected,
+                    sentence: p.joined_sentence.clone(),
+                });
             } else {
                 // 否则仅在控制台或通过拼音预览（由 handle_key 处理）工作，GUI 保持清空
-                let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0 });
+                let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });
             }
         }
     }
@@ -304,17 +310,15 @@ impl EvdevHost {
             let _ = self.notify_tx.send(NotifyEvent::Close);
             return; 
         }
-            let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
         let mut body = String::new();
         let start = p.page;
-        let end = (start + 5).min(p.candidates.len());
+        let end = (start + 3).min(p.candidates.len());
         for (i, cand) in p.candidates[start..end].iter().enumerate() {
             let abs_idx = start + i;
-            let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
-            if abs_idx == p.selected { body.push_str(&format!("【{}.{}{}】 ", i+1, cand, hint)); }
-            else { body.push_str(&format!("{}.{}{} ", i+1, cand, hint)); }
+            if abs_idx == p.selected { body.push_str(&format!("【{}.{}】", i+1, cand)); }
+            else { body.push_str(&format!("{}.{} ", i+1, cand)); }
         }
-        let summary = format!("[{}] {}", p.current_profile, pinyin);
+        let summary = format!("{}: {}", p.current_profile, p.joined_sentence);
         let _ = self.notify_tx.send(NotifyEvent::Update(summary, body));
     }
 }

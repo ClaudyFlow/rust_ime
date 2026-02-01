@@ -42,6 +42,7 @@ pub struct Processor {
     pub chinese_enabled: bool,
     pub segmenter: Segmenter,
     pub best_segmentation: Vec<String>,
+    pub joined_sentence: String,
     
     pub show_candidates: bool,
     pub show_modern_candidates: bool,
@@ -92,6 +93,7 @@ impl Processor {
             state: ImeState::Direct, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
+            joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
@@ -122,6 +124,7 @@ impl Processor {
         self.candidates.clear();
         self.candidate_hints.clear();
         self.best_segmentation.clear();
+        self.joined_sentence.clear();
         self.selected = 0;
         self.page = 0;
         self.state = ImeState::Direct;
@@ -337,8 +340,24 @@ impl Processor {
         }
         
         self.best_segmentation = all_segments;
+        self.joined_sentence = greedy_word.clone();
+
         if seen.insert(greedy_word.clone()) {
             final_candidates.push((greedy_word, String::new()));
+        }
+
+        // 增加对最后一个分词的候选词（满足用户：在进入第二个词拼音时，看到第二个词的候选词）
+        if self.best_segmentation.len() > 1 {
+            if let Some(last_seg) = self.best_segmentation.last() {
+                let last_seg_clean = last_seg.trim_start_matches('/');
+                if let Some(last_matches) = dict.get_all_exact(last_seg_clean) {
+                    for (word, hint) in last_matches {
+                        if seen.insert(word.clone()) {
+                            final_candidates.push((word, hint));
+                        }
+                    }
+                }
+            }
         }
 
         self.candidates.clear();
