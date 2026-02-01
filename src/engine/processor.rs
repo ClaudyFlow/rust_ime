@@ -331,7 +331,7 @@ impl Processor {
         let mut greedy_word = String::new();
         
         for part in parts {
-            // 解析 part，提取末尾数字索引（如 "hui3" -> "hui", 3）
+            // 解析 part，提取末尾数字索引
             let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
                 let p = &part[..first_digit_idx];
                 let d = part[first_digit_idx..].parse::<usize>().unwrap_or(1);
@@ -341,16 +341,32 @@ impl Processor {
             };
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
-            let segments = self.segmenter.segment_greedy(&part_clean, dict);
             
+            // 如果是 Long 模式（意味着有空格或数字），我们不对该 part 进行贪婪分割，除非它完全没匹配
+            if self.input_mode == InputMode::Long {
+                let matches = if part_clean.len() == 1 {
+                    dict.search_bfs(&part_clean, 10)
+                } else {
+                    dict.get_all_exact(&part_clean).unwrap_or_default()
+                };
+
+                if !matches.is_empty() {
+                    let idx = specified_idx.unwrap_or(1).saturating_sub(1);
+                    let word = matches.get(idx).map(|(w, _)| w.clone()).unwrap_or_else(|| matches[0].0.clone());
+                    greedy_word.push_str(&word);
+                    all_segments.push(part_clean);
+                    continue;
+                }
+            }
+
+            // 备选：如果不是精准匹配，或者非精准模式，使用贪婪分割
+            let segments = self.segmenter.segment_greedy(&part_clean, dict);
             for (i, seg) in segments.iter().enumerate() {
                 all_segments.push(seg.clone());
                 if seg.starts_with('/') {
                     greedy_word.push_str(&seg[1..]);
                 } else {
                     let matches = if seg.chars().count() == 1 { dict.search_bfs(seg, 10) } else { dict.get_all_exact(seg).unwrap_or_default() };
-                    
-                    // 如果是该 part 的最后一个 segment 且有指定索引
                     let word = if i == segments.len() - 1 && specified_idx.is_some() {
                         let idx = specified_idx.unwrap().saturating_sub(1);
                         matches.get(idx).map(|(w, _)| w.clone()).unwrap_or_else(|| matches.first().map(|(w, _)| w.clone()).unwrap_or_else(|| seg.clone()))
