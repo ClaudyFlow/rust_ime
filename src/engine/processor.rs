@@ -322,8 +322,11 @@ impl Processor {
                             let mut score = *prev_score;
                             if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
                             if let Some(model) = ngram_model {
-                                let context: Vec<char> = prev_text.chars().collect();
-                                score += model.get_score(&context, opt_word);
+                                // 只有在有上下文时才应用 n-gram 模型（避免首词受单字/unigram 频率影响）
+                                if !prev_text.is_empty() {
+                                    let context: Vec<char> = prev_text.chars().collect();
+                                    score += model.get_score(&context, opt_word);
+                                }
                             }
                             let mut new_text = prev_text.clone();
                             new_text.push_str(opt_word);
