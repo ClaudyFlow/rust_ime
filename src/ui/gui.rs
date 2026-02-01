@@ -58,7 +58,7 @@ impl KeystrokeController {
 
     fn reset_timeout(&self) {
         if let Some(old) = self.timeout.borrow_mut().take() {
-            old.remove();
+            let _ = old.remove();
         }
 
         let box_weak = self.box_.downgrade();
@@ -84,7 +84,7 @@ impl KeystrokeController {
 
     fn clear(&self) {
         if let Some(old) = self.timeout.borrow_mut().take() {
-            old.remove();
+            let _ = old.remove();
         }
         while let Some(child) = self.box_.first_child() {
             self.box_.remove(&child);
@@ -102,17 +102,15 @@ struct LearningController {
     word_label: Label,
     hint_label: Label,
     timeout: RefCell<Option<SourceId>>,
-    interval_sec: RefCell<u64>,
 }
 
 impl LearningController {
-    fn new(window: Window, word_label: Label, hint_label: Label, interval_sec: u64) -> Rc<Self> {
+    fn new(window: Window, word_label: Label, hint_label: Label, _interval_sec: u64) -> Rc<Self> {
         Rc::new(Self {
             window,
             word_label,
             hint_label,
             timeout: RefCell::new(None),
-            interval_sec: RefCell::new(interval_sec),
         })
     }
 
@@ -122,7 +120,7 @@ impl LearningController {
         self.window.set_opacity(1.0);
         
         if let Some(old) = self.timeout.borrow_mut().take() {
-            old.remove();
+            let _ = old.remove();
         }
 
         let win_weak = self.window.downgrade();
@@ -140,7 +138,7 @@ impl LearningController {
 
     fn clear(&self) {
         if let Some(old) = self.timeout.borrow_mut().take() {
-            old.remove();
+            let _ = old.remove();
         }
         self.window.set_opacity(0.0);
     }
