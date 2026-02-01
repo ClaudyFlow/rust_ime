@@ -272,12 +272,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.show_keystrokes = enabled);
                     if let Ok(mut w) = config_tray.write() { w.appearance.show_keystrokes = enabled; let _ = save_config(&w); }
                 }
+                ui::tray::TrayEvent::ClearKeystrokes => {
+                    // 清除按键屏幕显示
+                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
+                }
                 ui::tray::TrayEvent::ToggleLearning => {
                     let mut w = config_tray.write().unwrap();
                     w.appearance.learning_mode = !w.appearance.learning_mode;
                     let enabled = w.appearance.learning_mode;
                     tray_handle.update(|t| t.learning_mode = enabled);
                     let _ = save_config(&w);
+                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
                 }
                 ui::tray::TrayEvent::CyclePreview => {
                     let mode_str = {

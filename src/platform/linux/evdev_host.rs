@@ -11,6 +11,104 @@ use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use crate::config::parse_key;
 use crate::NotifyEvent;
 
+fn map_key_to_display_name(key: Key) -> String {
+    match key {
+        // 修饰键
+        Key::KEY_LEFTCTRL | Key::KEY_RIGHTCTRL => "Ctrl".to_string(),
+        Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => "Shift".to_string(),
+        Key::KEY_LEFTALT | Key::KEY_RIGHTALT => "Alt".to_string(),
+        Key::KEY_LEFTMETA | Key::KEY_RIGHTMETA => "Win".to_string(),
+        Key::KEY_CAPSLOCK => "Caps".to_string(),
+        
+        // 特殊键
+        Key::KEY_ESC => "Esc".to_string(),
+        Key::KEY_TAB => "Tab".to_string(),
+        Key::KEY_ENTER => "Enter".to_string(),
+        Key::KEY_SPACE => "Space".to_string(),
+        Key::KEY_BACKSPACE => "Backspace".to_string(),
+        Key::KEY_DELETE => "Delete".to_string(),
+        Key::KEY_INSERT => "Insert".to_string(),
+        Key::KEY_HOME => "Home".to_string(),
+        Key::KEY_END => "End".to_string(),
+        Key::KEY_PAGEUP => "PgUp".to_string(),
+        Key::KEY_PAGEDOWN => "PgDn".to_string(),
+        Key::KEY_UP => "↑".to_string(),
+        Key::KEY_DOWN => "↓".to_string(),
+        Key::KEY_LEFT => "←".to_string(),
+        Key::KEY_RIGHT => "→".to_string(),
+        
+        // 功能键
+        Key::KEY_F1 => "F1".to_string(),
+        Key::KEY_F2 => "F2".to_string(),
+        Key::KEY_F3 => "F3".to_string(),
+        Key::KEY_F4 => "F4".to_string(),
+        Key::KEY_F5 => "F5".to_string(),
+        Key::KEY_F6 => "F6".to_string(),
+        Key::KEY_F7 => "F7".to_string(),
+        Key::KEY_F8 => "F8".to_string(),
+        Key::KEY_F9 => "F9".to_string(),
+        Key::KEY_F10 => "F10".to_string(),
+        Key::KEY_F11 => "F11".to_string(),
+        Key::KEY_F12 => "F12".to_string(),
+        
+        // 字母键
+        Key::KEY_A => "A".to_string(),
+        Key::KEY_B => "B".to_string(),
+        Key::KEY_C => "C".to_string(),
+        Key::KEY_D => "D".to_string(),
+        Key::KEY_E => "E".to_string(),
+        Key::KEY_F => "F".to_string(),
+        Key::KEY_G => "G".to_string(),
+        Key::KEY_H => "H".to_string(),
+        Key::KEY_I => "I".to_string(),
+        Key::KEY_J => "J".to_string(),
+        Key::KEY_K => "K".to_string(),
+        Key::KEY_L => "L".to_string(),
+        Key::KEY_M => "M".to_string(),
+        Key::KEY_N => "N".to_string(),
+        Key::KEY_O => "O".to_string(),
+        Key::KEY_P => "P".to_string(),
+        Key::KEY_Q => "Q".to_string(),
+        Key::KEY_R => "R".to_string(),
+        Key::KEY_S => "S".to_string(),
+        Key::KEY_T => "T".to_string(),
+        Key::KEY_U => "U".to_string(),
+        Key::KEY_V => "V".to_string(),
+        Key::KEY_W => "W".to_string(),
+        Key::KEY_X => "X".to_string(),
+        Key::KEY_Y => "Y".to_string(),
+        Key::KEY_Z => "Z".to_string(),
+        
+        // 数字键
+        Key::KEY_0 => "0".to_string(),
+        Key::KEY_1 => "1".to_string(),
+        Key::KEY_2 => "2".to_string(),
+        Key::KEY_3 => "3".to_string(),
+        Key::KEY_4 => "4".to_string(),
+        Key::KEY_5 => "5".to_string(),
+        Key::KEY_6 => "6".to_string(),
+        Key::KEY_7 => "7".to_string(),
+        Key::KEY_8 => "8".to_string(),
+        Key::KEY_9 => "9".to_string(),
+        
+        // 其他键
+        Key::KEY_MINUS => "-".to_string(),
+        Key::KEY_EQUAL => "=".to_string(),
+        Key::KEY_LEFTBRACE => "[".to_string(),
+        Key::KEY_RIGHTBRACE => "]".to_string(),
+        Key::KEY_SEMICOLON => ";".to_string(),
+        Key::KEY_APOSTROPHE => "'".to_string(),
+        Key::KEY_GRAVE => "`".to_string(),
+        Key::KEY_BACKSLASH => "\\".to_string(),
+        Key::KEY_COMMA => ",".to_string(),
+        Key::KEY_DOT => ".".to_string(),
+        Key::KEY_SLASH => "/".to_string(),
+        
+        // 其他按键使用原始名称
+        _ => format!("{:?}", key).replace("KEY_", "")
+    }
+}
+
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
     vkbd: Mutex<Vkbd>,
@@ -265,11 +363,8 @@ impl InputMethodHost for EvdevHost {
                         let show_ks = self.processor.lock().unwrap().show_keystrokes;
                         if show_ks {
                             if let Some(ref tx) = self.gui_tx {
-                                let name = format!("{:?}", key).replace("KEY_", "");
-                                // 过滤掉特殊键和修饰键，只显示普通字符键
-                                if !name.is_empty() && !name.contains("SHIFT") && !name.contains("CTRL") 
-                                   && !name.contains("ALT") && !name.contains("META") 
-                                   && !name.contains("SUPER") && !name.contains("HYPER") {
+                                let name = map_key_to_display_name(key);
+                                if !name.is_empty() {
                                     let _ = tx.send(GuiEvent::Keystroke(name));
                                 }
                             }

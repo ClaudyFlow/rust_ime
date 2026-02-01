@@ -17,6 +17,7 @@ pub enum TrayEvent {
     ToggleLearning,
     ReloadConfig,
     CyclePreview,
+    ClearKeystrokes,
 }
 
 pub struct ImeTray {
@@ -161,6 +162,11 @@ impl Tray for ImeTray {
             StandardItem {
                 label: format!("按键屏幕显示: {}", if self.show_keystrokes { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleKeystroke); }),
+                ..Default::default()
+            }.into(),
+            StandardItem {
+                label: "清除按键显示".to_string(),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ClearKeystrokes); }),
                 ..Default::default()
             }.into(),
             StandardItem {

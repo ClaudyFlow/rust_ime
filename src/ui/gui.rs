@@ -117,6 +117,12 @@ impl KeystrokeController {
     }
 
     fn clear(&self) {
+        // 清除所有按键显示
+        let mut keys = self.displayed_keys.borrow_mut();
+        while let Some(child) = self.box_.first_child() {
+            self.box_.remove(&child);
+        }
+        keys.clear();
         self.window.set_opacity(0.0);
     }
 
