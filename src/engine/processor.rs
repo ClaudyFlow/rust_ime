@@ -161,7 +161,7 @@ impl Processor {
                 }
             }
             Action::PassThrough
-        } else { Action::PassThrough }
+        } else { Action::PassThrough } 
     }
 
     fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
@@ -179,14 +179,8 @@ impl Processor {
             }
             Key::KEY_TAB => {
                 if !self.candidates.is_empty() {
-                    if !self.preview_selected_candidate {
-                        // First Tab press: Enter preview mode, select 0
-                        self.preview_selected_candidate = true;
-                        self.selected = 0;
-                    } else {
-                        // Subsequent Tab press: Cycle
-                        if shift_pressed { if self.selected > 0 { self.selected -= 1; } } else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
-                    }
+                    self.preview_selected_candidate = true;
+                    if shift_pressed { if self.selected > 0 { self.selected -= 1; } } else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
                     self.page = (self.selected / 5) * 5;
                     self.update_phantom_action()
                 } else {
@@ -212,7 +206,6 @@ impl Processor {
                 }
             }
             Key::KEY_ENTER => { 
-                // 现在回车作为确认上屏键
                 if let Some(word) = self.candidates.get(self.selected) { 
                     self.commit_candidate(word.clone())
                 } else if !self.buffer.is_empty() { 
@@ -270,53 +263,53 @@ impl Processor {
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
         
-        let target = if self.preview_selected_candidate && !self.candidates.is_empty() {
-             self.candidates[self.selected].clone()
+        let mut target = if !self.candidates.is_empty() {
+             self.candidates[self.selected.min(self.candidates.len()-1)].clone()
         } else {
              self.buffer.clone()
         };
+
+        if self.buffer.ends_with(' ') && !target.ends_with(' ') {
+            target.push(' ');
+        }
 
         if target == self.phantom_text { return Action::Consume; }
         
         let old_phantom = self.phantom_text.clone();
         self.phantom_text = target.clone();
 
-        // 1. 如果是追加 (例如从 "w" 变成 "wo")
+        let old_chars: Vec<char> = old_phantom.chars().collect();
+        let target_chars: Vec<char> = target.chars().collect();
+
         if target.starts_with(&old_phantom) {
-            let added = &target[old_phantom.len()..];
-            return Action::Emit(added.to_string());
+            let added: String = target_chars[old_chars.len()..].iter().collect();
+            return Action::Emit(added);
         }
         
-        // 2. 如果是简单的退格 (例如从 "wo" 变成 "w")
         if old_phantom.starts_with(&target) {
-            let count = old_phantom.chars().count() - target.chars().count();
+            let count = old_chars.len() - target_chars.len();
             return Action::DeleteAndEmit { delete: count, insert: "".into() };
         }
 
-        // 3. 复杂变更 (强制原子同步)
-        Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target }
+        Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
     }
 
     pub fn lookup(&mut self) {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
-        let pinyin_search = self.buffer.clone();
-        let pinyin_stripped = strip_tones(&pinyin_search).to_lowercase();
-        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('"', "").replace('`', "");
-
+        let pinyin_stripped = strip_tones(&self.buffer).to_lowercase();
+        
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        // 1. 词典全量匹配 (高优先级) - Pinyin Priority
+        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('"', "").replace('`', "");
         if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
-            let matches = exact_matches;
-            for (word, hint) in matches {
+            for (word, hint) in exact_matches {
                 if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
         }
 
-        // 2. 语义映射 (English Semantic) - Secondary
         let buf_lower = self.buffer.to_lowercase();
         if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
             for zh in zh_words {
@@ -324,51 +317,28 @@ impl Processor {
             }
         }
 
-        // 3. 极简分段查找逻辑 (Greedy)
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
-        if parts.len() > 1 {
-            let mut stable_prefix = String::new();
-            for i in 0..parts.len() - 1 {
-                let part = parts[i].replace('\'', "").replace('`', "");
-                let segments = self.segmenter.segment_greedy(&part, dict);
-                for seg in &segments {
-                    if seg.starts_with('/') { stable_prefix.push_str(&seg[1..]); continue; }
-                    let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                    if let Some((word, _)) = matches.first() { stable_prefix.push_str(word); }
-                    else { stable_prefix.push_str(&seg); }
+        let mut all_segments = Vec::new();
+        let mut greedy_word = String::new();
+        
+        for part in parts {
+            let part_clean = part.replace('"', "").replace('`', "");
+            let segments = self.segmenter.segment_greedy(&part_clean, dict);
+            for seg in segments {
+                all_segments.push(seg.clone());
+                if seg.starts_with('/') {
+                    greedy_word.push_str(&seg[1..]);
+                } else {
+                    let matches = if seg.chars().count() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                    if let Some((w, _)) = matches.first() { greedy_word.push_str(w); }
+                    else { greedy_word.push_str(&seg); }
                 }
             }
-
-            let last_part = parts.last().unwrap().replace('\'', "").replace('`', "");
-            let last_options = if last_part.starts_with('/') {
-                vec![(last_part[1..].to_string(), "1000000".to_string())]
-            } else {
-                let segments = self.segmenter.segment_greedy(&last_part, dict);
-                let mut word = String::new();
-                for seg in &segments {
-                    if seg.starts_with('/') { word.push_str(&seg[1..]); continue; }
-                    let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                    if let Some((w, _)) = matches.first() { word.push_str(w); }
-                    else { word.push_str(&seg); }
-                }
-                vec![(word, String::new())]
-            };
-            
-            for (word, hint) in last_options {
-                let mut full = stable_prefix.clone();
-                full.push_str(&word);
-                if seen.insert(full.clone()) { final_candidates.push((full, hint)); }
-            }
-        } else {
-            let segments = self.segmenter.segment_greedy(&pinyin_for_dict, dict);
-            let mut word = String::new();
-            for seg in &segments {
-                if seg.starts_with('/') { word.push_str(&seg[1..]); continue; }
-                let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                if let Some((w, _)) = matches.first() { word.push_str(w); }
-                else { word.push_str(&seg); }
-            }
-            if seen.insert(word.clone()) { final_candidates.push((word, String::new())); }
+        }
+        
+        self.best_segmentation = all_segments;
+        if seen.insert(greedy_word.clone()) {
+            final_candidates.push((greedy_word, String::new()));
         }
 
         self.candidates.clear();
@@ -385,7 +355,8 @@ impl Processor {
     }
 
     fn update_state(&mut self) {
-        if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; } else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
+        if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
+        else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
     }
 
     pub fn next_profile(&mut self) -> String {
@@ -414,7 +385,7 @@ pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }
 fn get_punctuation_key(key: Key, shift: bool) -> Option<&'static str> {
-    match (key, shift) { (Key::KEY_GRAVE, false) => Some("`"), (Key::KEY_GRAVE, true) => Some("~"), (Key::KEY_MINUS, false) => Some("-"), (Key::KEY_MINUS, true) => Some("_"), (Key::KEY_EQUAL, false) => Some("="), (Key::KEY_EQUAL, true) => Some("+"), (Key::KEY_LEFTBRACE, false) => Some("["), (Key::KEY_LEFTBRACE, true) => Some("{"), (Key::KEY_RIGHTBRACE, false) => Some("]"), (Key::KEY_RIGHTBRACE, true) => Some("}"), (Key::KEY_BACKSLASH, false) => Some("\\"), (Key::KEY_BACKSLASH, true) => Some("|"), (Key::KEY_SEMICOLON, false) => Some(";"), (Key::KEY_SEMICOLON, true) => Some(":"), (Key::KEY_APOSTROPHE, false) => Some("'"), (Key::KEY_APOSTROPHE, true) => Some("\""), (Key::KEY_COMMA, false) => Some(","), (Key::KEY_COMMA, true) => Some("<"), (Key::KEY_DOT, false) => Some("."), (Key::KEY_DOT, true) => Some(">"), (Key::KEY_SLASH, true) => Some("?"), (Key::KEY_1, true) => Some("!"), (Key::KEY_2, true) => Some("@"), (Key::KEY_3, true) => Some("#"), (Key::KEY_4, true) => Some("$"), (Key::KEY_5, true) => Some("%"), (Key::KEY_6, true) => Some("^"), (Key::KEY_7, true) => Some("&"), (Key::KEY_8, true) => Some("*"), (Key::KEY_9, true) => Some("("), (Key::KEY_0, true) => Some(")"), _ => None } }
+    match (key, shift) { (Key::KEY_GRAVE, false) => Some("`"), (Key::KEY_GRAVE, true) => Some("~"), (Key::KEY_MINUS, false) => Some("-"), (Key::KEY_MINUS, true) => Some("_"), (Key::KEY_EQUAL, false) => Some("="), (Key::KEY_EQUAL, true) => Some("+"), (Key::KEY_LEFTBRACE, false) => Some("["), (Key::KEY_LEFTBRACE, true) => Some("{"), (Key::KEY_RIGHTBRACE, false) => Some("]"), (Key::KEY_RIGHTBRACE, true) => Some("}"), (Key::KEY_BACKSLASH, false) => Some("\\"), (Key::KEY_BACKSLASH, true) => Some("|"), (Key::KEY_SEMICOLON, false) => Some(";"), (Key::KEY_SEMICOLON, true) => Some(":"), (Key::KEY_APOSTROPHE, false) => Some("'"), (Key::KEY_APOSTROPHE, true) => Some("\""), (Key::KEY_COMMA, false) => Some(","), (Key::KEY_COMMA, true) => Some("<"), (Key::KEY_DOT, false) => Some("."), (Key::KEY_DOT, true) => Some(">"), (Key::KEY_SLASH, false) => Some("/"), (Key::KEY_SLASH, true) => Some("?"), (Key::KEY_1, true) => Some("!"), (Key::KEY_2, true) => Some("@"), (Key::KEY_3, true) => Some("#"), (Key::KEY_4, true) => Some("$"), (Key::KEY_5, true) => Some("%"), (Key::KEY_6, true) => Some("^"), (Key::KEY_7, true) => Some("&"), (Key::KEY_8, true) => Some("*"), (Key::KEY_9, true) => Some("("), (Key::KEY_0, true) => Some(")"), _ => None } }
 pub fn strip_tones(s: &str) -> String {
     let mut res = String::new();
     for c in s.chars() { match c { 'ā'|'á'|'ǎ'|'à' => res.push('a'), 'ē'|'é'|'ě'|'è' => res.push('e'), 'ī'|'í'|'ǐ'|'ì' => res.push('i'), 'ō'|'ó'|'ǒ'|'ò' => res.push('o'), 'ū'|'ú'|'ǔ'|'ù' => res.push('u'), 'ǖ'|'ǘ'|'ǚ'|'ǜ' => res.push('v'), 'Ā'|'Á'|'Ǎ'|'À' => res.push('A'), 'Ē'|'É'|'Ě'|'È' => res.push('E'), 'Ī'|'Í'|'Ǐ'|'Ì' => res.push('I'), 'Ō'|'Ó'|'Ǒ'|'Ò' => res.push('O'), 'Ū'|'Ú'|'Ǔ'|'Ù' => res.push('U'), 'Ǖ'|'Ǘ'|'Ǚ'|'Ǜ' => res.push('V'), _ => res.push(c) } } 

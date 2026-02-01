@@ -17,92 +17,48 @@ impl Segmenter {
         Self { syllable_set }
     }
 
-    pub fn segment_all(&self, pinyin: &str, dict: &Trie) -> Vec<Vec<String>> {
-        let mut results = Vec::new();
-        let mut current = Vec::new();
-        self.segment_recursive(pinyin, dict, &mut current, &mut results);
-        if results.is_empty() {
-            results.push(self.segment_greedy(pinyin, dict));
-        }
-        results
-    }
-
-    fn segment_recursive(&self, remaining: &str, dict: &Trie, current: &mut Vec<String>, results: &mut Vec<Vec<String>>) {
-        if remaining.is_empty() { results.push(current.clone()); return; }
-        if results.len() >= 15 { return; }
-
-        let has_apostrophe = remaining.starts_with('`') || remaining.starts_with('\'') || remaining.starts_with(' ');
-        if has_apostrophe {
-            let actual = &remaining[1..];
-            let max_len = actual.len().min(6);
-            for len in (1..=max_len).rev() {
-                let sub = &actual[..len];
-                if self.syllable_set.contains(sub) || dict.contains(sub) {
-                    current.push(sub.to_string());
-                    self.segment_recursive(&actual[len..], dict, current, results);
-                    current.pop();
-                    if results.len() >= 15 { return; }
-                }
-            }
-            return;
-        }
-
-        if remaining.starts_with('/') {
-            let end = remaining[1..].find(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(remaining.len());
-            let sub = &remaining[..end];
-            current.push(sub.to_string());
-            self.segment_recursive(&remaining[end..], dict, current, results);
-            current.pop();
-            return;
-        }
-
-        // 核心改进：计算到下一个分隔符的距离，限制最大探测长度
-        let sep_pos = remaining.find(|c| c == ' ' || c == '\'' || c == '`' || c == '/');
-        let limit = sep_pos.unwrap_or(remaining.len());
-        let max_len = limit.min(6);
-
-        for len in (2..=max_len).rev() {
-            let sub = &remaining[..len];
-            if self.syllable_set.contains(sub) || dict.contains(sub) {
-                current.push(sub.to_string());
-                self.segment_recursive(&remaining[len..], dict, current, results);
-                current.pop();
-                if results.len() >= 15 { return; }
-            }
-        }
-        if !remaining.is_empty() {
-            let sub = &remaining[..1];
-            current.push(sub.to_string());
-            self.segment_recursive(&remaining[1..], dict, current, results);
-            current.pop();
-        }
-    }
-
     pub fn segment_greedy(&self, pinyin: &str, dict: &Trie) -> Vec<String> {
         let mut segments = Vec::new();
-        let mut current_offset = 0;
-        while current_offset < pinyin.len() {
-            let mut found_len = 0;
-            let current_str = &pinyin[current_offset..];
-            if current_str.starts_with('`') || current_str.starts_with('\'') || current_str.starts_with(' ') { current_offset += 1; continue; }
+        let chars: Vec<char> = pinyin.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let remaining: String = chars[i..].iter().collect();
             
-            if current_str.starts_with('/') {
-                let end = current_str[1..].find(|c: char| !c.is_alphanumeric()).map(|i| i + 1).unwrap_or(current_str.len());
-                segments.push(current_str[..end].to_string());
-                current_offset += end;
+            // 跳过分隔符
+            if remaining.starts_with('`') || remaining.starts_with('\'') || remaining.starts_with(' ') { 
+                i += 1; continue; 
+            }
+            
+            // 处理转义英语
+            if remaining.starts_with('/') {
+                let mut end = 1;
+                while i + end < chars.len() && chars[i + end].is_alphanumeric() {
+                    end += 1;
+                }
+                segments.push(chars[i..i+end].iter().collect());
+                i += end;
                 continue;
             }
 
-            let sep_pos = current_str.find(|c| c == ' ' || c == '\'' || c == '`' || c == '/');
-            let limit = sep_pos.unwrap_or(current_str.len());
-            let max_match_len = limit.min(6);
-
-            for len in (1..=max_match_len).rev() {
-                let sub = &current_str[..len];
-                if dict.contains(sub) || self.syllable_set.contains(sub) { found_len = len; break; }
+            // 贪婪匹配
+            let mut found_len = 0;
+            let max_match = (chars.len() - i).min(8); 
+            for len in (1..=max_match).rev() {
+                let sub: String = chars[i..i+len].iter().collect();
+                if self.syllable_set.contains(&sub) || dict.contains(&sub) {
+                    segments.push(sub);
+                    found_len = len;
+                    break;
+                }
             }
-            if found_len > 0 { segments.push(current_str[..found_len].to_string()); current_offset += found_len; }
-            else { segments.push(current_str[..1].to_string()); current_offset += 1; }
+            
+            if found_len > 0 {
+                i += found_len;
+            } else { 
+                // 回退：单字符处理（支持标点符号）
+                segments.push(chars[i].to_string());
+                i += 1;
+            }
         }
         segments
     }
