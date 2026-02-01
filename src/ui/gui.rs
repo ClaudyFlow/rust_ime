@@ -36,6 +36,7 @@ struct KeystrokeController {
     window: Window,
     timeout: RefCell<Option<SourceId>>,
     timeout_ms: RefCell<u64>,
+    timeout_active: RefCell<bool>, // 标志位：定时器是否仍在活动
 }
 
 impl KeystrokeController {
@@ -45,6 +46,7 @@ impl KeystrokeController {
             window,
             timeout: RefCell::new(None),
             timeout_ms: RefCell::new(initial_timeout),
+            timeout_active: RefCell::new(false),
         })
     }
 
@@ -64,7 +66,7 @@ impl KeystrokeController {
         
         // 如果超过限制，清空重新开始
         if count > 20 {
-            self.clear();
+            self.clear_display_only();
             // 重新计数
             count = 0;
         }
@@ -84,16 +86,25 @@ impl KeystrokeController {
         self.reset_timeout();
     }
 
-    fn clear_timeout(&self) {
-        if let Some(old) = self.timeout.borrow_mut().take() {
-            // 直接尝试移除定时器，如果已经执行过，remove会返回Err，我们忽略错误
-            let _ = old.remove();
+    fn clear_display_only(&self) {
+        // 只清除显示内容，不涉及定时器
+        while let Some(child) = self.box_.first_child() {
+            self.box_.remove(&child);
         }
+        self.window.set_opacity(0.0);
+    }
+
+    fn clear_timeout(&self) {
+        // 完全不调用remove，只清除引用
+        // 让GLib自动清理已执行或即将执行的定时器
+        self.timeout.borrow_mut().take();
+        *self.timeout_active.borrow_mut() = false;
     }
 
     fn reset_timeout(&self) {
-        // 先清理旧的定时器
-        self.clear_timeout();
+        // 只清除引用，不调用remove避免panic
+        *self.timeout.borrow_mut() = None;
+        *self.timeout_active.borrow_mut() = true;
 
         let box_weak = self.box_.downgrade();
         let win_weak = self.window.downgrade();
@@ -117,11 +128,10 @@ impl KeystrokeController {
     }
 
     fn clear(&self) {
-        self.clear_timeout();
-        while let Some(child) = self.box_.first_child() {
-            self.box_.remove(&child);
-        }
-        self.window.set_opacity(0.0);
+        self.clear_display_only();
+        // 完全不调用remove，让GLib自动管理
+        *self.timeout.borrow_mut() = None;
+        *self.timeout_active.borrow_mut() = false;
     }
 
     fn update_config(&self, timeout_ms: u64) {
@@ -151,9 +161,8 @@ impl LearningController {
         self.hint_label.set_text(hint);
         self.window.set_opacity(1.0);
         
-        if let Some(old) = self.timeout.borrow_mut().take() {
-            let _ = old.remove();
-        }
+        // 只清除引用，不调用remove避免panic
+        *self.timeout.borrow_mut() = None;
 
         let win_weak = self.window.downgrade();
         let id = glib::timeout_add_local(
@@ -169,9 +178,8 @@ impl LearningController {
     }
 
     fn clear(&self) {
-        if let Some(old) = self.timeout.borrow_mut().take() {
-            let _ = old.remove();
-        }
+        // 完全不调用remove，让GLib自动管理
+        *self.timeout.borrow_mut() = None;
         self.window.set_opacity(0.0);
     }
 }
