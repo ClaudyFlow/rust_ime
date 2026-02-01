@@ -169,8 +169,7 @@ impl Processor {
                         self.selected = 0;
                     } else {
                         // Subsequent Tab press: Cycle
-                        if shift_pressed { if self.selected > 0 { self.selected -= 1; } }
-                        else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
+                        if shift_pressed { if self.selected > 0 { self.selected -= 1; } } else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
                     }
                     self.page = (self.selected / 5) * 5;
                     self.update_phantom_action()
@@ -181,7 +180,7 @@ impl Processor {
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
-                if self.preview_selected_candidate || self.buffer.ends_with(' ') {
+                if self.preview_selected_candidate {
                      if let Some(word) = self.candidates.get(self.selected) {
                         self.commit_candidate(word.clone())
                      } else {
@@ -229,10 +228,6 @@ impl Processor {
                     self.buffer.push(c); 
                     self.preview_selected_candidate = false;
                     self.lookup();
-                    let has_filter = self.buffer.char_indices().skip(1).any(|(_, c)| c.is_ascii_uppercase());
-                    if has_filter && self.candidates.len() == 1 { 
-                        return self.commit_candidate(self.candidates[0].clone());
-                    }
                     self.update_phantom_action()
                 } else { Action::Consume }
             }
@@ -280,14 +275,9 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
-        let mut pinyin_search = self.buffer.clone();
-        let mut filter_string = String::new();
-        if let Some((idx, _)) = self.buffer.char_indices().skip(1).find(|(_, c)| c.is_ascii_uppercase()) {
-            pinyin_search = self.buffer.get(..idx).unwrap_or(&self.buffer).to_string();
-            filter_string = self.buffer.get(idx..).unwrap_or("").to_lowercase();
-        }
+        let pinyin_search = self.buffer.clone();
         let pinyin_stripped = strip_tones(&pinyin_search).to_lowercase();
-        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('\'', "").replace('`', "");
+        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('"', "").replace('`', "");
 
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -308,101 +298,35 @@ impl Processor {
             }
         }
 
-        // 3. 分段稳定查找逻辑
+        // 3. 极简分段查找逻辑 (Greedy)
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
         if parts.len() > 1 {
-            // 有空格：执行“锁定前缀”逻辑
             let mut stable_prefix = String::new();
-            let ngram_model = self.ngrams.get(&self.current_profile.to_lowercase());
-
             for i in 0..parts.len() - 1 {
                 let part = parts[i].replace('\'', "").replace('`', "");
-                if part.starts_with('/') {
-                    stable_prefix.push_str(&part[1..]);
-                    continue;
+                let segments = self.segmenter.segment_greedy(&part, dict);
+                for seg in &segments {
+                    if seg.starts_with('/') { stable_prefix.push_str(&seg[1..]); continue; }
+                    let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                    if let Some((word, _)) = matches.first() { stable_prefix.push_str(word); }
+                    else { stable_prefix.push_str(&seg); }
                 }
-                // 尝试取该段的最佳候选 (优先全量匹配，否则执行 Viterbi)
-                let matches = if part.len() == 1 { 
-                    dict.search_bfs(&part, 1) 
-                } else if let Some(exact) = dict.get_all_exact(&part) {
-                    exact
-                } else {
-                    // 局部 Viterbi
-                    let mut best_word = part.clone();
-                    let segs = self.segmenter.segment_all(&part, dict);
-                    let mut best_score = 0;
-                    for s in segs {
-                        let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
-                        for seg in s {
-                            let options = if seg.len() == 1 { dict.search_bfs(&seg, 5) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                            let mut next_paths = Vec::new();
-                            for (prev_text, prev_score) in &current_paths {
-                                for (opt_word, hint) in &options {
-                                    let mut score = *prev_score;
-                                    if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
-                                    if let Some(model) = ngram_model {
-                                        let context: Vec<char> = prev_text.chars().collect();
-                                        score += model.get_score(&context, opt_word);
-                                    }
-                                    let mut new_text = prev_text.clone();
-                                    new_text.push_str(opt_word);
-                                    next_paths.push((new_text, score));
-                                }
-                            }
-                            next_paths.sort_by(|a, b| b.1.cmp(&a.1));
-                            next_paths.truncate(1);
-                            current_paths = next_paths;
-                        }
-                        if let Some((w, s)) = current_paths.first() {
-                            if *s > best_score { best_score = *s; best_word = w.clone(); }
-                        }
-                    }
-                    vec![(best_word, String::new())]
-                };
-
-                if let Some((word, _)) = matches.first() { stable_prefix.push_str(word); }
-                else { stable_prefix.push_str(&part); }
             }
 
             let last_part = parts.last().unwrap().replace('\'', "").replace('`', "");
-            let mut last_options = if last_part.starts_with('/') {
+            let last_options = if last_part.starts_with('/') {
                 vec![(last_part[1..].to_string(), "1000000".to_string())]
-            } else if last_part.len() == 1 { 
-                dict.search_bfs(&last_part, 10) 
-            } else { 
-                dict.get_all_exact(&last_part).unwrap_or_default() 
-            };
-
-            // 如果最后一段没有候选且长度 > 1，尝试 Viterbi
-            if last_options.is_empty() && last_part.len() > 1 && !last_part.starts_with('/') {
-                let segs = self.segmenter.segment_all(&last_part, dict);
-                for s in segs {
-                    let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
-                    for seg in s {
-                        let options = if seg.len() == 1 { dict.search_bfs(&seg, 5) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                        let mut next_paths = Vec::new();
-                        for (prev_text, prev_score) in &current_paths {
-                            for (opt_word, hint) in &options {
-                                let mut score = *prev_score;
-                                if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
-                                if let Some(model) = ngram_model {
-                                    let context: Vec<char> = prev_text.chars().collect();
-                                    score += model.get_score(&context, opt_word);
-                                }
-                                let mut new_text = prev_text.clone();
-                                new_text.push_str(opt_word);
-                                next_paths.push((new_text, score));
-                            }
-                        }
-                        next_paths.sort_by(|a, b| b.1.cmp(&a.1));
-                        next_paths.truncate(10);
-                        current_paths = next_paths;
-                    }
-                    for (w, _) in current_paths {
-                        last_options.push((w, String::new()));
-                    }
+            } else {
+                let segments = self.segmenter.segment_greedy(&last_part, dict);
+                let mut word = String::new();
+                for seg in &segments {
+                    if seg.starts_with('/') { word.push_str(&seg[1..]); continue; }
+                    let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                    if let Some((w, _)) = matches.first() { word.push_str(w); }
+                    else { word.push_str(&seg); }
                 }
-            }
+                vec![(word, String::new())]
+            };
             
             for (word, hint) in last_options {
                 let mut full = stable_prefix.clone();
@@ -410,51 +334,15 @@ impl Processor {
                 if seen.insert(full.clone()) { final_candidates.push((full, hint)); }
             }
         } else {
-            // 无空格：执行 Viterbi 全量寻径
-            let all_segmentations = self.segmenter.segment_all(&pinyin_stripped, dict);
-            let ngram_model = self.ngrams.get(&self.current_profile.to_lowercase());
-
-            for segments in all_segmentations {
-                if segments.len() <= 1 { continue; }
-                let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
-                for seg in segments {
-                    let options = if seg.starts_with('/') {
-                        vec![(seg[1..].to_string(), "1000000".to_string())]
-                    } else if seg.len() == 1 { 
-                        dict.search_bfs(&seg, 5) 
-                    } else { 
-                        dict.get_all_exact(&seg).unwrap_or_default() 
-                    };
-                    let mut next_paths = Vec::new();
-                    for (prev_text, prev_score) in &current_paths {
-                        for (opt_word, hint) in &options {
-                            let mut score = *prev_score;
-                            if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
-                            if let Some(model) = ngram_model {
-                                // 只有在有上下文时才应用 n-gram 模型（避免首词受单字/unigram 频率影响）
-                                if !prev_text.is_empty() {
-                                    let context: Vec<char> = prev_text.chars().collect();
-                                    score += model.get_score(&context, opt_word);
-                                }
-                            }
-                            let mut new_text = prev_text.clone();
-                            new_text.push_str(opt_word);
-                            next_paths.push((new_text, score));
-                        }
-                    }
-                    next_paths.sort_by(|a, b| b.1.cmp(&a.1));
-                    next_paths.truncate(10);
-                    current_paths = next_paths;
-                }
-                for (w, _) in current_paths {
-                    if seen.insert(w.clone()) { final_candidates.push((w, String::new())); }
-                }
+            let segments = self.segmenter.segment_greedy(&pinyin_for_dict, dict);
+            let mut word = String::new();
+            for seg in &segments {
+                if seg.starts_with('/') { word.push_str(&seg[1..]); continue; }
+                let matches = if seg.len() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                if let Some((w, _)) = matches.first() { word.push_str(w); }
+                else { word.push_str(&seg); }
             }
-        }
-
-        // 4. 辅助过滤 (仅在有大写辅码时触发)
-        if !filter_string.is_empty() {
-            final_candidates.retain(|(_, hint)| hint.to_lowercase().starts_with(&filter_string));
+            if seen.insert(word.clone()) { final_candidates.push((word, String::new())); }
         }
 
         self.candidates.clear();
@@ -471,8 +359,7 @@ impl Processor {
     }
 
     fn update_state(&mut self) {
-        if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
-        else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
+        if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; } else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
     }
 
     pub fn next_profile(&mut self) -> String {
@@ -496,7 +383,7 @@ pub fn is_digit(key: Key) -> bool {
 pub fn key_to_digit(key: Key) -> Option<usize> { match key { Key::KEY_1 => Some(1), Key::KEY_2 => Some(2), Key::KEY_3 => Some(3), Key::KEY_4 => Some(4), Key::KEY_5 => Some(5), Key::KEY_6 => Some(6), Key::KEY_7 => Some(7), Key::KEY_8 => Some(8), Key::KEY_9 => Some(9), Key::KEY_0 => Some(0), _ => None } }
 pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
     let c = match key {
-        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('\''), Key::KEY_SLASH => Some('/'), _ => None
+        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('"'), Key::KEY_SLASH => Some('/'), _ => None
     };
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }

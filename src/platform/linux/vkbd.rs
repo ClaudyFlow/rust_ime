@@ -173,11 +173,6 @@ impl Vkbd {
             },
             PasteMode::ShiftInsert => {
                 println!("[Vkbd] Injecting via Shift+Insert");
-                // 关键改进：先发送一次 ESC，强行关闭 Firefox 等浏览器的自动补全建议
-                // 这样后续的 Backspace 就能准确删掉拼音字符，而不是删掉自动补全的后缀
-                self.tap(Key::KEY_ESC);
-                thread::sleep(Duration::from_millis(5));
-
                 // 粘贴前增加同步延迟
                 thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTSHIFT, true);

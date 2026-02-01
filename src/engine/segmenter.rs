@@ -78,7 +78,7 @@ impl Segmenter {
         }
     }
 
-    fn segment_greedy(&self, pinyin: &str, dict: &Trie) -> Vec<String> {
+    pub fn segment_greedy(&self, pinyin: &str, dict: &Trie) -> Vec<String> {
         let mut segments = Vec::new();
         let mut current_offset = 0;
         while current_offset < pinyin.len() {
