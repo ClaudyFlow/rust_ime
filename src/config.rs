@@ -169,8 +169,6 @@ pub struct Hotkeys {
     pub toggle_traditional_gui: Shortcut,
     #[serde(default = "default_modern_gui_toggle")]
     pub toggle_modern_gui: Shortcut,
-    #[serde(default = "default_batch_convert")]
-    pub batch_convert_selection: Shortcut,
 }
 
 impl Default for Hotkeys {
@@ -185,7 +183,6 @@ impl Default for Hotkeys {
             trigger_caps_lock: default_caps_lock_toggle(),
             toggle_traditional_gui: default_trad_gui_toggle(),
             toggle_modern_gui: default_modern_gui_toggle(),
-            batch_convert_selection: default_batch_convert(),
         }
     }
 }
@@ -441,9 +438,6 @@ fn default_trad_gui_toggle() -> Shortcut {
 }
 fn default_modern_gui_toggle() -> Shortcut {
     Shortcut::new("ctrl+alt+h", "功能: 显示/隐藏 卡片式候选词")
-}
-fn default_batch_convert() -> Shortcut {
-    Shortcut::new("ctrl+alt+c", "心流: 选中拼音并按下此键，在通知栏查看转换结果")
 }
 
 // Helper for parse (unchanged)
