@@ -313,26 +313,96 @@ impl Processor {
         if parts.len() > 1 {
             // 有空格：执行“锁定前缀”逻辑
             let mut stable_prefix = String::new();
+            let ngram_model = self.ngrams.get(&self.current_profile.to_lowercase());
+
             for i in 0..parts.len() - 1 {
                 let part = parts[i].replace('\'', "").replace('`', "");
                 if part.starts_with('/') {
                     stable_prefix.push_str(&part[1..]);
                     continue;
                 }
-                // 取该段的最佳候选
-                let matches = if part.len() == 1 { dict.search_bfs(&part, 1) } else { dict.get_all_exact(&part).unwrap_or_default() };
+                // 尝试取该段的最佳候选 (优先全量匹配，否则执行 Viterbi)
+                let matches = if part.len() == 1 { 
+                    dict.search_bfs(&part, 1) 
+                } else if let Some(exact) = dict.get_all_exact(&part) {
+                    exact
+                } else {
+                    // 局部 Viterbi
+                    let mut best_word = part.clone();
+                    let segs = self.segmenter.segment_all(&part, dict);
+                    let mut best_score = 0;
+                    for s in segs {
+                        let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
+                        for seg in s {
+                            let options = if seg.len() == 1 { dict.search_bfs(&seg, 5) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                            let mut next_paths = Vec::new();
+                            for (prev_text, prev_score) in &current_paths {
+                                for (opt_word, hint) in &options {
+                                    let mut score = *prev_score;
+                                    if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
+                                    if let Some(model) = ngram_model {
+                                        let context: Vec<char> = prev_text.chars().collect();
+                                        score += model.get_score(&context, opt_word);
+                                    }
+                                    let mut new_text = prev_text.clone();
+                                    new_text.push_str(opt_word);
+                                    next_paths.push((new_text, score));
+                                }
+                            }
+                            next_paths.sort_by(|a, b| b.1.cmp(&a.1));
+                            next_paths.truncate(1);
+                            current_paths = next_paths;
+                        }
+                        if let Some((w, s)) = current_paths.first() {
+                            if *s > best_score { best_score = *s; best_word = w.clone(); }
+                        }
+                    }
+                    vec![(best_word, String::new())]
+                };
+
                 if let Some((word, _)) = matches.first() { stable_prefix.push_str(word); }
                 else { stable_prefix.push_str(&part); }
             }
 
             let last_part = parts.last().unwrap().replace('\'', "").replace('`', "");
-            let last_options = if last_part.starts_with('/') {
+            let mut last_options = if last_part.starts_with('/') {
                 vec![(last_part[1..].to_string(), "1000000".to_string())]
             } else if last_part.len() == 1 { 
                 dict.search_bfs(&last_part, 10) 
             } else { 
                 dict.get_all_exact(&last_part).unwrap_or_default() 
             };
+
+            // 如果最后一段没有候选且长度 > 1，尝试 Viterbi
+            if last_options.is_empty() && last_part.len() > 1 && !last_part.starts_with('/') {
+                let segs = self.segmenter.segment_all(&last_part, dict);
+                for s in segs {
+                    let mut current_paths: Vec<(String, u32)> = vec![("".to_string(), 0)];
+                    for seg in s {
+                        let options = if seg.len() == 1 { dict.search_bfs(&seg, 5) } else { dict.get_all_exact(&seg).unwrap_or_default() };
+                        let mut next_paths = Vec::new();
+                        for (prev_text, prev_score) in &current_paths {
+                            for (opt_word, hint) in &options {
+                                let mut score = *prev_score;
+                                if let Ok(weight) = hint.parse::<u32>() { score += weight / 100; }
+                                if let Some(model) = ngram_model {
+                                    let context: Vec<char> = prev_text.chars().collect();
+                                    score += model.get_score(&context, opt_word);
+                                }
+                                let mut new_text = prev_text.clone();
+                                new_text.push_str(opt_word);
+                                next_paths.push((new_text, score));
+                            }
+                        }
+                        next_paths.sort_by(|a, b| b.1.cmp(&a.1));
+                        next_paths.truncate(10);
+                        current_paths = next_paths;
+                    }
+                    for (w, _) in current_paths {
+                        last_options.push((w, String::new()));
+                    }
+                }
+            }
             
             for (word, hint) in last_options {
                 let mut full = stable_prefix.clone();
