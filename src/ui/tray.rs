@@ -17,7 +17,6 @@ pub enum TrayEvent {
     ToggleLearning,
     ReloadConfig,
     CyclePreview,
-    ClearKeystrokes,
 }
 
 pub struct ImeTray {

@@ -277,10 +277,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
                     }
                 }
-                ui::tray::TrayEvent::ClearKeystrokes => {
-                    // 清除按键屏幕显示（保留作为快捷键使用，例如 Ctrl+Alt+K 关闭时）
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
-                }
                 ui::tray::TrayEvent::ToggleLearning => {
                     let mut w = config_tray.write().unwrap();
                     w.appearance.learning_mode = !w.appearance.learning_mode;
