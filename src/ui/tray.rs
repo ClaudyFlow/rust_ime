@@ -165,11 +165,6 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: "清除按键显示".to_string(),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ClearKeystrokes); }),
-                ..Default::default()
-            }.into(),
-            StandardItem {
                 label: format!("学习模式: {}", if self.learning_mode { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleLearning); }),
                 ..Default::default()

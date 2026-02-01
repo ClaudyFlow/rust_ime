@@ -271,9 +271,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     tray_handle.update(|t| t.show_keystrokes = enabled);
                     if let Ok(mut w) = config_tray.write() { w.appearance.show_keystrokes = enabled; let _ = save_config(&w); }
+                    
+                    // 如果关闭按键屏幕显示，清除当前的按键显示
+                    if !enabled {
+                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
+                    }
                 }
                 ui::tray::TrayEvent::ClearKeystrokes => {
-                    // 清除按键屏幕显示
+                    // 清除按键屏幕显示（保留作为快捷键使用，例如 Ctrl+Alt+K 关闭时）
                     let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
                 }
                 ui::tray::TrayEvent::ToggleLearning => {
