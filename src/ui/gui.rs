@@ -34,20 +34,25 @@ use glib::SourceId;
 struct KeystrokeController {
     box_: Box,
     window: Window,
-    timeout: RefCell<Option<SourceId>>,
     timeout_ms: RefCell<u64>,
-    timeout_active: RefCell<bool>, // 标志位：定时器是否仍在活动
+    last_activity: RefCell<std::time::Instant>,
+    idle_timer: RefCell<Option<SourceId>>,
 }
 
 impl KeystrokeController {
     fn new(box_: Box, window: Window, initial_timeout: u64) -> Rc<Self> {
-        Rc::new(Self {
+        let controller = Rc::new(Self {
             box_,
             window,
-            timeout: RefCell::new(None),
             timeout_ms: RefCell::new(initial_timeout),
-            timeout_active: RefCell::new(false),
-        })
+            last_activity: RefCell::new(std::time::Instant::now()),
+            idle_timer: RefCell::new(None),
+        });
+        
+        // 启动全局空闲检查定时器
+        controller.start_idle_timer();
+        
+        controller
     }
 
     fn show_key(&self, key: &str) {
@@ -55,6 +60,12 @@ impl KeystrokeController {
         if key.is_empty() {
             return;
         }
+        
+        // 更新最后活动时间
+        *self.last_activity.borrow_mut() = std::time::Instant::now();
+        
+        // 确保窗口可见
+        self.window.set_opacity(1.0);
         
         // 检查是否已经有太多标签（防止内存泄漏）
         let mut count = 0;
@@ -81,9 +92,6 @@ impl KeystrokeController {
                 self.box_.remove(&first);
             }
         }
-
-        self.window.set_opacity(1.0);
-        self.reset_timeout();
     }
 
     fn clear_display_only(&self) {
@@ -94,44 +102,36 @@ impl KeystrokeController {
         self.window.set_opacity(0.0);
     }
 
-    fn clear_timeout(&self) {
-        // 完全不调用remove，只清除引用
-        // 让GLib自动清理已执行或即将执行的定时器
-        self.timeout.borrow_mut().take();
-        *self.timeout_active.borrow_mut() = false;
-    }
-
-    fn reset_timeout(&self) {
-        // 只清除引用，不调用remove避免panic
-        *self.timeout.borrow_mut() = None;
-        *self.timeout_active.borrow_mut() = true;
-
+    fn start_idle_timer(&self) {
         let box_weak = self.box_.downgrade();
         let win_weak = self.window.downgrade();
+        let last_activity = self.last_activity.clone();
         let timeout_ms = *self.timeout_ms.borrow();
-
+        
         let id = glib::timeout_add_local(
-            std::time::Duration::from_millis(timeout_ms),
+            std::time::Duration::from_millis(100), // 每100ms检查一次
             move || {
-                if let Some(b) = box_weak.upgrade() {
-                    while let Some(child) = b.first_child() {
-                        b.remove(&child);
+                // 检查是否需要清理
+                if let (Some(b), Some(w)) = (box_weak.upgrade(), win_weak.upgrade()) {
+                    // 计算空闲时间
+                    let idle_time = std::time::Instant::now().duration_since(*last_activity.borrow());
+                    if idle_time >= std::time::Duration::from_millis(timeout_ms) {
+                        // 空闲超时，清理显示
+                        while let Some(child) = b.first_child() {
+                            b.remove(&child);
+                        }
+                        w.set_opacity(0.0);
                     }
                 }
-                if let Some(w) = win_weak.upgrade() {
-                    w.set_opacity(0.0);
-                }
-                glib::Continue(false)
+                glib::Continue(true) // 保持定时器运行
             },
         );
-        *self.timeout.borrow_mut() = Some(id);
+        *self.idle_timer.borrow_mut() = Some(id);
     }
 
     fn clear(&self) {
         self.clear_display_only();
-        // 完全不调用remove，让GLib自动管理
-        *self.timeout.borrow_mut() = None;
-        *self.timeout_active.borrow_mut() = false;
+        // 全局定时器不停止，继续运行
     }
 
     fn update_config(&self, timeout_ms: u64) {
