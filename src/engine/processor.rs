@@ -369,9 +369,20 @@ impl Processor {
 
         if !is_precise_mode {
             let full_pinyin = buffer_normalized.to_lowercase();
+            // --- 2.1 中文/拼音精准匹配 ---
             if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
                 for (word, hint) in exact_matches {
                     if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                }
+            }
+
+            // --- 2.2 英文辅助输入 (长度 >= 3 时触发) ---
+            if full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                if let Some(en_dict) = self.tries.get("english") {
+                    let en_matches = en_dict.search_bfs(&full_pinyin, 10);
+                    for (word, hint) in en_matches {
+                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    }
                 }
             }
         } else {
