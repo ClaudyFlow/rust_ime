@@ -263,7 +263,7 @@ impl Processor {
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
         
-        let mut target = if !self.candidates.is_empty() {
+        let mut target = if self.preview_selected_candidate && !self.candidates.is_empty() {
              self.candidates[self.selected.min(self.candidates.len()-1)].clone()
         } else {
              self.buffer.clone()
