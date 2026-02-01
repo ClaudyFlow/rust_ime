@@ -31,11 +31,6 @@ impl EvdevHost {
         notify_tx: Sender<NotifyEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
-        let fd = dev.as_raw_fd();
-        unsafe {
-            let flags = libc::fcntl(fd, libc::F_GETFL);
-            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
-        }
         let vkbd = Vkbd::new(&dev)?;
         Ok(Self {
             processor,
@@ -63,40 +58,8 @@ impl InputMethodHost for EvdevHost {
 
         while !self.should_exit.load(Ordering::Relaxed) {
             let events: Vec<_> = if let Ok(mut dev) = self.dev.lock() {
-                // 使用非阻塞读取，配合超时检查
-                match dev.fetch_events() {
-                    Ok(evs) => evs.collect(),
-                    Err(_) => vec![],
-                }
+                dev.fetch_events()?.collect()
             } else { break; };
-
-            if events.is_empty() {
-                // 检查数字超时
-                let mut p = self.processor.lock().unwrap();
-                let action = p.check_digit_timeout();
-                match action {
-                    Action::DeleteAndEmit { delete, insert } => {
-                        if let Ok(mut vkbd) = self.vkbd.lock() {
-                            if delete > 0 { vkbd.backspace(delete); }
-                            if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
-                        }
-                        drop(p);
-                        self.update_gui();
-                        self.notify_preview();
-                    }
-                    _ => {
-                        // 如果 digit_buffer 不为空，可能还在等待输入，但我们需要更新 GUI 以显示当前的累加选择效果
-                        let needs_update = !p.digit_buffer.is_empty();
-                        drop(p);
-                        if needs_update {
-                            self.update_gui();
-                            self.notify_preview();
-                        }
-                    }
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                continue;
-            }
 
             for ev in events {
                 if let InputEventKind::Key(key) = ev.kind() {

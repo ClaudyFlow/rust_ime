@@ -50,8 +50,6 @@ pub struct Processor {
     pub segmenter: Segmenter,
     pub best_segmentation: Vec<String>,
     pub joined_sentence: String,
-    pub digit_buffer: String,
-    pub last_digit_time: std::time::Instant,
     
     pub show_candidates: bool,
     pub show_modern_candidates: bool,
@@ -103,8 +101,6 @@ impl Processor {
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
             joined_sentence: String::new(),
-            digit_buffer: String::new(),
-            last_digit_time: std::time::Instant::now(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
@@ -136,7 +132,6 @@ impl Processor {
         self.candidate_hints.clear();
         self.best_segmentation.clear();
         self.joined_sentence.clear();
-        self.digit_buffer.clear();
         self.selected = 0;
         self.page = 0;
         self.state = ImeState::Direct;
@@ -241,24 +236,9 @@ impl Processor {
             }
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                let now = std::time::Instant::now();
-                
-                if !self.digit_buffer.is_empty() && now.duration_since(self.last_digit_time).as_millis() > 500 {
-                    self.digit_buffer.clear();
-                }
-                
-                self.digit_buffer.push_str(&digit.to_string());
-                self.last_digit_time = now;
-                
-                let val = self.digit_buffer.parse::<usize>().unwrap_or(0);
-                if val > 0 {
-                    let idx = self.page + (val - 1);
-                    if idx < self.candidates.len() {
-                        self.selected = idx;
-                        self.preview_selected_candidate = true;
-                    }
-                }
-                Action::Consume
+                self.buffer.push_str(&digit.to_string());
+                self.lookup();
+                self.update_phantom_action()
             }
             _ if is_letter(key) => {
                 if let Some(c) = key_to_char(key, shift_pressed) {
@@ -326,8 +306,8 @@ impl Processor {
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
         let pinyin_stripped = strip_tones(&self.buffer).to_lowercase();
-        // 如果包含空格、分号或者是较长拼音，进入长句模式
-        self.input_mode = if pinyin_stripped.contains(' ') || pinyin_stripped.contains('\'') || pinyin_stripped.len() > 7 {
+        // 含有空格、数字或分号，或者是较长拼音，进入长句/精准模式
+        self.input_mode = if pinyin_stripped.contains(' ') || pinyin_stripped.contains('\'') || pinyin_stripped.chars().any(|c| c.is_ascii_digit()) || pinyin_stripped.len() > 7 {
             InputMode::Long
         } else {
             InputMode::Single
@@ -336,71 +316,84 @@ impl Processor {
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('\'', "").replace('`', "");
-        
-        // --- 1. 计算 Greedy 结果 (总是需要，作为长句模式首选) ---
+        // --- 1. 计算精准 Greedy 结果 ---
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
         let mut all_segments = Vec::new();
         let mut greedy_word = String::new();
         
         for part in parts {
-            let part_clean = part.replace('\'', "").replace('`', "");
+            // 解析 part，提取末尾数字索引（如 "hui3" -> "hui", 3）
+            let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
+                let p = &part[..first_digit_idx];
+                let d = part[first_digit_idx..].parse::<usize>().unwrap_or(1);
+                (p, Some(d))
+            } else {
+                (part, None)
+            };
+
+            let part_clean = pinyin_part.replace('\'', "").replace('`', "");
             let segments = self.segmenter.segment_greedy(&part_clean, dict);
-            for seg in segments {
+            
+            for (i, seg) in segments.iter().enumerate() {
                 all_segments.push(seg.clone());
                 if seg.starts_with('/') {
                     greedy_word.push_str(&seg[1..]);
                 } else {
-                    let matches = if seg.chars().count() == 1 { dict.search_bfs(&seg, 1) } else { dict.get_all_exact(&seg).unwrap_or_default() };
-                    if let Some((w, _)) = matches.first() { greedy_word.push_str(w); }
-                    else { greedy_word.push_str(&seg); }
+                    let matches = if seg.chars().count() == 1 { dict.search_bfs(seg, 10) } else { dict.get_all_exact(seg).unwrap_or_default() };
+                    
+                    // 如果是该 part 的最后一个 segment 且有指定索引
+                    let word = if i == segments.len() - 1 && specified_idx.is_some() {
+                        let idx = specified_idx.unwrap().saturating_sub(1);
+                        matches.get(idx).map(|(w, _)| w.clone()).unwrap_or_else(|| matches.first().map(|(w, _)| w.clone()).unwrap_or_else(|| seg.clone()))
+                    } else {
+                        matches.first().map(|(w, _)| w.clone()).unwrap_or_else(|| seg.clone())
+                    };
+                    greedy_word.push_str(&word);
                 }
             }
         }
         self.best_segmentation = all_segments;
         self.joined_sentence = greedy_word.clone();
 
-        // --- 2. 填充候选词 ---
+        // --- 2. 组装候选词 ---
+        let pinyin_for_dict = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+        
         if self.input_mode == InputMode::Long {
-            // 长句模式：Greedy 结果排第一
             if seen.insert(greedy_word.clone()) {
                 final_candidates.push((greedy_word, String::new()));
             }
-            // 之后是精确匹配
             if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
                 for (word, hint) in exact_matches {
                     if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
         } else {
-            // 单词模式：精确匹配排第一
             if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
                 for (word, hint) in exact_matches {
                     if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
-            // 之后是 Greedy
             if seen.insert(greedy_word.clone()) {
                 final_candidates.push((greedy_word, String::new()));
             }
         }
 
-        // 英语语义映射 (English to Chinese)
-        let buf_lower = self.buffer.to_lowercase();
+        // 语义映射
+        let buf_lower = self.buffer.to_lowercase().chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
         if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
             for zh in zh_words {
                 if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
             }
         }
 
-        // 增加对最后一个分词的候选词
+        // 最后分词候选
         if self.best_segmentation.len() > 1 {
             if let Some(last_seg) = self.best_segmentation.last() {
-                let last_seg_clean = last_seg.trim_start_matches('/');
-                if let Some(last_matches) = dict.get_all_exact(last_seg_clean) {
-                    for (word, hint) in last_matches {
-                        if seen.insert(word.clone()) {
-                            final_candidates.push((word, hint));
+                let last_seg_clean = last_seg.trim_start_matches('/').chars().filter(|c| !c.is_ascii_digit()).collect::<String>();
+                if !last_seg_clean.is_empty() {
+                    if let Some(last_matches) = dict.get_all_exact(&last_seg_clean) {
+                        for (word, hint) in last_matches {
+                            if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                         }
                     }
                 }
@@ -409,7 +402,6 @@ impl Processor {
 
         self.candidates.clear();
         self.candidate_hints.clear();
-        self.digit_buffer.clear();
         for (cand, hint) in final_candidates {
             self.candidates.push(cand);
             self.candidate_hints.push(hint);
@@ -423,14 +415,6 @@ impl Processor {
     fn update_state(&mut self) {
         if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
         else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
-    }
-
-    pub fn check_digit_timeout(&mut self) -> Action {
-        if self.digit_buffer.is_empty() { return Action::Consume; }
-        if std::time::Instant::now().duration_since(self.last_digit_time).as_millis() > 400 {
-            self.digit_buffer.clear();
-        }
-        Action::Consume
     }
 
     pub fn next_profile(&mut self) -> String {
