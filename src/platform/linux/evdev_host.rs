@@ -69,7 +69,7 @@ impl InputMethodHost for EvdevHost {
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, batch_conv) = {
                             let conf = self.config.read().unwrap();
                             (
                                 parse_key(&conf.hotkeys.switch_language.key),
@@ -80,9 +80,29 @@ impl InputMethodHost for EvdevHost {
                                 parse_key(&conf.hotkeys.cycle_paste_method.key),
                                 parse_key(&conf.hotkeys.toggle_traditional_gui.key),
                                 parse_key(&conf.hotkeys.toggle_modern_gui.key),
+                                parse_key(&conf.hotkeys.batch_convert_selection.key),
                             )
                         };
                         
+                        // 0. 选中转换 (心流模式)
+                        if is_combo(&held_keys, &batch_conv) {
+                            if let Ok(mut vkbd) = self.vkbd.lock() {
+                                vkbd.copy_selection();
+                                if let Some(text) = vkbd.get_clipboard_text() {
+                                    let mut p = self.processor.lock().unwrap();
+                                    let old_buf = p.buffer.clone();
+                                    p.buffer = text.trim().to_string();
+                                    p.lookup();
+                                    if let Some(best) = p.candidates.first() {
+                                        let _ = self.notify_tx.send(NotifyEvent::Message("心流转换结果".into(), best.clone()));
+                                    }
+                                    p.buffer = old_buf;
+                                    p.lookup();
+                                }
+                            }
+                            continue;
+                        }
+
                         // 1. 中英切换
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
                             let mut p = self.processor.lock().unwrap();
