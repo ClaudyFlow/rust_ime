@@ -272,7 +272,7 @@ impl EvdevHost {
                 return;
             }
 
-            let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join("'") };
+                let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
             
             // 打印到终端 (前台模式)
             if !p.candidates.is_empty() {
@@ -304,7 +304,7 @@ impl EvdevHost {
             let _ = self.notify_tx.send(NotifyEvent::Close);
             return; 
         }
-        let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join("'") };
+            let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
         let mut body = String::new();
         let start = p.page;
         let end = (start + 5).min(p.candidates.len());

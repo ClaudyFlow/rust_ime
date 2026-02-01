@@ -90,8 +90,8 @@ impl Vkbd {
     fn send_text_internal(&mut self, text: &str, highlight: bool) {
         if text.is_empty() { return; }
 
-        // FAST PATH: If string is pure ASCII and no highlight is needed, type directly
-        if !highlight && text.chars().all(|c| c.is_ascii()) {
+        // FAST PATH: Only for supported lowercase, digits and basic punctuation
+        if !highlight && text.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || " /'.,;[]\\-=`".contains(c)) {
             for c in text.chars() {
                 if let Some(key) = char_to_key(c) {
                     self.tap(key);
@@ -313,6 +313,16 @@ fn char_to_key(c: char) -> Option<Key> {
         '9' => Some(Key::KEY_9),
         '\'' => Some(Key::KEY_APOSTROPHE),
         ' ' => Some(Key::KEY_SPACE),
+        ',' => Some(Key::KEY_COMMA),
+        '.' => Some(Key::KEY_DOT),
+        '/' => Some(Key::KEY_SLASH),
+        ';' => Some(Key::KEY_SEMICOLON),
+        '[' => Some(Key::KEY_LEFTBRACE),
+        ']' => Some(Key::KEY_RIGHTBRACE),
+        '\\' => Some(Key::KEY_BACKSLASH),
+        '-' => Some(Key::KEY_MINUS),
+        '=' => Some(Key::KEY_EQUAL),
+        '`' => Some(Key::KEY_GRAVE),
         _ => None,
     }
 }

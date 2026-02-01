@@ -132,7 +132,7 @@ impl Processor {
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
         if !is_press {
             if self.buffer.is_empty() { return Action::PassThrough; }
-            if is_letter(key) || is_digit(key) || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_TAB | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
+            if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_TAB | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
                 return Action::Consume; 
             }
             return Action::PassThrough;
@@ -303,7 +303,7 @@ impl Processor {
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('"', "").replace('`', "");
+        let pinyin_for_dict = pinyin_stripped.replace(' ', "").replace('\'', "").replace('`', "");
         if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
             for (word, hint) in exact_matches {
                 if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
@@ -322,7 +322,7 @@ impl Processor {
         let mut greedy_word = String::new();
         
         for part in parts {
-            let part_clean = part.replace('"', "").replace('`', "");
+            let part_clean = part.replace('\'', "").replace('`', "");
             let segments = self.segmenter.segment_greedy(&part_clean, dict);
             for seg in segments {
                 all_segments.push(seg.clone());
