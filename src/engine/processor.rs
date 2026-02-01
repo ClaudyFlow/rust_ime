@@ -203,18 +203,22 @@ impl Processor {
             Key::KEY_SPACE => { 
                 if self.preview_selected_candidate {
                      if let Some(word) = self.candidates.get(self.selected) {
-                        self.commit_candidate(word.clone())
-                     } else {
-                        self.commit_candidate(self.joined_sentence.clone())
+                        return self.commit_candidate(word.clone());
                      }
-                } else if !self.joined_sentence.is_empty() {
-                    self.commit_candidate(self.joined_sentence.clone())
-                } else {
-                    self.buffer.push(' ');
-                    self.preview_selected_candidate = false;
-                    self.lookup();
-                    self.update_phantom_action()
                 }
+                
+                // 如果缓冲区已经以空格结尾，则第二次按空格表示确认（上屏）
+                if self.buffer.ends_with(' ') {
+                    if !self.joined_sentence.is_empty() {
+                        return self.commit_candidate(self.joined_sentence.clone());
+                    }
+                }
+
+                // 否则，将空格作为分隔符加入 buffer，并进行 lookup
+                self.buffer.push(' ');
+                self.preview_selected_candidate = false;
+                self.lookup();
+                self.update_phantom_action()
             }
             Key::KEY_ENTER => { 
                 if self.preview_selected_candidate {
