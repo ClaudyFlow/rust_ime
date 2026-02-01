@@ -154,7 +154,10 @@ impl Processor {
         } else if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
             if let Some(zh_puncs) = self.punctuation.get(punc_key) { 
                 if let Some(first) = zh_puncs.first() {
-                    return Action::Emit(first.clone());
+                    self.buffer.push_str(first);
+                    self.state = ImeState::Composing;
+                    self.lookup();
+                    return self.update_phantom_action();
                 }
             }
             Action::PassThrough
@@ -193,11 +196,12 @@ impl Processor {
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
-                if self.preview_selected_candidate {
+                if self.preview_selected_candidate || self.buffer.ends_with(' ') {
                      if let Some(word) = self.candidates.get(self.selected) {
-                        self.commit_candidate(word.clone())
+                        let out = if self.buffer.ends_with(' ') { word.trim_end().to_string() } else { word.clone() };
+                        self.commit_candidate(out)
                      } else {
-                        let out = self.buffer.clone();
+                        let out = self.buffer.trim_end().to_string();
                         self.commit_candidate(out)
                      }
                 } else {
@@ -248,10 +252,10 @@ impl Processor {
                 let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
                 let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
                 
-                let word = if let Some(w) = self.candidates.get(self.selected) { w.clone() } else { self.buffer.clone() };
-                let del = self.phantom_text.chars().count();
-                self.reset();
-                Action::DeleteAndEmit { delete: del, insert: format!("{}{}", word, zh_punc) }
+                self.buffer.push_str(&zh_punc);
+                self.preview_selected_candidate = false;
+                self.lookup();
+                self.update_phantom_action()
             }
             _ => Action::PassThrough,
         }
