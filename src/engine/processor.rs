@@ -273,13 +273,7 @@ impl Processor {
 
         // 2. 词典全量匹配 (高优先级)
         if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
-            let mut matches = exact_matches;
-            // 按照权重排序 (如果 hint 是数字)
-            matches.sort_by(|a, b| {
-                let wa = a.1.parse::<u32>().unwrap_or(0);
-                let wb = b.1.parse::<u32>().unwrap_or(0);
-                wb.cmp(&wa)
-            });
+            let matches = exact_matches;
             for (word, hint) in matches {
                 if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
