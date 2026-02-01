@@ -5,7 +5,7 @@
     "preview_mode": "pinyin",
     "show_candidates": false,
     "show_modern_candidates": true,
-    "show_keystrokes": true,
+    "show_keystrokes": false,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
     "candidate_margin_y": 120,
@@ -23,14 +23,14 @@
     "keystroke_bg_color": "rgba(20, 20, 20, 0.85)",
     "keystroke_font_size": 11,
     "keystroke_timeout_ms": 1000,
-    "learning_mode": true,
+    "learning_mode": false,
     "learning_interval_sec": 10,
     "learning_dict_path": "dicts/chinese/chars.json"
   },
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "english",
+    "default_profile": "chinese",
     "paste_method": "ctrl_v"
   },
   "hotkeys": {
@@ -69,6 +69,10 @@
     "toggle_modern_gui": {
       "key": "ctrl+alt+h",
       "description": "功能: 显示/隐藏 卡片式候选词"
+    },
+    "toggle_keystrokes": {
+      "key": "ctrl+alt+k",
+      "description": "功能: 显示/隐藏 按键屏幕显示"
     }
   },
   "files": {
@@ -80,6 +84,13 @@
         "dicts": [
           "dicts/chars.json",
           "dicts/basic_words.json"
+        ]
+      },
+      {
+        "name": "English",
+        "description": "英文输入方案",
+        "dicts": [
+          "dicts/english"
         ]
       },
       {

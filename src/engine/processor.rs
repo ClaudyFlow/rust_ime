@@ -376,13 +376,12 @@ impl Processor {
                 }
             }
 
-            // --- 2.2 英文辅助输入 (长度 >= 3 时触发) ---
-            if full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                if let Some(en_dict) = self.tries.get("english") {
-                    let en_matches = en_dict.search_bfs(&full_pinyin, 10);
-                    for (word, hint) in en_matches {
-                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                    }
+            // --- 2.2 前缀模糊搜索 (非中文方案使用) ---
+            // 中文方案只使用精准匹配，避免混用英文结果
+            if self.current_profile != "chinese" && full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                let prefix_matches = dict.search_bfs(&full_pinyin, 10);
+                for (word, hint) in prefix_matches {
+                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
         } else {
