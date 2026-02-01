@@ -340,11 +340,20 @@ impl Processor {
             all_segments.push(part_clean.clone());
 
             // 严格匹配整个 part_clean，绝不进行分割
-            let matches = if part_clean.len() == 1 {
+            let mut matches = if part_clean.len() == 1 {
                 dict.search_bfs(&part_clean, 10)
             } else {
                 dict.get_all_exact(&part_clean).unwrap_or_default()
             };
+
+            // 补充英语语义映射 (例如 apple -> 苹)
+            if let Some(zh_words) = self.en_to_zh.get(&part_clean) {
+                for zh in zh_words {
+                    if !matches.iter().any(|(w, _)| w == zh) {
+                        matches.push((zh.clone(), String::new()));
+                    }
+                }
+            }
 
             let idx = specified_idx.unwrap_or(1).saturating_sub(1);
             if let Some((w, _)) = matches.get(idx) {
