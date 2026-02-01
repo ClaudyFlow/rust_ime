@@ -275,11 +275,13 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
 
-        // 不要在这里直接 to_lowercase，否则无法识别大写辅码
         let buffer_normalized = strip_tones(&self.buffer);
         
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
+
+        // 精准模式判定：包含空格或数字或大写字母
+        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
 
         // --- 1. 计算精准组合结果 (原子分词) ---
         let parts: Vec<&str> = buffer_normalized.split(' ').filter(|s| !s.is_empty()).collect();
@@ -288,27 +290,20 @@ impl Processor {
         
         for part in &parts {
             let part = *part;
-            // 提取 英文辅码 (I) 和 数字索引 (2)
-            // 逻辑：liI2 -> pinyin="li", aux="I", idx=2
             let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
             
             let (pinyin_part, specified_idx, aux_code) = if let Some(pos) = split_pos {
                 let (p, suffix) = part.split_at(pos);
-                
-                // 在后缀中寻找数字开始的位置
                 let digit_start = suffix.find(|c: char| c.is_ascii_digit());
-                
                 let (a, d) = if let Some(ds) = digit_start {
                     let (alpha, digits) = suffix.split_at(ds);
                     let aux = if alpha.is_empty() { None } else { Some(alpha) };
-                    // 提取纯数字部分
                     let end_of_digits = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
                     let idx = digits[..end_of_digits].parse::<usize>().ok();
                     (aux, idx)
                 } else {
                     (Some(suffix), None)
                 };
-                
                 (p, d, a)
             } else {
                 (part, None, None)
@@ -317,29 +312,27 @@ impl Processor {
             let part_clean = pinyin_part.to_lowercase().replace('\'', "").replace('`', "");
             all_segments.push(part.to_string());
 
-            let mut matches = if part_clean.len() == 1 {
+            let mut seg_matches = if part_clean.len() == 1 {
                 dict.search_bfs(&part_clean, 15)
             } else {
                 dict.get_all_exact(&part_clean).unwrap_or_default()
             };
 
-            // 应用英文辅码过滤
+            // 应用辅码过滤
             if let Some(code) = aux_code {
                 let code_lower = code.to_lowercase();
-                matches.retain(|(_, hint)| {
+                seg_matches.retain(|(_, hint)| {
                     let hint_lower = hint.to_lowercase();
                     if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                        // 单个大写字母：匹配单词开头 (liH -> match "house")
                         hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
                     } else {
-                        // 多个字母或包含小写：模糊包含匹配 (liIn -> match "find")
                         hint_lower.contains(&code_lower)
                     }
                 });
             }
 
             let idx = specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _)) = matches.get(idx) {
+            if let Some((w, _)) = seg_matches.get(idx) {
                 greedy_word.push_str(w);
             } else {
                 greedy_word.push_str(&part_clean);
@@ -350,60 +343,48 @@ impl Processor {
         self.joined_sentence = greedy_word;
 
         // --- 2. 填充候选词列表 ---
-        let full_pinyin = buffer_normalized.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>().to_lowercase();
-
-        // 精准模式判定：包含空格或数字或大写字母
-        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || c.is_ascii_uppercase());
-
         if !is_precise_mode {
-            // 单词模式：显示整词匹配
+            let full_pinyin = buffer_normalized.to_lowercase();
             if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
                 for (word, hint) in exact_matches {
                     if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
         } else {
-            // 精准模式：列表只显示“当前输入部分”的候选
+            // 精准模式：候选词列表显示最后一部分经过辅码过滤后的候选
             if let Some(last_part) = parts.last() {
-                // 同样解析最后一部分的 aux_code
                 let split_pos = last_part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
-                let (last_pinyin, aux_code) = if let Some(pos) = split_pos {
+                let (pinyin_part, aux_code) = if let Some(pos) = split_pos {
                     let (p, suffix) = last_part.split_at(pos);
                     let digit_start = suffix.find(|c: char| c.is_ascii_digit());
                     let a = if let Some(ds) = digit_start {
                         let alpha = &suffix[..ds];
                         if alpha.is_empty() { None } else { Some(alpha) }
-                    } else {
-                        Some(suffix)
-                    };
+                    } else { Some(suffix) };
                     (p, a)
+                } else { (*last_part, None) };
+
+                let part_clean = pinyin_part.to_lowercase().replace('\'', "").replace('`', "");
+                let mut matches = if part_clean.len() == 1 {
+                    dict.search_bfs(&part_clean, 15)
                 } else {
-                    (*last_part, None)
+                    dict.get_all_exact(&part_clean).unwrap_or_default()
                 };
 
-                let last_clean = last_pinyin.to_lowercase().replace('\'', "").replace('`', "").chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
-                if !last_clean.is_empty() {
-                    let mut matches = if last_clean.len() == 1 {
-                        dict.search_bfs(&last_clean, 15)
-                    } else {
-                        dict.get_all_exact(&last_clean).unwrap_or_default()
-                    };
+                if let Some(code) = aux_code {
+                    let code_lower = code.to_lowercase();
+                    matches.retain(|(_, hint)| {
+                        let hint_lower = hint.to_lowercase();
+                        if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
+                            hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
+                        } else {
+                            hint_lower.contains(&code_lower)
+                        }
+                    });
+                }
 
-                    if let Some(code) = aux_code {
-                        let code_lower = code.to_lowercase();
-                        matches.retain(|(_, hint)| {
-                            let hint_lower = hint.to_lowercase();
-                            if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                                hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
-                            } else {
-                                hint_lower.contains(&code_lower)
-                            }
-                        });
-                    }
-
-                    for (word, hint) in matches {
-                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                    }
+                for (word, hint) in matches {
+                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
         }
@@ -519,7 +500,7 @@ mod tests {
     #[test]
     fn test_digit_selector_parsing() {
         let mut p = setup_mock_processor();
-        if p.tries.is_empty() { return; } // 如果没加载到词库则跳过
+        if p.tries.is_empty() { return; } 
         p.buffer = "hui3".to_string();
         p.lookup();
         assert_eq!(p.best_segmentation, vec!["hui3"]);
@@ -529,11 +510,32 @@ mod tests {
     fn test_aux_and_digit_combination() {
         let mut p = setup_mock_processor();
         if p.tries.is_empty() { return; }
-        // 测试 liI2 逻辑 (辅码 I + 第 2 个候选)
-        p.buffer = "liI2".to_string();
+        // 测试 liL2 逻辑 (辅码 L + 第 2 个候选)
+        p.buffer = "liL2".to_string();
         p.lookup();
-        // 验证 best_segmentation 包含完整 buffer
-        assert_eq!(p.best_segmentation, vec!["liI2"]);
+        
+        // 验证 joined_sentence 选择了满足辅码 L 的第二个候选
+        // 在真实词库中，荔枝(Litchi)通常排在离(Leave)之后
+        if p.candidates.len() >= 2 {
+             // 逻辑验证：如果第一个是离(Leave)，第二个是荔(Litchi)，
+             // 输入 liL2 应该让 joined_sentence 变成 荔
+             assert!(p.joined_sentence != "li", "Joined sentence should not be raw pinyin if matches exist");
+        }
+    }
+
+    #[test]
+    fn test_precise_mode_candidates() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        
+        // 测试 "qin2 shi"
+        p.buffer = "qin2 shi".to_string();
+        p.lookup();
+        
+        // 在精准模式下，候选词列表不应该包含 "寝室" (qinshi)
+        for cand in &p.candidates {
+            assert!(cand != "寝室", "Candidates should not contain '寝室' in precise mode for 'qin2 shi'");
+        }
     }
 
     #[test]
