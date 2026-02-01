@@ -342,7 +342,8 @@ impl Processor {
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
             
-            // 如果是 Long 模式（意味着有空格或数字），我们不对该 part 进行贪婪分割，除非它完全没匹配
+            // 精准模式：绝对禁止自动分词
+            // 如果用户输入 zheyang 作为一个 part，且词库没有 zheyang 这个词，它必须保持 zheyang，而不是拆成 zhe yang
             if self.input_mode == InputMode::Long {
                 let matches = if part_clean.len() == 1 {
                     dict.search_bfs(&part_clean, 10)
@@ -350,16 +351,19 @@ impl Processor {
                     dict.get_all_exact(&part_clean).unwrap_or_default()
                 };
 
-                if !matches.is_empty() {
-                    let idx = specified_idx.unwrap_or(1).saturating_sub(1);
-                    let word = matches.get(idx).map(|(w, _)| w.clone()).unwrap_or_else(|| matches[0].0.clone());
-                    greedy_word.push_str(&word);
-                    all_segments.push(part_clean);
-                    continue;
-                }
+                let idx = specified_idx.unwrap_or(1).saturating_sub(1);
+                let word = if let Some((w, _)) = matches.get(idx) {
+                    w.clone()
+                } else {
+                    // 没有精准匹配，保持拼音原文
+                    part_clean.clone()
+                };
+                greedy_word.push_str(&word);
+                all_segments.push(part_clean);
+                continue;
             }
 
-            // 备选：如果不是精准匹配，或者非精准模式，使用贪婪分割
+            // 备选：非精准模式（单词录入模式），使用贪婪分割
             let segments = self.segmenter.segment_greedy(&part_clean, dict);
             for (i, seg) in segments.iter().enumerate() {
                 all_segments.push(seg.clone());

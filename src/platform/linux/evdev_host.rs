@@ -5,7 +5,6 @@ use crate::platform::linux::vkbd::Vkbd;
 use crate::config::Config;
 use crate::ui::GuiEvent;
 use evdev::{Device, InputEventKind, Key};
-use std::os::unix::io::AsRawFd;
 use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
