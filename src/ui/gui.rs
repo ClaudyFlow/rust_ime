@@ -52,12 +52,27 @@ impl KeystrokeController {
         let label = Label::new(Some(key));
         label.add_css_class("key-label");
         self.box_.append(&label);
+        
+        let mut count = 0;
+        let mut next = self.box_.first_child();
+        while let Some(child) = next {
+            count += 1;
+            next = child.next_sibling();
+        }
+        if count > 15 {
+            if let Some(first) = self.box_.first_child() {
+                self.box_.remove(&first);
+            }
+        }
+
         self.window.set_opacity(1.0);
         self.reset_timeout();
     }
 
     fn reset_timeout(&self) {
         if let Some(old) = self.timeout.borrow_mut().take() {
+            // 在某些 glib-rs 版本中，如果 source 已经执行，remove 会返回 Err。
+            // 我们显式忽略它，因为这只是为了确保旧的 timeout 不会干扰。
             let _ = old.remove();
         }
 
@@ -125,7 +140,7 @@ impl LearningController {
 
         let win_weak = self.window.downgrade();
         let id = glib::timeout_add_local(
-            std::time::Duration::from_secs(5), // Fixed 5s display
+            std::time::Duration::from_secs(5),
             move || {
                 if let Some(w) = win_weak.upgrade() {
                     w.set_opacity(0.0);
