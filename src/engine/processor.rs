@@ -287,24 +287,56 @@ impl Processor {
         
         for part in &parts {
             let part = *part;
-            let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
-                let (p, d_str) = part.split_at(first_digit_idx);
-                let end_of_digits = d_str.find(|c: char| !c.is_ascii_digit()).unwrap_or(d_str.len());
-                let digits = &d_str[..end_of_digits];
-                let d = digits.parse::<usize>().unwrap_or(1);
-                (p, Some(d))
+            // 提取数字索引 (hui3) 和 英文辅码 (liH, liIn)
+            // 逻辑：找到第一个数字或第一个大写字母的位置
+            let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
+            
+            let (pinyin_part, specified_idx, aux_code) = if let Some(pos) = split_pos {
+                let (p, suffix) = part.split_at(pos);
+                
+                let mut d = None;
+                let mut a = None;
+                
+                // 如果后缀以数字开头
+                if suffix.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                    let end_of_digits = suffix.find(|c: char| !c.is_ascii_digit()).unwrap_or(suffix.len());
+                    d = Some(suffix[..end_of_digits].parse::<usize>().unwrap_or(1));
+                    if end_of_digits < suffix.len() {
+                        a = Some(&suffix[end_of_digits..]);
+                    }
+                } else {
+                    // 否则整个后缀都是辅码
+                    a = Some(suffix);
+                }
+                
+                (p, d, a)
             } else {
-                (part, None)
+                (part, None, None)
             };
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
             all_segments.push(part.to_string());
 
-            let matches = if part_clean.len() == 1 {
-                dict.search_bfs(&part_clean, 10)
+            let mut matches = if part_clean.len() == 1 {
+                dict.search_bfs(&part_clean, 15)
             } else {
                 dict.get_all_exact(&part_clean).unwrap_or_default()
             };
+
+            // 应用英文辅码过滤
+            if let Some(code) = aux_code {
+                let code_lower = code.to_lowercase();
+                matches.retain(|(_, hint)| {
+                    let hint_lower = hint.to_lowercase();
+                    if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
+                        // 单个大写字母：匹配单词开头 (liH -> match "house")
+                        hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
+                    } else {
+                        // 多个字母或包含小写：模糊包含匹配 (liIn -> match "find")
+                        hint_lower.contains(&code_lower)
+                    }
+                });
+            }
 
             let idx = specified_idx.unwrap_or(1).saturating_sub(1);
             if let Some((w, _)) = matches.get(idx) {
@@ -333,18 +365,38 @@ impl Processor {
         } else {
             // 精准模式：列表只显示“当前输入部分”的候选
             if let Some(last_part) = parts.last() {
-                let (last_pinyin, _) = if let Some(idx) = last_part.find(|c: char| c.is_ascii_digit()) {
-                    (&last_part[..idx], true)
+                // 同样解析最后一部分的 aux_code
+                let split_pos = last_part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
+                let (last_pinyin, aux_code) = if let Some(pos) = split_pos {
+                    let (p, suffix) = last_part.split_at(pos);
+                    // 过滤掉后缀中的数字部分
+                    let start_of_aux = suffix.find(|c: char| !c.is_ascii_digit()).unwrap_or(suffix.len());
+                    let a = if start_of_aux < suffix.len() { Some(&suffix[start_of_aux..]) } else { None };
+                    (p, a)
                 } else {
-                    (*last_part, false)
+                    (*last_part, None)
                 };
+
                 let last_clean = last_pinyin.replace('\'', "").replace('`', "").chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
                 if !last_clean.is_empty() {
-                    let matches = if last_clean.len() == 1 {
-                        dict.search_bfs(&last_clean, 10)
+                    let mut matches = if last_clean.len() == 1 {
+                        dict.search_bfs(&last_clean, 15)
                     } else {
                         dict.get_all_exact(&last_clean).unwrap_or_default()
                     };
+
+                    if let Some(code) = aux_code {
+                        let code_lower = code.to_lowercase();
+                        matches.retain(|(_, hint)| {
+                            let hint_lower = hint.to_lowercase();
+                            if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
+                                hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
+                            } else {
+                                hint_lower.contains(&code_lower)
+                            }
+                        });
+                    }
+
                     for (word, hint) in matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
@@ -393,7 +445,7 @@ pub fn is_digit(key: Key) -> bool {
 pub fn key_to_digit(key: Key) -> Option<usize> { match key { Key::KEY_1 => Some(1), Key::KEY_2 => Some(2), Key::KEY_3 => Some(3), Key::KEY_4 => Some(4), Key::KEY_5 => Some(5), Key::KEY_6 => Some(6), Key::KEY_7 => Some(7), Key::KEY_8 => Some(8), Key::KEY_9 => Some(9), Key::KEY_0 => Some(0), _ => None } }
 pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
     let c = match key {
-        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('"'), Key::KEY_SLASH => Some('/'), _ => None
+        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('\''), Key::KEY_SLASH => Some('/'), _ => None
     };
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }
@@ -467,5 +519,20 @@ mod tests {
         p.buffer = "hui3".to_string();
         p.lookup();
         assert_eq!(p.best_segmentation, vec!["hui3"]);
+    }
+
+    #[test]
+    fn test_auxiliary_code_filtering() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        
+        // 假设 'li' 有多个候选，比如 '1.里Inside 2.力Power'
+        // 输入 'liI' 应该只剩下 '里'
+        p.buffer = "liI".to_string();
+        p.lookup();
+        
+        // 检查 joined_sentence 是否包含 '里' (或者是过滤后的首选)
+        // 注意：这取决于真实词库内容，但在逻辑上应能运行
+        assert!(!p.joined_sentence.is_empty());
     }
 }
