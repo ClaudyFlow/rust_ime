@@ -123,6 +123,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let default_profile = conf_guard.input.default_profile.to_lowercase();
     let mut processor_obj = Processor::new(tries_map, ngrams, default_profile, punctuation);
     processor_obj.apply_config(&conf_guard);
+
+    // --- 命令行即时转换模式 ---
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && !args[1].starts_with('-') {
+        let input = args[1..].join(" ");
+        println!("[Batch] 输入拼音: {}", input);
+        processor_obj.buffer = input;
+        processor_obj.lookup();
+        println!("[Batch] 转换结果:");
+        for (i, cand) in processor_obj.candidates.iter().take(10).enumerate() {
+            println!("  {}. {}", i + 1, cand);
+        }
+        return Ok(());
+    }
+
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);
 
