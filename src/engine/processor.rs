@@ -302,18 +302,15 @@ impl Processor {
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        // --- 1. 计算精准组合结果 (绝对禁止自动分词) ---
-        // 每个由空格分隔的部分都是一个独立的原子查找单元。
+        // --- 1. 计算精准组合结果 (原子分词) ---
         let parts: Vec<&str> = pinyin_stripped.split(' ').filter(|s| !s.is_empty()).collect();
         let mut greedy_word = String::new();
         let mut all_segments = Vec::new();
         
         for part in &parts {
             let part = *part;
-            // 提取末尾所有连续数字，例如 "hui3" -> ("hui", 3), "hui10" -> ("hui", 10)
             let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
                 let (p, d_str) = part.split_at(first_digit_idx);
-                // 只提取连续数字部分，避免 trailing pinyin 被当成数字解析失败
                 let end_of_digits = d_str.find(|c: char| !c.is_ascii_digit()).unwrap_or(d_str.len());
                 let digits = &d_str[..end_of_digits];
                 let d = digits.parse::<usize>().unwrap_or(1);
@@ -323,17 +320,14 @@ impl Processor {
             };
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
-            // best_segmentation 用于显示，我们在这里保留数字以满足用户
             all_segments.push(part.to_string());
 
-            // 严格匹配整个 part_clean，绝不进行分割
             let mut matches = if part_clean.len() == 1 {
                 dict.search_bfs(&part_clean, 10)
             } else {
                 dict.get_all_exact(&part_clean).unwrap_or_default()
             };
 
-            // 补充英语语义映射 (例如 apple -> 苹)
             if let Some(zh_words) = self.en_to_zh.get(&part_clean) {
                 for zh in zh_words {
                     if !matches.iter().any(|(w, _)| w == zh) {
@@ -346,7 +340,6 @@ impl Processor {
             if let Some((w, _)) = matches.get(idx) {
                 greedy_word.push_str(w);
             } else {
-                // 没匹配到，保持拼音原文
                 greedy_word.push_str(&part_clean);
             }
         }
@@ -357,27 +350,31 @@ impl Processor {
         // --- 2. 填充候选词列表 ---
         let full_pinyin = pinyin_stripped.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
 
-        // (A) 整个输入的精确匹配
-        if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
-            for (word, hint) in exact_matches {
-                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-            }
-        }
+        // 精准模式判定：包含空格或数字
+        let is_precise_mode = pinyin_stripped.contains(' ') || pinyin_stripped.chars().any(|c| c.is_ascii_digit());
 
-        // (B) 英语语义映射
-        if !full_pinyin.is_empty() {
+        if !is_precise_mode {
+            // 单词模式：显示整词匹配
+            if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
+                for (word, hint) in exact_matches {
+                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                }
+            }
             if let Some(zh_words) = self.en_to_zh.get(&full_pinyin) {
                 for zh in zh_words {
                     if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", full_pinyin))); }
                 }
             }
-        }
-
-        // (C) 最后一部分的精确候选词
-        if parts.len() > 1 {
+        } else {
+            // 精准模式：列表只显示“当前输入部分”的候选
             if let Some(last_part) = parts.last() {
-                let last_clean = last_part.chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
-                if !last_clean.is_empty() && last_clean != full_pinyin {
+                let (last_pinyin, _) = if let Some(idx) = last_part.find(|c: char| c.is_ascii_digit()) {
+                    (&last_part[..idx], true)
+                } else {
+                    (*last_part, false)
+                };
+                let last_clean = last_pinyin.replace('\'', "").replace('`', "").chars().filter(|c| c.is_ascii_alphabetic()).collect::<String>();
+                if !last_clean.is_empty() {
                     let matches = if last_clean.len() == 1 {
                         dict.search_bfs(&last_clean, 10)
                     } else {
@@ -385,6 +382,11 @@ impl Processor {
                     };
                     for (word, hint) in matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    }
+                    if let Some(zh_words) = self.en_to_zh.get(&last_clean) {
+                        for zh in zh_words {
+                            if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", last_clean))); }
+                        }
                     }
                 }
             }
