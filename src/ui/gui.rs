@@ -49,17 +49,32 @@ impl KeystrokeController {
     }
 
     fn show_key(&self, key: &str) {
-        let label = Label::new(Some(key));
-        label.add_css_class("key-label");
-        self.box_.append(&label);
+        // 安全检查：防止空键名
+        if key.is_empty() {
+            return;
+        }
         
+        // 检查是否已经有太多标签（防止内存泄漏）
         let mut count = 0;
         let mut next = self.box_.first_child();
         while let Some(child) = next {
             count += 1;
             next = child.next_sibling();
         }
-        if count > 15 {
+        
+        // 如果超过限制，清空重新开始
+        if count > 20 {
+            self.clear();
+            // 重新计数
+            count = 0;
+        }
+        
+        let label = Label::new(Some(key));
+        label.add_css_class("key-label");
+        self.box_.append(&label);
+        
+        // 保持最多15个按键显示
+        if count >= 15 {
             if let Some(first) = self.box_.first_child() {
                 self.box_.remove(&first);
             }
@@ -69,12 +84,16 @@ impl KeystrokeController {
         self.reset_timeout();
     }
 
-    fn reset_timeout(&self) {
+    fn clear_timeout(&self) {
         if let Some(old) = self.timeout.borrow_mut().take() {
-            // 在某些 glib-rs 版本中，如果 source 已经执行，remove 会返回 Err。
-            // 我们显式忽略它，因为这只是为了确保旧的 timeout 不会干扰。
+            // 直接尝试移除定时器，如果已经执行过，remove会返回Err，我们忽略错误
             let _ = old.remove();
         }
+    }
+
+    fn reset_timeout(&self) {
+        // 先清理旧的定时器
+        self.clear_timeout();
 
         let box_weak = self.box_.downgrade();
         let win_weak = self.window.downgrade();
@@ -98,9 +117,7 @@ impl KeystrokeController {
     }
 
     fn clear(&self) {
-        if let Some(old) = self.timeout.borrow_mut().take() {
-            let _ = old.remove();
-        }
+        self.clear_timeout();
         while let Some(child) = self.box_.first_child() {
             self.box_.remove(&child);
         }

@@ -266,7 +266,12 @@ impl InputMethodHost for EvdevHost {
                         if show_ks {
                             if let Some(ref tx) = self.gui_tx {
                                 let name = format!("{:?}", key).replace("KEY_", "");
-                                let _ = tx.send(GuiEvent::Keystroke(name));
+                                // 过滤掉特殊键和修饰键，只显示普通字符键
+                                if !name.is_empty() && !name.contains("SHIFT") && !name.contains("CTRL") 
+                                   && !name.contains("ALT") && !name.contains("META") 
+                                   && !name.contains("SUPER") && !name.contains("HYPER") {
+                                    let _ = tx.send(GuiEvent::Keystroke(name));
+                                }
                             }
                         }
                     }
