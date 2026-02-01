@@ -181,7 +181,7 @@ impl Processor {
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
-                if self.buffer.ends_with(' ') {
+                if self.preview_selected_candidate || self.buffer.ends_with(' ') {
                      if let Some(word) = self.candidates.get(self.selected) {
                         self.commit_candidate(word.clone())
                      } else {
