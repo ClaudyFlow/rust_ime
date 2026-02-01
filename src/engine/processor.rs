@@ -263,19 +263,19 @@ impl Processor {
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        // 1. 语义映射优先 (English Semantic)
-        let buf_lower = self.buffer.to_lowercase();
-        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
-            for zh in zh_words {
-                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
-            }
-        }
-
-        // 2. 词典全量匹配 (高优先级)
+        // 1. 词典全量匹配 (高优先级) - Pinyin Priority
         if let Some(exact_matches) = dict.get_all_exact(&pinyin_for_dict) {
             let matches = exact_matches;
             for (word, hint) in matches {
                 if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+            }
+        }
+
+        // 2. 语义映射 (English Semantic) - Secondary
+        let buf_lower = self.buffer.to_lowercase();
+        if let Some(zh_words) = self.en_to_zh.get(&buf_lower) {
+            for zh in zh_words {
+                if seen.insert(zh.clone()) { final_candidates.push((zh.clone(), format!("[{}]", buf_lower))); }
             }
         }
 
