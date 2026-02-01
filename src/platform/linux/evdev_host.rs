@@ -203,8 +203,13 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
+                    let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
+                    let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
+                    let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
+                    let has_mod = ctrl || alt || meta;
+
                     let mut p = self.processor.lock().unwrap();
-                    if p.chinese_enabled {
+                    if p.chinese_enabled && !has_mod {
                         match p.handle_key(key, val != 0, shift) {
                             Action::Emit(s) => { 
                                 if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); }
@@ -224,6 +229,16 @@ impl InputMethodHost for EvdevHost {
                             self.notify_preview();
                         }
                     } else {
+                        // 如果有修饰键按下，且当前正在输入拼音，重置输入法并清除屏幕预览
+                        if has_mod && p.state != crate::engine::processor::ImeState::Direct {
+                            let del = p.phantom_text.chars().count();
+                            p.reset();
+                            if del > 0 {
+                                if let Ok(mut vkbd) = self.vkbd.lock() {
+                                    vkbd.backspace(del);
+                                }
+                            }
+                        }
                         drop(p);
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
