@@ -169,6 +169,8 @@ pub struct Hotkeys {
     pub toggle_traditional_gui: Shortcut,
     #[serde(default = "default_modern_gui_toggle")]
     pub toggle_modern_gui: Shortcut,
+    #[serde(default = "default_keystroke_toggle")]
+    pub toggle_keystrokes: Shortcut,
 }
 
 impl Default for Hotkeys {
@@ -183,6 +185,7 @@ impl Default for Hotkeys {
             trigger_caps_lock: default_caps_lock_toggle(),
             toggle_traditional_gui: default_trad_gui_toggle(),
             toggle_modern_gui: default_modern_gui_toggle(),
+            toggle_keystrokes: default_keystroke_toggle(),
         }
     }
 }
@@ -438,6 +441,9 @@ fn default_trad_gui_toggle() -> Shortcut {
 }
 fn default_modern_gui_toggle() -> Shortcut {
     Shortcut::new("ctrl+alt+h", "功能: 显示/隐藏 卡片式候选词")
+}
+fn default_keystroke_toggle() -> Shortcut {
+    Shortcut::new("ctrl+alt+k", "功能: 显示/隐藏 GhostEcho (灵动回显)")
 }
 
 // Helper for parse (unchanged)

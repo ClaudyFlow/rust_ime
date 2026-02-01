@@ -69,7 +69,7 @@ impl InputMethodHost for EvdevHost {
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks) = {
                             let conf = self.config.read().unwrap();
                             (
                                 parse_key(&conf.hotkeys.switch_language.key),
@@ -80,6 +80,7 @@ impl InputMethodHost for EvdevHost {
                                 parse_key(&conf.hotkeys.cycle_paste_method.key),
                                 parse_key(&conf.hotkeys.toggle_traditional_gui.key),
                                 parse_key(&conf.hotkeys.toggle_modern_gui.key),
+                                parse_key(&conf.hotkeys.toggle_keystrokes.key),
                             )
                         };
                         
@@ -200,6 +201,22 @@ impl InputMethodHost for EvdevHost {
                             let _ = self.notify_tx.send(NotifyEvent::Message("UI切换".into(), msg.into()));
                             continue;
                         }
+
+                        // 8. 切换 GhostEcho (Ctrl+Alt+K)
+                        if is_combo(&held_keys, &toggle_ks) {
+                            let enabled = {
+                                let mut p = self.processor.lock().unwrap();
+                                p.show_keystrokes = !p.show_keystrokes;
+                                p.show_keystrokes
+                            };
+                            if let Ok(mut w) = self.config.write() {
+                                w.appearance.show_keystrokes = enabled;
+                                let _ = crate::save_config(&w);
+                            }
+                            let msg = if enabled { "开启 GhostEcho" } else { "关闭 GhostEcho" };
+                            let _ = self.notify_tx.send(NotifyEvent::Message("功能切换".into(), msg.into()));
+                            continue;
+                        }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
@@ -243,7 +260,7 @@ impl InputMethodHost for EvdevHost {
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
 
-                    // --- UI 回显移动到逻辑处理之后 ---
+                    // --- UI 回显 (GhostEcho) 移动到逻辑处理之后 ---
                     if val == 1 {
                         let show_ks = self.processor.lock().unwrap().show_keystrokes;
                         if show_ks {

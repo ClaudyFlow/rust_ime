@@ -159,7 +159,7 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("按键回显: {}", if self.show_keystrokes { "开启" } else { "关闭" }),
+                label: format!("灵动回显 (GhostEcho): {}", if self.show_keystrokes { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleKeystroke); }),
                 ..Default::default()
             }.into(),
