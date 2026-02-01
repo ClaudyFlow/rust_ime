@@ -266,15 +266,11 @@ impl Processor {
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
         
-        let mut target = if self.preview_selected_candidate && !self.candidates.is_empty() {
+        let target = if self.preview_selected_candidate && !self.candidates.is_empty() {
              self.candidates[self.selected.min(self.candidates.len()-1)].clone()
         } else {
              self.buffer.clone()
         };
-
-        if self.buffer.ends_with(' ') && !target.ends_with(' ') {
-            target.push(' ');
-        }
 
         if target == self.phantom_text { return Action::Consume; }
         
@@ -314,17 +310,21 @@ impl Processor {
         
         for part in &parts {
             let part = *part;
-            // 解析数字索引，例如 "hui3"
+            // 提取末尾所有连续数字，例如 "hui3" -> ("hui", 3), "hui10" -> ("hui", 10)
             let (pinyin_part, specified_idx) = if let Some(first_digit_idx) = part.find(|c: char| c.is_ascii_digit()) {
-                let p = &part[..first_digit_idx];
-                let d = part[first_digit_idx..].parse::<usize>().unwrap_or(1);
+                let (p, d_str) = part.split_at(first_digit_idx);
+                // 只提取连续数字部分，避免 trailing pinyin 被当成数字解析失败
+                let end_of_digits = d_str.find(|c: char| !c.is_ascii_digit()).unwrap_or(d_str.len());
+                let digits = &d_str[..end_of_digits];
+                let d = digits.parse::<usize>().unwrap_or(1);
                 (p, Some(d))
             } else {
                 (part, None)
             };
 
             let part_clean = pinyin_part.replace('\'', "").replace('`', "");
-            all_segments.push(part_clean.clone());
+            // best_segmentation 用于显示，我们在这里保留数字以满足用户
+            all_segments.push(part.to_string());
 
             // 严格匹配整个 part_clean，绝不进行分割
             let mut matches = if part_clean.len() == 1 {

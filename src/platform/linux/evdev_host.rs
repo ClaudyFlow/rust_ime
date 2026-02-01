@@ -281,8 +281,9 @@ impl EvdevHost {
                 let end = (start + 10).min(p.candidates.len());
                 for (i, cand) in p.candidates[start..end].iter().enumerate() {
                     let abs_idx = start + i;
-                    if abs_idx == p.selected { print!("\x1b[1;32m{}.{}\x1b[0m ", (i % 10)+1, cand); }
-                    else { print!("{}.{} ", (i % 10)+1, cand); }
+                    let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
+                    if abs_idx == p.selected { print!("\x1b[1;32m{}.{}{} \x1b[0m ", (i % 10)+1, cand, hint); }
+                    else { print!("{}.{}{} ", (i % 10)+1, cand, hint); }
                 }
                 use std::io::Write;
                 std::io::stdout().flush().unwrap();
