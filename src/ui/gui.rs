@@ -193,6 +193,8 @@ impl LearningController {
         // 完全不调用remove，让GLib自动管理
         *self.timeout.borrow_mut() = None;
         self.window.set_opacity(0.0);
+        self.word_label.set_text("");
+        self.hint_label.set_text("");
     }
 }
 
