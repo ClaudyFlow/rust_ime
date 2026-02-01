@@ -119,11 +119,21 @@ impl KeystrokeController {
     fn clear(&self) {
         // 清除所有按键显示
         let mut keys = self.displayed_keys.borrow_mut();
+        
+        // 强制移除所有子元素
         while let Some(child) = self.box_.first_child() {
             self.box_.remove(&child);
         }
+        
+        // 清空按键数组
         keys.clear();
+        
+        // 强制隐藏窗口
         self.window.set_opacity(0.0);
+        self.window.hide();
+        
+        // 重新显示窗口（确保状态重置）
+        self.window.show();
     }
 
     fn update_config(&self, timeout_ms: u64) {
