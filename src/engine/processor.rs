@@ -288,27 +288,26 @@ impl Processor {
         
         for part in &parts {
             let part = *part;
-            // 提取数字索引 (hui3) 和 英文辅码 (liH, liIn)
-            // 逻辑：找到第一个数字或第一个大写字母的位置
+            // 提取 英文辅码 (I) 和 数字索引 (2)
+            // 逻辑：liI2 -> pinyin="li", aux="I", idx=2
             let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
             
             let (pinyin_part, specified_idx, aux_code) = if let Some(pos) = split_pos {
                 let (p, suffix) = part.split_at(pos);
                 
-                let mut d = None;
-                let mut a = None;
+                // 在后缀中寻找数字开始的位置
+                let digit_start = suffix.find(|c: char| c.is_ascii_digit());
                 
-                // 如果后缀以数字开头
-                if suffix.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                    let end_of_digits = suffix.find(|c: char| !c.is_ascii_digit()).unwrap_or(suffix.len());
-                    d = Some(suffix[..end_of_digits].parse::<usize>().unwrap_or(1));
-                    if end_of_digits < suffix.len() {
-                        a = Some(&suffix[end_of_digits..]);
-                    }
+                let (a, d) = if let Some(ds) = digit_start {
+                    let (alpha, digits) = suffix.split_at(ds);
+                    let aux = if alpha.is_empty() { None } else { Some(alpha) };
+                    // 提取纯数字部分
+                    let end_of_digits = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
+                    let idx = digits[..end_of_digits].parse::<usize>().ok();
+                    (aux, idx)
                 } else {
-                    // 否则整个后缀都是辅码
-                    a = Some(suffix);
-                }
+                    (Some(suffix), None)
+                };
                 
                 (p, d, a)
             } else {
@@ -370,9 +369,13 @@ impl Processor {
                 let split_pos = last_part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
                 let (last_pinyin, aux_code) = if let Some(pos) = split_pos {
                     let (p, suffix) = last_part.split_at(pos);
-                    // 过滤掉后缀中的数字部分
-                    let start_of_aux = suffix.find(|c: char| !c.is_ascii_digit()).unwrap_or(suffix.len());
-                    let a = if start_of_aux < suffix.len() { Some(&suffix[start_of_aux..]) } else { None };
+                    let digit_start = suffix.find(|c: char| c.is_ascii_digit());
+                    let a = if let Some(ds) = digit_start {
+                        let alpha = &suffix[..ds];
+                        if alpha.is_empty() { None } else { Some(alpha) }
+                    } else {
+                        Some(suffix)
+                    };
                     (p, a)
                 } else {
                     (*last_part, None)
@@ -520,6 +523,17 @@ mod tests {
         p.buffer = "hui3".to_string();
         p.lookup();
         assert_eq!(p.best_segmentation, vec!["hui3"]);
+    }
+
+    #[test]
+    fn test_aux_and_digit_combination() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        // 测试 liI2 逻辑 (辅码 I + 第 2 个候选)
+        p.buffer = "liI2".to_string();
+        p.lookup();
+        // 验证 best_segmentation 包含完整 buffer
+        assert_eq!(p.best_segmentation, vec!["liI2"]);
     }
 
     #[test]
