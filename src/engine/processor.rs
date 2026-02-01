@@ -442,3 +442,80 @@ pub fn strip_tones(s: &str) -> String {
     for c in s.chars() { match c { 'ā'|'á'|'ǎ'|'à' => res.push('a'), 'ē'|'é'|'ě'|'è' => res.push('e'), 'ī'|'í'|'ǐ'|'ì' => res.push('i'), 'ō'|'ó'|'ǒ'|'ò' => res.push('o'), 'ū'|'ú'|'ǔ'|'ù' => res.push('u'), 'ǖ'|'ǘ'|'ǚ'|'ǜ' => res.push('v'), 'Ā'|'Á'|'Ǎ'|'À' => res.push('A'), 'Ē'|'É'|'Ě'|'È' => res.push('E'), 'Ī'|'Í'|'Ǐ'|'Ì' => res.push('I'), 'Ō'|'Ó'|'Ǒ'|'Ò' => res.push('O'), 'Ū'|'Ú'|'Ǔ'|'Ù' => res.push('U'), 'Ǖ'|'Ǘ'|'Ǚ'|'Ǜ' => res.push('V'), _ => res.push(c) } } 
     res
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn setup_mock_processor() -> Processor {
+        let mut tries = HashMap::new();
+        // 尝试加载真实词库以便测试 lookup 逻辑
+        if let Ok(trie) = Trie::load("data/chinese/trie.index", "data/chinese/trie.data") {
+            tries.insert("chinese".to_string(), trie);
+        }
+
+        let mut en_to_zh = HashMap::new();
+        en_to_zh.insert("apple".to_string(), vec!["苹".to_string()]);
+        
+        Processor {
+            state: ImeState::Direct,
+            buffer: String::new(),
+            tries,
+            current_profile: "chinese".to_string(),
+            punctuation: HashMap::new(),
+            en_to_zh,
+            candidates: vec![],
+            candidate_hints: vec![],
+            selected: 0,
+            page: 0,
+            chinese_enabled: true,
+            best_segmentation: vec![],
+            joined_sentence: String::new(),
+            show_candidates: true,
+            show_modern_candidates: false,
+            show_notifications: true,
+            show_keystrokes: true,
+            phantom_mode: PhantomMode::Pinyin,
+            phantom_text: String::new(),
+            preview_selected_candidate: false,
+        }
+    }
+
+    #[test]
+    fn test_precise_grammar_apple() {
+        let mut p = setup_mock_processor();
+        p.buffer = "apple".to_string();
+        p.lookup();
+        assert_eq!(p.joined_sentence, "苹");
+    }
+
+    #[test]
+    fn test_double_space_commit() {
+        let mut p = setup_mock_processor();
+        p.buffer = "apple".to_string();
+        p.lookup(); // 这会将 joined_sentence 设为 "苹"
+        assert_eq!(p.joined_sentence, "苹");
+        
+        // 第一次空格 -> 加入 buffer 变 "apple "
+        let _ = p.handle_key(Key::KEY_SPACE, true, false);
+        assert_eq!(p.buffer, "apple ");
+
+        // 第二次空格 -> Commit
+        let action2 = p.handle_key(Key::KEY_SPACE, true, false);
+        if let Action::DeleteAndEmit { insert, .. } = action2 {
+            assert_eq!(insert, "苹");
+        } else {
+            panic!("Should have committed '苹' on second space, got {:?}", action2);
+        }
+    }
+
+    #[test]
+    fn test_digit_selector_parsing() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; } // 如果没加载到词库则跳过
+        p.buffer = "hui3".to_string();
+        p.lookup();
+        assert_eq!(p.best_segmentation, vec!["hui3"]);
+    }
+}
