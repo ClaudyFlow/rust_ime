@@ -369,7 +369,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
             /* 学习模式样式 */
             window.learning-window {{
-                pointer-events: none;
             }}
             #learning-container {{
                 background-color: {key_bg};
@@ -377,19 +376,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 padding: 12px 20px;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.5);
                 border: 1px solid rgba(255,255,255,0.1);
-                pointer-events: none;
             }}
             #learning-word {{
                 color: #f5f5f7;
                 font-size: 24pt;
                 font-weight: 800;
-                pointer-events: none;
             }}
             #learning-hint {{
                 color: rgba(255,255,255,0.6);
                 font-size: 10pt;
                 font-weight: 400;
-                pointer-events: none;
             }}
         "#, 
         cand_bg = app.candidate_bg_color,
