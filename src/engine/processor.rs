@@ -314,6 +314,23 @@ impl Processor {
         Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
     }
 
+    fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String)> {
+        let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
+
+        if let Some(ref code) = part.aux_code {
+            let code_lower = code.to_lowercase();
+            matches.retain(|(_, hint)| {
+                let hint_lower = hint.to_lowercase();
+                if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
+                    hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
+                } else {
+                    hint_lower.contains(&code_lower)
+                }
+            });
+        }
+        matches
+    }
+
     pub fn lookup(&mut self) {
         if self.buffer.is_empty() { self.reset(); return; }
         let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
@@ -326,21 +343,7 @@ impl Processor {
         for (i, part) in parsed_parts.iter().enumerate() {
             all_raw_segments.push(part.raw.clone());
             
-            // Atomic Lookup: Exact match only
-            let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
-
-            // Filter by Auxiliary Code
-            if let Some(ref code) = part.aux_code {
-                let code_lower = code.to_lowercase();
-                matches.retain(|(_, hint)| {
-                    let hint_lower = hint.to_lowercase();
-                    if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                        hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
-                    } else {
-                        hint_lower.contains(&code_lower)
-                    }
-                });
-            }
+            let matches = self.lookup_part(dict, part);
 
             // Select by Index
             let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
