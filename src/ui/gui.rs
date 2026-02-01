@@ -6,7 +6,7 @@ use std::sync::mpsc::Receiver;
 use glib::MainContext;
 use crate::config::Config;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GuiEvent {
     Update {
         pinyin: String,
@@ -25,6 +25,125 @@ pub enum GuiEvent {
     ApplyConfig(Config),
     #[allow(dead_code)]
     Exit,
+}
+
+use std::rc::Rc;
+use std::cell::RefCell;
+use glib::SourceId;
+
+struct KeystrokeController {
+    box_: Box,
+    window: Window,
+    timeout: RefCell<Option<SourceId>>,
+    timeout_ms: RefCell<u64>,
+}
+
+impl KeystrokeController {
+    fn new(box_: Box, window: Window, initial_timeout: u64) -> Rc<Self> {
+        Rc::new(Self {
+            box_,
+            window,
+            timeout: RefCell::new(None),
+            timeout_ms: RefCell::new(initial_timeout),
+        })
+    }
+
+    fn show_key(&self, key: &str) {
+        let label = Label::new(Some(key));
+        label.add_css_class("key-label");
+        self.box_.append(&label);
+        self.window.set_opacity(1.0);
+        self.reset_timeout();
+    }
+
+    fn reset_timeout(&self) {
+        if let Some(old) = self.timeout.borrow_mut().take() {
+            old.remove();
+        }
+
+        let box_weak = self.box_.downgrade();
+        let win_weak = self.window.downgrade();
+        let timeout_ms = *self.timeout_ms.borrow();
+
+        let id = glib::timeout_add_local(
+            std::time::Duration::from_millis(timeout_ms),
+            move || {
+                if let Some(b) = box_weak.upgrade() {
+                    while let Some(child) = b.first_child() {
+                        b.remove(&child);
+                    }
+                }
+                if let Some(w) = win_weak.upgrade() {
+                    w.set_opacity(0.0);
+                }
+                glib::Continue(false)
+            },
+        );
+        *self.timeout.borrow_mut() = Some(id);
+    }
+
+    fn clear(&self) {
+        if let Some(old) = self.timeout.borrow_mut().take() {
+            old.remove();
+        }
+        while let Some(child) = self.box_.first_child() {
+            self.box_.remove(&child);
+        }
+        self.window.set_opacity(0.0);
+    }
+
+    fn update_config(&self, timeout_ms: u64) {
+        *self.timeout_ms.borrow_mut() = timeout_ms;
+    }
+}
+
+struct LearningController {
+    window: Window,
+    word_label: Label,
+    hint_label: Label,
+    timeout: RefCell<Option<SourceId>>,
+    interval_sec: RefCell<u64>,
+}
+
+impl LearningController {
+    fn new(window: Window, word_label: Label, hint_label: Label, interval_sec: u64) -> Rc<Self> {
+        Rc::new(Self {
+            window,
+            word_label,
+            hint_label,
+            timeout: RefCell::new(None),
+            interval_sec: RefCell::new(interval_sec),
+        })
+    }
+
+    fn show(&self, word: &str, hint: &str) {
+        self.word_label.set_text(word);
+        self.hint_label.set_text(hint);
+        self.window.set_opacity(1.0);
+        
+        if let Some(old) = self.timeout.borrow_mut().take() {
+            old.remove();
+        }
+
+        let win_weak = self.window.downgrade();
+        let id = glib::timeout_add_local(
+            std::time::Duration::from_secs(5), // Fixed 5s display
+            move || {
+                if let Some(w) = win_weak.upgrade() {
+                    w.set_opacity(0.0);
+                }
+                glib::Continue(false)
+            }
+        );
+        *self.timeout.borrow_mut() = Some(id);
+    }
+
+    fn clear(&self) {
+        if let Some(old) = self.timeout.borrow_mut().take() {
+            old.remove();
+        }
+        self.window.set_opacity(0.0);
+    }
 }
 
 pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
@@ -92,17 +211,38 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     key_box.set_widget_name("keystroke-container");
     key_window.set_child(Some(&key_box));
 
+    // --- 4. 学习模式 (Learning Mode) 窗口 ---
+    let learn_window = Window::builder().title("Learning Mode").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    if is_layer_supported {
+        learn_window.init_layer_shell();
+        learn_window.set_namespace("rust-ime-learning");
+        learn_window.set_layer(Layer::Overlay);
+        learn_window.set_keyboard_mode(KeyboardMode::None);
+    }
+    learn_window.add_css_class("learning-window");
+    let learn_box = Box::new(Orientation::Vertical, 4);
+    learn_box.set_widget_name("learning-container");
+    learn_window.set_child(Some(&learn_box));
+    
+    let learn_word_label = Label::new(None);
+    learn_word_label.set_widget_name("learning-word");
+    learn_box.append(&learn_word_label);
+    
+    let learn_hint_label = Label::new(None);
+    learn_hint_label.set_widget_name("learning-hint");
+    learn_box.append(&learn_hint_label);
+
     let css_provider = CssProvider::new();
     if let Some(display) = Display::default() {
         gtk4::style_context_add_provider_for_display(&display, &css_provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
     // --- 配置应用逻辑 ---
-    let apply_style = move |conf: &Config, css: &CssProvider, w: &Window, mw: &Window, kw: &Window| {
+    let apply_style = move |conf: &Config, css: &CssProvider, w: &Window, mw: &Window, kw: &Window, lw: &Window| {
         let app = &conf.appearance;
         
         let css_data = format!(r#"
-            window.ime-window, window.modern-window, window.keystroke-window {{ background-color: transparent; }}
+            window.ime-window, window.modern-window, window.keystroke-window, window.learning-window {{ background-color: transparent; }}
             
             /* 传统样式 */
             #main-container {{
@@ -176,6 +316,25 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 border-radius: 8px;
                 margin: 3px;
             }}
+
+            /* 学习模式样式 */
+            #learning-container {{
+                background-color: {key_bg};
+                border-radius: 16px;
+                padding: 12px 20px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                border: 1px solid rgba(255,255,255,0.1);
+            }}
+            #learning-word {{
+                color: #f5f5f7;
+                font-size: 24pt;
+                font-weight: 800;
+            }}
+            #learning-hint {{
+                color: rgba(255,255,255,0.6);
+                font-size: 10pt;
+                font-weight: 400;
+            }}
         "#, 
         cand_bg = app.candidate_bg_color,
         cand_font = app.candidate_font_size,
@@ -220,10 +379,20 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             }
             kw.set_margin(Edge::Bottom, app.keystroke_margin_y);
             kw.set_margin(Edge::Right, app.keystroke_margin_x);
+
+            // 学习模式 (默认右上)
+            lw.set_anchor(Edge::Top, true);
+            lw.set_anchor(Edge::Right, true);
+            lw.set_margin(Edge::Top, 40);
+            lw.set_margin(Edge::Right, 40);
         }
+        lw.set_opacity(0.0);
     };
 
-    apply_style(&initial_config, &css_provider, &window, &modern_window, &key_window);
+    apply_style(&initial_config, &css_provider, &window, &modern_window, &key_window, &learn_window);
+
+    let ks_controller = KeystrokeController::new(key_box.clone(), key_window.clone(), initial_config.appearance.keystroke_timeout_ms);
+    let learn_controller = LearningController::new(learn_window.clone(), learn_word_label.clone(), learn_hint_label.clone(), initial_config.appearance.learning_interval_sec);
 
     let (tx, gtk_rx) = MainContext::channel::<GuiEvent>(glib::Priority::default());
     std::thread::spawn(move || {
@@ -234,21 +403,38 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     let window_c = window.clone();
     let modern_window_c = modern_window.clone();
-    let key_window_c = key_window.clone();
     let pinyin_label_c = pinyin_label.clone();
     let sentence_label_c = sentence_label.clone();
     let candidates_box_c = candidates_box.clone();
     let modern_pinyin_c = modern_pinyin_label.clone();
     let modern_candidates_c = modern_candidates_box.clone();
-    let key_box_c = key_box.clone();
+
     let css_p_c = css_provider.clone();
     let mut current_config = initial_config;
+
+    let ks_c = ks_controller.clone();
+    let learn_c = learn_controller.clone();
 
     gtk_rx.attach(None, move |event| {
         match event {
             GuiEvent::ApplyConfig(conf) => {
-                apply_style(&conf, &css_p_c, &window_c, &modern_window_c, &key_window_c);
+                apply_style(&conf, &css_p_c, &window_c, &modern_window_c, &ks_c.window, &learn_c.window);
+                ks_c.update_config(conf.appearance.keystroke_timeout_ms);
+                if !conf.appearance.learning_mode {
+                    learn_c.clear();
+                }
                 current_config = conf;
+            }
+            GuiEvent::ShowLearning(word, hint) => {
+                if current_config.appearance.learning_mode {
+                    learn_c.show(&word, &hint);
+                }
+            }
+            GuiEvent::Keystroke(key_name) => {
+                ks_c.show_key(&key_name);
+            }
+            GuiEvent::ClearKeystrokes => {
+                ks_c.clear();
             }
             GuiEvent::Update { pinyin, candidates, hints, selected, sentence } => {
                 let show_trad = current_config.appearance.show_candidates;
@@ -259,13 +445,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     return glib::Continue(true);
                 }
 
-                // 1. 更新传统窗口
                 if show_trad {
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
-                    
-                    // 如果 sentence 和第一个候选词一样，或者 sentence 为空，可以考虑隐藏或显示
-                    // 按照用户需求，sentence 应该始终作为“组合预览”显示在拼音旁
                     sentence_label_c.set_text(&sentence);
                     if sentence.is_empty() { sentence_label_c.set_opacity(0.0); } else { sentence_label_c.set_opacity(1.0); }
 
@@ -276,16 +458,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let item = Box::new(Orientation::Horizontal, 0);
                         item.add_css_class("candidate-item");
                         if i == selected { item.add_css_class("candidate-selected"); }
-                        
                         let idx_lbl = Label::new(Some(&format!("{}", (i % 10) + 1)));
                         idx_lbl.add_css_class("index");
                         let txt_lbl = Label::new(Some(&candidates[i]));
                         txt_lbl.add_css_class("candidate-text");
-                        
                         item.append(&idx_lbl);
                         item.append(&txt_lbl);
-
-                        // 加入 Hints 显示
                         if let Some(hint) = hints.get(i) {
                             if !hint.is_empty() {
                                 let hint_lbl = Label::new(Some(hint));
@@ -293,15 +471,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                 item.append(&hint_lbl);
                             }
                         }
-                        
                         candidates_box_c.append(&item);
                     }
                 } else { window_c.set_opacity(0.0); }
 
-                // 2. 更新“卡片式” (Modern) 窗口
                 if show_modern {
                     modern_window_c.set_opacity(1.0);
-                    // 隐藏拼音
                     modern_pinyin_c.set_text(""); 
                     while let Some(child) = modern_candidates_c.first_child() { modern_candidates_c.remove(&child); }
                     let start = (selected / 10) * 10;
@@ -310,16 +485,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let item = Box::new(Orientation::Horizontal, 0);
                         item.add_css_class("modern-item");
                         if i == selected { item.add_css_class("modern-selected"); }
-                        
                         let idx_lbl = Label::new(Some(&format!("{}", (i % 10) + 1)));
                         idx_lbl.add_css_class("m-index");
                         let txt_lbl = Label::new(Some(&candidates[i]));
                         txt_lbl.add_css_class("modern-text");
-                        
                         item.append(&idx_lbl);
                         item.append(&txt_lbl);
-
-                        // 加入 Hints 显示
                         if let Some(hint) = hints.get(i) {
                             if !hint.is_empty() {
                                 let hint_lbl = Label::new(Some(hint));
@@ -327,33 +498,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                 item.append(&hint_lbl);
                             }
                         }
-                        
                         modern_candidates_c.append(&item);
                     }
                 } else { modern_window_c.set_opacity(0.0); }
-            },
-            GuiEvent::Keystroke(key_name) => {
-                let label = Label::new(Some(&key_name));
-                label.add_css_class("key-label");
-                key_box_c.append(&label);
-                key_window_c.set_opacity(1.0);
-                let kb_weak = key_box_c.downgrade();
-                let label_weak = label.downgrade();
-                let kw_weak = key_window_c.downgrade();
-                glib::timeout_add_local(std::time::Duration::from_millis(current_config.appearance.keystroke_timeout_ms), move || {
-                    if let (Some(kb), Some(l)) = (kb_weak.upgrade(), label_weak.upgrade()) {
-                        kb.remove(&l);
-                        if kb.first_child().is_none() { if let Some(kw) = kw_weak.upgrade() { kw.set_opacity(0.0); } }
-                    }
-                    glib::Continue(false)
-                });
             },
             _ => {}
         }
         glib::Continue(true)
     });
 
-    window.present(); modern_window.present(); key_window.present();
-    window.set_opacity(0.0); modern_window.set_opacity(0.0); key_window.set_opacity(0.0);
+    window.present(); modern_window.present(); ks_controller.window.present(); learn_controller.window.present();
+    window.set_opacity(0.0); modern_window.set_opacity(0.0); ks_controller.window.set_opacity(0.0); learn_controller.window.set_opacity(0.0);
     glib::MainLoop::new(None, false).run();
 }

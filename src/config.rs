@@ -2,7 +2,7 @@ use evdev::Key;
 use serde::{Deserialize, Serialize};
 
 // --- 1. 外观设置 ---
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Appearance {
     #[serde(default = "default_enable_notifications")]
     pub show_notifications: bool,
@@ -97,7 +97,7 @@ impl Default for Appearance {
 }
 
 // --- 2. 输入行为 ---
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Input {
     #[serde(default)]
     pub enable_fuzzy_pinyin: bool,
@@ -121,7 +121,7 @@ impl Default for Input {
 }
 
 // --- 3. 词库与文件 ---
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Files {
     #[serde(default)]
     pub device_path: Option<String>,
@@ -145,7 +145,7 @@ impl Default for Files {
 }
 
 // --- 4. 快捷键 ---
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Hotkeys {
     #[serde(default = "default_ime_toggle")]
     pub switch_language: Shortcut,
@@ -191,7 +191,7 @@ impl Default for Hotkeys {
 }
 
 // --- 主配置结构 ---
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Config {
     #[serde(default = "default_readme", rename = "_help_readme")]
     pub readme: String,
@@ -223,7 +223,7 @@ impl Config {
 
 // --- Helper Structs & Defaults ---
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Profile {
     pub name: String,
     pub description: String,
@@ -245,7 +245,7 @@ impl Default for Profile {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 
 pub struct Shortcut {
     pub key: String,
