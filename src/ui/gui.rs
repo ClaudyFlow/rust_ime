@@ -171,6 +171,7 @@ impl LearningController {
     fn show(&self, word: &str, hint: &str) {
         self.word_label.set_text(word);
         self.hint_label.set_text(hint);
+        self.window.show();
         self.window.set_opacity(1.0);
         
         // 只清除引用，不调用remove避免panic
@@ -182,6 +183,7 @@ impl LearningController {
             move || {
                 if let Some(w) = win_weak.upgrade() {
                     w.set_opacity(0.0);
+                    w.hide();
                 }
                 glib::Continue(false)
             }
@@ -190,9 +192,12 @@ impl LearningController {
     }
 
     fn clear(&self) {
-        // 完全不调用remove，让GLib自动管理
+        // 清除定时器引用，让GLib自动管理
         *self.timeout.borrow_mut() = None;
+        // 立即隐藏窗口
         self.window.set_opacity(0.0);
+        self.window.hide();
+        // 清空文本
         self.word_label.set_text("");
         self.hint_label.set_text("");
     }
