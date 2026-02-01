@@ -43,6 +43,8 @@ pub struct Processor {
     pub segmenter: Segmenter,
     pub best_segmentation: Vec<String>,
     pub joined_sentence: String,
+    pub digit_buffer: String,
+    pub last_digit_time: std::time::Instant,
     
     pub show_candidates: bool,
     pub show_modern_candidates: bool,
@@ -94,6 +96,8 @@ impl Processor {
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
             joined_sentence: String::new(),
+            digit_buffer: String::new(),
+            last_digit_time: std::time::Instant::now(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
@@ -125,6 +129,7 @@ impl Processor {
         self.candidate_hints.clear();
         self.best_segmentation.clear();
         self.joined_sentence.clear();
+        self.digit_buffer.clear();
         self.selected = 0;
         self.page = 0;
         self.state = ImeState::Direct;
@@ -184,14 +189,14 @@ impl Processor {
                 if !self.candidates.is_empty() {
                     self.preview_selected_candidate = true;
                     if shift_pressed { if self.selected > 0 { self.selected -= 1; } } else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
-                    self.page = (self.selected / 5) * 5;
+                    self.page = (self.selected / 10) * 10;
                     self.update_phantom_action()
                 } else {
                     Action::Consume
                 }
             }
-            Key::KEY_MINUS => { self.page = self.page.saturating_sub(5); self.selected = self.page; Action::Consume }
-            Key::KEY_EQUAL => { if self.page + 5 < self.candidates.len() { self.page += 5; self.selected = self.page; } Action::Consume }
+            Key::KEY_MINUS => { self.page = self.page.saturating_sub(10); self.selected = self.page; Action::Consume }
+            Key::KEY_EQUAL => { if self.page + 10 < self.candidates.len() { self.page += 10; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
                 if self.preview_selected_candidate || self.buffer.ends_with(' ') {
                      if let Some(word) = self.candidates.get(self.selected) {
@@ -228,11 +233,32 @@ impl Processor {
             }
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                if digit >= 1 && digit <= 5 { 
-                    let idx = self.page + (digit - 1); 
-                    if let Some(word) = self.candidates.get(idx) { 
-                        return self.commit_candidate(word.clone());
-                    } 
+                let now = std::time::Instant::now();
+                
+                // 如果距离上次按数字超过 500ms，且当前已经有数字在 buffer，先处理之前的（或者直接覆盖）
+                // 这里我们采用累加逻辑：如果有数字输入，就加入 digit_buffer
+                if !self.digit_buffer.is_empty() && now.duration_since(self.last_digit_time).as_millis() > 500 {
+                    self.digit_buffer.clear();
+                }
+                
+                self.digit_buffer.push_str(&digit.to_string());
+                self.last_digit_time = now;
+                
+                let val = self.digit_buffer.parse::<usize>().unwrap_or(0);
+                if val > 0 {
+                    let idx = self.page + (val - 1);
+                    if idx < self.candidates.len() {
+                        self.selected = idx;
+                        // 如果当前累加的数字已经让候选词范围缩小到不可能有更多位（比如只有10个候选词，输入了2，后面如果是21就超了）
+                        // 或者简单点：如果当前数字 > 1，且 candidates 长度没那么多，直接 commit
+                        // 或者是用户按得很快，我们等一下 update_gui 里的逻辑或者在此处直接 commit
+                        // 为了满足 "shuo10" 这种，我们需要等待一段时间或者直到数字组合唯一
+                        
+                        // 逻辑：如果 val * 10 > self.candidates.len()，说明不可能再输入下一位了，直接 commit
+                        if val * 10 > self.candidates.len() {
+                             return self.commit_candidate(self.candidates[idx].clone());
+                        }
+                    }
                 }
                 Action::Consume
             }
@@ -362,10 +388,10 @@ impl Processor {
 
         self.candidates.clear();
         self.candidate_hints.clear();
+        self.digit_buffer.clear();
         for (cand, hint) in final_candidates {
             self.candidates.push(cand);
-            if !hint.is_empty() && hint.chars().all(|c| c.is_ascii_digit()) { self.candidate_hints.push(String::new()); }
-            else { self.candidate_hints.push(hint); }
+            self.candidate_hints.push(hint);
         }
 
         if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
@@ -376,6 +402,21 @@ impl Processor {
     fn update_state(&mut self) {
         if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
         else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
+    }
+
+    pub fn check_digit_timeout(&mut self) -> Action {
+        if self.digit_buffer.is_empty() { return Action::Consume; }
+        if std::time::Instant::now().duration_since(self.last_digit_time).as_millis() > 400 {
+            let val = self.digit_buffer.parse::<usize>().unwrap_or(0);
+            if val > 0 {
+                let idx = self.page + (val - 1);
+                if let Some(word) = self.candidates.get(idx).cloned() {
+                    return self.commit_candidate(word);
+                }
+            }
+            self.digit_buffer.clear();
+        }
+        Action::Consume
     }
 
     pub fn next_profile(&mut self) -> String {

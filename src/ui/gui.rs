@@ -265,14 +265,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     pinyin_label_c.set_text(&pinyin);
                     sentence_label_c.set_text(&sentence);
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
-                    let start = (selected / 5) * 5;
-                    let end = (start + 5).min(candidates.len());
+                    let start = (selected / 10) * 10;
+                    let end = (start + 10).min(candidates.len());
                     for i in start..end {
                         let item = Box::new(Orientation::Horizontal, 0);
                         item.add_css_class("candidate-item");
                         if i == selected { item.add_css_class("candidate-selected"); }
                         
-                        let idx_lbl = Label::new(Some(&format!("{}", (i % 5) + 1)));
+                        let idx_lbl = Label::new(Some(&format!("{}", (i % 10) + 1)));
                         idx_lbl.add_css_class("index");
                         let txt_lbl = Label::new(Some(&candidates[i]));
                         txt_lbl.add_css_class("candidate-text");
@@ -299,14 +299,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     // 隐藏拼音
                     modern_pinyin_c.set_text(""); 
                     while let Some(child) = modern_candidates_c.first_child() { modern_candidates_c.remove(&child); }
-                    let start = (selected / 5) * 5;
-                    let end = (start + 5).min(candidates.len());
+                    let start = (selected / 10) * 10;
+                    let end = (start + 10).min(candidates.len());
                     for i in start..end {
                         let item = Box::new(Orientation::Horizontal, 0);
                         item.add_css_class("modern-item");
                         if i == selected { item.add_css_class("modern-selected"); }
                         
-                        let idx_lbl = Label::new(Some(&format!("{}", (i % 5) + 1)));
+                        let idx_lbl = Label::new(Some(&format!("{}", (i % 10) + 1)));
                         idx_lbl.add_css_class("m-index");
                         let txt_lbl = Label::new(Some(&candidates[i]));
                         txt_lbl.add_css_class("modern-text");

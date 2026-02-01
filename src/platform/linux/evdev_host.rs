@@ -57,8 +57,33 @@ impl InputMethodHost for EvdevHost {
 
         while !self.should_exit.load(Ordering::Relaxed) {
             let events: Vec<_> = if let Ok(mut dev) = self.dev.lock() {
-                dev.fetch_events()?.collect()
+                // 使用非阻塞读取，配合超时检查
+                match dev.fetch_events() {
+                    Ok(evs) => evs.collect(),
+                    Err(_) => vec![],
+                }
             } else { break; };
+
+            if events.is_empty() {
+                // 检查数字超时
+                let mut p = self.processor.lock().unwrap();
+                let action = p.check_digit_timeout();
+                match action {
+                    Action::DeleteAndEmit { delete, insert } => {
+                        if let Ok(mut vkbd) = self.vkbd.lock() {
+                            if delete > 0 { vkbd.backspace(delete); }
+                            if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                        }
+                        drop(p);
+                        self.update_gui();
+                    }
+                    _ => {
+                        drop(p);
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                continue;
+            }
 
             for ev in events {
                 if let InputEventKind::Key(key) = ev.kind() {
@@ -278,11 +303,11 @@ impl EvdevHost {
             if !p.candidates.is_empty() {
                 print!("\r\x1b[K[Console] {} | ", pinyin);
                 let start = p.page;
-                let end = (start + 5).min(p.candidates.len());
+                let end = (start + 10).min(p.candidates.len());
                 for (i, cand) in p.candidates[start..end].iter().enumerate() {
                     let abs_idx = start + i;
-                    if abs_idx == p.selected { print!("\x1b[1;32m{}.{}\x1b[0m ", i+1, cand); }
-                    else { print!("{}.{} ", i+1, cand); }
+                    if abs_idx == p.selected { print!("\x1b[1;32m{}.{}\x1b[0m ", (i % 10)+1, cand); }
+                    else { print!("{}.{} ", (i % 10)+1, cand); }
                 }
                 use std::io::Write;
                 std::io::stdout().flush().unwrap();
