@@ -10,17 +10,12 @@ use std::env;
 use std::collections::HashMap;
 use std::io::BufReader;
 
-use engine::{Processor, Trie, NgramModel};
+use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
 use platform::linux::evdev_host::EvdevHost;
 pub use config::Config;
 use serde::Deserialize;
 use serde_json::Value;
-
-#[derive(Debug, Deserialize)]
-struct PunctuationEntry {
-    char: String,
-}
 
 #[derive(Debug, Deserialize, Clone)]
 struct DictEntry {
@@ -97,7 +92,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. 加载词库
     let mut tries_map = HashMap::new();
-    let mut ngrams = HashMap::new();
     if let Ok(entries) = std::fs::read_dir("data") {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
@@ -109,8 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
                         println!("[Main] 加载方案: {}", dir_name);
                         tries_map.insert(dir_name.clone(), trie);
-                        let model = NgramModel::new(Some(&entry.path().to_string_lossy()));
-                        ngrams.insert(dir_name, model);
                     }
                 }
             }
@@ -121,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conf_guard = config.read().unwrap();
     let punctuation = load_punctuation_dict(&conf_guard.files.punctuation_file);
     let default_profile = conf_guard.input.default_profile.to_lowercase();
-    let mut processor_obj = Processor::new(tries_map, ngrams, default_profile, punctuation);
+    let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
     processor_obj.apply_config(&conf_guard);
 
     // --- 命令行即时转换模式 ---

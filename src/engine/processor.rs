@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use evdev::Key;
 use crate::engine::trie::Trie;
-use crate::engine::ngram::NgramModel;
-use crate::engine::segmenter::Segmenter;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImeState {
@@ -27,18 +25,10 @@ pub enum PhantomMode {
     Pinyin,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum InputMode {
-    Single,
-    Long,
-}
-
 pub struct Processor {
     pub state: ImeState,
-    pub input_mode: InputMode,
     pub buffer: String,
     pub tries: HashMap<String, Trie>, 
-    pub ngrams: HashMap<String, NgramModel>,
     pub current_profile: String,
     pub punctuation: HashMap<String, Vec<String>>,
     pub en_to_zh: HashMap<String, Vec<String>>, // English -> Chinese words
@@ -47,7 +37,6 @@ pub struct Processor {
     pub selected: usize,
     pub page: usize,
     pub chinese_enabled: bool,
-    pub segmenter: Segmenter,
     pub best_segmentation: Vec<String>,
     pub joined_sentence: String,
     
@@ -63,7 +52,6 @@ pub struct Processor {
 impl Processor {
     pub fn new(
         tries: HashMap<String, Trie>, 
-        ngrams: HashMap<String, NgramModel>,
         initial_profile: String, 
         punctuation_raw: HashMap<String, serde_json::Value>, 
     ) -> Self {
@@ -97,9 +85,9 @@ impl Processor {
         }
 
         Self {
-            state: ImeState::Direct, input_mode: InputMode::Single, buffer: String::new(), tries, ngrams, current_profile: initial_profile,
+            state: ImeState::Direct, buffer: String::new(), tries, current_profile: initial_profile,
             punctuation, en_to_zh, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
-            chinese_enabled: false, segmenter: Segmenter::new(), best_segmentation: vec![],
+            chinese_enabled: false, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,
@@ -135,7 +123,6 @@ impl Processor {
         self.selected = 0;
         self.page = 0;
         self.state = ImeState::Direct;
-        self.input_mode = InputMode::Single;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
     }
