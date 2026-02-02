@@ -174,12 +174,14 @@ impl InputMethodHost for EvdevHost {
                     let has_mod = ctrl || alt || meta;
 
                     // --- 特殊处理: Tab 键 Dual-Role 逻辑 ---
-                    // 仅在无其他修饰键且中文模式下启用
-                    let processor_guard = self.processor.lock().unwrap();
-                    let chinese_mode = processor_guard.chinese_enabled;
-                    drop(processor_guard);
+                    // 仅在无其他修饰键、中文模式且开启长韵母映射时启用
+                    let (chinese_mode, quick_rime_enabled) = {
+                        let p = self.processor.lock().unwrap();
+                        let conf = self.config.read().unwrap();
+                        (p.chinese_enabled, conf.input.enable_quick_rime)
+                    };
 
-                    if key == Key::KEY_TAB && !has_mod && chinese_mode {
+                    if key == Key::KEY_TAB && !has_mod && chinese_mode && quick_rime_enabled {
                         if val == 1 { // Press
                             self.pending_tab = true;
                             continue; // 暂不发送，拦截

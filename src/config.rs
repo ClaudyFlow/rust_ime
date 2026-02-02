@@ -115,6 +115,8 @@ pub struct Input {
     pub commit_mode: String, // "single" or "double"
     #[serde(default = "default_quick_rimes")]
     pub quick_rimes: Vec<QuickRime>,
+    #[serde(default = "default_enable_quick_rime")]
+    pub enable_quick_rime: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -134,9 +136,12 @@ impl Default for Input {
             enable_anti_typo: true,
             commit_mode: "double".to_string(),
             quick_rimes: default_quick_rimes(),
+            enable_quick_rime: true,
         }
     }
 }
+
+fn default_enable_quick_rime() -> bool { true }
 
 fn default_quick_rimes() -> Vec<QuickRime> {
     vec![
