@@ -552,7 +552,8 @@ impl EvdevHost {
 
     fn notify_preview(&self) {
         let p = self.processor.lock().unwrap();
-        if !p.show_notifications || p.buffer.is_empty() { 
+        // 只有当 buffer 为空且不在 Vim 模式时，才关闭通知
+        if !p.show_notifications || (p.buffer.is_empty() && !p.vim_mode) { 
             let _ = self.notify_tx.send(NotifyEvent::Close);
             return; 
         }

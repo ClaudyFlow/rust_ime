@@ -30,7 +30,7 @@
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "Chinese",
+    "default_profile": "chinese",
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
     "enable_anti_typo": true,
@@ -81,7 +81,8 @@
         "insert": "uan"
       }
     ],
-    "enable_quick_rime": true
+    "enable_quick_rime": true,
+    "enable_error_sound": true
   },
   "hotkeys": {
     "switch_language": {

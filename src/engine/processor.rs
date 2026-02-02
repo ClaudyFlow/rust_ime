@@ -194,37 +194,41 @@ impl Processor {
 
         // --- 切换 Vim 模式 ---
         if key == Key::KEY_GRAVE {
-            if !self.buffer.is_empty() {
-                self.vim_mode = !self.vim_mode;
-                if self.vim_mode { self.cursor_pos = self.buffer.len(); }
-                return Action::Consume;
-            }
-            return Action::PassThrough;
+            self.vim_mode = !self.vim_mode;
+            if self.vim_mode { self.cursor_pos = self.buffer.len(); }
+            return Action::Consume;
         }
 
         // --- Vim 模式处理 ---
-        if self.vim_mode && !self.buffer.is_empty() {
+        if self.vim_mode {
             match key {
                 Key::KEY_H => { // 左移
-                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
-                    return Action::Consume;
+                    if !self.buffer.is_empty() {
+                        self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                    }
                 }
                 Key::KEY_L => { // 右移
-                    self.cursor_pos = (self.cursor_pos + 1).min(self.buffer.len());
-                    return Action::Consume;
+                    if !self.buffer.is_empty() {
+                        self.cursor_pos = (self.cursor_pos + 1).min(self.buffer.len());
+                    }
                 }
                 Key::KEY_D => { // 按音节删除
-                    self.delete_syllable_at_cursor();
-                    if self.buffer.is_empty() { self.reset(); return Action::Consume; }
-                    self.lookup();
-                    return self.update_phantom_action();
+                    if !self.buffer.is_empty() {
+                        self.delete_syllable_at_cursor();
+                        if self.buffer.is_empty() { 
+                            self.lookup(); 
+                        } else {
+                            self.lookup();
+                        }
+                    }
                 }
-                Key::KEY_C => { self.current_profile = "chinese".into(); self.lookup(); return Action::Consume; }
-                Key::KEY_E => { self.current_profile = "english".into(); self.lookup(); return Action::Consume; }
-                Key::KEY_R => { self.current_profile = "rime-ice".into(); self.lookup(); return Action::Consume; }
-                Key::KEY_J => { self.current_profile = "japanese".into(); self.lookup(); return Action::Consume; }
-                Key::KEY_ESC => { self.vim_mode = false; return Action::Consume; }
-                _ => {} // 其他键在 Vim 模式下保持静默
+                Key::KEY_C => { self.current_profile = "chinese".into(); self.lookup(); }
+                Key::KEY_E => { self.current_profile = "english".into(); self.lookup(); }
+                Key::KEY_R => { self.current_profile = "rime-ice".into(); self.lookup(); }
+                Key::KEY_J => { self.current_profile = "japanese".into(); self.lookup(); }
+                Key::KEY_ESC => { self.vim_mode = false; }
+                Key::KEY_SPACE | Key::KEY_ENTER => { self.vim_mode = false; } // 按空格或回车退出模式
+                _ => {} 
             }
             return Action::Consume;
         }
