@@ -198,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_modern_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.appearance.preview_mode.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_modern_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), tray_tx);
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -292,6 +292,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.anti_typo = enabled);
                     let _ = save_config(&w);
                     processor_clone.lock().unwrap().enable_anti_typo = enabled;
+                }
+                ui::tray::TrayEvent::SwitchCommitMode => {
+                    let mut w = config_tray.write().unwrap();
+                    w.input.commit_mode = if w.input.commit_mode == "single" { "double".into() } else { "single".into() };
+                    let mode = w.input.commit_mode.clone();
+                    tray_handle.update(|t| t.commit_mode = mode.clone());
+                    let _ = save_config(&w);
+                    processor_clone.lock().unwrap().commit_mode = mode.clone();
+                    let msg = if mode == "single" { "词模式(单空格)" } else { "长句模式(双空格)" };
+                    let _ = notify_tx_tray.send(NotifyEvent::Message("上屏模式切换".into(), msg.into()));
                 }
                 ui::tray::TrayEvent::CyclePreview => {
                     let mode_str = {

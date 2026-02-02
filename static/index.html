@@ -228,6 +228,16 @@
                     </div>
                     <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
                 </div>
+                <div class="setting-item">
+                    <div class="info">
+                        <div class="title">上屏模式</div>
+                        <div class="desc">词模式 (单空格上屏) vs 长句模式 (双空格上屏)</div>
+                    </div>
+                    <select id="commit_mode">
+                        <option value="single">词模式 (单空格上屏)</option>
+                        <option value="double">长句模式 (双空格上屏)</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -347,6 +357,7 @@
             document.getElementById('autostart').checked = config.input.autostart;
             document.getElementById('enable_fuzzy_pinyin').checked = config.input.enable_fuzzy_pinyin;
             document.getElementById('enable_anti_typo').checked = config.input.enable_anti_typo;
+            document.getElementById('commit_mode').value = config.input.commit_mode;
             document.getElementById('paste_method').value = config.input.paste_method;
             
             const ps = document.getElementById('default_profile');
@@ -415,6 +426,7 @@
             config.input.autostart = document.getElementById('autostart').checked;
             config.input.enable_fuzzy_pinyin = document.getElementById('enable_fuzzy_pinyin').checked;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
+            config.input.commit_mode = document.getElementById('commit_mode').value;
             config.input.paste_method = document.getElementById('paste_method').value;
             config.input.default_profile = document.getElementById('default_profile').value;
 

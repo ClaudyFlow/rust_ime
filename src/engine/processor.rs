@@ -54,6 +54,7 @@ pub struct Processor {
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
     pub enable_anti_typo: bool,
+    pub commit_mode: String,
 }
 
 impl Processor {
@@ -116,6 +117,7 @@ impl Processor {
             phantom_text: String::new(),
             preview_selected_candidate: false,
             enable_anti_typo: true,
+            commit_mode: "double".to_string(),
         }
     }
 
@@ -125,6 +127,7 @@ impl Processor {
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.enable_anti_typo = conf.input.enable_anti_typo;
+        self.commit_mode = conf.input.commit_mode.clone();
         self.current_profile = conf.input.default_profile.to_lowercase();
         self.phantom_mode = match conf.appearance.preview_mode.as_str() {
             "pinyin" => PhantomMode::Pinyin,
@@ -218,6 +221,14 @@ impl Processor {
                      }
                 }
                 
+                // --- 词模式 (Single Space Mode) ---
+                if self.commit_mode == "single" {
+                    if let Some(word) = self.candidates.get(self.selected) {
+                        return self.commit_candidate(word.clone());
+                    }
+                }
+
+                // --- 长句模式 (Double Space Mode) ---
                 // 如果缓冲区已经以空格结尾，则第二次按空格表示确认（上屏）
                 if self.buffer.ends_with(' ') {
                     if !self.joined_sentence.is_empty() {

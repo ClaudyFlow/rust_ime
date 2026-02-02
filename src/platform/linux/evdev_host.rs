@@ -167,7 +167,7 @@ impl InputMethodHost for EvdevHost {
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit) = {
                             let conf = self.config.read().unwrap();
                             (
                                 parse_key(&conf.hotkeys.switch_language.key),
@@ -179,6 +179,7 @@ impl InputMethodHost for EvdevHost {
                                 parse_key(&conf.hotkeys.toggle_traditional_gui.key),
                                 parse_key(&conf.hotkeys.toggle_modern_gui.key),
                                 parse_key(&conf.hotkeys.toggle_keystrokes.key),
+                                parse_key(&conf.hotkeys.switch_commit_mode.key),
                             )
                         };
                         
@@ -320,6 +321,22 @@ impl InputMethodHost for EvdevHost {
                                     let _ = tx.send(GuiEvent::ClearKeystrokes);
                                 }
                             }
+                            continue;
+                        }
+
+                        // 9. 切换上屏模式 (Ctrl+Alt+M)
+                        if is_combo(&held_keys, &toggle_commit) {
+                            let (mode, profile) = {
+                                let mut p = self.processor.lock().unwrap();
+                                p.commit_mode = if p.commit_mode == "single" { "double".into() } else { "single".into() };
+                                (p.commit_mode.clone(), p.current_profile.clone())
+                            };
+                            if let Ok(mut w) = self.config.write() {
+                                w.input.commit_mode = mode.clone();
+                                let _ = crate::save_config(&w);
+                            }
+                            let msg = if mode == "single" { "上屏: 词模式(单空格)" } else { "上屏: 长句模式(双空格)" };
+                            let _ = self.notify_tx.send(NotifyEvent::Message(profile, msg.into()));
                             continue;
                         }
                     }

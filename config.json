@@ -5,7 +5,7 @@
     "preview_mode": "pinyin",
     "show_candidates": false,
     "show_modern_candidates": true,
-    "show_keystrokes": false,
+    "show_keystrokes": true,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
     "candidate_margin_y": 120,
@@ -31,7 +31,9 @@
     "enable_fuzzy_pinyin": false,
     "autostart": false,
     "default_profile": "chinese",
-    "paste_method": "ctrl_v"
+    "paste_method": "ctrl_v",
+    "clipboard_delay_ms": 50,
+    "enable_anti_typo": true
   },
   "hotkeys": {
     "switch_language": {

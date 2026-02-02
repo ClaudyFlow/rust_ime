@@ -111,6 +111,8 @@ pub struct Input {
     pub clipboard_delay_ms: u64,
     #[serde(default = "default_enable_anti_typo")]
     pub enable_anti_typo: bool,
+    #[serde(default = "default_commit_mode")]
+    pub commit_mode: String, // "single" or "double"
 }
 
 impl Default for Input {
@@ -122,10 +124,12 @@ impl Default for Input {
             paste_method: "ctrl_v".to_string(),
             clipboard_delay_ms: 50,
             enable_anti_typo: true,
+            commit_mode: "double".to_string(),
         }
     }
 }
 
+fn default_commit_mode() -> String { "double".to_string() }
 fn default_enable_anti_typo() -> bool { true }
 fn default_clipboard_delay() -> u64 { 50 }
 
@@ -180,6 +184,8 @@ pub struct Hotkeys {
     pub toggle_modern_gui: Shortcut,
     #[serde(default = "default_keystroke_toggle")]
     pub toggle_keystrokes: Shortcut,
+    #[serde(default = "default_commit_mode_toggle")]
+    pub switch_commit_mode: Shortcut,
 }
 
 impl Default for Hotkeys {
@@ -195,6 +201,7 @@ impl Default for Hotkeys {
             toggle_traditional_gui: default_trad_gui_toggle(),
             toggle_modern_gui: default_modern_gui_toggle(),
             toggle_keystrokes: default_keystroke_toggle(),
+            switch_commit_mode: default_commit_mode_toggle(),
         }
     }
 }
@@ -453,6 +460,10 @@ fn default_modern_gui_toggle() -> Shortcut {
 }
 fn default_keystroke_toggle() -> Shortcut {
     Shortcut::new("ctrl+alt+k", "功能: 显示/隐藏 按键显示")
+}
+
+fn default_commit_mode_toggle() -> Shortcut {
+    Shortcut::new("ctrl+alt+m", "功能: 切换上屏模式 (词模式/长句模式)")
 }
 
 // Helper for parse (unchanged)

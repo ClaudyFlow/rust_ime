@@ -16,6 +16,7 @@ pub enum TrayEvent {
     ToggleKeystroke,
     ToggleLearning,
     ToggleAntiTypo,
+    SwitchCommitMode,
     ReloadConfig,
     CyclePreview,
 }
@@ -29,6 +30,7 @@ pub struct ImeTray {
     pub show_keystrokes: bool,
     pub learning_mode: bool,
     pub anti_typo: bool,
+    pub commit_mode: String,
     pub preview_mode: String,
     pub tx: Sender<TrayEvent>,
 }
@@ -175,6 +177,11 @@ impl Tray for ImeTray {
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleAntiTypo); }),
                 ..Default::default()
             }.into(),
+            StandardItem {
+                label: format!("上屏模式: {}", if self.commit_mode == "single" { "词模式(单空格)" } else { "长句模式(双空格)" }),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::SwitchCommitMode); }),
+                ..Default::default()
+            }.into(),
             MenuItem::Separator,
             StandardItem {
                 label: "配置中心 (Web)".to_string(),
@@ -206,10 +213,11 @@ pub fn start_tray(
     show_modern_candidates: bool,
     show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
     anti_typo: bool,
+    commit_mode: String,
     preview_mode: String,
     event_tx: Sender<TrayEvent>
 ) -> Handle<ImeTray> {
-    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_modern_candidates, show_notifications, show_keystrokes, learning_mode, anti_typo, preview_mode, tx: event_tx };
+    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_modern_candidates, show_notifications, show_keystrokes, learning_mode, anti_typo, commit_mode, preview_mode, tx: event_tx };
     let tray_service = TrayService::new(service);
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });
