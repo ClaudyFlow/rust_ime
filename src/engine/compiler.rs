@@ -46,6 +46,11 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
 fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
     if !target_file.exists() { return true; } 
     let target_mtime = target_file.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
+    
+    // 检查目录本身的修改时间 (删除或新增文件会改变目录 mtime)
+    let src_dir_mtime = src_dir.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
+    if src_dir_mtime > target_mtime { return true; }
+
     let mut max_src_mtime = SystemTime::UNIX_EPOCH;
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         if entry.path().is_file() {
