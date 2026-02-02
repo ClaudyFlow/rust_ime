@@ -439,11 +439,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             kw.set_margin(Edge::Bottom, app.keystroke_margin_y);
             kw.set_margin(Edge::Right, app.keystroke_margin_x);
 
-            // 学习模式 (默认右上)
-            lw.set_anchor(Edge::Top, true);
-            lw.set_anchor(Edge::Right, true);
-            lw.set_margin(Edge::Top, 40);
-            lw.set_margin(Edge::Right, 40);
+            // 学习模式
+            lw.set_anchor(Edge::Top, false); lw.set_anchor(Edge::Bottom, false);
+            lw.set_anchor(Edge::Left, false); lw.set_anchor(Edge::Right, false);
+            match app.learning_anchor.as_str() {
+                "top_left" => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Left, true); }
+                "bottom_left" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Left, true); }
+                "bottom_right" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Right, true); }
+                _ => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Right, true); }
+            }
+            lw.set_margin(Edge::Top, app.learning_margin_y);
+            lw.set_margin(Edge::Bottom, app.learning_margin_y);
+            lw.set_margin(Edge::Right, app.learning_margin_x);
+            lw.set_margin(Edge::Left, app.learning_margin_x);
         }
         lw.set_opacity(0.0);
     };
