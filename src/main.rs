@@ -112,7 +112,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let conf_guard = config.read().unwrap();
     let punctuation = load_punctuation_dict(&conf_guard.files.punctuation_file);
-    let default_profile = conf_guard.input.default_profile.to_lowercase();
+    let mut default_profile = conf_guard.input.default_profile.to_lowercase();
+    if default_profile.is_empty() || !tries_map.contains_key(&default_profile) {
+        if tries_map.contains_key("chinese") {
+            default_profile = "chinese".to_string();
+        } else if let Some(k) = tries_map.keys().next() {
+            default_profile = k.clone();
+        }
+    }
+    
     let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
     processor_obj.apply_config(&conf_guard);
 

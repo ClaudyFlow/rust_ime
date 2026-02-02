@@ -128,7 +128,16 @@ impl Processor {
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
-        self.current_profile = conf.input.default_profile.to_lowercase();
+        
+        let new_profile = conf.input.default_profile.to_lowercase();
+        if !new_profile.is_empty() && self.tries.contains_key(&new_profile) {
+            self.current_profile = new_profile;
+        } else if self.tries.contains_key("chinese") {
+            self.current_profile = "chinese".to_string();
+        } else if let Some(k) = self.tries.keys().next() {
+            self.current_profile = k.clone();
+        }
+
         self.phantom_mode = match conf.appearance.preview_mode.as_str() {
             "pinyin" => PhantomMode::Pinyin,
             _ => PhantomMode::None,

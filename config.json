@@ -4,7 +4,7 @@
     "show_notifications": true,
     "preview_mode": "pinyin",
     "show_candidates": false,
-    "show_modern_candidates": true,
+    "show_modern_candidates": false,
     "show_keystrokes": false,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
@@ -30,7 +30,7 @@
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "",
+    "default_profile": "Chinese",
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
     "enable_anti_typo": true,
