@@ -365,7 +365,8 @@ impl Processor {
 
     pub fn lookup(&mut self) {
         if self.buffer.is_empty() { self.reset(); return; }
-        let dict = if let Some(d) = self.tries.get(&self.current_profile.to_lowercase()) { d } else { return; };
+        let dict_key = self.current_profile.to_lowercase();
+        let dict = self.tries.get(&dict_key);
 
         let parsed_parts = self.parse_buffer();
         let mut greedy_sentence = String::new();
@@ -375,7 +376,11 @@ impl Processor {
         for (i, part) in parsed_parts.iter().enumerate() {
             all_raw_segments.push(part.raw.clone());
             
-            let matches = self.lookup_part(dict, part);
+            let matches = if let Some(d) = dict {
+                self.lookup_part(d, part)
+            } else {
+                Vec::new()
+            };
 
             // Select by Index
             let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
@@ -396,30 +401,32 @@ impl Processor {
         // --- 2. 填充候选词列表 ---
         let mut final_candidates: Vec<(String, String)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
-        let buffer_normalized = strip_tones(&self.buffer);
-        let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+        
+        if let Some(d) = dict {
+            let buffer_normalized = strip_tones(&self.buffer);
+            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
 
-        if !is_precise_mode {
-            let full_pinyin = buffer_normalized.to_lowercase();
-            // --- 2.1 中文/拼音精准匹配 ---
-            if let Some(exact_matches) = dict.get_all_exact(&full_pinyin) {
-                for (word, hint) in exact_matches {
+            if !is_precise_mode {
+                let full_pinyin = buffer_normalized.to_lowercase();
+                // --- 2.1 中文/拼音精准匹配 ---
+                if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
+                    for (word, hint) in exact_matches {
+                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    }
+                }
+
+                // --- 2.2 前缀模糊搜索 (非中文方案使用) ---
+                if dict_key != "chinese" && full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    let prefix_matches = d.search_bfs(&full_pinyin, 10);
+                    for (word, hint) in prefix_matches {
+                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    }
+                }
+            } else {
+                // 精准模式：候选词列表显示最后一部分经过辅码过滤后的候选
+                for (word, hint) in last_matches {
                     if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
-            }
-
-            // --- 2.2 前缀模糊搜索 (非中文方案使用) ---
-            // 中文方案只使用精准匹配，避免混用英文结果
-            if self.current_profile != "chinese" && full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                let prefix_matches = dict.search_bfs(&full_pinyin, 10);
-                for (word, hint) in prefix_matches {
-                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                }
-            }
-        } else {
-            // 精准模式：候选词列表显示最后一部分经过辅码过滤后的候选
-            for (word, hint) in last_matches {
-                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
             }
         }
 
@@ -508,6 +515,8 @@ mod tests {
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
             preview_selected_candidate: false,
+            enable_anti_typo: true,
+            commit_mode: "double".to_string(),
         }
     }
 
