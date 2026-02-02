@@ -508,11 +508,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 let show_modern = current_config.appearance.show_modern_candidates;
 
                 if pinyin.is_empty() && candidates.is_empty() {
-                    window_c.set_opacity(0.0); modern_window_c.set_opacity(0.0);
+                    window_c.set_opacity(0.0); window_c.hide();
+                    modern_window_c.set_opacity(0.0); modern_window_c.hide();
                     return glib::Continue(true);
                 }
 
                 if show_trad {
+                    window_c.show();
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
                     sentence_label_c.set_text(&sentence);
@@ -540,9 +542,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         }
                         candidates_box_c.append(&item);
                     }
-                } else { window_c.set_opacity(0.0); }
+                } else { window_c.set_opacity(0.0); window_c.hide(); }
 
                 if show_modern {
+                    modern_window_c.show();
                     modern_window_c.set_opacity(1.0);
                     modern_pinyin_c.set_text(""); 
                     while let Some(child) = modern_candidates_c.first_child() { modern_candidates_c.remove(&child); }
@@ -567,7 +570,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         }
                         modern_candidates_c.append(&item);
                     }
-                } else { modern_window_c.set_opacity(0.0); }
+                } else { modern_window_c.set_opacity(0.0); modern_window_c.hide(); }
             },
             _ => {}
         }
