@@ -34,7 +34,7 @@
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
     "enable_anti_typo": true,
-    "commit_mode": "single",
+    "commit_mode": "double",
     "quick_rimes": [
       {
         "trigger": "tab+g",
@@ -82,7 +82,25 @@
       }
     ],
     "enable_quick_rime": true,
-    "enable_error_sound": true
+    "enable_error_sound": true,
+    "profile_keys": [
+      {
+        "key": "c",
+        "profile": "chinese"
+      },
+      {
+        "key": "e",
+        "profile": "english"
+      },
+      {
+        "key": "r",
+        "profile": "rime-ice"
+      },
+      {
+        "key": "j",
+        "profile": "japanese"
+      }
+    ]
   },
   "hotkeys": {
     "switch_language": {

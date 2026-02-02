@@ -254,6 +254,13 @@
                         <option value="double">长句模式 (双空格上屏)</option>
                     </select>
                 </div>
+                <div class="setting-item">
+                    <div class="info">
+                        <div class="title">每页候选词数量</div>
+                        <div class="desc">设置候选窗口一次显示的词条个数 (1-9)</div>
+                    </div>
+                    <input type="number" id="page_size" min="1" max="9">
+                </div>
             </div>
         </div>
 
@@ -398,6 +405,7 @@
             document.getElementById('enable_error_sound').checked = config.input.enable_error_sound;
             document.getElementById('enable_quick_rime').checked = config.input.enable_quick_rime;
             document.getElementById('commit_mode').value = config.input.commit_mode;
+            document.getElementById('page_size').value = config.appearance.page_size;
             document.getElementById('paste_method').value = config.input.paste_method;
             
             const ps = document.getElementById('default_profile');
@@ -475,6 +483,7 @@
             config.input.enable_error_sound = document.getElementById('enable_error_sound').checked;
             config.input.enable_quick_rime = document.getElementById('enable_quick_rime').checked;
             config.input.commit_mode = document.getElementById('commit_mode').value;
+            config.appearance.page_size = parseInt(document.getElementById('page_size').value) || 9;
             config.input.paste_method = document.getElementById('paste_method').value;
             config.input.default_profile = document.getElementById('default_profile').value;
 

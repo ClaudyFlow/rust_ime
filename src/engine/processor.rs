@@ -60,6 +60,7 @@ pub struct Processor {
     pub switch_mode: bool,
     pub cursor_pos: usize,
     pub profile_keys: Vec<(String, String)>,
+    pub page_size: usize,
 }
 
 impl Processor {
@@ -126,6 +127,7 @@ impl Processor {
             switch_mode: false,
             cursor_pos: 0,
             profile_keys: Vec::new(),
+            page_size: 9,
         }
     }
 
@@ -134,6 +136,7 @@ impl Processor {
         self.show_modern_candidates = conf.appearance.show_modern_candidates;
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
+        self.page_size = conf.appearance.page_size;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
@@ -278,7 +281,7 @@ impl Processor {
                 if !self.candidates.is_empty() {
                     self.preview_selected_candidate = true;
                     if self.selected > 0 { self.selected -= 1; }
-                    self.page = (self.selected / 10) * 10;
+                    self.page = (self.selected / self.page_size) * self.page_size;
                     self.update_phantom_action()
                 } else { Action::PassThrough } // 如果没有候选词，允许左键移动光标(但这需要 Host 支持，暂 PassThrough)
             }
@@ -286,13 +289,13 @@ impl Processor {
                 if !self.candidates.is_empty() {
                     self.preview_selected_candidate = true;
                     if self.selected + 1 < self.candidates.len() { self.selected += 1; }
-                    self.page = (self.selected / 10) * 10;
+                    self.page = (self.selected / self.page_size) * self.page_size;
                     self.update_phantom_action()
                 } else { Action::PassThrough }
             }
             Key::KEY_TAB => Action::PassThrough, // Tab 键交由 Host 处理（作为长韵母修饰键或原样发送）
-            Key::KEY_MINUS => { self.page = self.page.saturating_sub(10); self.selected = self.page; Action::Consume }
-            Key::KEY_EQUAL => { if self.page + 10 < self.candidates.len() { self.page += 10; self.selected = self.page; } Action::Consume }
+            Key::KEY_MINUS => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
+            Key::KEY_EQUAL => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
                 if self.preview_selected_candidate {
                      if let Some(word) = self.candidates.get(self.selected) {
@@ -346,6 +349,16 @@ impl Processor {
             }
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
+                
+                // 如果数字在 1..=page_size 范围内且当前有候选词，执行选词
+                if digit >= 1 && digit <= self.page_size {
+                    let abs_idx = self.page + digit - 1;
+                    if let Some(word) = self.candidates.get(abs_idx) {
+                        return self.commit_candidate(word.clone());
+                    }
+                }
+
+                // 否则，作为普通数字加入缓冲区（例如输入 0，或者 page_size 以外的数字）
                 self.buffer.push_str(&digit.to_string());
                 self.lookup();
                 self.update_phantom_action()

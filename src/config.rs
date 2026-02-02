@@ -62,6 +62,8 @@ pub struct Appearance {
     pub learning_interval_sec: u64,
     #[serde(default = "default_learning_dict_path")]
     pub learning_dict_path: String,
+    #[serde(default = "default_page_size")]
+    pub page_size: usize,
 }
 
 impl Default for Appearance {
@@ -92,9 +94,12 @@ impl Default for Appearance {
             learning_mode: false,
             learning_interval_sec: default_learning_interval(),
             learning_dict_path: default_learning_dict_path(),
+            page_size: default_page_size(),
         }
     }
 }
+
+fn default_page_size() -> usize { 9 }
 
 // --- 2. 输入行为 ---
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
