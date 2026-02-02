@@ -327,6 +327,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let new_conf = load_config();
                     processor_clone.lock().unwrap().apply_config(&new_conf);
                     let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(new_conf.clone()));
+                    
+                    // 同步更新托盘菜单状态
+                    tray_handle.update(|t| {
+                        t.show_candidates = new_conf.appearance.show_candidates;
+                        t.show_modern_candidates = new_conf.appearance.show_modern_candidates;
+                        t.show_notifications = new_conf.appearance.show_notifications;
+                        t.show_keystrokes = new_conf.appearance.show_keystrokes;
+                        t.learning_mode = new_conf.appearance.learning_mode;
+                        t.preview_mode = new_conf.appearance.preview_mode.clone();
+                        t.anti_typo = new_conf.input.enable_anti_typo;
+                        t.commit_mode = new_conf.input.commit_mode.clone();
+                    });
+
                     if let Ok(mut w) = config_tray.write() { *w = new_conf; }
                 }
                 ui::tray::TrayEvent::OpenConfig => {

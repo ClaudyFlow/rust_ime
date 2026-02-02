@@ -541,8 +541,8 @@ impl EvdevHost {
                 std::io::stdout().flush().unwrap();
             }
 
-            // 如果开启了候选框显示，发送完整数据
-            if p.show_candidates {
+            // 只要传统或卡片式候选窗中有一个开启，就发送完整数据
+            if p.show_candidates || p.show_modern_candidates {
                 let _ = tx.send(GuiEvent::Update { 
                     pinyin, 
                     candidates: p.candidates.clone(), 
@@ -551,7 +551,7 @@ impl EvdevHost {
                     sentence: p.joined_sentence.clone(),
                 });
             } else {
-                // 否则仅在控制台或通过拼音预览（由 handle_key 处理）工作，GUI 保持清空
+                // 两者都关闭时，发送空更新以隐藏窗口
                 let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });
             }
         }
