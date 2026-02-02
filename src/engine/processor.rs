@@ -17,6 +17,7 @@ pub enum Action {
     DeleteAndEmit { delete: usize, insert: String },
     PassThrough,
     Consume,
+    Alert,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -315,7 +316,7 @@ impl Processor {
                             let dict = self.tries.get(&self.current_profile.to_lowercase());
                             if let Some(d) = dict {
                                 if !d.has_prefix(last_segment) {
-                                    return Action::Consume; // 拦截无效输入
+                                    return Action::Alert; // 拦截无效输入并发出警报
                                 }
                             }
                         }

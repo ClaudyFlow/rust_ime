@@ -117,6 +117,8 @@ pub struct Input {
     pub quick_rimes: Vec<QuickRime>,
     #[serde(default = "default_enable_quick_rime")]
     pub enable_quick_rime: bool,
+    #[serde(default = "default_enable_error_sound")]
+    pub enable_error_sound: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -137,10 +139,12 @@ impl Default for Input {
             commit_mode: "double".to_string(),
             quick_rimes: default_quick_rimes(),
             enable_quick_rime: true,
+            enable_error_sound: true,
         }
     }
 }
 
+fn default_enable_error_sound() -> bool { true }
 fn default_enable_quick_rime() -> bool { true }
 
 fn default_quick_rimes() -> Vec<QuickRime> {

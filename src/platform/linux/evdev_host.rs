@@ -225,6 +225,12 @@ impl InputMethodHost for EvdevHost {
                                                 }
                                             }
                                             Action::Consume => {}
+                                            Action::Alert => {
+                                                // QuickRime 注入导致警报 (虽然理论上注入的是预设正确韵母，不太会发生)
+                                                if self.config.read().unwrap().input.enable_error_sound {
+                                                    let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn();
+                                                }
+                                            }
                                             Action::PassThrough => {} 
                                          }
                                          handled_quick_rime = true;
@@ -444,6 +450,17 @@ impl InputMethodHost for EvdevHost {
                                 if let Ok(mut vkbd) = self.vkbd.lock() {
                                     if delete > 0 { vkbd.backspace(delete); }
                                     if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                                }
+                            }
+                            Action::Alert => {
+                                // 播放错误音
+                                let enabled = self.config.read().unwrap().input.enable_error_sound;
+                                if enabled {
+                                    // 使用 canberra-gtk-play 播放系统标准的 "dialog-error" 声音
+                                    // 这在 GNOME/KDE 等主流桌面环境下是开箱即用的
+                                    let _ = std::process::Command::new("canberra-gtk-play")
+                                        .arg("--id=dialog-error")
+                                        .spawn();
                                 }
                             }
                             Action::Consume => {}

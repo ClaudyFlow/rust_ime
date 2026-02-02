@@ -231,6 +231,13 @@
                 </div>
                 <div class="setting-item">
                     <div class="info">
+                        <div class="title">防呆错误提示音</div>
+                        <div class="desc">输入错误组合时播放声音提醒</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info">
                         <div class="title">长韵母映射</div>
                         <div class="desc">使用组合键快速输入（如 Tab+L）</div>
                     </div>
@@ -376,6 +383,7 @@
             document.getElementById('autostart').checked = config.input.autostart;
             document.getElementById('enable_fuzzy_pinyin').checked = config.input.enable_fuzzy_pinyin;
             document.getElementById('enable_anti_typo').checked = config.input.enable_anti_typo;
+            document.getElementById('enable_error_sound').checked = config.input.enable_error_sound;
             document.getElementById('enable_quick_rime').checked = config.input.enable_quick_rime;
             document.getElementById('commit_mode').value = config.input.commit_mode;
             document.getElementById('paste_method').value = config.input.paste_method;
@@ -449,6 +457,7 @@
             config.input.autostart = document.getElementById('autostart').checked;
             config.input.enable_fuzzy_pinyin = document.getElementById('enable_fuzzy_pinyin').checked;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
+            config.input.enable_error_sound = document.getElementById('enable_error_sound').checked;
             config.input.enable_quick_rime = document.getElementById('enable_quick_rime').checked;
             config.input.commit_mode = document.getElementById('commit_mode').value;
             config.input.paste_method = document.getElementById('paste_method').value;
