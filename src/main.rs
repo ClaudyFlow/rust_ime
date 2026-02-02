@@ -223,7 +223,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
                         (p.current_profile.clone(), p.chinese_enabled)
                     };
-                    let msg = if enabled { "中文模式" } else { "英文模式" };
+                    let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
                     let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });

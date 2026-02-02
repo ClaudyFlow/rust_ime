@@ -279,7 +279,7 @@ impl InputMethodHost for EvdevHost {
                             let mut p = self.processor.lock().unwrap();
                             let action = p.toggle();
                             let enabled = p.chinese_enabled;
-                            let msg = if enabled { "中文模式" } else { "英文模式" };
+                            let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
                             let summary = p.current_profile.clone();
                             
                             // 发送新通知的同时，确保之前的候选列表通知已关闭

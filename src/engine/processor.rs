@@ -392,7 +392,15 @@ impl Processor {
         }
     }
 
-    fn commit_candidate(&mut self, cand: String) -> Action {
+    fn commit_candidate(&mut self, mut cand: String) -> Action {
+        // 如果是英语方案，且上屏的是一个单词（不以标点结尾），则自动追加空格
+        if self.current_profile == "english" && !cand.is_empty() {
+            let last_char = cand.chars().last().unwrap_or(' ');
+            if last_char.is_alphanumeric() {
+                cand.push(' ');
+            }
+        }
+
         let del = self.phantom_text.chars().count();
         self.reset();
         Action::DeleteAndEmit { delete: del, insert: cand }

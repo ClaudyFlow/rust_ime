@@ -113,7 +113,7 @@ impl Tray for ImeTray {
     }
 
     fn title(&self) -> String {
-        format!("rust-IME ({})", if self.chinese_enabled { "中" } else { "英" })
+        format!("rust-IME ({})", if self.chinese_enabled { "中" } else { "直" })
     }
 
     fn tool_tip(&self) -> ToolTip {
@@ -132,7 +132,7 @@ impl Tray for ImeTray {
     fn menu(&self) -> Vec<MenuItem<Self>> {
         vec![
             StandardItem {
-                label: format!("模式: {}", if self.chinese_enabled { "中文" } else { "英文" }),
+                label: format!("模式: {}", if self.chinese_enabled { "中文" } else { "直通 (无输入法)" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleIme); }),
                 ..Default::default()
             }.into(),
