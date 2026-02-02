@@ -28,11 +28,12 @@ mkdir -p "$RELEASE_DIR/data"
 
 # 3. 创建压缩包
 echo "🗜️ 正在生成压缩包..."
-tar -czf "$ARCHIVE_NAME" -C "$RELEASE_DIR" .
+mkdir -p releases
+tar -czf "releases/$ARCHIVE_NAME" -C "$RELEASE_DIR" .
 
 # 4. 清理
 rm -rf "$RELEASE_DIR"
 
 echo -e "\n✅ 打包完成！"
-echo "📦 发行版文件: $(pwd)/$ARCHIVE_NAME"
+echo "📦 发行版文件: $(pwd)/releases/$ARCHIVE_NAME"
 echo "💡 用户只需下载并解压该包，运行 './install.sh' 即可完成安装。"
