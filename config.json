@@ -5,7 +5,7 @@
     "preview_mode": "pinyin",
     "show_candidates": false,
     "show_modern_candidates": true,
-    "show_keystrokes": true,
+    "show_keystrokes": false,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
     "candidate_margin_y": 120,
@@ -33,7 +33,8 @@
     "default_profile": "chinese",
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
-    "enable_anti_typo": true
+    "enable_anti_typo": true,
+    "commit_mode": "single"
   },
   "hotkeys": {
     "switch_language": {
@@ -75,6 +76,10 @@
     "toggle_keystrokes": {
       "key": "ctrl+alt+k",
       "description": "功能: 显示/隐藏 按键显示"
+    },
+    "switch_commit_mode": {
+      "key": "ctrl+alt+m",
+      "description": "功能: 切换上屏模式 (词模式/长句模式)"
     }
   },
   "files": {

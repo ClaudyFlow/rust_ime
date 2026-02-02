@@ -463,7 +463,7 @@ fn default_keystroke_toggle() -> Shortcut {
 }
 
 fn default_commit_mode_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+m", "功能: 切换上屏模式 (词模式/长句模式)")
+    Shortcut::new("alt+space", "功能: 切换上屏模式 (词模式/长句模式)")
 }
 
 // Helper for parse (unchanged)
