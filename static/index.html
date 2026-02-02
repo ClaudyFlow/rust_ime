@@ -417,6 +417,25 @@
 
     <script>
         let config = null;
+        let isDirty = false;
+
+        function markDirty() {
+            isDirty = true;
+        }
+
+        window.addEventListener('beforeunload', (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = ''; // 触发浏览器标准的确认对话框
+            }
+        });
+
+        // 监听 body 上所有的输入/改变事件来标记“已修改”
+        document.body.addEventListener('input', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                markDirty();
+            }
+        });
 
         async function load() {
             const r = await fetch('/api/config');
@@ -538,7 +557,11 @@
             document.querySelectorAll('.hotkey-input').forEach(el => { config.hotkeys[el.dataset.id].key = el.value; });
 
             const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
-            if (r.ok) { document.getElementById('toast').style.display = 'block'; setTimeout(() => document.getElementById('toast').style.display = 'none', 3000); }
+            if (r.ok) { 
+                isDirty = false;
+                document.getElementById('toast').style.display = 'block'; 
+                setTimeout(() => document.getElementById('toast').style.display = 'none', 3000); 
+            }
         }
 
         // Helper functions
@@ -560,8 +583,8 @@
             c.innerHTML = config.input.quick_rimes.map((qr, i) => `<div class="setting-item qr-item"><input type="text" class="qr-trigger" value="${qr.trigger}" style="width:100px;"> ⮕ <input type="text" class="qr-insert" value="${qr.insert}" style="width:100px;"> <button onclick="removeQuickRime(${i})" style="color:red; background:none; border:none; cursor:pointer;">✕</button></div>`).join('');
         }
 
-        function addQuickRime() { syncQuickRimesFromDOM(); config.input.quick_rimes.push({ trigger: 'tab+key', insert: 'text' }); renderQuickRimes(); }
-        function removeQuickRime(i) { syncQuickRimesFromDOM(); config.input.quick_rimes.splice(i, 1); renderQuickRimes(); }
+        function addQuickRime() { markDirty(); syncQuickRimesFromDOM(); config.input.quick_rimes.push({ trigger: 'tab+key', insert: 'text' }); renderQuickRimes(); }
+        function removeQuickRime(i) { markDirty(); syncQuickRimesFromDOM(); config.input.quick_rimes.splice(i, 1); renderQuickRimes(); }
 
         function syncProfileKeysFromDOM() {
             const list = [];
@@ -574,8 +597,8 @@
             c.innerHTML = config.input.profile_keys.map((pk, i) => `<div class="setting-item pk-item"><input type="text" class="pk-trigger" value="${pk.key}" style="width:60px;"> ⮕ <input type="text" class="pk-profile" value="${pk.profile}" style="width:120px;"> <button onclick="removeProfileKey(${i})" style="color:red; background:none; border:none; cursor:pointer;">✕</button></div>`).join('');
         }
 
-        function addProfileKey() { syncProfileKeysFromDOM(); config.input.profile_keys.push({ key: '?', profile: 'scheme' }); renderProfileKeys(); }
-        function removeProfileKey(i) { syncProfileKeysFromDOM(); config.input.profile_keys.splice(i, 1); renderProfileKeys(); }
+        function addProfileKey() { markDirty(); syncProfileKeysFromDOM(); config.input.profile_keys.push({ key: '?', profile: 'scheme' }); renderProfileKeys(); }
+        function removeProfileKey(i) { markDirty(); syncProfileKeysFromDOM(); config.input.profile_keys.splice(i, 1); renderProfileKeys(); }
 
         async function compileDicts() { const r = await fetch('/api/dicts/compile', { method: 'POST' }); if (r.ok) alert('编译成功'); }
         async function resetAll() { if (confirm("确定重置？")) { await fetch('/api/config/reset', { method: 'POST' }); await load(); } }
