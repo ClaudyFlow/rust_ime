@@ -596,30 +596,6 @@ impl Processor {
         self.reset();
         self.current_profile.clone()
     }
-
-    fn delete_syllable_at_cursor(&mut self) {
-        if self.buffer.is_empty() { return; }
-        
-        // 简单实现：删除最后一个音节（如果光标在末尾）或根据 best_segmentation 切分
-        if self.best_segmentation.is_empty() {
-            self.buffer.pop();
-        } else {
-            // 如果光标在末尾，删掉最后一个 segment
-            if self.cursor_pos == self.buffer.len() {
-                if let Some(last) = self.best_segmentation.pop() {
-                    // 处理可能带空格的 raw segment
-                    let len = last.len();
-                    for _ in 0..len { self.buffer.pop(); }
-                    // 还要删掉可能存在的前置空格
-                    if self.buffer.ends_with(' ') { self.buffer.pop(); }
-                }
-            } else {
-                // 如果光标在中间，暂时回退到删除单个字符（待完善更精确的中间切分逻辑）
-                self.buffer.remove(self.cursor_pos - 1);
-            }
-        }
-        self.cursor_pos = self.buffer.len();
-    }
 }
 
 pub fn is_letter(key: Key) -> bool { key_to_char(key, false).is_some() }
