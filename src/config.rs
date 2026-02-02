@@ -140,12 +140,18 @@ impl Default for Input {
 
 fn default_quick_rimes() -> Vec<QuickRime> {
     vec![
+        // Alt 组合 (传统)
         QuickRime { trigger: "alt+l".into(), insert: "iang".into() },
         QuickRime { trigger: "alt+s".into(), insert: "ong".into() },
         QuickRime { trigger: "alt+g".into(), insert: "eng".into() },
         QuickRime { trigger: "alt+h".into(), insert: "ang".into() },
         QuickRime { trigger: "alt+r".into(), insert: "uan".into() },
         QuickRime { trigger: "alt+k".into(), insert: "uai".into() },
+        
+        // Shift 组合 (推荐: 无干扰)
+        // 用户可以在 Web 端自行删除不需要的映射
+        QuickRime { trigger: "shift+l".into(), insert: "iang".into() }, // Li -> Liang
+        QuickRime { trigger: "shift+n".into(), insert: "ing".into() },  // Ni -> Ning
     ]
 }
 

@@ -167,6 +167,52 @@ impl InputMethodHost for EvdevHost {
 
                     // --- 快捷键检测 ---
                     if val == 1 {
+                        // 0. 优先检测：快速韵母/自定义注入 (Quick Rime)
+                        // 放在最前面以防止被后面的 has_mod 逻辑重置
+                        let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
+                        let mut handled_quick_rime = false;
+                        for qr in quick_rimes {
+                             let keys = parse_key(&qr.trigger);
+                             if is_combo(&held_keys, &keys) {
+                                 let mut p = self.processor.lock().unwrap();
+                                 if p.chinese_enabled {
+                                     // 仅在中文模式下生效
+                                     let action = p.inject_text(&qr.insert);
+                                     
+                                     // Anti-Menu Trick: 如果使用了 Alt，发送一个无害的 Shift 点击
+                                     // 这能防止大多数桌面环境(GNOME/KDE)在释放 Alt 时弹出菜单
+                                     let use_alt = keys.iter().any(|group| group.contains(&Key::KEY_LEFTALT) || group.contains(&Key::KEY_RIGHTALT));
+                                     
+                                     match action {
+                                        Action::Emit(s) => { 
+                                            if let Ok(mut vkbd) = self.vkbd.lock() { 
+                                                if use_alt { vkbd.tap(Key::KEY_RIGHTSHIFT); }
+                                                let _ = vkbd.send_text(&s); 
+                                            } 
+                                        }
+                                        Action::DeleteAndEmit { delete, insert } => { 
+                                            if let Ok(mut vkbd) = self.vkbd.lock() {
+                                                if use_alt { vkbd.tap(Key::KEY_RIGHTSHIFT); }
+                                                if delete > 0 { vkbd.backspace(delete); }
+                                                if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                                            }
+                                        }
+                                        Action::Consume => {
+                                            if use_alt { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_RIGHTSHIFT); } }
+                                        }
+                                        Action::PassThrough => {} 
+                                     }
+                                     handled_quick_rime = true;
+                                 }
+                                 drop(p);
+                                 if handled_quick_rime {
+                                     self.update_gui();
+                                     break; 
+                                 }
+                             }
+                        }
+                        if handled_quick_rime { continue; }
+
                         let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit) = {
                             let conf = self.config.read().unwrap();
                             (
@@ -339,38 +385,6 @@ impl InputMethodHost for EvdevHost {
                             let _ = self.notify_tx.send(NotifyEvent::Message(profile, msg.into()));
                             continue;
                         }
-
-                        // 10. 快速韵母/自定义注入 (Quick Rime)
-                        let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
-                        let mut handled_quick_rime = false;
-                        for qr in quick_rimes {
-                             let keys = parse_key(&qr.trigger);
-                             if is_combo(&held_keys, &keys) {
-                                 let mut p = self.processor.lock().unwrap();
-                                 if p.chinese_enabled {
-                                     // 仅在中文模式下生效
-                                     let action = p.inject_text(&qr.insert);
-                                     match action {
-                                        Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                                        Action::DeleteAndEmit { delete, insert } => { 
-                                            if let Ok(mut vkbd) = self.vkbd.lock() {
-                                                if delete > 0 { vkbd.backspace(delete); }
-                                                if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
-                                            }
-                                        }
-                                        Action::Consume => {}
-                                        Action::PassThrough => {} // unlikely
-                                     }
-                                     handled_quick_rime = true;
-                                 }
-                                 drop(p);
-                                 if handled_quick_rime {
-                                     self.update_gui();
-                                     break; 
-                                 }
-                             }
-                        }
-                        if handled_quick_rime { continue; }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
