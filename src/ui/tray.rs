@@ -143,12 +143,12 @@ impl Tray for ImeTray {
             }.into(),
             MenuItem::Separator,
             StandardItem {
-                label: format!("候选窗: {}", if self.show_candidates { "显示" } else { "隐藏" }),
+                label: format!("传统候选窗: {}", if self.show_candidates { "显示" } else { "隐藏" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleGui); }),
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("卡片式候选词: {}", if self.show_modern_candidates { "显示" } else { "隐藏" }),
+                label: format!("卡片式候选窗: {}", if self.show_modern_candidates { "显示" } else { "隐藏" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleModernGui); }),
                 ..Default::default()
             }.into(),
