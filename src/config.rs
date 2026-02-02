@@ -109,6 +109,8 @@ pub struct Input {
     pub paste_method: String, // 原 paste_shortcut.key (ctrl_v/shift_insert...)
     #[serde(default = "default_clipboard_delay")]
     pub clipboard_delay_ms: u64,
+    #[serde(default = "default_enable_anti_typo")]
+    pub enable_anti_typo: bool,
 }
 
 impl Default for Input {
@@ -119,10 +121,12 @@ impl Default for Input {
             default_profile: "Chinese".to_string(),
             paste_method: "ctrl_v".to_string(),
             clipboard_delay_ms: 50,
+            enable_anti_typo: true,
         }
     }
 }
 
+fn default_enable_anti_typo() -> bool { true }
 fn default_clipboard_delay() -> u64 { 50 }
 
 // --- 3. 词库与文件 ---

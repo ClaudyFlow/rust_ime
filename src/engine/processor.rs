@@ -53,6 +53,7 @@ pub struct Processor {
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
+    pub enable_anti_typo: bool,
 }
 
 impl Processor {
@@ -114,6 +115,7 @@ impl Processor {
             phantom_mode: PhantomMode::Pinyin,
             phantom_text: String::new(),
             preview_selected_candidate: false,
+            enable_anti_typo: true,
         }
     }
 
@@ -122,6 +124,7 @@ impl Processor {
         self.show_modern_candidates = conf.appearance.show_modern_candidates;
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
+        self.enable_anti_typo = conf.input.enable_anti_typo;
         self.current_profile = conf.input.default_profile.to_lowercase();
         self.phantom_mode = match conf.appearance.preview_mode.as_str() {
             "pinyin" => PhantomMode::Pinyin,
@@ -259,6 +262,24 @@ impl Processor {
             }
             _ if is_letter(key) => {
                 if let Some(c) = key_to_char(key, shift_pressed) {
+                    if self.enable_anti_typo && c.is_ascii_lowercase() {
+                        let mut test_buf = self.buffer.clone();
+                        test_buf.push(c);
+                        
+                        // 获取当前正在输入的片段（最后一个空格之后的部分）
+                        let last_segment = test_buf.split(' ').last().unwrap_or("");
+                        
+                        // 检查词库中是否存在以此片段开头的词条
+                        if !last_segment.is_empty() {
+                            let dict = self.tries.get(&self.current_profile.to_lowercase());
+                            if let Some(d) = dict {
+                                if !d.has_prefix(last_segment) {
+                                    return Action::Consume; // 拦截无效输入
+                                }
+                            }
+                        }
+                    }
+
                     self.buffer.push(c); 
                     self.preview_selected_candidate = false;
                     self.lookup();

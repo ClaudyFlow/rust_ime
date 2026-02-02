@@ -31,6 +31,11 @@ impl Trie {
         Some(self.read_block(offset))
     }
 
+    pub fn has_prefix(&self, prefix: &str) -> bool {
+        let matcher = fst::automaton::Str::new(prefix).starts_with();
+        self.index.search(matcher).into_stream().next().is_some()
+    }
+
     pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();
