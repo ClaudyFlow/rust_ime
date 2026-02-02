@@ -173,6 +173,7 @@
         <div class="logo">rust-IME</div>
         <nav>
             <button id="nav-general" class="active" onclick="showTab('general')">系统总览</button>
+            <button id="nav-quickrime" onclick="showTab('quickrime')">长韵母映射</button>
             <button id="nav-appearance" onclick="showTab('appearance')">视觉与样式</button>
             <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
             <button id="nav-dicts" onclick="showTab('dicts')">词库管理</button>
@@ -238,6 +239,17 @@
                         <option value="double">长句模式 (双空格上屏)</option>
                     </select>
                 </div>
+            </div>
+        </div>
+
+        <div id="tab-quickrime" class="tab-content">
+            <h1>长韵母映射</h1>
+            <div class="card">
+                <p style="color:var(--apple-secondary); font-size:14px; margin-bottom:20px;">
+                    参考小鹤双拼等方案，配置组合键快速输入长韵母。例如：Alt+L -> iang。
+                </p>
+                <div id="quick-rimes-container"></div>
+                <button class="btn" style="width:100%; margin-top:15px; background:rgba(0,0,0,0.05); color:var(--apple-text);" onclick="addQuickRime()">+ 添加新映射</button>
             </div>
         </div>
 
@@ -389,6 +401,9 @@
             ls.innerHTML = dicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
             ls.value = config.appearance.learning_dict_path;
 
+            // Quick Rimes
+            renderQuickRimes();
+
             // Hotkeys
             const hc = document.getElementById('hotkeys-container');
             hc.innerHTML = '';
@@ -448,6 +463,17 @@
             config.appearance.keystroke_timeout_ms = parseInt(document.getElementById('keystroke_timeout_ms').value);
             config.appearance.keystroke_bg_color = document.getElementById('keystroke_bg_color').value;
 
+            // Save Quick Rimes
+            const qrList = [];
+            document.querySelectorAll('.qr-item').forEach(el => {
+                const trigger = el.querySelector('.qr-trigger').value;
+                const insert = el.querySelector('.qr-insert').value;
+                if (trigger && insert) {
+                    qrList.push({ trigger, insert });
+                }
+            });
+            config.input.quick_rimes = qrList;
+
             document.querySelectorAll('.hotkey-input').forEach(el => {
                 config.hotkeys[el.dataset.id].key = el.value;
             });
@@ -495,6 +521,32 @@
                     toast.textContent = '已保存并应用';
                 }, 3000);
             }
+        }
+
+        function renderQuickRimes() {
+            const container = document.getElementById('quick-rimes-container');
+            container.innerHTML = config.input.quick_rimes.map((qr, i) => `
+                <div class="setting-item qr-item">
+                    <div style="display:flex; align-items:center; gap:10px; width:100%;">
+                        <div style="width:120px;">快捷键</div>
+                        <input type="text" class="qr-trigger" value="${qr.trigger}" style="width:100px;">
+                        <div style="width:20px; text-align:center;">⮕</div>
+                        <div style="width:60px;">韵母</div>
+                        <input type="text" class="qr-insert" value="${qr.insert}" style="width:80px;">
+                        <button onclick="removeQuickRime(${i})" style="margin-left:auto; background:transparent; border:none; color:#ff3b30; cursor:pointer;">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addQuickRime() {
+            config.input.quick_rimes.push({ trigger: 'alt+key', insert: 'text' });
+            renderQuickRimes();
+        }
+
+        function removeQuickRime(index) {
+            config.input.quick_rimes.splice(index, 1);
+            renderQuickRimes();
         }
 
         load();

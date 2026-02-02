@@ -150,6 +150,16 @@ impl Processor {
         Action::Consume
     }
 
+    pub fn inject_text(&mut self, text: &str) -> Action {
+        self.buffer.push_str(text);
+        if self.state == ImeState::Direct {
+            self.state = ImeState::Composing;
+        }
+        self.preview_selected_candidate = false;
+        self.lookup();
+        self.update_phantom_action()
+    }
+
     pub fn reset(&mut self) {
         self.buffer.clear();
         self.candidates.clear();

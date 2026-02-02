@@ -113,6 +113,14 @@ pub struct Input {
     pub enable_anti_typo: bool,
     #[serde(default = "default_commit_mode")]
     pub commit_mode: String, // "single" or "double"
+    #[serde(default = "default_quick_rimes")]
+    pub quick_rimes: Vec<QuickRime>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct QuickRime {
+    pub trigger: String, // e.g. "alt+l"
+    pub insert: String,  // e.g. "iang"
 }
 
 impl Default for Input {
@@ -125,8 +133,20 @@ impl Default for Input {
             clipboard_delay_ms: 50,
             enable_anti_typo: true,
             commit_mode: "double".to_string(),
+            quick_rimes: default_quick_rimes(),
         }
     }
+}
+
+fn default_quick_rimes() -> Vec<QuickRime> {
+    vec![
+        QuickRime { trigger: "alt+l".into(), insert: "iang".into() },
+        QuickRime { trigger: "alt+s".into(), insert: "ong".into() },
+        QuickRime { trigger: "alt+g".into(), insert: "eng".into() },
+        QuickRime { trigger: "alt+h".into(), insert: "ang".into() },
+        QuickRime { trigger: "alt+r".into(), insert: "uan".into() },
+        QuickRime { trigger: "alt+k".into(), insert: "uai".into() },
+    ]
 }
 
 fn default_commit_mode() -> String { "double".to_string() }

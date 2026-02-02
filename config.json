@@ -30,11 +30,11 @@
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "Chinese",
+    "default_profile": "chinese",
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
-    "enable_anti_typo": true,
-    "commit_mode": "double"
+    "enable_anti_typo": false,
+    "commit_mode": "single"
   },
   "hotkeys": {
     "switch_language": {

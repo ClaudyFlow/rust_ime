@@ -339,6 +339,38 @@ impl InputMethodHost for EvdevHost {
                             let _ = self.notify_tx.send(NotifyEvent::Message(profile, msg.into()));
                             continue;
                         }
+
+                        // 10. 快速韵母/自定义注入 (Quick Rime)
+                        let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
+                        let mut handled_quick_rime = false;
+                        for qr in quick_rimes {
+                             let keys = parse_key(&qr.trigger);
+                             if is_combo(&held_keys, &keys) {
+                                 let mut p = self.processor.lock().unwrap();
+                                 if p.chinese_enabled {
+                                     // 仅在中文模式下生效
+                                     let action = p.inject_text(&qr.insert);
+                                     match action {
+                                        Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                        Action::DeleteAndEmit { delete, insert } => { 
+                                            if let Ok(mut vkbd) = self.vkbd.lock() {
+                                                if delete > 0 { vkbd.backspace(delete); }
+                                                if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                                            }
+                                        }
+                                        Action::Consume => {}
+                                        Action::PassThrough => {} // unlikely
+                                     }
+                                     handled_quick_rime = true;
+                                 }
+                                 drop(p);
+                                 if handled_quick_rime {
+                                     self.update_gui();
+                                     break; 
+                                 }
+                             }
+                        }
+                        if handled_quick_rime { continue; }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
