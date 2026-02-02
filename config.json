@@ -2,9 +2,9 @@
   "_help_readme": "本配置文件已优化。请修改 'key' 字段来更改快捷键。'paste_method' 可选值: ctrl_v, ctrl_shift_v, shift_insert",
   "appearance": {
     "show_notifications": false,
-    "preview_mode": "pinyin",
-    "show_candidates": false,
-    "show_modern_candidates": true,
+    "preview_mode": "none",
+    "show_candidates": true,
+    "show_modern_candidates": false,
     "show_keystrokes": true,
     "candidate_anchor": "bottom",
     "candidate_margin_x": 100,
