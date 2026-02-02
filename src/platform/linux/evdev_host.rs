@@ -533,6 +533,7 @@ impl EvdevHost {
                 for (i, cand) in p.candidates[start..end].iter().enumerate() {
                     let abs_idx = start + i;
                     let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
+                    // 控制台简单显示汉字和提示
                     if abs_idx == p.selected { print!("\x1b[1;32m{}.{}{} \x1b[0m ", (i % p.page_size)+1, cand, hint); }
                     else { print!("{}.{}{} ", (i % p.page_size)+1, cand, hint); }
                 }

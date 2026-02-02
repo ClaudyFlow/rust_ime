@@ -39,7 +39,6 @@ chi
 chong
 chou
 chu
-chua
 chuai
 chuan
 chuang
@@ -61,7 +60,6 @@ dang
 dao
 de
 dei
-den
 deng
 di
 dian
@@ -116,7 +114,6 @@ he
 hei
 hen
 heng
-hng
 hong
 hou
 hu
@@ -147,7 +144,6 @@ kan
 kang
 kao
 ke
-kei
 ken
 keng
 kong
@@ -185,7 +181,6 @@ lun
 luo
 lv
 lve
-m
 ma
 mai
 man
@@ -205,7 +200,6 @@ miu
 mo
 mou
 mu
-n
 na
 nai
 nan
@@ -224,7 +218,6 @@ nin
 ning
 niu
 nong
-nou
 nu
 nuan
 nuo
@@ -291,7 +284,6 @@ shan
 shang
 shao
 she
-shei
 shen
 sheng
 shi
@@ -384,7 +376,6 @@ zhan
 zhang
 zhao
 zhe
-zhei
 zhen
 zheng
 zhi

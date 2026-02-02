@@ -92,13 +92,22 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
                     let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
                     entries.entry(key_lower.clone()).or_default().push((key.clone(), hint));
                 } else {
-                    // 普通逻辑: 上屏 Value (汉字)，提示为空或辅助码
+                    // 普通逻辑: 上屏 Value (汉字)，提示包含声调和英文
                     for v in arr {
                         if let Some(s) = v.as_str() { entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); }
                         else if let Some(o) = v.as_object() {
                             if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
-                                let hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("").to_string();
-                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), hint));
+                                let en_hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("");
+                                let tone_hint = o.get("tone").and_then(|t| t.as_str()).unwrap_or("");
+                                
+                                // 合并声调和英文提示
+                                let mut combined_hint = tone_hint.to_string();
+                                if !en_hint.is_empty() {
+                                    if !combined_hint.is_empty() { combined_hint.push(' '); }
+                                    combined_hint.push_str(en_hint);
+                                }
+                                
+                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), combined_hint));
                             }
                         }
                     }
