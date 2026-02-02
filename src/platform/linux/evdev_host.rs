@@ -227,12 +227,14 @@ impl InputMethodHost for EvdevHost {
                                          }
                                          handled_quick_rime = true;
                                      }
-                                     drop(p);
-                                     if handled_quick_rime {
-                                         self.update_gui();
-                                         break; 
-                                     }
-                                 }
+                                                                      drop(p);
+                                                                      if handled_quick_rime {
+                                                                          self.update_gui();
+                                                                          self.notify_preview();
+                                                                          break; 
+                                                                      }
+                                                                  }
+                                     
                              }
 
                              if handled_quick_rime {
