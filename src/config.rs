@@ -60,10 +60,24 @@ pub struct Appearance {
     pub learning_mode: bool,
     #[serde(default = "default_learning_interval")]
     pub learning_interval_sec: u64,
-    #[serde(default = "default_learning_dict_path")]
-    pub learning_dict_path: String,
-    #[serde(default = "default_page_size")]
-    pub page_size: usize,
+        #[serde(default = "default_learning_dict_path")]
+        pub learning_dict_path: String,
+        
+        // 学习模式样式
+        #[serde(default = "default_learn_anchor")]
+        pub learning_anchor: String,
+        #[serde(default = "default_learn_margin_x")]
+        pub learning_margin_x: i32,
+        #[serde(default = "default_learn_margin_y")]
+        pub learning_margin_y: i32,
+        #[serde(default = "default_learn_bg")]
+        pub learning_bg_color: String,
+        #[serde(default = "default_learn_font_size")]
+        pub learning_font_size: i32,
+    
+        #[serde(default = "default_page_size")]
+        pub page_size: usize,
+    
     #[serde(default = "default_show_tone")]
     pub show_tone_hint: bool,
     #[serde(default = "default_show_en")]
@@ -98,6 +112,11 @@ impl Default for Appearance {
             learning_mode: false,
             learning_interval_sec: default_learning_interval(),
             learning_dict_path: default_learning_dict_path(),
+            learning_anchor: default_learn_anchor(),
+            learning_margin_x: default_learn_margin_x(),
+            learning_margin_y: default_learn_margin_y(),
+            learning_bg_color: default_learn_bg(),
+            learning_font_size: default_learn_font_size(),
             page_size: default_page_size(),
             show_tone_hint: true,
             show_en_hint: true,
@@ -451,6 +470,12 @@ fn default_learning_interval() -> u64 {
 fn default_learning_dict_path() -> String {
     "dicts/chinese/chars.json".to_string()
 }
+
+fn default_learn_anchor() -> String { "top_right".to_string() }
+fn default_learn_margin_x() -> i32 { 40 }
+fn default_learn_margin_y() -> i32 { 40 }
+fn default_learn_bg() -> String { "rgba(20, 20, 20, 0.85)".to_string() }
+fn default_learn_font_size() -> i32 { 24 }
 
 fn default_autostart() -> bool {
     false

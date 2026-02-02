@@ -26,13 +26,15 @@
     "learning_mode": true,
     "learning_interval_sec": 10,
     "learning_dict_path": "dicts/chinese/chars.json",
-    "page_size": 5
+    "page_size": 5,
+    "show_tone_hint": true,
+    "show_en_hint": false
   },
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
     "default_profile": "",
-    "paste_method": "ctrl_v",
+    "paste_method": "shift_insert",
     "clipboard_delay_ms": 50,
     "enable_anti_typo": true,
     "commit_mode": "single",
