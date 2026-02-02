@@ -548,12 +548,24 @@
             `).join('');
         }
 
+        function syncQuickRimesFromDOM() {
+            const qrList = [];
+            document.querySelectorAll('.qr-item').forEach(el => {
+                const trigger = el.querySelector('.qr-trigger').value;
+                const insert = el.querySelector('.qr-insert').value;
+                qrList.push({ trigger, insert });
+            });
+            config.input.quick_rimes = qrList;
+        }
+
         function addQuickRime() {
+            syncQuickRimesFromDOM();
             config.input.quick_rimes.push({ trigger: 'tab+key', insert: 'text' });
             renderQuickRimes();
         }
 
         function removeQuickRime(index) {
+            syncQuickRimesFromDOM();
             config.input.quick_rimes.splice(index, 1);
             renderQuickRimes();
         }
