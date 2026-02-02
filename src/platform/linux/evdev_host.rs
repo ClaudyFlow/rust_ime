@@ -117,6 +117,7 @@ pub struct EvdevHost {
     notify_tx: Sender<NotifyEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
+    pending_tab: bool,
 }
 
 impl EvdevHost {
@@ -137,6 +138,7 @@ impl EvdevHost {
             notify_tx,
             should_exit: Arc::new(AtomicBool::new(false)),
             config,
+            pending_tab: false,
         })
     }
 }
@@ -165,53 +167,83 @@ impl InputMethodHost for EvdevHost {
                         held_keys.insert(key); 
                     } else if val == 0 { held_keys.remove(&key); }
 
+                    let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
+                    let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
+                    let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
+                    let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
+                    let has_mod = ctrl || alt || meta;
+
+                    // --- 特殊处理: Tab 键 Dual-Role 逻辑 ---
+                    // 仅在无其他修饰键且中文模式下启用
+                    let processor_guard = self.processor.lock().unwrap();
+                    let chinese_mode = processor_guard.chinese_enabled;
+                    drop(processor_guard);
+
+                    if key == Key::KEY_TAB && !has_mod && chinese_mode {
+                        if val == 1 { // Press
+                            self.pending_tab = true;
+                            continue; // 暂不发送，拦截
+                        } else if val == 0 { // Release
+                            if self.pending_tab {
+                                // Tab 未被消费，原样发送
+                                if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_TAB); }
+                                self.pending_tab = false;
+                            }
+                            continue;
+                        }
+                    }
+
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        // 0. 优先检测：快速韵母/自定义注入 (Quick Rime)
-                        // 放在最前面以防止被后面的 has_mod 逻辑重置
-                        let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
-                        let mut handled_quick_rime = false;
-                        for qr in quick_rimes {
-                             let keys = parse_key(&qr.trigger);
-                             if is_combo(&held_keys, &keys) {
-                                 let mut p = self.processor.lock().unwrap();
-                                 if p.chinese_enabled {
-                                     // 仅在中文模式下生效
-                                     let action = p.inject_text(&qr.insert);
-                                     
-                                     // Anti-Menu Trick: 如果使用了 Alt，发送一个无害的 Shift 点击
-                                     // 这能防止大多数桌面环境(GNOME/KDE)在释放 Alt 时弹出菜单
-                                     let use_alt = keys.iter().any(|group| group.contains(&Key::KEY_LEFTALT) || group.contains(&Key::KEY_RIGHTALT));
-                                     
-                                     match action {
-                                        Action::Emit(s) => { 
-                                            if let Ok(mut vkbd) = self.vkbd.lock() { 
-                                                if use_alt { vkbd.tap(Key::KEY_RIGHTSHIFT); }
-                                                let _ = vkbd.send_text(&s); 
-                                            } 
-                                        }
-                                        Action::DeleteAndEmit { delete, insert } => { 
-                                            if let Ok(mut vkbd) = self.vkbd.lock() {
-                                                if use_alt { vkbd.tap(Key::KEY_RIGHTSHIFT); }
-                                                if delete > 0 { vkbd.backspace(delete); }
-                                                if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                        // 0. 优先检测：Tab 组合键 / 快速韵母 (Quick Rime)
+                        if self.pending_tab {
+                             let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
+                             let mut handled_quick_rime = false;
+                             
+                             // 构造虚拟触发键名，例如 "tab+l"
+                             // 这里简化匹配：直接查找 trigger 字符串包含 "tab+" 且以当前按键名结尾的配置
+                             let key_name = map_key_to_display_name(key).to_lowercase();
+                             let trigger_target = format!("tab+{}", key_name);
+
+                             for qr in quick_rimes {
+                                 if qr.trigger.to_lowercase() == trigger_target {
+                                     let mut p = self.processor.lock().unwrap();
+                                     if p.chinese_enabled {
+                                         // 消费 pending_tab
+                                         self.pending_tab = false;
+                                         
+                                         // 注入韵母
+                                         let action = p.inject_text(&qr.insert);
+                                         match action {
+                                            Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                            Action::DeleteAndEmit { delete, insert } => { 
+                                                if let Ok(mut vkbd) = self.vkbd.lock() {
+                                                    if delete > 0 { vkbd.backspace(delete); }
+                                                    if !insert.is_empty() { let _ = vkbd.send_text(&insert); }
+                                                }
                                             }
-                                        }
-                                        Action::Consume => {
-                                            if use_alt { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_RIGHTSHIFT); } }
-                                        }
-                                        Action::PassThrough => {} 
+                                            Action::Consume => {}
+                                            Action::PassThrough => {} 
+                                         }
+                                         handled_quick_rime = true;
                                      }
-                                     handled_quick_rime = true;
-                                 }
-                                 drop(p);
-                                 if handled_quick_rime {
-                                     self.update_gui();
-                                     break; 
+                                     drop(p);
+                                     if handled_quick_rime {
+                                         self.update_gui();
+                                         break; 
+                                     }
                                  }
                              }
+
+                             if handled_quick_rime {
+                                 continue; // 按键已被处理，跳过后续逻辑
+                             } else {
+                                 // Tab 被按下了，但当前键不是组合键的一部分 -> 立即补发 Tab
+                                 if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_TAB); }
+                                 self.pending_tab = false;
+                                 // 然后继续处理当前按键（fall through）
+                             }
                         }
-                        if handled_quick_rime { continue; }
 
                         let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit) = {
                             let conf = self.config.read().unwrap();

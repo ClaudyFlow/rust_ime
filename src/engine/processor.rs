@@ -176,7 +176,8 @@ impl Processor {
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
         if !is_press {
             if self.buffer.is_empty() { return Action::PassThrough; }
-            if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_TAB | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
+            // 允许 TAB, LEFT, RIGHT 在 Composing 状态下处理，这里只拦截明确不需要的
+            if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
                 return Action::Consume; 
             }
             return Action::PassThrough;
@@ -221,16 +222,23 @@ impl Processor {
                     self.update_phantom_action()
                 }
             }
-            Key::KEY_TAB => {
+            Key::KEY_LEFT => {
                 if !self.candidates.is_empty() {
                     self.preview_selected_candidate = true;
-                    if shift_pressed { if self.selected > 0 { self.selected -= 1; } } else { if self.selected + 1 < self.candidates.len() { self.selected += 1; } }
+                    if self.selected > 0 { self.selected -= 1; }
                     self.page = (self.selected / 10) * 10;
                     self.update_phantom_action()
-                } else {
-                    Action::Consume
-                }
+                } else { Action::PassThrough } // 如果没有候选词，允许左键移动光标(但这需要 Host 支持，暂 PassThrough)
             }
+            Key::KEY_RIGHT => {
+                if !self.candidates.is_empty() {
+                    self.preview_selected_candidate = true;
+                    if self.selected + 1 < self.candidates.len() { self.selected += 1; }
+                    self.page = (self.selected / 10) * 10;
+                    self.update_phantom_action()
+                } else { Action::PassThrough }
+            }
+            Key::KEY_TAB => Action::PassThrough, // Tab 键交由 Host 处理（作为长韵母修饰键或原样发送）
             Key::KEY_MINUS => { self.page = self.page.saturating_sub(10); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL => { if self.page + 10 < self.candidates.len() { self.page += 10; self.selected = self.page; } Action::Consume }
             Key::KEY_SPACE => { 
