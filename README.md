@@ -112,3 +112,26 @@
 - **Evdev & Uinput**：底层硬件级按键拦截与仿真。
 - **GTK4 Layer Shell**：现代 Wayland 窗口渲染。
 - **FST & Mmap**：极速词库检索。
+
+## 📦 安装与发布 (Installation & Release)
+
+### 1. 开发者编译安装
+如果你已经克隆了源码，可以直接运行：
+```bash
+chmod +x install.sh
+./install.sh
+```
+脚本会自动安装依赖、配置权限、编译 Release 版本的程序并自动生成二进制词库。
+
+### 2. 构建发行包
+运行以下命令生成一个可供他人使用的独立安装包：
+```bash
+./make_release.sh
+```
+这会生成 `rust-ime-linux-x64.tar.gz`。用户只需解压后运行 `./install.sh` 即可。
+
+### 3. 系统权限说明
+由于程序涉及底层按键拦截，安装脚本会自动尝试：
+- 将当前用户加入 `input` 组。
+- 创建 `/etc/udev/rules.d/99-rust-ime-uinput.rules` 以允许非 root 用户操作 `uinput`。
+- **注意**：修改权限后，需**重启系统**或**注销重登**才能生效。

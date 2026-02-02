@@ -61,14 +61,22 @@ fi
 echo -e "\n[3/4] 正在编译项目 (Release模式)..."
 cargo build --release
 
-# 4. Install Autostart
-echo -e "\n[4/4] 配置开机自启..."
-./target/release/rust-ime --install
+# 3.5 Compile Dictionaries
+echo -e "\n[3.5/4] 正在编译词库..."
+cargo run --release --bin compile_dict
+
+# 4. Install Autostart & Binary
+echo -e "\n[4/4] 配置安装..."
+# 创建软链接
+sudo ln -sf "$(pwd)/target/release/rust-ime" /usr/local/bin/rust-ime
+echo "✅ 已创建系统链接: /usr/local/bin/rust-ime"
+
+# 尝试运行安装自启（如果程序支持此参数）
+./target/release/rust-ime --install || true
 
 echo -e "\n=========================================="
 echo "🎉 安装完成！"
+echo "你可以直接在终端输入 'rust-ime' 启动"
 echo "⚠️  注意: 如果是第一次运行脚本并被添加到了 input 组，"
 echo "    你必须【注销并重新登录】(或重启电脑) 才能正常使用！"
-echo ""
-echo "手动启动命令: ./target/release/rust-ime"
-echo "==========================================
+echo "=========================================="
