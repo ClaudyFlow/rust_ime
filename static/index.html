@@ -253,7 +253,7 @@
             <h1>长韵母映射</h1>
             <div class="card">
                 <p style="color:var(--apple-secondary); font-size:14px; margin-bottom:20px;">
-                    参考小鹤双拼等方案，配置组合键快速输入长韵母。例如：Alt+L -> iang。
+                    参考小鹤双拼等方案，配置组合键快速输入长韵母。例如：Tab+L -> iang。
                 </p>
                 <div id="quick-rimes-container"></div>
                 <button class="btn" style="width:100%; margin-top:15px; background:rgba(0,0,0,0.05); color:var(--apple-text);" onclick="addQuickRime()">+ 添加新映射</button>
@@ -549,7 +549,7 @@
         }
 
         function addQuickRime() {
-            config.input.quick_rimes.push({ trigger: 'alt+key', insert: 'text' });
+            config.input.quick_rimes.push({ trigger: 'tab+key', insert: 'text' });
             renderQuickRimes();
         }
 
