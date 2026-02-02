@@ -198,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_modern_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.appearance.preview_mode.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_modern_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.appearance.preview_mode.clone(), tray_tx);
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -284,6 +284,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.learning_mode = enabled);
                     let _ = save_config(&w);
                     let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                }
+                ui::tray::TrayEvent::ToggleAntiTypo => {
+                    let mut w = config_tray.write().unwrap();
+                    w.input.enable_anti_typo = !w.input.enable_anti_typo;
+                    let enabled = w.input.enable_anti_typo;
+                    tray_handle.update(|t| t.anti_typo = enabled);
+                    let _ = save_config(&w);
+                    processor_clone.lock().unwrap().enable_anti_typo = enabled;
                 }
                 ui::tray::TrayEvent::CyclePreview => {
                     let mode_str = {

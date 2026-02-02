@@ -221,6 +221,13 @@
                     </div>
                     <label class="switch"><input type="checkbox" id="enable_fuzzy_pinyin"><span class="slider"></span></label>
                 </div>
+                <div class="setting-item">
+                    <div class="info">
+                        <div class="title">防呆模式</div>
+                        <div class="desc">禁止输入词库中不存在的拼音组合</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
+                </div>
             </div>
         </div>
 
@@ -339,11 +346,30 @@
             // General
             document.getElementById('autostart').checked = config.input.autostart;
             document.getElementById('enable_fuzzy_pinyin').checked = config.input.enable_fuzzy_pinyin;
+            document.getElementById('enable_anti_typo').checked = config.input.enable_anti_typo;
             document.getElementById('paste_method').value = config.input.paste_method;
             
             const ps = document.getElementById('default_profile');
             ps.innerHTML = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
             ps.value = config.input.default_profile;
+
+            // Appearance
+            document.getElementById('show_candidates').checked = config.appearance.show_candidates;
+            document.getElementById('show_keystrokes').checked = config.appearance.show_keystrokes;
+            document.getElementById('show_notifications').checked = config.appearance.show_notifications;
+            document.getElementById('learning_mode').checked = config.appearance.learning_mode;
+            document.getElementById('learning_interval_sec').value = config.appearance.learning_interval_sec;
+            
+            document.getElementById('candidate_anchor').value = config.appearance.candidate_anchor;
+            document.getElementById('candidate_font_size').value = config.appearance.candidate_font_size;
+            document.getElementById('candidate_margin_x').value = config.appearance.candidate_margin_x;
+            document.getElementById('candidate_margin_y').value = config.appearance.candidate_margin_y;
+            document.getElementById('candidate_bg_color').value = config.appearance.candidate_bg_color;
+
+            document.getElementById('keystroke_anchor').value = config.appearance.keystroke_anchor;
+            document.getElementById('keystroke_font_size').value = config.appearance.keystroke_font_size;
+            document.getElementById('keystroke_timeout_ms').value = config.appearance.keystroke_timeout_ms;
+            document.getElementById('keystroke_bg_color').value = config.appearance.keystroke_bg_color;
 
             // Dictionary List for Learning Mode
             const dr = await fetch('/api/dicts');
@@ -388,6 +414,7 @@
             // Collect all
             config.input.autostart = document.getElementById('autostart').checked;
             config.input.enable_fuzzy_pinyin = document.getElementById('enable_fuzzy_pinyin').checked;
+            config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
             config.input.paste_method = document.getElementById('paste_method').value;
             config.input.default_profile = document.getElementById('default_profile').value;
 
