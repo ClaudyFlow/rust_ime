@@ -61,6 +61,8 @@ pub struct Processor {
     pub cursor_pos: usize,
     pub profile_keys: Vec<(String, String)>,
     pub page_size: usize,
+    pub show_tone_hint: bool,
+    pub show_en_hint: bool,
 }
 
 impl Processor {
@@ -128,6 +130,8 @@ impl Processor {
             cursor_pos: 0,
             profile_keys: Vec::new(),
             page_size: 9,
+            show_tone_hint: true,
+            show_en_hint: true,
         }
     }
 
@@ -137,6 +141,8 @@ impl Processor {
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.page_size = conf.appearance.page_size;
+        self.show_tone_hint = conf.appearance.show_tone_hint;
+        self.show_en_hint = conf.appearance.show_en_hint;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
@@ -538,9 +544,32 @@ impl Processor {
 
         self.candidates.clear();
         self.candidate_hints.clear();
-        for (cand, hint) in final_candidates {
+        for (cand, raw_hint) in final_candidates {
             self.candidates.push(cand);
-            self.candidate_hints.push(hint);
+            
+            // 动态处理 Hint
+            let mut final_hint = String::new();
+            if !raw_hint.is_empty() {
+                // 尝试拆分声调和英文 (我们在 compiler 中是用空格连接的)
+                let parts: Vec<&str> = raw_hint.splitn(2, ' ').collect();
+                
+                let (tone, en) = if parts.len() == 2 {
+                    (parts[0], parts[1])
+                } else if !raw_hint.is_empty() && (raw_hint.chars().any(|c| "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü".contains(c))) {
+                    (raw_hint.as_str(), "")
+                } else {
+                    ("", raw_hint.as_str())
+                };
+
+                if self.show_tone_hint && !tone.is_empty() {
+                    final_hint.push_str(tone);
+                }
+                if self.show_en_hint && !en.is_empty() {
+                    if !final_hint.is_empty() { final_hint.push(' '); }
+                    final_hint.push_str(en);
+                }
+            }
+            self.candidate_hints.push(final_hint);
         }
 
         if self.candidates.is_empty() { 

@@ -305,6 +305,14 @@
                     <label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
+                    <div class="info"><div class="title">显示汉字注音</div><div class="desc">在候选词旁显示带声调的拼音</div></div>
+                    <label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示英文释义</div><div class="desc">在候选词旁显示简单的英文翻译</div></div>
+                    <label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
                     <div class="info"><div class="title">汉字学习模式</div><div class="desc">在闲置时轮播汉字及其英文释义</div></div>
                     <label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label>
                 </div>
@@ -416,6 +424,8 @@
             document.getElementById('show_candidates').checked = config.appearance.show_candidates;
             document.getElementById('show_keystrokes').checked = config.appearance.show_keystrokes;
             document.getElementById('show_notifications').checked = config.appearance.show_notifications;
+            document.getElementById('show_tone_hint').checked = config.appearance.show_tone_hint;
+            document.getElementById('show_en_hint').checked = config.appearance.show_en_hint;
             document.getElementById('learning_mode').checked = config.appearance.learning_mode;
             document.getElementById('learning_interval_sec').value = config.appearance.learning_interval_sec;
             
@@ -490,6 +500,8 @@
             config.appearance.show_candidates = document.getElementById('show_candidates').checked;
             config.appearance.show_keystrokes = document.getElementById('show_keystrokes').checked;
             config.appearance.show_notifications = document.getElementById('show_notifications').checked;
+            config.appearance.show_tone_hint = document.getElementById('show_tone_hint').checked;
+            config.appearance.show_en_hint = document.getElementById('show_en_hint').checked;
             config.appearance.learning_mode = document.getElementById('learning_mode').checked;
             config.appearance.learning_interval_sec = parseInt(document.getElementById('learning_interval_sec').value);
             config.appearance.learning_dict_path = document.getElementById('learning_dict_path').value;

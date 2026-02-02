@@ -64,6 +64,10 @@ pub struct Appearance {
     pub learning_dict_path: String,
     #[serde(default = "default_page_size")]
     pub page_size: usize,
+    #[serde(default = "default_show_tone")]
+    pub show_tone_hint: bool,
+    #[serde(default = "default_show_en")]
+    pub show_en_hint: bool,
 }
 
 impl Default for Appearance {
@@ -95,10 +99,14 @@ impl Default for Appearance {
             learning_interval_sec: default_learning_interval(),
             learning_dict_path: default_learning_dict_path(),
             page_size: default_page_size(),
+            show_tone_hint: true,
+            show_en_hint: true,
         }
     }
 }
 
+fn default_show_tone() -> bool { true }
+fn default_show_en() -> bool { true }
 fn default_page_size() -> usize { 9 }
 
 // --- 2. 输入行为 ---
