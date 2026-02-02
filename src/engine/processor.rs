@@ -350,15 +350,18 @@ impl Processor {
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
                 
-                // 如果数字在 1..=page_size 范围内且当前有候选词，执行选词
-                if digit >= 1 && digit <= self.page_size {
-                    let abs_idx = self.page + digit - 1;
-                    if let Some(word) = self.candidates.get(abs_idx) {
-                        return self.commit_candidate(word.clone());
+                // --- 词模式 (Single Space Mode): 数字键选词上屏 ---
+                if self.commit_mode == "single" {
+                    if digit >= 1 && digit <= self.page_size {
+                        let abs_idx = self.page + digit - 1;
+                        if let Some(word) = self.candidates.get(abs_idx) {
+                            return self.commit_candidate(word.clone());
+                        }
                     }
                 }
 
-                // 否则，作为普通数字加入缓冲区（例如输入 0，或者 page_size 以外的数字）
+                // --- 长句模式 (Double Space Mode) 或 词模式下未匹配数字 ---
+                // 将数字作为普通字符加入缓冲区，供 parse_buffer 处理 (实现类似 nihao2 的选词效果)
                 self.buffer.push_str(&digit.to_string());
                 self.lookup();
                 self.update_phantom_action()
