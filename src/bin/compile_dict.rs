@@ -24,7 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 
                 // 1. 检查是否需要编译 Trie
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
-                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir))?;
+                    let is_english = dir_name.contains("english");
+                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
                 } else {
                     println!("[Compiler] Skipping Trie for: {} (No changes detected)", dir_name);
                 }
@@ -93,7 +94,7 @@ fn extract_syllables_to_file(src_json: &str, out_txt: &str) -> Result<(), Box<dy
     Ok(())
 }
 
-fn compile_dict_for_path(src_dir: &str, out_stem: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     println!("[Compiler] Compiling dictionary from {} -> {}...", src_dir, out_stem);
     
@@ -103,7 +104,7 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str) -> Result<(), Box<dyn st
             if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n == "punctuation.json") {
                 continue;
             }
-            process_json_file(path, &mut entries)?;
+            process_json_file(path, &mut entries, is_english)?;
         } else if path.extension().map_or(false, |ext| ext == "yaml") {
             process_yaml_file(path, &mut entries)?;
         }
@@ -142,24 +143,33 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
     Ok(())
 }
 
-fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
-        for (pinyin, val) in obj {
-            let pinyin_lower = pinyin.to_lowercase();
+        for (key, val) in obj {
+            let key_lower = key.to_lowercase();
             if let Some(arr) = val.as_array() {
-                for v in arr {
-                    if let Some(s) = v.as_str() { entries.entry(pinyin_lower.clone()).or_default().push((s.to_string(), String::new())); }
-                    else if let Some(o) = v.as_object() {
-                        if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
-                            let hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("").to_string();
-                            entries.entry(pinyin_lower.clone()).or_default().push((c.to_string(), hint));
+                if is_english {
+                    let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
+                    entries.entry(key_lower).or_default().push((key.clone(), hint));
+                } else {
+                    for v in arr {
+                        if let Some(s) = v.as_str() { entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); }
+                        else if let Some(o) = v.as_object() {
+                            if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
+                                let hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("").to_string();
+                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), hint));
+                            }
                         }
                     }
                 }
             } else if let Some(s) = val.as_str() {
-                entries.entry(pinyin_lower).or_default().push((s.to_string(), String::new()));
+                if is_english {
+                    entries.entry(key_lower).or_default().push((key.clone(), s.to_string()));
+                } else {
+                    entries.entry(key_lower).or_default().push((s.to_string(), String::new()));
+                }
             }
         }
     }

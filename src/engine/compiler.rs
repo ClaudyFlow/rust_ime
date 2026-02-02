@@ -21,7 +21,8 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
                 let trie_idx = format!("{}/trie.index", out_dir);
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
                     println!("[Compiler] 检测到变动，正在重新编译方案: {}", dir_name);
-                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir))?;
+                    let is_english = dir_name.contains("english");
+                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
                 }
             }
         }
@@ -65,13 +66,13 @@ fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
     max_src_mtime > target_mtime
 }
 
-fn compile_dict_for_path(src_dir: &str, out_stem: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().map_or(false, |ext| ext == "json") {
             if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n == "punctuation.json") { continue; }
-            process_json_file(path, &mut entries)?;
+            process_json_file(path, &mut entries, is_english)?;
         } else if path.extension().map_or(false, |ext| ext == "yaml") {
             process_yaml_file(path, &mut entries)?;
         }
@@ -79,19 +80,26 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str) -> Result<(), Box<dyn st
     write_binary_dict(&format!("{}.index", out_stem), &format!("{}.data", out_stem), entries)
 }
 
-fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
-        for (pinyin, val) in obj {
-            let pinyin_lower = pinyin.to_lowercase();
+        for (key, val) in obj {
+            let key_lower = key.to_lowercase();
             if let Some(arr) = val.as_array() {
-                for v in arr {
-                    if let Some(s) = v.as_str() { entries.entry(pinyin_lower.clone()).or_default().push((s.to_string(), String::new())); }
-                    else if let Some(o) = v.as_object() {
-                        if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
-                            let hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("").to_string();
-                            entries.entry(pinyin_lower.clone()).or_default().push((c.to_string(), hint));
+                if is_english {
+                    // 英语逻辑: 上屏 Key (单词)，提示 Value (翻译)
+                    let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
+                    entries.entry(key_lower.clone()).or_default().push((key.clone(), hint));
+                } else {
+                    // 普通逻辑: 上屏 Value (汉字)，提示为空或辅助码
+                    for v in arr {
+                        if let Some(s) = v.as_str() { entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); }
+                        else if let Some(o) = v.as_object() {
+                            if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
+                                let hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("").to_string();
+                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), hint));
+                            }
                         }
                     }
                 }
