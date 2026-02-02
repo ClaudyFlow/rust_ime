@@ -456,8 +456,6 @@ impl InputMethodHost for EvdevHost {
                                 // 播放错误音
                                 let enabled = self.config.read().unwrap().input.enable_error_sound;
                                 if enabled {
-                                    // 使用 canberra-gtk-play 播放系统标准的 "dialog-error" 声音
-                                    // 这在 GNOME/KDE 等主流桌面环境下是开箱即用的
                                     let _ = std::process::Command::new("canberra-gtk-play")
                                         .arg("--id=dialog-error")
                                         .spawn();
@@ -471,7 +469,8 @@ impl InputMethodHost for EvdevHost {
                             self.update_gui();
                             self.notify_preview();
                         }
-                    } else if p.chinese_enabled && has_mod {
+                    } else {
+                        // 逻辑：要么是英文模式，要么是带修饰键的中文模式
                         // 如果有修饰键按下，且当前正在输入拼音，重置输入法并清除屏幕预览
                         if has_mod && p.state != crate::engine::processor::ImeState::Direct {
                             let del = p.phantom_text.chars().count();
@@ -483,6 +482,7 @@ impl InputMethodHost for EvdevHost {
                             }
                         }
                         drop(p);
+                        // 核心：所有非输入法处理的按键必须在这里 Emit 出去！
                         if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
 
