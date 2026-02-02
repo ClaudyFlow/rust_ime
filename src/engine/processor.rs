@@ -18,6 +18,7 @@ pub enum Action {
     PassThrough,
     Consume,
     Alert,
+    Notify(String, String), // Summary, Body
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -202,32 +203,44 @@ impl Processor {
         // --- Vim 模式处理 ---
         if self.vim_mode {
             match key {
-                Key::KEY_H => { // 左移
-                    if !self.buffer.is_empty() {
-                        self.cursor_pos = self.cursor_pos.saturating_sub(1);
-                    }
+                Key::KEY_H => { // 左移 (模拟左箭头)
+                    return self.handle_composing(Key::KEY_LEFT, shift_pressed);
                 }
-                Key::KEY_L => { // 右移
-                    if !self.buffer.is_empty() {
-                        self.cursor_pos = (self.cursor_pos + 1).min(self.buffer.len());
-                    }
+                Key::KEY_L => { // 右移 (模拟右箭头)
+                    return self.handle_composing(Key::KEY_RIGHT, shift_pressed);
                 }
                 Key::KEY_D => { // 按音节删除
                     if !self.buffer.is_empty() {
                         self.delete_syllable_at_cursor();
-                        if self.buffer.is_empty() { 
-                            self.lookup(); 
-                        } else {
-                            self.lookup();
-                        }
+                        self.lookup();
+                        return self.update_phantom_action();
                     }
                 }
-                Key::KEY_C => { self.current_profile = "chinese".into(); self.lookup(); }
-                Key::KEY_E => { self.current_profile = "english".into(); self.lookup(); }
-                Key::KEY_R => { self.current_profile = "rime-ice".into(); self.lookup(); }
-                Key::KEY_J => { self.current_profile = "japanese".into(); self.lookup(); }
-                Key::KEY_ESC => { self.vim_mode = false; }
-                Key::KEY_SPACE | Key::KEY_ENTER => { self.vim_mode = false; } // 按空格或回车退出模式
+                Key::KEY_C => { 
+                    self.current_profile = "chinese".into(); 
+                    self.lookup(); 
+                    self.vim_mode = false;
+                    return Action::Notify("输入方案".into(), "已切换至: 中文".into());
+                }
+                Key::KEY_E => { 
+                    self.current_profile = "english".into(); 
+                    self.lookup(); 
+                    self.vim_mode = false;
+                    return Action::Notify("输入方案".into(), "已切换至: 英文".into());
+                }
+                Key::KEY_R => { 
+                    self.current_profile = "rime-ice".into(); 
+                    self.lookup(); 
+                    self.vim_mode = false;
+                    return Action::Notify("输入方案".into(), "已切换至: 雾凇拼音".into());
+                }
+                Key::KEY_J => { 
+                    self.current_profile = "japanese".into(); 
+                    self.lookup(); 
+                    self.vim_mode = false;
+                    return Action::Notify("输入方案".into(), "已切换至: 日语".into());
+                }
+                Key::KEY_ESC | Key::KEY_SPACE | Key::KEY_ENTER => { self.vim_mode = false; }
                 _ => {} 
             }
             return Action::Consume;

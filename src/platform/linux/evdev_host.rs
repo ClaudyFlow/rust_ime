@@ -226,21 +226,24 @@ impl InputMethodHost for EvdevHost {
                                             }
                                             Action::Consume => {}
                                             Action::Alert => {
-                                                // QuickRime 注入导致警报 (虽然理论上注入的是预设正确韵母，不太会发生)
+                                                // QuickRime 注入导致警报
                                                 if self.config.read().unwrap().input.enable_error_sound {
                                                     let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn();
                                                 }
+                                            }
+                                            Action::Notify(s, b) => {
+                                                let _ = self.notify_tx.send(NotifyEvent::Message(s, b));
                                             }
                                             Action::PassThrough => {} 
                                          }
                                          handled_quick_rime = true;
                                      }
-                                                                      drop(p);
-                                                                      if handled_quick_rime {
-                                                                          self.update_gui();
-                                                                          self.notify_preview();
-                                                                          break; 
-                                                                      }
+                                     drop(p);
+                                     if handled_quick_rime {
+                                         self.update_gui();
+                                         self.notify_preview();
+                                         break; 
+                                     }
                                                                   }
                                      
                              }
@@ -460,6 +463,9 @@ impl InputMethodHost for EvdevHost {
                                         .arg("--id=dialog-error")
                                         .spawn();
                                 }
+                            }
+                            Action::Notify(summary, body) => {
+                                let _ = self.notify_tx.send(NotifyEvent::Message(summary, body));
                             }
                             Action::Consume => {}
                             Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
