@@ -332,6 +332,11 @@ impl InputMethodHost for EvdevHost {
 
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
+                        // 执行动作前同步延迟设置
+                        if let Ok(mut vkbd) = self.vkbd.lock() {
+                             vkbd.clipboard_delay_ms = self.config.read().unwrap().input.clipboard_delay_ms;
+                        }
+
                         match p.handle_key(key, val != 0, shift) {
                             Action::Emit(s) => { 
                                 if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); }
@@ -449,7 +454,12 @@ impl EvdevHost {
     }
 }
 
-fn is_combo(held: &HashSet<Key>, target: &[Key]) -> bool {
+fn is_combo(held: &HashSet<Key>, target: &[Vec<Key>]) -> bool {
+
     if target.is_empty() { return false; }
-    target.iter().all(|k| held.contains(k))
+
+    // 每一组修饰键/按键（如 [LCTRL, RCTRL]）中至少有一个在 held 中
+
+    target.iter().all(|keys| keys.iter().any(|k| held.contains(k)))
+
 }

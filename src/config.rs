@@ -107,6 +107,8 @@ pub struct Input {
     pub default_profile: String, // 原 active_profile
     #[serde(default = "default_paste_behavior")]
     pub paste_method: String, // 原 paste_shortcut.key (ctrl_v/shift_insert...)
+    #[serde(default = "default_clipboard_delay")]
+    pub clipboard_delay_ms: u64,
 }
 
 impl Default for Input {
@@ -116,9 +118,12 @@ impl Default for Input {
             autostart: false,
             default_profile: "Chinese".to_string(),
             paste_method: "ctrl_v".to_string(),
+            clipboard_delay_ms: 50,
         }
     }
 }
+
+fn default_clipboard_delay() -> u64 { 50 }
 
 // --- 3. 词库与文件 ---
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -448,69 +453,69 @@ fn default_keystroke_toggle() -> Shortcut {
 
 // Helper for parse (unchanged)
 #[allow(dead_code)]
-pub fn parse_key(s: &str) -> Vec<Key> {
+pub fn parse_key(s: &str) -> Vec<Vec<Key>> {
     s.split('+')
-        .filter_map(|k| {
+        .map(|k| {
             let k = k.to_lowercase().trim().to_string();
             match k.as_str() {
-                "ctrl" => Some(Key::KEY_LEFTCTRL),
-                "alt" => Some(Key::KEY_LEFTALT),
-                "shift" => Some(Key::KEY_LEFTSHIFT),
-                "meta" | "super" | "win" => Some(Key::KEY_LEFTMETA),
-                "space" => Some(Key::KEY_SPACE),
-                "caps_lock" | "caps" => Some(Key::KEY_CAPSLOCK),
-                "tab" => Some(Key::KEY_TAB),
-                "enter" => Some(Key::KEY_ENTER),
-                "esc" => Some(Key::KEY_ESC),
-                "backspace" => Some(Key::KEY_BACKSPACE),
-                "insert" => Some(Key::KEY_INSERT),
-                "delete" => Some(Key::KEY_DELETE),
-                "home" => Some(Key::KEY_HOME),
-                "end" => Some(Key::KEY_END),
-                "page_up" => Some(Key::KEY_PAGEUP),
-                "page_down" => Some(Key::KEY_PAGEDOWN),
+                "ctrl" => vec![Key::KEY_LEFTCTRL, Key::KEY_RIGHTCTRL],
+                "alt" => vec![Key::KEY_LEFTALT, Key::KEY_RIGHTALT],
+                "shift" => vec![Key::KEY_LEFTSHIFT, Key::KEY_RIGHTSHIFT],
+                "meta" | "super" | "win" => vec![Key::KEY_LEFTMETA, Key::KEY_RIGHTMETA],
+                "space" => vec![Key::KEY_SPACE],
+                "caps_lock" | "caps" => vec![Key::KEY_CAPSLOCK],
+                "tab" => vec![Key::KEY_TAB],
+                "enter" => vec![Key::KEY_ENTER],
+                "esc" => vec![Key::KEY_ESC],
+                "backspace" => vec![Key::KEY_BACKSPACE],
+                "insert" => vec![Key::KEY_INSERT],
+                "delete" => vec![Key::KEY_DELETE],
+                "home" => vec![Key::KEY_HOME],
+                "end" => vec![Key::KEY_END],
+                "page_up" => vec![Key::KEY_PAGEUP],
+                "page_down" => vec![Key::KEY_PAGEDOWN],
                 s if s.len() == 1 => {
                     s.chars().next().and_then(|c| match c {
-                        'a' => Some(Key::KEY_A),
-                        'b' => Some(Key::KEY_B),
-                        'c' => Some(Key::KEY_C),
-                        'd' => Some(Key::KEY_D),
-                        'e' => Some(Key::KEY_E),
-                        'f' => Some(Key::KEY_F),
-                        'g' => Some(Key::KEY_G),
-                        'h' => Some(Key::KEY_H),
-                        'i' => Some(Key::KEY_I),
-                        'j' => Some(Key::KEY_J),
-                        'k' => Some(Key::KEY_K),
-                        'l' => Some(Key::KEY_L),
-                        'm' => Some(Key::KEY_M),
-                        'n' => Some(Key::KEY_N),
-                        'o' => Some(Key::KEY_O),
-                        'p' => Some(Key::KEY_P),
-                        'q' => Some(Key::KEY_Q),
-                        'r' => Some(Key::KEY_R),
-                        's' => Some(Key::KEY_S),
-                        't' => Some(Key::KEY_T),
-                        'u' => Some(Key::KEY_U),
-                        'v' => Some(Key::KEY_V),
-                        'w' => Some(Key::KEY_W),
-                        'x' => Some(Key::KEY_X),
-                        'y' => Some(Key::KEY_Y),
-                        'z' => Some(Key::KEY_Z),
-                        '0' => Some(Key::KEY_0),
-                        '1' => Some(Key::KEY_1),
-                        '2' => Some(Key::KEY_2),
-                        '3' => Some(Key::KEY_3),
-                        '4' => Some(Key::KEY_4),
-                        '5' => Some(Key::KEY_5),
-                        '6' => Some(Key::KEY_6),
-                        '7' => Some(Key::KEY_7),
-                        '8' => Some(Key::KEY_8),
-                        '9' => Some(Key::KEY_9),
+                        'a' => Some(vec![Key::KEY_A]),
+                        'b' => Some(vec![Key::KEY_B]),
+                        'c' => Some(vec![Key::KEY_C]),
+                        'd' => Some(vec![Key::KEY_D]),
+                        'e' => Some(vec![Key::KEY_E]),
+                        'f' => Some(vec![Key::KEY_F]),
+                        'g' => Some(vec![Key::KEY_G]),
+                        'h' => Some(vec![Key::KEY_H]),
+                        'i' => Some(vec![Key::KEY_I]),
+                        'j' => Some(vec![Key::KEY_J]),
+                        'k' => Some(vec![Key::KEY_K]),
+                        'l' => Some(vec![Key::KEY_L]),
+                        'm' => Some(vec![Key::KEY_M]),
+                        'n' => Some(vec![Key::KEY_N]),
+                        'o' => Some(vec![Key::KEY_O]),
+                        'p' => Some(vec![Key::KEY_P]),
+                        'q' => Some(vec![Key::KEY_Q]),
+                        'r' => Some(vec![Key::KEY_R]),
+                        's' => Some(vec![Key::KEY_S]),
+                        't' => Some(vec![Key::KEY_T]),
+                        'u' => Some(vec![Key::KEY_U]),
+                        'v' => Some(vec![Key::KEY_V]),
+                        'w' => Some(vec![Key::KEY_W]),
+                        'x' => Some(vec![Key::KEY_X]),
+                        'y' => Some(vec![Key::KEY_Y]),
+                        'z' => Some(vec![Key::KEY_Z]),
+                        '0' => Some(vec![Key::KEY_0]),
+                        '1' => Some(vec![Key::KEY_1]),
+                        '2' => Some(vec![Key::KEY_2]),
+                        '3' => Some(vec![Key::KEY_3]),
+                        '4' => Some(vec![Key::KEY_4]),
+                        '5' => Some(vec![Key::KEY_5]),
+                        '6' => Some(vec![Key::KEY_6]),
+                        '7' => Some(vec![Key::KEY_7]),
+                        '8' => Some(vec![Key::KEY_8]),
+                        '9' => Some(vec![Key::KEY_9]),
                         _ => None,
-                    })
+                    }).unwrap_or_default()
                 }
-                _ => None,
+                _ => vec![],
             }
         })
         .collect()

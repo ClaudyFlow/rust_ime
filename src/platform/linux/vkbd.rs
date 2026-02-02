@@ -19,6 +19,7 @@ pub enum PasteMode {
 pub struct Vkbd {
     pub dev: VirtualDevice,
     pub paste_mode: PasteMode,
+    pub clipboard_delay_ms: u64,
 }
 
 impl Vkbd {
@@ -56,6 +57,7 @@ impl Vkbd {
         Ok(Self { 
             dev,
             paste_mode: PasteMode::ShiftInsert, // Standard universal mode
+            clipboard_delay_ms: 50,
         })
     }
 
@@ -149,36 +151,36 @@ impl Vkbd {
             return false;
         }
 
-        // 稍微延长等待剪贴板同步的时间，确保复杂应用能感知
-        thread::sleep(Duration::from_millis(180));
+        // 使用配置的延迟时间，确保应用感知到剪贴板变化
+        thread::sleep(Duration::from_millis(self.clipboard_delay_ms));
         
         match self.paste_mode {
             PasteMode::CtrlV => {
                 println!("[Vkbd] Injecting via Ctrl+V");
                 self.emit(Key::KEY_LEFTCTRL, true);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.tap(Key::KEY_V);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTCTRL, false);
             },
             PasteMode::CtrlShiftV => {
                 println!("[Vkbd] Injecting via Ctrl+Shift+V");
                 self.emit(Key::KEY_LEFTCTRL, true);
                 self.emit(Key::KEY_LEFTSHIFT, true);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.tap(Key::KEY_V);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTSHIFT, false);
                 self.emit(Key::KEY_LEFTCTRL, false);
             },
             PasteMode::ShiftInsert => {
                 println!("[Vkbd] Injecting via Shift+Insert");
-                // 粘贴前增加同步延迟
-                thread::sleep(Duration::from_millis(15));
+                // 粘贴前增加微量同步延迟
+                thread::sleep(Duration::from_millis(10));
                 self.emit(Key::KEY_LEFTSHIFT, true);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.tap(Key::KEY_INSERT);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTSHIFT, false);
             },
             PasteMode::UnicodeHex => {} // No-op
@@ -194,15 +196,14 @@ impl Vkbd {
         // 这在 Firefox 搜索框中能强行打断自动补全建议，确保后续退格能删掉真实的字符
         self.tap(Key::KEY_SPACE);
         self.tap(Key::KEY_BACKSPACE);
-        thread::sleep(Duration::from_millis(2));
 
         for _ in 0..count {
             self.tap(Key::KEY_BACKSPACE);
-            // 物理间隔
-            thread::sleep(Duration::from_millis(2));
+            // 物理间隔减小到 1ms
+            thread::sleep(Duration::from_millis(1));
         }
-        // 关键同步
-        thread::sleep(Duration::from_millis(15));
+        // 关键同步延迟减小
+        thread::sleep(Duration::from_millis(5));
     }
 
     fn send_via_ydotool(&self, text: &str) -> bool {
