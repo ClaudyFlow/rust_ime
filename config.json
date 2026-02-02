@@ -30,11 +30,58 @@
   "input": {
     "enable_fuzzy_pinyin": false,
     "autostart": false,
-    "default_profile": "chinese",
+    "default_profile": "Chinese",
     "paste_method": "ctrl_v",
     "clipboard_delay_ms": 50,
-    "enable_anti_typo": false,
-    "commit_mode": "single"
+    "enable_anti_typo": true,
+    "commit_mode": "single",
+    "quick_rimes": [
+      {
+        "trigger": "tab+g",
+        "insert": "eng"
+      },
+      {
+        "trigger": "tab+h",
+        "insert": "ang"
+      },
+      {
+        "trigger": "tab+j",
+        "insert": "iang"
+      },
+      {
+        "trigger": "tab+k",
+        "insert": "uai"
+      },
+      {
+        "trigger": "tab+l",
+        "insert": "uang"
+      },
+      {
+        "trigger": "tab+i",
+        "insert": "ing"
+      },
+      {
+        "trigger": "tab+o",
+        "insert": "ong"
+      },
+      {
+        "trigger": "tab+p",
+        "insert": "iong"
+      },
+      {
+        "trigger": "tab+n",
+        "insert": "iao"
+      },
+      {
+        "trigger": "tab+m",
+        "insert": "ian"
+      },
+      {
+        "trigger": "tab+u",
+        "insert": "uan"
+      }
+    ],
+    "enable_quick_rime": true
   },
   "hotkeys": {
     "switch_language": {

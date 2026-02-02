@@ -307,8 +307,11 @@ impl Processor {
                         // 获取当前正在输入的片段（最后一个空格之后的部分）
                         let last_segment = test_buf.split(' ').last().unwrap_or("");
                         
-                        // 检查词库中是否存在以此片段开头的词条
-                        if !last_segment.is_empty() {
+                        // 检查：只有当整个片段都是小写字母时，才进行词库前缀校验
+                        // 这样一旦有了大写字母（辅码）或数字，防呆功能就会自动放行
+                        let is_pure_pinyin = last_segment.chars().all(|ch| ch.is_ascii_lowercase());
+                        
+                        if is_pure_pinyin && !last_segment.is_empty() {
                             let dict = self.tries.get(&self.current_profile.to_lowercase());
                             if let Some(d) = dict {
                                 if !d.has_prefix(last_segment) {
