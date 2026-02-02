@@ -119,6 +119,14 @@ pub struct Input {
     pub enable_quick_rime: bool,
     #[serde(default = "default_enable_error_sound")]
     pub enable_error_sound: bool,
+    #[serde(default = "default_profile_keys")]
+    pub profile_keys: Vec<ProfileKey>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct ProfileKey {
+    pub key: String,    // e.g. "c"
+    pub profile: String, // e.g. "chinese"
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -140,8 +148,18 @@ impl Default for Input {
             quick_rimes: default_quick_rimes(),
             enable_quick_rime: true,
             enable_error_sound: true,
+            profile_keys: default_profile_keys(),
         }
     }
+}
+
+fn default_profile_keys() -> Vec<ProfileKey> {
+    vec![
+        ProfileKey { key: "c".into(), profile: "chinese".into() },
+        ProfileKey { key: "e".into(), profile: "english".into() },
+        ProfileKey { key: "r".into(), profile: "rime-ice".into() },
+        ProfileKey { key: "j".into(), profile: "japanese".into() },
+    ]
 }
 
 fn default_enable_error_sound() -> bool { true }

@@ -57,8 +57,9 @@ pub struct Processor {
     pub preview_selected_candidate: bool,
     pub enable_anti_typo: bool,
     pub commit_mode: String,
-    pub vim_mode: bool,
+    pub switch_mode: bool,
     pub cursor_pos: usize,
+    pub profile_keys: Vec<(String, String)>,
 }
 
 impl Processor {
@@ -122,8 +123,9 @@ impl Processor {
             preview_selected_candidate: false,
             enable_anti_typo: true,
             commit_mode: "double".to_string(),
-            vim_mode: false,
+            switch_mode: false,
             cursor_pos: 0,
+            profile_keys: Vec::new(),
         }
     }
 
@@ -134,6 +136,7 @@ impl Processor {
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
+        self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         
         let new_profile = conf.input.default_profile.to_lowercase();
         if !new_profile.is_empty() && self.tries.contains_key(&new_profile) {
@@ -177,7 +180,7 @@ impl Processor {
         self.state = ImeState::Direct;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
-        self.vim_mode = false;
+        self.switch_mode = false;
         self.cursor_pos = 0;
     }
 
@@ -185,7 +188,7 @@ impl Processor {
         if !is_press {
             if self.buffer.is_empty() { return Action::PassThrough; }
             if key == Key::KEY_GRAVE { return Action::Consume; }
-            if self.vim_mode && (key == Key::KEY_H || key == Key::KEY_L || key == Key::KEY_D || key == Key::KEY_C || key == Key::KEY_E || key == Key::KEY_R || key == Key::KEY_J) { return Action::Consume; }
+            if self.switch_mode && (key == Key::KEY_H || key == Key::KEY_L || key == Key::KEY_D || key == Key::KEY_C || key == Key::KEY_E || key == Key::KEY_R || key == Key::KEY_J) { return Action::Consume; }
             // 允许 TAB, LEFT, RIGHT 在 Composing 状态下处理，这里只拦截明确不需要的
             if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
                 return Action::Consume; 
@@ -193,55 +196,41 @@ impl Processor {
             return Action::PassThrough;
         }
 
-        // --- 切换 Vim 模式 ---
+        // --- 切换快捷模式 (Grave `) ---
         if key == Key::KEY_GRAVE {
-            self.vim_mode = !self.vim_mode;
-            if self.vim_mode { self.cursor_pos = self.buffer.len(); }
-            return Action::Consume;
+            self.switch_mode = !self.switch_mode;
+            if self.switch_mode {
+                return Action::Notify("快捷切换".into(), "已进入方案切换模式 (按 Esc 退出)".into());
+            } else {
+                return Action::Notify("快捷切换".into(), "已退出切换模式".into());
+            }
         }
 
-        // --- Vim 模式处理 ---
-        if self.vim_mode {
+        // --- 快捷切换模式逻辑 ---
+        if self.switch_mode {
             match key {
-                Key::KEY_H => { // 左移 (模拟左箭头)
-                    return self.handle_composing(Key::KEY_LEFT, shift_pressed);
+                Key::KEY_ESC | Key::KEY_SPACE | Key::KEY_ENTER => { 
+                    self.switch_mode = false; 
+                    return Action::Notify("快捷切换".into(), "已退出".into());
                 }
-                Key::KEY_L => { // 右移 (模拟右箭头)
-                    return self.handle_composing(Key::KEY_RIGHT, shift_pressed);
-                }
-                Key::KEY_D => { // 按音节删除
-                    if !self.buffer.is_empty() {
-                        self.delete_syllable_at_cursor();
+                _ if is_letter(key) => {
+                    let k = key_to_char(key, false).unwrap_or(' ').to_string();
+                    let mut target_profile = None;
+                    for (trigger_key, profile_name) in &self.profile_keys {
+                        if trigger_key == &k {
+                            target_profile = Some(profile_name.clone());
+                            break;
+                        }
+                    }
+
+                    if let Some(p) = target_profile {
+                        self.current_profile = p.clone();
                         self.lookup();
-                        return self.update_phantom_action();
+                        self.switch_mode = false;
+                        return Action::Notify("输入方案".into(), format!("已切换至: {}", p));
                     }
                 }
-                Key::KEY_C => { 
-                    self.current_profile = "chinese".into(); 
-                    self.lookup(); 
-                    self.vim_mode = false;
-                    return Action::Notify("输入方案".into(), "已切换至: 中文".into());
-                }
-                Key::KEY_E => { 
-                    self.current_profile = "english".into(); 
-                    self.lookup(); 
-                    self.vim_mode = false;
-                    return Action::Notify("输入方案".into(), "已切换至: 英文".into());
-                }
-                Key::KEY_R => { 
-                    self.current_profile = "rime-ice".into(); 
-                    self.lookup(); 
-                    self.vim_mode = false;
-                    return Action::Notify("输入方案".into(), "已切换至: 雾凇拼音".into());
-                }
-                Key::KEY_J => { 
-                    self.current_profile = "japanese".into(); 
-                    self.lookup(); 
-                    self.vim_mode = false;
-                    return Action::Notify("输入方案".into(), "已切换至: 日语".into());
-                }
-                Key::KEY_ESC | Key::KEY_SPACE | Key::KEY_ENTER => { self.vim_mode = false; }
-                _ => {} 
+                _ => {}
             }
             return Action::Consume;
         }

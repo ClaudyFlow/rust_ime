@@ -558,30 +558,23 @@ impl EvdevHost {
 
     fn notify_preview(&self) {
         let p = self.processor.lock().unwrap();
-        // 只有当 buffer 为空且不在 Vim 模式时，才关闭通知
-        if !p.show_notifications || (p.buffer.is_empty() && !p.vim_mode) { 
+        // 只有当 buffer 为空且不在切换模式时，才关闭通知
+        if !p.show_notifications || (p.buffer.is_empty() && !p.switch_mode) { 
             let _ = self.notify_tx.send(NotifyEvent::Close);
             return; 
         }
 
-        let summary = if p.vim_mode {
-            format!("[Vim] {}: {}", p.current_profile, p.joined_sentence)
+        let summary = if p.switch_mode {
+            format!("[快捷切换] {}: {}", p.current_profile, p.joined_sentence)
         } else {
             format!("{}: {}", p.current_profile, p.joined_sentence)
         };
 
         let mut body = String::new();
         
-        // 如果在 Vim 模式，回显带光标的拼音
-        if p.vim_mode {
-            let buf_chars: Vec<char> = p.buffer.chars().collect();
-            let mut buf_with_cursor = String::new();
-            for (i, &c) in buf_chars.iter().enumerate() {
-                if i == p.cursor_pos { buf_with_cursor.push('|'); }
-                buf_with_cursor.push(c);
-            }
-            if p.cursor_pos == buf_chars.len() { buf_with_cursor.push('|'); }
-            body.push_str(&format!("PinYin: {}\n", buf_with_cursor));
+        // 如果在切换模式，显示当前方案列表提示（可选，这里先保持简洁）
+        if p.switch_mode && p.buffer.is_empty() {
+            body.push_str("请按键切换方案: C(中) E(英) R(雾) J(日)");
         }
 
         let start = p.page;
