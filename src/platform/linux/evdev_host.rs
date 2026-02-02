@@ -471,7 +471,7 @@ impl InputMethodHost for EvdevHost {
                             self.update_gui();
                             self.notify_preview();
                         }
-                    } else {
+                    } else if p.chinese_enabled && has_mod {
                         // 如果有修饰键按下，且当前正在输入拼音，重置输入法并清除屏幕预览
                         if has_mod && p.state != crate::engine::processor::ImeState::Direct {
                             let del = p.phantom_text.chars().count();
@@ -556,7 +556,27 @@ impl EvdevHost {
             let _ = self.notify_tx.send(NotifyEvent::Close);
             return; 
         }
+
+        let summary = if p.vim_mode {
+            format!("[Vim] {}: {}", p.current_profile, p.joined_sentence)
+        } else {
+            format!("{}: {}", p.current_profile, p.joined_sentence)
+        };
+
         let mut body = String::new();
+        
+        // 如果在 Vim 模式，回显带光标的拼音
+        if p.vim_mode {
+            let buf_chars: Vec<char> = p.buffer.chars().collect();
+            let mut buf_with_cursor = String::new();
+            for (i, &c) in buf_chars.iter().enumerate() {
+                if i == p.cursor_pos { buf_with_cursor.push('|'); }
+                buf_with_cursor.push(c);
+            }
+            if p.cursor_pos == buf_chars.len() { buf_with_cursor.push('|'); }
+            body.push_str(&format!("PinYin: {}\n", buf_with_cursor));
+        }
+
         let start = p.page;
         let end = (start + 10).min(p.candidates.len());
         for (i, cand) in p.candidates[start..end].iter().enumerate() {
@@ -565,7 +585,7 @@ impl EvdevHost {
             if abs_idx == p.selected { body.push_str(&format!("【{}.{} {}】", (i % 10)+1, cand, hint)); }
             else { body.push_str(&format!("{}.{}{} ", (i % 10)+1, cand, hint)); }
         }
-        let summary = format!("{}: {}", p.current_profile, p.joined_sentence);
+        
         let _ = self.notify_tx.send(NotifyEvent::Update(summary, body));
     }
 }

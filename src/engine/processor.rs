@@ -56,6 +56,8 @@ pub struct Processor {
     pub preview_selected_candidate: bool,
     pub enable_anti_typo: bool,
     pub commit_mode: String,
+    pub vim_mode: bool,
+    pub cursor_pos: usize,
 }
 
 impl Processor {
@@ -119,6 +121,8 @@ impl Processor {
             preview_selected_candidate: false,
             enable_anti_typo: true,
             commit_mode: "double".to_string(),
+            vim_mode: false,
+            cursor_pos: 0,
         }
     }
 
@@ -172,16 +176,57 @@ impl Processor {
         self.state = ImeState::Direct;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
+        self.vim_mode = false;
+        self.cursor_pos = 0;
     }
 
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
         if !is_press {
             if self.buffer.is_empty() { return Action::PassThrough; }
+            if key == Key::KEY_GRAVE { return Action::Consume; }
+            if self.vim_mode && (key == Key::KEY_H || key == Key::KEY_L || key == Key::KEY_D || key == Key::KEY_C || key == Key::KEY_E || key == Key::KEY_R || key == Key::KEY_J) { return Action::Consume; }
             // 允许 TAB, LEFT, RIGHT 在 Composing 状态下处理，这里只拦截明确不需要的
             if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
                 return Action::Consume; 
             }
             return Action::PassThrough;
+        }
+
+        // --- 切换 Vim 模式 ---
+        if key == Key::KEY_GRAVE {
+            if !self.buffer.is_empty() {
+                self.vim_mode = !self.vim_mode;
+                if self.vim_mode { self.cursor_pos = self.buffer.len(); }
+                return Action::Consume;
+            }
+            return Action::PassThrough;
+        }
+
+        // --- Vim 模式处理 ---
+        if self.vim_mode && !self.buffer.is_empty() {
+            match key {
+                Key::KEY_H => { // 左移
+                    self.cursor_pos = self.cursor_pos.saturating_sub(1);
+                    return Action::Consume;
+                }
+                Key::KEY_L => { // 右移
+                    self.cursor_pos = (self.cursor_pos + 1).min(self.buffer.len());
+                    return Action::Consume;
+                }
+                Key::KEY_D => { // 按音节删除
+                    self.delete_syllable_at_cursor();
+                    if self.buffer.is_empty() { self.reset(); return Action::Consume; }
+                    self.lookup();
+                    return self.update_phantom_action();
+                }
+                Key::KEY_C => { self.current_profile = "chinese".into(); self.lookup(); return Action::Consume; }
+                Key::KEY_E => { self.current_profile = "english".into(); self.lookup(); return Action::Consume; }
+                Key::KEY_R => { self.current_profile = "rime-ice".into(); self.lookup(); return Action::Consume; }
+                Key::KEY_J => { self.current_profile = "japanese".into(); self.lookup(); return Action::Consume; }
+                Key::KEY_ESC => { self.vim_mode = false; return Action::Consume; }
+                _ => {} // 其他键在 Vim 模式下保持静默
+            }
+            return Action::Consume;
         }
 
         if !self.buffer.is_empty() { return self.handle_composing(key, shift_pressed); }
@@ -491,6 +536,30 @@ impl Processor {
         self.current_profile = profiles[next_idx].clone();
         self.reset();
         self.current_profile.clone()
+    }
+
+    fn delete_syllable_at_cursor(&mut self) {
+        if self.buffer.is_empty() { return; }
+        
+        // 简单实现：删除最后一个音节（如果光标在末尾）或根据 best_segmentation 切分
+        if self.best_segmentation.is_empty() {
+            self.buffer.pop();
+        } else {
+            // 如果光标在末尾，删掉最后一个 segment
+            if self.cursor_pos == self.buffer.len() {
+                if let Some(last) = self.best_segmentation.pop() {
+                    // 处理可能带空格的 raw segment
+                    let len = last.len();
+                    for _ in 0..len { self.buffer.pop(); }
+                    // 还要删掉可能存在的前置空格
+                    if self.buffer.ends_with(' ') { self.buffer.pop(); }
+                }
+            } else {
+                // 如果光标在中间，暂时回退到删除单个字符（待完善更精确的中间切分逻辑）
+                self.buffer.remove(self.cursor_pos - 1);
+            }
+        }
+        self.cursor_pos = self.buffer.len();
     }
 }
 
