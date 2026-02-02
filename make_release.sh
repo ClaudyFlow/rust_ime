@@ -7,9 +7,11 @@ ARCHIVE_NAME="${APP_NAME}-linux-x64.tar.gz"
 
 echo "📦 开始打包发行版..."
 
-# 1. 编译
+# 1. 编译程序和词库
 echo "🔨 正在进行 Release 编译..."
 cargo build --release
+echo "📚 正在预编译词库..."
+cargo run --release --bin compile_dict
 
 # 2. 创建打包目录
 echo "📂 正在收集文件..."
@@ -23,8 +25,7 @@ cp install.sh "$RELEASE_DIR/"
 # 复制必要的资源目录
 cp -r dicts "$RELEASE_DIR/"
 cp -r static "$RELEASE_DIR/"
-# 创建空的 data 目录（供词库编译输出）
-mkdir -p "$RELEASE_DIR/data"
+cp -r data "$RELEASE_DIR/" # 包含编译好的二进制词库
 
 # 3. 创建压缩包
 echo "🗜️ 正在生成压缩包..."

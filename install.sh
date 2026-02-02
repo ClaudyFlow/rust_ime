@@ -57,18 +57,41 @@ else
     echo "✅ 规则文件已存在"
 fi
 
-# 3. Build Project
-echo -e "\n[3/4] 正在编译项目 (Release模式)..."
-cargo build --release
+# 3. Build Project / Prepare Binary
+echo -e "\n[3/4] 准备程序文件..."
+if [ -f "./rust-ime" ]; then
+    echo "✅ 检测到预编译二进制文件，跳过编译步骤。"
+    chmod +x ./rust-ime
+else
+    echo "未检测到预编译文件，尝试从源码编译..."
+    if ! command -v cargo &> /dev/null; then
+        echo "❌ 错误: 未检测到 Rust 环境，且当前目录没有预编译的二进制文件。"
+        echo "请先安装 Rust 或使用发布的二进制安装包。"
+        exit 1
+    fi
+    cargo build --release
+    cp target/release/rust-ime .
+fi
 
 # 3.5 Compile Dictionaries
-echo -e "\n[3.5/4] 正在编译词库..."
-cargo run --release --bin compile_dict
+echo -e "\n[3.5/4] 准备词库..."
+if [ -d "./data" ] && [ "$(ls -A ./data 2>/dev/null)" ]; then
+    echo "✅ 检测到已有词库数据。"
+else
+    echo "正在编译原始词库 (需要几秒钟)..."
+    if command -v cargo &> /dev/null; then
+        cargo run --release --bin compile_dict
+    else
+        # 如果是二进制包，我们需要确保包里已经带了编译好的 data，或者通过二进制运行编译
+        ./rust-ime --compile-dict || echo "⚠️ 警告: 无法自动编译词库，请确保 data 目录完整。"
+    fi
+fi
 
-# 4. Install Autostart & Binary
-echo -e "\n[4/4] 配置安装..."
-# 创建软链接
-sudo ln -sf "$(pwd)/target/release/rust-ime" /usr/local/bin/rust-ime
+# 4. Install
+echo -e "\n[4/4] 执行安装..."
+# 获取当前绝对路径
+INSTALL_PATH=$(pwd)
+sudo ln -sf "$INSTALL_PATH/rust-ime" /usr/local/bin/rust-ime
 echo "✅ 已创建系统链接: /usr/local/bin/rust-ime"
 
 # 尝试运行安装自启（如果程序支持此参数）
