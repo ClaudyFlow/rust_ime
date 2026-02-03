@@ -542,6 +542,18 @@ impl Processor {
     fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String)> {
         let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
 
+        // 如果有辅码，我们额外搜索前缀，以便支持 "拼音前缀 + 辅码" 的匹配方式
+        if part.aux_code.is_some() && !part.pinyin.is_empty() {
+            let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
+            // 搜索范围稍微大一些，因为后续还有辅码过滤
+            let prefix_matches = dict.search_bfs(&part.pinyin, 100);
+            for (word, hint) in prefix_matches {
+                if seen.insert(word.clone()) {
+                    matches.push((word, hint));
+                }
+            }
+        }
+
         if let Some(ref code) = part.aux_code {
             let code_lower = code.to_lowercase();
             matches.retain(|(_, hint)| {
