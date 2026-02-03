@@ -91,11 +91,31 @@ fi
 echo -e "\n[4/4] 执行安装..."
 # 获取当前绝对路径
 INSTALL_PATH=$(pwd)
-sudo ln -sf "$INSTALL_PATH/rust-ime" /usr/local/bin/rust-ime
-echo "✅ 已创建系统链接: /usr/local/bin/rust-ime"
 
-# 尝试运行安装自启（如果程序支持此参数）
-./target/release/rust-ime --install || true
+# 4.1 安装二进制文件
+sudo cp -f "$INSTALL_PATH/rust-ime" /usr/local/bin/rust-ime
+sudo chmod +x /usr/local/bin/rust-ime
+echo "✅ 已安装二进制文件到: /usr/local/bin/rust-ime"
+
+# 4.2 安装图标
+ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
+sudo mkdir -p "$ICON_DIR"
+if [ -f "$INSTALL_PATH/picture/rust-ime.png" ]; then
+    sudo cp -f "$INSTALL_PATH/picture/rust-ime.png" "$ICON_DIR/rust-ime.png"
+    echo "✅ 已安装图标到: $ICON_DIR/rust-ime.png"
+fi
+
+# 4.3 安装桌面入口文件
+APP_DIR="/usr/share/applications"
+if [ -f "$INSTALL_PATH/rust-ime.desktop" ]; then
+    sudo cp -f "$INSTALL_PATH/rust-ime.desktop" "$APP_DIR/rust-ime.desktop"
+    sudo update-desktop-database "$APP_DIR" || true
+    echo "✅ 已安装桌面快捷方式，现在你可以在应用菜单找到 Rust-IME"
+fi
+
+# 4.4 开启默认配置中的自启 (如果是第一次安装)
+# 修正: 使用已经安装到系统的路径执行
+/usr/local/bin/rust-ime --install || true
 
 echo -e "\n=========================================="
 echo "🎉 安装完成！"
