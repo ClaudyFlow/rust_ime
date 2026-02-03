@@ -601,16 +601,18 @@ impl Processor {
 
             if !is_precise_mode {
                 let full_pinyin = buffer_normalized.to_lowercase();
-                // --- 2.1 中文/拼音精准匹配 ---
+                // --- 2.1 精准匹配 (Exact Match) ---
                 if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
                     for (word, hint) in exact_matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
                 }
 
-                // --- 2.2 前缀模糊搜索 (非中文方案使用) ---
-                if dict_key != "chinese" && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    let prefix_matches = d.search_bfs(&full_pinyin, 10);
+                // --- 2.2 前缀匹配 (Prefix Matching / Suggestions) ---
+                // 当输入长度 >= 2 且为纯小写时，开启前缀联想
+                if full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    let limit = if dict_key == "chinese" { 20 } else { 15 };
+                    let prefix_matches = d.search_bfs(&full_pinyin, limit);
                     for (word, hint) in prefix_matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
