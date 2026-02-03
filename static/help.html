@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rust-ime 使用帮助与文档</title>
+    <style>
+        :root {
+            --apple-bg: #f5f5f7;
+            --apple-card: rgba(255, 255, 255, 0.8);
+            --apple-accent: #0071e3;
+            --apple-text: #1d1d1f;
+            --apple-secondary: #86868b;
+            --apple-border: rgba(0, 0, 0, 0.1);
+            --apple-glass: blur(20px) saturate(180%);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Myriad Set Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background-color: var(--apple-bg);
+            color: var(--apple-text);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        h1 { font-size: 40px; font-weight: 700; margin-bottom: 20px; letter-spacing: -1px; }
+        h2 { font-size: 28px; font-weight: 600; margin: 40px 0 20px; border-bottom: 1px solid var(--apple-border); padding-bottom: 10px; }
+        h3 { font-size: 22px; font-weight: 600; margin: 30px 0 15px; color: var(--apple-accent); }
+        
+        p, li { font-size: 16px; color: #333; margin-bottom: 10px; }
+        
+        code {
+            font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #d63384;
+        }
+
+        pre {
+            background: #f0f0f5;
+            padding: 15px;
+            border-radius: 12px;
+            overflow-x: auto;
+            border: 1px solid var(--apple-border);
+        }
+
+        .card {
+            background: var(--apple-card);
+            backdrop-filter: var(--apple-glass);
+            border-radius: 18px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid var(--apple-border);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--apple-accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-btn:hover { text-decoration: underline; }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .feature-item {
+            background: rgba(255,255,255,0.5);
+            padding: 20px;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="/" class="back-btn">← 返回配置中心</a>
+    
+    <h1>使用帮助与文档</h1>
+    <p class="intro">欢迎使用 rust-ime，这是一款极速、轻量且高度可定制的输入法引擎。本文档将指导您了解核心功能及英文辅码的使用。</p>
+
+    <div class="card">
+        <h2>基础操作指南</h2>
+        
+        <h3>1. 模式切换</h3>
+        <ul>
+            <li><strong>中/英切换</strong>: 默认使用 <code>Caps Lock</code> 键。也可在设置中更改为 <code>Ctrl + Space</code>。</li>
+            <li><strong>方案切换</strong>: 默认使用 <code>Ctrl + Alt + S</code> 循环切换（如中文 -> 日语 -> 英语）。</li>
+            <li><strong>快捷方案跳转</strong>: 按下 <code>`</code> (波浪号键) 进入快捷模式，然后按首字母跳转：
+                <ul>
+                    <li><code>c</code> -> Chinese (中文)</li>
+                    <li><code>e</code> -> English (英语)</li>
+                    <li><code>j</code> -> Japanese (日语)</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>2. 候选词选择</h3>
+        <ul>
+            <li><strong>数字键选词</strong>: 按 <code>1</code> ~ <code>9</code> 直接选择对应候选词。</li>
+            <li><strong>空格键</strong>:
+                <ul>
+                    <li><strong>首选上屏</strong>: 默认上屏第一个候选词。</li>
+                    <li><strong>长句模式</strong>: 在长句模式下，空格作为分词符，第二次按空格才上屏。</li>
+                </ul>
+            </li>
+            <li><strong>翻页</strong>:
+                <ul>
+                    <li>默认使用 <code>↑</code> / <code>↓</code> (上下方向键) 翻页。</li>
+                    <li>也可在设置中开启 <code>-</code> / <code>=</code> 翻页。</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>英文辅码功能详解</h2>
+        <p>rust-ime 引入了独特的“英文辅码”筛选机制，旨在解决拼音输入中重码过多的问题，让您无需翻页即可精准定位候选词。</p>
+
+        <h3>功能原理</h3>
+        <p>在输入拼音后，您可以直接输入<strong>大写字母</strong>作为辅码，用来筛选<strong>以此字母开头</strong>的英文单词（或候选词提示中包含该字母的词）。</p>
+        <p><strong>格式：</strong> <code>拼音</code> + <code>大写首字母</code></p>
+
+        <h3>使用示例</h3>
+        <div class="feature-grid">
+            <div class="feature-item">
+                <strong>场景 1：输入 "号" (Hao -> Number/Call)</strong>
+                <p>输入 <code>hao</code>，候选词可能有“好”、“号”、“豪”等。</p>
+                <p>想打“号” (对应英文 <strong>C</strong>all 或 Number)，输入 <code>haoC</code>。</p>
+                <p>结果：“号”会瞬间排到第一位。</p>
+            </div>
+            <div class="feature-item">
+                <strong>场景 2：输入 "离" (Li -> Leave)</strong>
+                <p>输入 <code>li</code>，重码极多（里、力、离...）。</p>
+                <p>想打“离” (对应英文 <strong>L</strong>eave)，输入 <code>liL</code>。</p>
+                <p>结果：“离”被筛选出来。</p>
+            </div>
+            <div class="feature-item">
+                <strong>场景 3：精确筛选</strong>
+                <p>如果辅码字母唯一，系统甚至会自动选中。</p>
+                <p>如果辅码对应多个词（如 <code>haoC</code> 可能对应 Call 和 Cry），则这些词都会被提前，按频率排序。</p>
+            </div>
+        </div>
+
+        <h3>优点</h3>
+        <ul>
+            <li><strong>无需翻页</strong>: 对于常用字，通过辅码基本可以实现“一击必中”。</li>
+            <li><strong>语义关联</strong>: 辅码基于英文单词，符合直觉（如“爱”-> Love -> L，“看”-> See -> S），容易记忆。</li>
+            <li><strong>不干扰正常输入</strong>: 只有输入大写字母时才触发，正常拼音输入完全不受影响。</li>
+        </ul>
+
+        <h3>局限与缺憾</h3>
+        <ul>
+            <li><strong>需要英文基础</strong>: 用户需要知道汉字对应的常用英文单词（如知道“食”对应 Eat）。</li>
+            <li><strong>Shift 键操作</strong>: 输入辅码需要按住 Shift 键（输入大写），这比单纯按小写字母多了一个动作。</li>
+            <li><strong>多义词</strong>: 有些汉字对应多个英文单词（如“行”可以 Walk, Go, OK, Line...），词库可能只收录了其中一部分。</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>其他高级功能</h2>
+        
+        <h3>长句模式 (Double Space Mode)</h3>
+        <p>这是 rust-ime 的默认推荐模式。输入一长串拼音，使用空格进行分词，屏幕上会实时显示转换结果。输入结束时，再次按空格确认上屏。这种方式非常适合整句输入，能大幅提高打字速度。</p>
+
+        <h3>防呆模式</h3>
+        <p>开启后，如果您输入的拼音组合在词库中不存在（例如 <code>biang</code> 或错打的 <code>ingg</code>），系统会阻止您继续输入无效字符，并可能发出提示音。这能有效减少无效击键。</p>
+
+        <h3>长韵母映射 (双快)</h3>
+        <p>通过 <code>Tab</code> + <code>首字母</code> 快速输入长韵母。例如：</p>
+        <ul>
+            <li><code>Tab</code> + <code>L</code> -> <code>iang</code> (良 liang)</li>
+            <li><code>Tab</code> + <code>S</code> -> <code>ong</code> (送 song)</li>
+        </ul>
+        <p>您可以在配置中心的“长韵母映射”页面自定义这些组合。</p>
+    </div>
+
+</div>
+
+</body>
+</html>
