@@ -47,6 +47,56 @@ impl Trie {
         false
     }
 
+    pub fn search_abbreviation(&self, abbr: &str, limit: usize) -> Vec<(String, String)> {
+        let mut results = Vec::new();
+        if abbr.is_empty() { return results; }
+        
+        // 我们利用 FST 的全量流进行过滤。虽然在大词库下全量扫略较慢，
+        // 但由于 FST 遍历极快，对于几十万词条的词库，体感延迟通常在几毫秒内。
+        let mut stream = self.index.stream();
+        while let Some((key_bytes, offset)) = stream.next() {
+            let key = String::from_utf8_lossy(key_bytes);
+            if self.is_abbreviation_match(abbr, &key) {
+                let pairs = self.read_block(offset as usize);
+                for pair in pairs {
+                    if !results.iter().any(|(w, _)| w == &pair.0) {
+                        results.push(pair);
+                        if results.len() >= limit { return results; }
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    fn is_abbreviation_match(&self, abbr: &str, pinyin: &str) -> bool {
+        let abbr_chars: Vec<char> = abbr.chars().collect();
+        let mut py_idx = 0;
+        let py_chars: Vec<char> = pinyin.chars().collect();
+        
+        for &ac in &abbr_chars {
+            // 寻找下一个音节的起始位置
+            // 在我们的系统中，音节起始位置定义为：
+            // 1. 字符串开头
+            // 2. 特定的拼音分割点（这里简化处理：假设每个 abbr 字符对应一个音节的开头）
+            let mut found = false;
+            while py_idx < py_chars.len() {
+                if py_chars[py_idx] == ac {
+                    // 找到一个匹配，我们需要确定它是否是合理的音节开头
+                    // 简单的启发式逻辑：在 'nh' 匹配 'nihao' 时，'h' 是音节开头。
+                    // 实际上拼音词库中，我们通常有分词信息，但在这里由于索引只有纯拼音，
+                    // 我们做一个贪婪匹配：只要当前字符匹配，就假设它是一个音节的开始，并跳过这个音节。
+                    py_idx += 1;
+                    found = true;
+                    break;
+                }
+                py_idx += 1;
+            }
+            if !found { return false; }
+        }
+        true
+    }
+
     pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();

@@ -268,6 +268,13 @@
                 </div>
                 <div class="setting-item">
                     <div class="info">
+                        <div class="title">开启简拼匹配</div>
+                        <div class="desc">允许只输入声母来匹配词条 (如输入 nh 匹配 "你好")</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info">
                         <div class="title">长韵母映射 (双快)</div>
                         <div class="desc">允许使用 Tab 组合键快速注入韵母</div>
                     </div>
@@ -498,6 +505,7 @@
             document.getElementById('auto_commit_unique_full_match').checked = config.input.auto_commit_unique_full_match;
             document.getElementById('enable_prefix_matching').checked = config.input.enable_prefix_matching;
             document.getElementById('prefix_matching_limit').value = config.input.prefix_matching_limit;
+            document.getElementById('enable_abbreviation_matching').checked = config.input.enable_abbreviation_matching;
             document.getElementById('enable_quick_rime').checked = config.input.enable_quick_rime;
             document.getElementById('commit_mode').value = config.input.commit_mode;
             document.getElementById('page_size').value = config.appearance.page_size;
@@ -639,6 +647,7 @@
             config.input.auto_commit_unique_full_match = document.getElementById('auto_commit_unique_full_match').checked;
             config.input.enable_prefix_matching = document.getElementById('enable_prefix_matching').checked;
             config.input.prefix_matching_limit = parseInt(document.getElementById('prefix_matching_limit').value);
+            config.input.enable_abbreviation_matching = document.getElementById('enable_abbreviation_matching').checked;
             config.input.enable_quick_rime = document.getElementById('enable_quick_rime').checked;
             config.input.page_flipping_keys = [document.getElementById('page_flipping_keys').value];
 

@@ -67,6 +67,7 @@ pub struct Processor {
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
     pub prefix_matching_limit: usize,
+    pub enable_abbreviation_matching: bool,
     pub has_dict_match: bool,
     pub page_flipping_style: String,
 }
@@ -142,6 +143,7 @@ impl Processor {
             auto_commit_unique_full_match: false,
             enable_prefix_matching: true,
             prefix_matching_limit: 20,
+            enable_abbreviation_matching: true,
             has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }
@@ -161,6 +163,7 @@ impl Processor {
         self.auto_commit_unique_full_match = conf.input.auto_commit_unique_full_match;
         self.enable_prefix_matching = conf.input.enable_prefix_matching;
         self.prefix_matching_limit = conf.input.prefix_matching_limit;
+        self.enable_abbreviation_matching = conf.input.enable_abbreviation_matching;
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         if let Some(style) = conf.input.page_flipping_keys.first() {
             self.page_flipping_style = style.clone();
@@ -558,6 +561,16 @@ impl Processor {
                     matches.push((word, hint));
                 }
             }
+
+            // 支持 "简拼 + 辅码"
+            if self.enable_abbreviation_matching && part.pinyin.len() <= 5 {
+                let abbr_matches = dict.search_abbreviation(&part.pinyin, 50);
+                for (word, hint) in abbr_matches {
+                    if seen.insert(word.clone()) {
+                        matches.push((word, hint));
+                    }
+                }
+            }
         }
 
         if let Some(ref code) = part.aux_code {
@@ -632,6 +645,17 @@ impl Processor {
                     let prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
                     for (word, hint) in prefix_matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    }
+                }
+
+                // --- 2.3 简拼匹配 (Abbreviation Matching) ---
+                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 5 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    // 只有当精准匹配和前缀匹配结果不多时，才补充简拼结果，避免干扰
+                    if final_candidates.len() < 5 {
+                        let abbr_matches = d.search_abbreviation(&full_pinyin, 10);
+                        for (word, hint) in abbr_matches {
+                            if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                        }
                     }
                 }
             } else {
