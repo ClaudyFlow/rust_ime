@@ -547,7 +547,17 @@
             });
 
             const dc = document.getElementById('dicts-container');
-            dc.innerHTML = Object.entries(dictGroups).map(([group, files]) => `
+            const sortOrder = ['chinese', 'english', 'japanese'];
+            const sortedGroups = Object.entries(dictGroups).sort(([a], [b]) => {
+                const idxA = sortOrder.indexOf(a.toLowerCase());
+                const idxB = sortOrder.indexOf(b.toLowerCase());
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            dc.innerHTML = sortedGroups.map(([group, files]) => `
                 <div class="card">
                     <div style="font-weight:700; font-size:18px; margin-bottom:10px; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center;">
                         <span>${group}</span>
