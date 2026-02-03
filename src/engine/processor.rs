@@ -65,6 +65,7 @@ pub struct Processor {
     pub show_en_hint: bool,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
+    pub has_dict_match: bool,
     pub page_flipping_style: String,
 }
 
@@ -137,6 +138,7 @@ impl Processor {
             show_en_hint: true,
             auto_commit_unique_en_fuzhuma: false,
             auto_commit_unique_full_match: false,
+            has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }
     }
@@ -623,6 +625,7 @@ impl Processor {
 
         self.candidates.clear();
         self.candidate_hints.clear();
+        self.has_dict_match = !final_candidates.is_empty();
         for (cand, raw_hint) in final_candidates {
             self.candidates.push(cand);
             
@@ -679,15 +682,20 @@ impl Processor {
     fn check_auto_commit(&mut self) -> Option<Action> {
         if self.commit_mode != "single" { return None; }
         if self.candidates.len() != 1 { return None; }
+        if !self.has_dict_match { return None; }
         if self.state == ImeState::NoMatch { return None; }
 
         let buffer_normalized = strip_tones(&self.buffer);
-        let has_fuzhuma = buffer_normalized.chars().any(|c| c.is_ascii_uppercase());
-        
-        // 1. English with fuzhuma (Uppercase)
-        if self.auto_commit_unique_en_fuzhuma && self.current_profile.to_lowercase() == "english" && has_fuzhuma {
-            let cand = self.candidates[0].clone();
-            return Some(self.commit_candidate(cand));
+        let dict_key = self.current_profile.to_lowercase();
+        let dict = self.tries.get(&dict_key);
+
+        // 1. English with fuzhuma (Uppercase) - Independent check
+        if self.auto_commit_unique_en_fuzhuma && dict_key == "english" {
+            let has_uppercase = buffer_normalized.chars().any(|c| c.is_ascii_uppercase());
+            if has_uppercase {
+                let cand = self.candidates[0].clone();
+                return Some(self.commit_candidate(cand));
+            }
         }
 
         // 2. Full match unique
@@ -695,17 +703,18 @@ impl Processor {
             let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
             
             if is_precise_mode {
+                // In precise mode (manual selection/aux code), assume user choice is intentional
                 let cand = self.candidates[0].clone();
                 return Some(self.commit_candidate(cand));
-            } else {
-                let dict_key = self.current_profile.to_lowercase();
-                if let Some(d) = self.tries.get(&dict_key) {
-                    let full_pinyin = buffer_normalized.to_lowercase();
-                    if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
-                        // Ensure it's truly unique: only one exact match AND we only have one candidate in total
-                        if exact_matches.len() == 1 && self.candidates.len() == 1 {
-                             let cand = self.candidates[0].clone();
-                             return Some(self.commit_candidate(cand));
+            } else if let Some(d) = dict {
+                let full_pinyin = buffer_normalized.to_lowercase();
+                // Check if this exact pinyin has exactly one dictionary entry
+                // AND ensure no longer words start with this pinyin (lookahead)
+                if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
+                    if exact_matches.len() == 1 {
+                        if !d.has_longer_match(&full_pinyin) {
+                            let cand = self.candidates[0].clone();
+                            return Some(self.commit_candidate(cand));
                         }
                     }
                 }

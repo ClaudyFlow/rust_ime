@@ -36,6 +36,17 @@ impl Trie {
         self.index.search(matcher).into_stream().next().is_some()
     }
 
+    pub fn has_longer_match(&self, prefix: &str) -> bool {
+        let matcher = fst::automaton::Str::new(prefix).starts_with();
+        let mut stream = self.index.search(matcher).into_stream();
+        while let Some((key, _)) = stream.next() {
+            if key.len() > prefix.as_bytes().len() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();

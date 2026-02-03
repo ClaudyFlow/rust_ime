@@ -91,6 +91,8 @@
     ],
     "enable_quick_rime": true,
     "enable_error_sound": true,
+    "auto_commit_unique_en_fuzhuma": true,
+    "auto_commit_unique_full_match": false,
     "profile_keys": [
       {
         "key": "c",
