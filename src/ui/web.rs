@@ -102,6 +102,16 @@ async fn update_config(
             Ok(w) => w,
             Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
         };
+        
+        // 处理自启逻辑变化
+        if w.input.autostart != new_config.input.autostart {
+            if new_config.input.autostart {
+                let _ = crate::setup_autostart();
+            } else {
+                let _ = crate::remove_autostart();
+            }
+        }
+
         *w = new_config.clone();
     }
     if let Err(_e) = crate::save_config(&new_config) { return StatusCode::INTERNAL_SERVER_ERROR; }

@@ -240,6 +240,13 @@
                 </div>
                 <div class="setting-item">
                     <div class="info">
+                        <div class="title">开机自动启动</div>
+                        <div class="desc">在系统登录时自动运行 rust-ime</div>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info">
                         <div class="title">英文辅码自动上屏</div>
                         <div class="desc">在英文方案中使用大写字母辅码，若结果唯一则自动提交</div>
                     </div>
@@ -500,6 +507,7 @@
             config = await r.json();
             
             // --- 1. General ---
+            document.getElementById('autostart').checked = config.input.autostart;
             document.getElementById('enable_anti_typo').checked = config.input.enable_anti_typo;
             document.getElementById('auto_commit_unique_en_fuzhuma').checked = config.input.auto_commit_unique_en_fuzhuma;
             document.getElementById('auto_commit_unique_full_match').checked = config.input.auto_commit_unique_full_match;
@@ -639,6 +647,7 @@
         }
 
         async function saveAll() {
+            config.input.autostart = document.getElementById('autostart').checked;
             config.input.commit_mode = document.getElementById('commit_mode').value;
             config.input.default_profile = document.getElementById('default_profile').value;
             config.input.paste_method = document.getElementById('paste_method').value;

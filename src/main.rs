@@ -443,7 +443,7 @@ fn find_keyboard_device() -> Result<String, Box<dyn std::error::Error>> {
     Err("未检测到合适的键盘设备。".into())
 }
 
-fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
     let home = env::var("HOME")?;
     let autostart_dir = format!("{}/.config/autostart", home);
     std::fs::create_dir_all(&autostart_dir)?;
@@ -466,5 +466,15 @@ X-GNOME-Autostart-enabled=true
 
     let mut file = File::create(desktop_path)?;
     file.write_all(content.as_bytes())?;
+    Ok(())
+}
+
+pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
+    let home = env::var("HOME")?;
+    let autostart_file = format!("{}/.config/autostart/rust-ime.desktop", home);
+    let path = std::path::Path::new(&autostart_file);
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
     Ok(())
 }
