@@ -155,6 +155,10 @@ pub struct Input {
     pub auto_commit_unique_en_fuzhuma: bool,
     #[serde(default = "default_auto_commit_unique_full_match")]
     pub auto_commit_unique_full_match: bool,
+    #[serde(default = "default_enable_prefix_matching")]
+    pub enable_prefix_matching: bool,
+    #[serde(default = "default_prefix_matching_limit")]
+    pub prefix_matching_limit: usize,
     #[serde(default = "default_profile_keys")]
     pub profile_keys: Vec<ProfileKey>,
     #[serde(default = "default_page_flipping_keys")]
@@ -188,6 +192,8 @@ impl Default for Input {
             enable_error_sound: true,
             auto_commit_unique_en_fuzhuma: false,
             auto_commit_unique_full_match: false,
+            enable_prefix_matching: true,
+            prefix_matching_limit: 20,
             profile_keys: default_profile_keys(),
             page_flipping_keys: default_page_flipping_keys(),
         }
@@ -197,6 +203,9 @@ impl Default for Input {
 fn default_page_flipping_keys() -> Vec<String> {
     vec!["arrow".to_string()] // Options: "arrow" (default), "minus_equal"
 }
+
+fn default_enable_prefix_matching() -> bool { true }
+fn default_prefix_matching_limit() -> usize { 20 }
 
 fn default_auto_commit_unique_en_fuzhuma() -> bool { false }
 fn default_auto_commit_unique_full_match() -> bool { false }

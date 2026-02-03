@@ -65,6 +65,8 @@ pub struct Processor {
     pub show_en_hint: bool,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
+    pub enable_prefix_matching: bool,
+    pub prefix_matching_limit: usize,
     pub has_dict_match: bool,
     pub page_flipping_style: String,
 }
@@ -138,6 +140,8 @@ impl Processor {
             show_en_hint: true,
             auto_commit_unique_en_fuzhuma: false,
             auto_commit_unique_full_match: false,
+            enable_prefix_matching: true,
+            prefix_matching_limit: 20,
             has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }
@@ -155,6 +159,8 @@ impl Processor {
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
         self.auto_commit_unique_full_match = conf.input.auto_commit_unique_full_match;
+        self.enable_prefix_matching = conf.input.enable_prefix_matching;
+        self.prefix_matching_limit = conf.input.prefix_matching_limit;
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         if let Some(style) = conf.input.page_flipping_keys.first() {
             self.page_flipping_style = style.clone();
@@ -543,10 +549,10 @@ impl Processor {
         let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
 
         // 如果有辅码，我们额外搜索前缀，以便支持 "拼音前缀 + 辅码" 的匹配方式
-        if part.aux_code.is_some() && !part.pinyin.is_empty() {
+        if self.enable_prefix_matching && part.aux_code.is_some() && !part.pinyin.is_empty() {
             let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
-            // 搜索范围稍微大一些，因为后续还有辅码过滤
-            let prefix_matches = dict.search_bfs(&part.pinyin, 100);
+            // 搜索范围根据配置动态调整
+            let prefix_matches = dict.search_bfs(&part.pinyin, self.prefix_matching_limit.max(100));
             for (word, hint) in prefix_matches {
                 if seen.insert(word.clone()) {
                     matches.push((word, hint));
@@ -622,9 +628,8 @@ impl Processor {
 
                 // --- 2.2 前缀匹配 (Prefix Matching / Suggestions) ---
                 // 当输入长度 >= 2 且为纯小写时，开启前缀联想
-                if full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    let limit = if dict_key == "chinese" { 20 } else { 15 };
-                    let prefix_matches = d.search_bfs(&full_pinyin, limit);
+                if self.enable_prefix_matching && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    let prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
                     for (word, hint) in prefix_matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
