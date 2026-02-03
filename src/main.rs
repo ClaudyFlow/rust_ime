@@ -8,7 +8,11 @@ use std::sync::{Arc, RwLock, Mutex};
 use std::path::PathBuf;
 use std::env;
 use std::collections::HashMap;
-use std::io::BufReader;
+use std::io::{BufReader, Write};
+use signal_hook::consts::signal::*;
+use signal_hook::iterator::Signals;
+use daemonize::Daemonize;
+use std::process::Command;
 
 use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
@@ -73,6 +77,73 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = find_project_root();
     env::set_current_dir(&root)?;
 
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "--install" => {
+                setup_autostart()?;
+                println!("✅ 已设置开机自启。");
+                return Ok(());
+            }
+            "--daemon" => {
+                let stdout = File::create("/tmp/rust-ime.out")?;
+                let stderr = File::create("/tmp/rust-ime.err")?;
+                let daemonize = Daemonize::new()
+                    .working_directory(&root)
+                    .stdout(stdout)
+                    .stderr(stderr);
+                match daemonize.start() {
+                    Ok(_) => println!("✅ 已在后台运行。"),
+                    Err(e) => {
+                        eprintln!("❌ 无法启动后台模式: {}", e);
+                        return Err(e.into());
+                    }
+                }
+            }
+            "--stop" => {
+                let _ = Command::new("pkill").arg("-f").arg("rust-ime").status();
+                println!("✅ 已停止后台进程。");
+                return Ok(());
+            }
+            _ if !args[1].starts_with('-') => {
+                // 原有的命令行即时转换模式
+                let mut tries_map = HashMap::new();
+                if let Ok(entries) = std::fs::read_dir("data") {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            let dir_name = entry.file_name().to_string_lossy().to_string().to_lowercase();
+                            if dir_name == "ngram" || dir_name.contains("user_adapter") { continue; }
+                            let trie_idx = entry.path().join("trie.index");
+                            let trie_dat = entry.path().join("trie.data");
+                            if trie_idx.exists() && trie_dat.exists() {
+                                if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
+                                    tries_map.insert(dir_name.clone(), trie);
+                                }
+                            }
+                        }
+                    }
+                }
+                let input = args[1..].join(" ");
+                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new());
+                p.buffer = input;
+                p.lookup();
+                for (i, cand) in p.candidates.iter().take(10).enumerate() {
+                    println!("  {}. {}", i + 1, cand);
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    // 忽略 SIGHUP，防止终端关闭时程序退出
+    let mut signals = Signals::new(&[SIGHUP])?;
+    std::thread::spawn(move || {
+        for _ in signals.forever() {
+            // 忽略 SIGHUP
+        }
+    });
+
     // 0. 自动检查并增量编译词库
     if let Err(e) = engine::compiler::check_and_compile_all() {
         eprintln!("[Main] 词库自动编译失败: {}", e);
@@ -123,20 +194,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
     processor_obj.apply_config(&conf_guard);
-
-    // --- 命令行即时转换模式 ---
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 && !args[1].starts_with('-') {
-        let input = args[1..].join(" ");
-        println!("[Batch] 输入拼音: {}", input);
-        processor_obj.buffer = input;
-        processor_obj.lookup();
-        println!("[Batch] 转换结果:");
-        for (i, cand) in processor_obj.candidates.iter().take(10).enumerate() {
-            println!("  {}. {}", i + 1, cand);
-        }
-        return Ok(());
-    }
 
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);
@@ -375,4 +432,30 @@ fn find_keyboard_device() -> Result<String, Box<dyn std::error::Error>> {
         }
     }
     Err("未检测到合适的键盘设备。".into())
+}
+
+fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
+    let home = env::var("HOME")?;
+    let autostart_dir = format!("{}/.config/autostart", home);
+    std::fs::create_dir_all(&autostart_dir)?;
+    
+    let mut desktop_path = PathBuf::from(autostart_dir);
+    desktop_path.push("rust-ime.desktop");
+    
+    let current_exe = env::current_exe()?;
+    let exe_path = current_exe.to_str().unwrap();
+    
+    let content = format!(r#"[Desktop Entry]
+Type=Application
+Name=Rust-IME
+Exec={} --daemon
+Icon=input-keyboard
+Comment=Rust Input Method Engine
+Terminal=false
+X-GNOME-Autostart-enabled=true
+"#, exe_path);
+
+    let mut file = File::create(desktop_path)?;
+    file.write_all(content.as_bytes())?;
+    Ok(())
 }
