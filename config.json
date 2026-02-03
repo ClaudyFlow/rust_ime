@@ -41,7 +41,7 @@
     "default_profile": "Chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 50,
-    "enable_anti_typo": true,
+    "enable_anti_typo": false,
     "commit_mode": "single",
     "quick_rimes": [
       {
@@ -93,6 +93,9 @@
     "enable_error_sound": true,
     "auto_commit_unique_en_fuzhuma": true,
     "auto_commit_unique_full_match": true,
+    "enable_prefix_matching": true,
+    "prefix_matching_limit": 20,
+    "enable_abbreviation_matching": true,
     "profile_keys": [
       {
         "key": "c",
