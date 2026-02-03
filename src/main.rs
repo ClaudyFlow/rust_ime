@@ -78,6 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env::set_current_dir(&root)?;
 
     let args: Vec<String> = env::args().collect();
+    let mut should_daemonize = true;
+
     if args.len() > 1 {
         match args[1].as_str() {
             "--install" => {
@@ -85,20 +87,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("✅ 已设置开机自启。");
                 return Ok(());
             }
+            "--foreground" => {
+                should_daemonize = false;
+            }
             "--daemon" => {
-                let stdout = File::create("/tmp/rust-ime.out")?;
-                let stderr = File::create("/tmp/rust-ime.err")?;
-                let daemonize = Daemonize::new()
-                    .working_directory(&root)
-                    .stdout(stdout)
-                    .stderr(stderr);
-                match daemonize.start() {
-                    Ok(_) => println!("✅ 已在后台运行。"),
-                    Err(e) => {
-                        eprintln!("❌ 无法启动后台模式: {}", e);
-                        return Err(e.into());
-                    }
-                }
+                should_daemonize = true;
             }
             "--stop" => {
                 let _ = Command::new("pkill").arg("-f").arg("rust-ime").status();
@@ -133,6 +126,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
             _ => {}
+        }
+    }
+
+    if should_daemonize {
+        let stdout = File::create("/tmp/rust-ime.out")?;
+        let stderr = File::create("/tmp/rust-ime.err")?;
+        let daemonize = Daemonize::new()
+            .working_directory(&root)
+            .stdout(stdout)
+            .stderr(stderr);
+        match daemonize.start() {
+            Ok(_) => println!("✅ 已转入后台运行。"),
+            Err(e) => {
+                eprintln!("❌ 无法启动后台模式: {}", e);
+                return Err(e.into());
+            }
         }
     }
 
@@ -448,7 +457,7 @@ fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
     let content = format!(r#"[Desktop Entry]
 Type=Application
 Name=Rust-IME
-Exec={} --daemon
+Exec={}
 Icon=input-keyboard
 Comment=Rust Input Method Engine
 Terminal=false
