@@ -172,6 +172,8 @@ fn process_dict_entry(path: std::path::PathBuf) -> DictFile {
         if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
             if let Some(obj) = json.as_object() {
                 entry_count = obj.len() as u64;
+            } else if let Some(arr) = json.as_array() {
+                entry_count = arr.len() as u64;
             }
         }
     }
