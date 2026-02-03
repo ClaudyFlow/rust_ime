@@ -48,6 +48,7 @@ impl WebServer {
             .route("/api/dicts", get(list_dicts))
             .route("/api/dicts/compile", post(compile_dicts_handler))
             .route("/api/dicts/reload", post(reload_dicts))
+            .route("/api/dicts/toggle", post(toggle_dict))
             .route("/static/*file", get(static_handler))
             .fallback(index_handler)
             .with_state(state);
@@ -129,35 +130,84 @@ struct DictFile {
     name: String,
     path: String,
     size: u64,
+    entry_count: u64,
+    enabled: bool,
 }
 
 async fn list_dicts() -> Json<Vec<DictFile>> {
     let mut list = Vec::new();
-    if let Ok(entries) = std::fs::read_dir("dicts") {
+    let root = "dicts";
+    if let Ok(entries) = std::fs::read_dir(root) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
-                // 递归扫描子目录
                 if let Ok(sub_entries) = std::fs::read_dir(entry.path()) {
                     for sub_entry in sub_entries.flatten() {
-                        if sub_entry.path().extension().map_or(false, |ext| ext == "json") {
-                            list.push(DictFile {
-                                name: sub_entry.file_name().to_string_lossy().to_string(),
-                                path: sub_entry.path().to_string_lossy().to_string(),
-                                size: sub_entry.metadata().map(|m| m.len()).unwrap_or(0),
-                            });
+                        let path = sub_entry.path();
+                        let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                        if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
+                            list.push(process_dict_entry(path));
                         }
                     }
                 }
-            } else if entry.path().extension().map_or(false, |ext| ext == "json") {
-                list.push(DictFile {
-                    name: entry.file_name().to_string_lossy().to_string(),
-                    path: entry.path().to_string_lossy().to_string(),
-                    size: entry.metadata().map(|m| m.len()).unwrap_or(0),
-                });
+            } else {
+                let path = entry.path();
+                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
+                    list.push(process_dict_entry(path));
+                }
             }
         }
     }
     Json(list)
+}
+
+fn process_dict_entry(path: std::path::PathBuf) -> DictFile {
+    let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let enabled = filename.ends_with(".json");
+    let metadata = path.metadata();
+    let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+    
+    let mut entry_count = 0;
+    if let Ok(f) = std::fs::File::open(&path) {
+        if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
+            if let Some(obj) = json.as_object() {
+                entry_count = obj.len() as u64;
+            }
+        }
+    }
+
+    DictFile {
+        name: filename,
+        path: path.to_string_lossy().to_string(),
+        size,
+        entry_count,
+        enabled,
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ToggleRequest {
+    path: String,
+}
+
+async fn toggle_dict(Json(req): Json<ToggleRequest>) -> StatusCode {
+    let path = std::path::Path::new(&req.path);
+    if !path.exists() { return StatusCode::NOT_FOUND; }
+
+    let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let new_path = if filename.ends_with(".json") {
+        path.with_file_name(format!("{}.disabled", filename))
+    } else if filename.ends_with(".json.disabled") {
+        path.with_file_name(filename.replace(".json.disabled", ".json"))
+    } else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    if std::fs::rename(path, new_path).is_ok() {
+        StatusCode::OK
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    }
 }
 
 async fn compile_dicts_handler() -> StatusCode {

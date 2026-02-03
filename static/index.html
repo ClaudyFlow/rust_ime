@@ -177,7 +177,6 @@
         </nav>
         <div style="margin-top: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
             <button class="btn" style="width: 100%;" onclick="saveAll()">保存更改</button>
-            <button class="btn" style="width: 100%; background: #5856d6;" onclick="compileDicts()">编译词库</button>
             <button class="btn" style="width: 100%; background: #ff3b30;" onclick="resetAll()">重置默认值</button>
         </div>
     </aside>
@@ -421,7 +420,20 @@
         <div id="tab-quickrime" class="tab-content"><h1>长韵母映射</h1><div class="card"><div id="quick-rimes-container"></div><button class="btn" style="width:100%;" onclick="addQuickRime()">+ 添加新映射</button></div></div>
         <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card"><div id="profile-keys-container"></div><button class="btn" style="width:100%;" onclick="addProfileKey()">+ 添加新映射</button></div></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hotkeys-container"></div></div>
-        <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div id="profiles-container"></div></div>
+        <div id="tab-dicts" class="tab-content">
+            <h1>词库管理</h1>
+            <div class="card">
+                <div class="setting-item">
+                    <div class="info">
+                        <div class="title">编译词库</div>
+                        <div class="desc">将 dicts/ 目录下的源文件编译为高效的二进制数据 (data/)</div>
+                    </div>
+                    <button class="btn" style="background: #5856d6;" onclick="compileDicts()">立即编译</button>
+                </div>
+            </div>
+            <h2>检测到的源词库 (dicts/)</h2>
+            <div id="dicts-container"></div>
+        </div>
     </main>
 
     <div id="toast" class="status-toast">已保存并应用</div>
@@ -517,9 +529,63 @@
                 hc.innerHTML += `<div class="setting-item"><div class="info"><div class="title">${val.description}</div></div><input type="text" class="hotkey-input" data-id="${key}" value="${val.key}"></div>`;
             }
 
-            // Profiles
-            const pc = document.getElementById('profiles-container');
-            pc.innerHTML = config.files.profiles.map((p, i) => `<div class="card"><div style="font-weight:700; font-size:18px; margin-bottom:10px;">${p.name}</div><div style="color:var(--apple-secondary); font-size:14px; margin-bottom:15px;">${p.description}</div><div style="font-size:12px; background:rgba(0,0,0,0.03); padding:10px; border-radius:8px;">${p.dicts.map(d => `<div style="margin-bottom:4px;">• ${d}</div>`).join('')}</div></div>`).join('');
+            // Dicts Management (Group by folder)
+            const dictGroups = {};
+            dicts.forEach(d => {
+                // Extract parent folder name from path (e.g., "dicts/chinese/chars.json" -> "chinese")
+                const parts = d.path.split(/[/\\]/);
+                let group = "root";
+                if (parts.length >= 2) {
+                    // Check if it's inside dicts/
+                    const dictsIdx = parts.indexOf("dicts");
+                    if (dictsIdx !== -1 && dictsIdx + 1 < parts.length - 1) {
+                         group = parts[dictsIdx + 1];
+                    }
+                }
+                if (!dictGroups[group]) dictGroups[group] = [];
+                dictGroups[group].push(d);
+            });
+
+            const dc = document.getElementById('dicts-container');
+            dc.innerHTML = Object.entries(dictGroups).map(([group, files]) => `
+                <div class="card">
+                    <div style="font-weight:700; font-size:18px; margin-bottom:10px; text-transform: capitalize; display: flex; justify-content: space-between; align-items: center;">
+                        <span>${group}</span>
+                        <span style="font-size: 12px; color: var(--apple-secondary); font-weight: 400;">
+                            共 ${files.length} 个文件, ${files.reduce((acc, f) => acc + f.entry_count, 0)} 个词条
+                        </span>
+                    </div>
+                    <div style="font-size:12px; background:rgba(0,0,0,0.03); padding:10px; border-radius:8px;">
+                        ${files.map(f => `
+                            <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom:8px; border-bottom:1px dashed rgba(0,0,0,0.1); padding-bottom:6px; ${f.enabled ? '' : 'opacity: 0.5;'}">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 13px; color: ${f.enabled ? 'var(--apple-text)' : 'var(--apple-secondary)'}">${f.name.replace('.disabled', '')}</div>
+                                    <div style="font-size: 11px; color: var(--apple-secondary);">
+                                        ${f.entry_count.toLocaleString()} 词条 | ${(f.size / 1024).toFixed(1)} KB
+                                    </div>
+                                </div>
+                                <label class="switch" style="transform: scale(0.7); margin-right: -8px;">
+                                    <input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="toggleDict('${f.path.replace(/\\/g, '/')}')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function toggleDict(path) {
+            const r = await fetch('/api/dicts/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+            if (r.ok) {
+                load(); // Reload the list
+            } else {
+                alert('操作失败');
+            }
         }
 
         async function saveAll() {
