@@ -41,7 +41,7 @@
     "default_profile": "Chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 50,
-    "enable_anti_typo": true,
+    "enable_anti_typo": false,
     "commit_mode": "single",
     "quick_rimes": [
       {

@@ -63,6 +63,8 @@ pub struct Processor {
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub show_en_hint: bool,
+    pub auto_commit_unique_en_fuzhuma: bool,
+    pub auto_commit_unique_full_match: bool,
     pub page_flipping_style: String,
 }
 
@@ -133,6 +135,8 @@ impl Processor {
             page_size: 9,
             show_tone_hint: true,
             show_en_hint: true,
+            auto_commit_unique_en_fuzhuma: false,
+            auto_commit_unique_full_match: false,
             page_flipping_style: "arrow".to_string(),
         }
     }
@@ -147,6 +151,8 @@ impl Processor {
         self.show_en_hint = conf.appearance.show_en_hint;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
+        self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
+        self.auto_commit_unique_full_match = conf.input.auto_commit_unique_full_match;
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         if let Some(style) = conf.input.page_flipping_keys.first() {
             self.page_flipping_style = style.clone();
@@ -180,6 +186,9 @@ impl Processor {
         }
         self.preview_selected_candidate = false;
         self.lookup();
+        if let Some(act) = self.check_auto_commit() {
+            return act;
+        }
         self.update_phantom_action()
     }
 
@@ -331,6 +340,9 @@ impl Processor {
                      self.buffer.push_str(&zh_punc);
                      self.preview_selected_candidate = false;
                      self.lookup();
+                     if let Some(act) = self.check_auto_commit() {
+                         return act;
+                     }
                      self.update_phantom_action()
                 }
             }
@@ -344,6 +356,9 @@ impl Processor {
                      self.buffer.push_str(&zh_punc);
                      self.preview_selected_candidate = false;
                      self.lookup();
+                     if let Some(act) = self.check_auto_commit() {
+                         return act;
+                     }
                      self.update_phantom_action()
                 }
             }
@@ -425,6 +440,9 @@ impl Processor {
                 // 将数字作为普通字符加入缓冲区，供 parse_buffer 处理 (实现类似 nihao2 的选词效果)
                 self.buffer.push_str(&digit.to_string());
                 self.lookup();
+                if let Some(act) = self.check_auto_commit() {
+                    return act;
+                }
                 self.update_phantom_action()
             }
             _ if is_letter(key) => {
@@ -453,6 +471,9 @@ impl Processor {
                     self.buffer.push(c); 
                     self.preview_selected_candidate = false;
                     self.lookup();
+                    if let Some(act) = self.check_auto_commit() {
+                        return act;
+                    }
                     self.update_phantom_action()
                 } else { Action::Consume }
             }
@@ -463,6 +484,9 @@ impl Processor {
                 self.buffer.push_str(&zh_punc);
                 self.preview_selected_candidate = false;
                 self.lookup();
+                if let Some(act) = self.check_auto_commit() {
+                    return act;
+                }
                 self.update_phantom_action()
             }
             _ => Action::PassThrough,
@@ -650,6 +674,45 @@ impl Processor {
         self.current_profile = profiles[next_idx].clone();
         self.reset();
         self.current_profile.clone()
+    }
+
+    fn check_auto_commit(&mut self) -> Option<Action> {
+        if self.commit_mode != "single" { return None; }
+        if self.candidates.len() != 1 { return None; }
+        if self.state == ImeState::NoMatch { return None; }
+
+        let buffer_normalized = strip_tones(&self.buffer);
+        let has_fuzhuma = buffer_normalized.chars().any(|c| c.is_ascii_uppercase());
+        
+        // 1. English with fuzhuma (Uppercase)
+        if self.auto_commit_unique_en_fuzhuma && self.current_profile.to_lowercase() == "english" && has_fuzhuma {
+            let cand = self.candidates[0].clone();
+            return Some(self.commit_candidate(cand));
+        }
+
+        // 2. Full match unique
+        if self.auto_commit_unique_full_match {
+            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+            
+            if is_precise_mode {
+                let cand = self.candidates[0].clone();
+                return Some(self.commit_candidate(cand));
+            } else {
+                let dict_key = self.current_profile.to_lowercase();
+                if let Some(d) = self.tries.get(&dict_key) {
+                    let full_pinyin = buffer_normalized.to_lowercase();
+                    if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
+                        // Ensure it's truly unique: only one exact match AND we only have one candidate in total
+                        if exact_matches.len() == 1 && self.candidates.len() == 1 {
+                             let cand = self.candidates[0].clone();
+                             return Some(self.commit_candidate(cand));
+                        }
+                    }
+                }
+            }
+        }
+        
+        None
     }
 }
 

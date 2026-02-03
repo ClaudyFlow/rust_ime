@@ -151,6 +151,10 @@ pub struct Input {
     pub enable_quick_rime: bool,
     #[serde(default = "default_enable_error_sound")]
     pub enable_error_sound: bool,
+    #[serde(default = "default_auto_commit_unique_en_fuzhuma")]
+    pub auto_commit_unique_en_fuzhuma: bool,
+    #[serde(default = "default_auto_commit_unique_full_match")]
+    pub auto_commit_unique_full_match: bool,
     #[serde(default = "default_profile_keys")]
     pub profile_keys: Vec<ProfileKey>,
     #[serde(default = "default_page_flipping_keys")]
@@ -182,6 +186,8 @@ impl Default for Input {
             quick_rimes: default_quick_rimes(),
             enable_quick_rime: true,
             enable_error_sound: true,
+            auto_commit_unique_en_fuzhuma: false,
+            auto_commit_unique_full_match: false,
             profile_keys: default_profile_keys(),
             page_flipping_keys: default_page_flipping_keys(),
         }
@@ -191,6 +197,9 @@ impl Default for Input {
 fn default_page_flipping_keys() -> Vec<String> {
     vec!["arrow".to_string()] // Options: "arrow" (default), "minus_equal"
 }
+
+fn default_auto_commit_unique_en_fuzhuma() -> bool { false }
+fn default_auto_commit_unique_full_match() -> bool { false }
 
 fn default_profile_keys() -> Vec<ProfileKey> {
     vec![
