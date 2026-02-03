@@ -108,6 +108,9 @@
         "key": "j",
         "profile": "japanese"
       }
+    ],
+    "page_flipping_keys": [
+      "arrow"
     ]
   },
   "hotkeys": {

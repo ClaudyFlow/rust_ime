@@ -223,6 +223,16 @@
                 </div>
                 <div class="setting-item">
                     <div class="info">
+                        <div class="title">翻页按键习惯</div>
+                        <div class="desc">选择翻页使用的按键 (方向键 或 -=)</div>
+                    </div>
+                    <select id="page_flipping_keys">
+                        <option value="arrow">方向键 (Up/Down)</option>
+                        <option value="minus_equal">加减号 (-/=)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <div class="info">
                         <div class="title">防呆模式</div>
                         <div class="desc">禁止输入词库中不存在的拼音组合</div>
                     </div>
@@ -447,6 +457,7 @@
             document.getElementById('commit_mode').value = config.input.commit_mode;
             document.getElementById('page_size').value = config.appearance.page_size;
             document.getElementById('paste_method').value = config.input.paste_method;
+            document.getElementById('page_flipping_keys').value = (config.input.page_flipping_keys && config.input.page_flipping_keys.length > 0) ? config.input.page_flipping_keys[0] : "arrow";
             
             const ps = document.getElementById('default_profile');
             ps.innerHTML = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
@@ -516,6 +527,7 @@
             config.input.paste_method = document.getElementById('paste_method').value;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
             config.input.enable_quick_rime = document.getElementById('enable_quick_rime').checked;
+            config.input.page_flipping_keys = [document.getElementById('page_flipping_keys').value];
 
             config.appearance.page_size = parseInt(document.getElementById('page_size').value);
             config.appearance.show_candidates = document.getElementById('show_candidates').checked;

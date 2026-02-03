@@ -153,6 +153,8 @@ pub struct Input {
     pub enable_error_sound: bool,
     #[serde(default = "default_profile_keys")]
     pub profile_keys: Vec<ProfileKey>,
+    #[serde(default = "default_page_flipping_keys")]
+    pub page_flipping_keys: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -181,8 +183,13 @@ impl Default for Input {
             enable_quick_rime: true,
             enable_error_sound: true,
             profile_keys: default_profile_keys(),
+            page_flipping_keys: default_page_flipping_keys(),
         }
     }
+}
+
+fn default_page_flipping_keys() -> Vec<String> {
+    vec!["arrow".to_string()] // Options: "arrow" (default), "minus_equal"
 }
 
 fn default_profile_keys() -> Vec<ProfileKey> {

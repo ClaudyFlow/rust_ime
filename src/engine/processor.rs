@@ -63,6 +63,7 @@ pub struct Processor {
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub show_en_hint: bool,
+    pub page_flipping_style: String,
 }
 
 impl Processor {
@@ -132,6 +133,7 @@ impl Processor {
             page_size: 9,
             show_tone_hint: true,
             show_en_hint: true,
+            page_flipping_style: "arrow".to_string(),
         }
     }
 
@@ -146,6 +148,9 @@ impl Processor {
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
+        if let Some(style) = conf.input.page_flipping_keys.first() {
+            self.page_flipping_style = style.clone();
+        }
         
         let new_profile = conf.input.default_profile.to_lowercase();
         if !new_profile.is_empty() && self.tries.contains_key(&new_profile) {
@@ -199,7 +204,13 @@ impl Processor {
             if key == Key::KEY_GRAVE { return Action::Consume; }
             if self.switch_mode && (key == Key::KEY_H || key == Key::KEY_L || key == Key::KEY_D || key == Key::KEY_C || key == Key::KEY_E || key == Key::KEY_R || key == Key::KEY_J) { return Action::Consume; }
             // 允许 TAB, LEFT, RIGHT 在 Composing 状态下处理，这里只拦截明确不需要的
-            if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_ESC | Key::KEY_MINUS | Key::KEY_EQUAL) { 
+            let is_flipping_key = if self.page_flipping_style == "minus_equal" {
+                matches!(key, Key::KEY_MINUS | Key::KEY_EQUAL)
+            } else {
+                matches!(key, Key::KEY_UP | Key::KEY_DOWN)
+            };
+            
+            if is_letter(key) || is_digit(key) || get_punctuation_key(key, shift_pressed).is_some() || is_flipping_key || matches!(key, Key::KEY_BACKSPACE | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_ESC | Key::KEY_PAGEUP | Key::KEY_PAGEDOWN | Key::KEY_HOME | Key::KEY_END) { 
                 return Action::Consume; 
             }
             return Action::PassThrough;
@@ -300,8 +311,52 @@ impl Processor {
                 } else { Action::PassThrough }
             }
             Key::KEY_TAB => Action::PassThrough, // Tab 键交由 Host 处理（作为长韵母修饰键或原样发送）
-            Key::KEY_MINUS => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            Key::KEY_EQUAL => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            Key::KEY_UP => { 
+                if self.page_flipping_style != "minus_equal" {
+                     self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume 
+                } else { Action::PassThrough }
+            }
+            Key::KEY_DOWN => { 
+                if self.page_flipping_style != "minus_equal" {
+                    if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume 
+                } else { Action::PassThrough }
+            }
+            Key::KEY_MINUS => {
+                if self.page_flipping_style == "minus_equal" {
+                    self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume
+                } else {
+                     // Default punctuation handling
+                     let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
+                     let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
+                     self.buffer.push_str(&zh_punc);
+                     self.preview_selected_candidate = false;
+                     self.lookup();
+                     self.update_phantom_action()
+                }
+            }
+            Key::KEY_EQUAL => {
+                if self.page_flipping_style == "minus_equal" {
+                    if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume
+                } else {
+                     // Default punctuation handling
+                     let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
+                     let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
+                     self.buffer.push_str(&zh_punc);
+                     self.preview_selected_candidate = false;
+                     self.lookup();
+                     self.update_phantom_action()
+                }
+            }
+            Key::KEY_PAGEUP => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
+            Key::KEY_PAGEDOWN => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            Key::KEY_HOME => { self.selected = 0; self.page = 0; Action::Consume }
+            Key::KEY_END => {
+                if !self.candidates.is_empty() {
+                    let last_on_page = (self.page + self.page_size - 1).min(self.candidates.len() - 1);
+                    self.selected = last_on_page;
+                }
+                Action::Consume
+            }
             Key::KEY_SPACE => { 
                 if self.preview_selected_candidate {
                      if let Some(word) = self.candidates.get(self.selected) {
@@ -528,7 +583,7 @@ impl Processor {
                 }
 
                 // --- 2.2 前缀模糊搜索 (非中文方案使用) ---
-                if dict_key != "chinese" && full_pinyin.len() >= 3 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                if dict_key != "chinese" && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
                     let prefix_matches = d.search_bfs(&full_pinyin, 10);
                     for (word, hint) in prefix_matches {
                         if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
@@ -652,6 +707,13 @@ mod tests {
             preview_selected_candidate: false,
             enable_anti_typo: true,
             commit_mode: "double".to_string(),
+            switch_mode: false,
+            cursor_pos: 0,
+            profile_keys: Vec::new(),
+            page_size: 5,
+            show_tone_hint: true,
+            show_en_hint: true,
+            page_flipping_style: "arrow".to_string(),
         }
     }
 
@@ -730,5 +792,107 @@ mod tests {
             let hint = &p.candidate_hints[0];
             assert!(hint.to_lowercase().split_whitespace().any(|w| w.starts_with('c')));
         }
+    }
+
+    #[test]
+    fn test_page_flipping_and_minus_equal() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+
+        // 1. Verify Page Flipping (UP/DOWN)
+        // Ensure we have enough candidates for multiple pages
+        p.candidates = (0..20).map(|i| format!("cand{}", i)).collect();
+        p.page_size = 5;
+        p.page = 0;
+        p.selected = 0;
+        p.state = ImeState::Composing;
+        p.buffer = "test".to_string();
+
+        // Page Down -> Page 1 (index 5)
+        p.handle_key(Key::KEY_DOWN, true, false);
+        assert_eq!(p.page, 5);
+        assert_eq!(p.selected, 5);
+
+        // Page Down -> Page 2 (index 10)
+        p.handle_key(Key::KEY_DOWN, true, false);
+        assert_eq!(p.page, 10);
+
+        // Page Up -> Page 1 (index 5)
+        p.handle_key(Key::KEY_UP, true, false);
+        assert_eq!(p.page, 5);
+
+        // PageUp/PageDown (explicit keys)
+        p.handle_key(Key::KEY_PAGEDOWN, true, false);
+        assert_eq!(p.page, 10);
+        p.handle_key(Key::KEY_PAGEUP, true, false);
+        assert_eq!(p.page, 5);
+
+        // Home -> Select first (index 0)
+        p.handle_key(Key::KEY_HOME, true, false);
+        assert_eq!(p.selected, 0);
+        assert_eq!(p.page, 0);
+
+        // End -> Select last on current page (index 4 since page_size is 5)
+        p.handle_key(Key::KEY_END, true, false);
+        assert_eq!(p.selected, 4);
+
+        // 2. Verify Minus/Equal as characters
+        p.reset();
+        p.buffer = "test".to_string();
+        p.state = ImeState::Composing;
+
+        // Minus should be added to buffer
+        p.handle_key(Key::KEY_MINUS, true, false);
+        assert!(p.buffer.ends_with('-'), "Buffer should contain minus: {}", p.buffer);
+
+        // Equal should be added to buffer
+        p.handle_key(Key::KEY_EQUAL, true, false);
+        assert!(p.buffer.ends_with('='), "Buffer should contain equal: {}", p.buffer);
+    }
+
+    #[test]
+    fn test_page_flipping_config() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        p.candidates = (0..20).map(|i| format!("cand{}", i)).collect();
+        p.page_size = 5;
+        p.state = ImeState::Composing;
+        p.buffer = "test".to_string();
+
+        // 1. Default Style (Arrow)
+        p.page_flipping_style = "arrow".to_string();
+        
+        // Arrow Down -> Page Flip
+        p.page = 0;
+        p.handle_key(Key::KEY_DOWN, true, false);
+        assert_eq!(p.page, 5);
+        
+        // Minus -> Input
+        p.reset(); p.buffer = "test".to_string(); p.state = ImeState::Composing;
+        p.handle_key(Key::KEY_MINUS, true, false);
+        assert!(p.buffer.ends_with('-'));
+
+        // 2. Switch to Minus/Equal Style
+        p.page_flipping_style = "minus_equal".to_string();
+        p.candidates = (0..20).map(|i| format!("cand{}", i)).collect(); // Restore candidates
+        
+        // Minus -> Page Flip (Previous) - Reset page first
+        p.page = 5; 
+        p.handle_key(Key::KEY_MINUS, true, false);
+        assert_eq!(p.page, 0);
+
+        // Equal -> Page Flip (Next)
+        p.page = 0;
+        p.handle_key(Key::KEY_EQUAL, true, false);
+        assert_eq!(p.page, 5);
+
+        // Arrow Down -> Should be PassThrough (not consumed for flipping) 
+        // Note: Our logic returns PassThrough for non-flipping keys in handle_composing?
+        // Wait, handle_key consumes it? Let's check handle_key logic.
+        // In handle_key: if style==minus_equal, matches!(key, UP|DOWN) is false, so it goes to PassThrough (unless matched by other conditions)
+        // Actually, arrows are usually strictly navigation. If not consumed by IME, they go to host.
+        // Let's verify return action.
+        let action = p.handle_key(Key::KEY_DOWN, true, false);
+        assert_eq!(action, Action::PassThrough);
     }
 }
