@@ -517,8 +517,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     window_c.show();
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
-                    sentence_label_c.set_text(&sentence);
-                    if sentence.is_empty() { sentence_label_c.set_opacity(0.0); } else { sentence_label_c.set_opacity(1.0); }
+                    // sentence_label_c.set_text(&sentence);
+                    // if sentence.is_empty() { sentence_label_c.set_opacity(0.0); } else { sentence_label_c.set_opacity(1.0); }
+                    sentence_label_c.hide(); // Explicitly hide it
 
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
                     let start = (selected / current_config.appearance.page_size) * current_config.appearance.page_size;
