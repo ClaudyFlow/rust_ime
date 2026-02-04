@@ -314,10 +314,28 @@ impl Processor {
             }
             Key::KEY_LEFT => { if !self.candidates.is_empty() { self.preview_selected_candidate = true; if self.selected > 0 { self.selected -= 1; } self.page = (self.selected / self.page_size) * self.page_size; self.update_phantom_action() } else { Action::PassThrough } }
             Key::KEY_RIGHT => { if !self.candidates.is_empty() { self.preview_selected_candidate = true; if self.selected + 1 < self.candidates.len() { self.selected += 1; } self.page = (self.selected / self.page_size) * self.page_size; self.update_phantom_action() } else { Action::PassThrough } }
+            Key::KEY_MINUS => {
+                if !self.candidates.is_empty() {
+                    self.page = self.page.saturating_sub(self.page_size);
+                    self.selected = self.page;
+                    Action::Consume
+                } else {
+                    self.handle_punctuation(key, shift_pressed)
+                }
+            }
+            Key::KEY_EQUAL => {
+                if !self.candidates.is_empty() {
+                    if self.page + self.page_size < self.candidates.len() {
+                        self.page += self.page_size;
+                        self.selected = self.page;
+                    }
+                    Action::Consume
+                } else {
+                    self.handle_punctuation(key, shift_pressed)
+                }
+            }
             Key::KEY_UP if self.page_flipping_style != "minus_equal" => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             Key::KEY_DOWN if self.page_flipping_style != "minus_equal" => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            Key::KEY_MINUS if self.page_flipping_style == "minus_equal" => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            Key::KEY_EQUAL if self.page_flipping_style == "minus_equal" => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
             Key::KEY_PAGEUP => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             Key::KEY_PAGEDOWN => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
             Key::KEY_HOME => { if shift_pressed { self.selected = 0; self.page = 0; } else { self.selected = self.page; } Action::Consume }
@@ -384,16 +402,20 @@ impl Processor {
                 } else { Action::Consume }
             }
             _ if get_punctuation_key(key, shift_pressed).is_some() => {
-                let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
-                let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
-                let mut commit_text = if !self.joined_sentence.is_empty() { self.joined_sentence.clone() } else if !self.candidates.is_empty() { self.candidates[0].clone() } else { self.buffer.clone() };
-                commit_text.push_str(&zh_punc);
-                let del_len = self.phantom_text.chars().count();
-                self.reset();
-                Action::DeleteAndEmit { delete: del_len, insert: commit_text }
+                self.handle_punctuation(key, shift_pressed)
             }
             _ => Action::PassThrough,
         }
+    }
+
+    fn handle_punctuation(&mut self, key: Key, shift_pressed: bool) -> Action {
+        let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
+        let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
+        let mut commit_text = if !self.joined_sentence.is_empty() { self.joined_sentence.clone() } else if !self.candidates.is_empty() { self.candidates[0].clone() } else { self.buffer.clone() };
+        commit_text.push_str(&zh_punc);
+        let del_len = self.phantom_text.chars().count();
+        self.reset();
+        Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
 
     fn commit_candidate(&mut self, mut cand: String) -> Action {
