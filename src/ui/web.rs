@@ -49,6 +49,8 @@ impl WebServer {
             .route("/api/dicts/compile", post(compile_dicts_handler))
             .route("/api/dicts/reload", post(reload_dicts))
             .route("/api/dicts/toggle", post(toggle_dict))
+            .route("/api/dict/search", get(search_dict))
+            .route("/api/dict/update", post(update_dict_entry))
             .route("/static/*file", get(static_handler))
             .fallback(index_handler)
             .with_state(state);
@@ -240,4 +242,96 @@ async fn compile_dicts_handler() -> StatusCode {
 async fn reload_dicts(State((_, _, tray_tx)): State<WebState>) -> StatusCode {
     let _ = tray_tx.send(crate::ui::tray::TrayEvent::ReloadConfig);
     StatusCode::OK
+}
+
+#[derive(serde::Deserialize)]
+struct SearchQuery {
+    q: String,
+}
+
+#[derive(Serialize)]
+struct SearchResult {
+    pinyin: String,
+    word: String,
+    hint: String,
+    file: String,
+}
+
+async fn search_dict(axum::extract::Query(query): axum::extract::Query<SearchQuery>) -> Json<Vec<SearchResult>> {
+    let mut results = Vec::new();
+    let q = query.q.to_lowercase();
+    
+    // 遍历 dicts 目录下所有有效的 json
+    let root = "dicts";
+    let entries = walkdir::WalkDir::new(root);
+    for entry in entries.into_iter().filter_map(|e| e.ok()) {
+        if entry.path().extension().map_or(false, |ext| ext == "json") {
+            let path_str = entry.path().to_string_lossy().to_string();
+            if let Ok(f) = std::fs::File::open(entry.path()) {
+                if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
+                    if let Some(obj) = json.as_object() {
+                        for (pinyin, val) in obj {
+                            if let Some(arr) = val.as_array() {
+                                for v in arr {
+                                    let word = v.get("char").and_then(|c| c.as_str()).unwrap_or("");
+                                    let hint = v.get("en").and_then(|e| e.as_str()).unwrap_or("");
+                                    if pinyin.to_lowercase().contains(&q) || word.contains(&q) {
+                                        results.push(SearchResult {
+                                            pinyin: pinyin.clone(),
+                                            word: word.to_string(),
+                                            hint: hint.to_string(),
+                                            file: path_str.clone(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if results.len() > 100 { break; } // 限制结果数量
+    }
+    Json(results)
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateEntryRequest {
+    pinyin: String,
+    word: String,
+    new_hint: String,
+    file: String,
+}
+
+async fn update_dict_entry(Json(req): Json<UpdateEntryRequest>) -> StatusCode {
+    let path = std::path::Path::new(&req.file);
+    if !path.exists() { return StatusCode::NOT_FOUND; }
+
+    let mut data: serde_json::Value = match std::fs::File::open(path) {
+        Ok(f) => serde_json::from_reader(std::io::BufReader::new(f)).unwrap_or(serde_json::Value::Null),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+
+    let mut success = false;
+    if let Some(obj) = data.as_object_mut() {
+        if let Some(entries) = obj.get_mut(&req.pinyin).and_then(|v| v.as_array_mut()) {
+            for entry in entries {
+                if entry.get("char").and_then(|c| c.as_str()) == Some(&req.word) {
+                    entry["en"] = serde_json::Value::String(req.new_hint.clone());
+                    success = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if success {
+        if let Ok(f) = std::fs::File::create(path) {
+            if serde_json::to_writer_pretty(f, &data).is_ok() {
+                return StatusCode::OK;
+            }
+        }
+    }
+
+    StatusCode::INTERNAL_SERVER_ERROR
 }
