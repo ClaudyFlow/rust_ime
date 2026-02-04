@@ -44,7 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fs::create_dir_all(&out_dir)?;
                 
                 let trie_idx = format!("{}/trie.index", out_dir);
-                let local_ngram_src = format!("{}/n-gram-model", src_path);
                 
                 // 3. 检查是否需要编译 Trie
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
@@ -52,21 +51,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english, &syllables, &freq_map)?;
                 } else {
                     println!("[Compiler] Skipping Trie for: {} (No changes detected)", dir_name);
-                }
-                
-                // 4. 检查并编译 N-gram
-                let ngram_idx = format!("{}/ngram.index", out_dir);
-                if Path::new(&local_ngram_src).exists() {
-                    if should_compile(Path::new(&local_ngram_src), Path::new(&ngram_idx)) {
-                        println!("[Compiler] Compiling local N-gram model for: {}", dir_name);
-                        compile_ngram_for_path(&local_ngram_src, &out_dir)?;
-                    }
-                } else if dir_name == "chinese" && Path::new("n-gram-model").exists() {
-                    if should_compile(Path::new("n-gram-model"), Path::new(&ngram_idx)) {
-                        compile_ngram_for_path("n-gram-model", &out_dir)?;
-                    } else {
-                        println!("[Compiler] Skipping Chinese N-gram (No changes detected)");
-                    }
                 }
             }
         }
@@ -427,55 +411,4 @@ fn encode_block(pairs: &[(String, String)]) -> Vec<u8> {
         block.extend_from_slice(h_bytes);
     }
     block
-}
-
-
-fn compile_ngram_for_path(src_dir: &str, out_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut transitions: BTreeMap<String, HashMap<String, u32>> = BTreeMap::new();
-    let mut unigrams: BTreeMap<String, u32> = BTreeMap::new();
-    for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
-        if entry.path().extension().map_or(false, |ext| ext == "json") {
-            let file = File::open(entry.path())?;
-            let json: Value = serde_json::from_reader(file)?;
-            if let Some(obj) = json.as_object() {
-                if let Some(trans) = obj.get("transitions").and_then(|t| t.as_object()) {
-                    for (ctx, next_map_val) in trans {
-                        if let Some(next_map) = next_map_val.as_object() {
-                            let entry = transitions.entry(ctx.clone()).or_default();
-                            for (token, score) in next_map { if let Some(s) = score.as_u64() { *entry.entry(token.clone()).or_default() += s as u32; } }
-                        }
-                    }
-                }
-                if let Some(unis) = obj.get("unigrams").and_then(|u| u.as_object()) {
-                    for (token, score) in unis { if let Some(s) = score.as_u64() { *unigrams.entry(token.clone()).or_default() += s as u32; } }
-                }
-            }
-        }
-    }
-    
-    if transitions.is_empty() && unigrams.is_empty() { return Ok(()); }
-
-    let mut data_writer = BufWriter::new(File::create(format!("{}/ngram.data", out_dir))?);
-    let mut index_builder = MapBuilder::new(File::create(format!("{}/ngram.index", out_dir))?)?;
-    let mut unigram_builder = MapBuilder::new(File::create(format!("{}/ngram.unigram", out_dir))?)?;
-    let mut current_offset = 0u64;
-    for (ctx, next_tokens) in transitions {
-        index_builder.insert(&ctx, current_offset)?;
-        let mut block = Vec::new();
-        block.extend_from_slice(&(next_tokens.len() as u32).to_le_bytes());
-        for (token, score) in next_tokens {
-            let bytes = token.as_bytes();
-            block.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(bytes);
-            block.extend_from_slice(&score.to_le_bytes());
-        }
-        data_writer.write_all(&block)?;
-        current_offset += block.len() as u64;
-    }
-    index_builder.finish()?;
-    data_writer.flush()?;
-    for (token, score) in unigrams { unigram_builder.insert(&token, score as u64)?; }
-    unigram_builder.finish()?;
-    println!("[Compiler] N-gram compiled to: {}", out_dir);
-    Ok(())
 }
