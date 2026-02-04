@@ -375,11 +375,24 @@ impl Processor {
             }
             Key::KEY_PAGEUP => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             Key::KEY_PAGEDOWN => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            Key::KEY_HOME => { self.selected = 0; self.page = 0; Action::Consume }
+            Key::KEY_HOME => {
+                if shift_pressed {
+                    self.selected = 0;
+                    self.page = 0;
+                } else {
+                    self.selected = self.page;
+                }
+                Action::Consume
+            }
             Key::KEY_END => {
                 if !self.candidates.is_empty() {
-                    let last_on_page = (self.page + self.page_size - 1).min(self.candidates.len() - 1);
-                    self.selected = last_on_page;
+                    if shift_pressed {
+                        self.selected = self.candidates.len() - 1;
+                        self.page = (self.selected / self.page_size) * self.page_size;
+                    } else {
+                        let last_on_page = (self.page + self.page_size - 1).min(self.candidates.len() - 1);
+                        self.selected = last_on_page;
+                    }
                 }
                 Action::Consume
             }
@@ -962,14 +975,24 @@ mod tests {
         p.handle_key(Key::KEY_PAGEUP, true, false);
         assert_eq!(p.page, 5);
 
-        // Home -> Select first (index 0)
+        // 1.1 Home -> Page Start (index 5)
+        p.selected = 7;
         p.handle_key(Key::KEY_HOME, true, false);
+        assert_eq!(p.selected, 5);
+
+        // 1.2 Shift + Home -> Absolute Start (index 0)
+        p.handle_key(Key::KEY_HOME, true, true);
         assert_eq!(p.selected, 0);
         assert_eq!(p.page, 0);
 
-        // End -> Select last on current page (index 4 since page_size is 5)
+        // 1.3 End -> Page End (index 4 on page 0)
         p.handle_key(Key::KEY_END, true, false);
         assert_eq!(p.selected, 4);
+
+        // 1.4 Shift + End -> Absolute End (index 19)
+        p.handle_key(Key::KEY_END, true, true);
+        assert_eq!(p.selected, 19);
+        assert_eq!(p.page, 15);
 
         // 2. Verify Minus/Equal as characters
         p.reset();
