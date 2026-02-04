@@ -252,11 +252,20 @@ impl Processor {
                         }
                     }
 
-                    if let Some(p) = target_profile {
-                        self.active_profiles = vec![p.clone()];
-                        self.lookup();
-                        self.switch_mode = false;
-                        return Action::Notify("输入方案".into(), format!("已切换至: {}", p));
+                    if let Some(p_str) = target_profile {
+                        // 支持逗号分隔的多个方案名，实现混输切换
+                        let profiles: Vec<String> = p_str.split(',')
+                            .map(|s| s.trim().to_lowercase())
+                            .filter(|s| !s.is_empty() && self.tries.contains_key(s))
+                            .collect();
+                        
+                        if !profiles.is_empty() {
+                            self.active_profiles = profiles;
+                            let display = self.get_current_profile_display();
+                            self.lookup();
+                            self.switch_mode = false;
+                            return Action::Notify("输入方案".into(), format!("已切换至: {}", display));
+                        }
                     }
                 }
                 _ => {}
