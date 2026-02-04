@@ -293,10 +293,7 @@ impl Processor {
         } else if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
             if let Some(zh_puncs) = self.punctuation.get(punc_key) { 
                 if let Some(first) = zh_puncs.first() {
-                    self.buffer.push_str(first);
-                    self.state = ImeState::Composing;
-                    self.lookup();
-                    return self.update_phantom_action();
+                    return Action::Emit(first.clone());
                 }
             }
             Action::PassThrough
@@ -507,13 +504,18 @@ impl Processor {
                 let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
                 let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
                 
-                self.buffer.push_str(&zh_punc);
-                self.preview_selected_candidate = false;
-                self.lookup();
-                if let Some(act) = self.check_auto_commit() {
-                    return act;
-                }
-                self.update_phantom_action()
+                // 修正：在 Composing 状态下，按下标点应先上屏当前首选词，再追加标点
+                let mut commit_text = if !self.joined_sentence.is_empty() {
+                    self.joined_sentence.clone()
+                } else if !self.candidates.is_empty() {
+                    self.candidates[0].clone()
+                } else {
+                    self.buffer.clone()
+                };
+                commit_text.push_str(&zh_punc);
+                let del_len = self.phantom_text.chars().count();
+                self.reset();
+                Action::DeleteAndEmit { delete: del_len, insert: commit_text }
             }
             _ => Action::PassThrough,
         }
@@ -594,7 +596,8 @@ impl Processor {
             matches.retain(|(_, hint)| {
                 let hint_lower = hint.to_lowercase();
                 if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                    hint_lower.split_whitespace().any(|word| word.starts_with(&code_lower))
+                    // 仅匹配 Hint 中第一个单词的开头，避免误伤
+                    hint_lower.split_whitespace().next().map_or(false, |first| first.starts_with(&code_lower))
                 } else {
                     hint_lower.contains(&code_lower)
                 }
