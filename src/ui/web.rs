@@ -175,18 +175,32 @@ async fn list_dicts() -> Json<Vec<DictFile>> {
 
 fn process_dict_entry(path: std::path::PathBuf) -> DictFile {
     let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    let enabled = filename.ends_with(".json");
+    let is_yaml = filename.contains(".yaml");
+    let enabled = !filename.contains(".disabled");
     let metadata = path.metadata();
     let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
     
     let mut entry_count = 0;
     if let Ok(f) = std::fs::File::open(&path) {
-        if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
-            if let Some(obj) = json.as_object() {
-                for val in obj.values() {
-                    if let Some(arr) = val.as_array() { entry_count += arr.len() as u64; } else { entry_count += 1; }
-                }
-            } else if let Some(arr) = json.as_array() { entry_count = arr.len() as u64; }
+        if is_yaml {
+            // 简单的 YAML 词条统计逻辑
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(f);
+            let mut in_data = false;
+            for line in reader.lines().flatten() {
+                if !in_data { if line.starts_with("...") { in_data = true; } continue; }
+                if line.starts_with('#') || line.trim().is_empty() { continue; }
+                if line.contains('\t') { entry_count += 1; }
+            }
+        } else {
+            // 原有的 JSON 统计逻辑
+            if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
+                if let Some(obj) = json.as_object() {
+                    for val in obj.values() {
+                        if let Some(arr) = val.as_array() { entry_count += arr.len() as u64; } else { entry_count += 1; }
+                    }
+                } else if let Some(arr) = json.as_array() { entry_count = arr.len() as u64; }
+            }
         }
     }
 

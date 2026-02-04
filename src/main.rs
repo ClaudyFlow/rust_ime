@@ -158,7 +158,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("[Main] 词库自动编译失败: {}", e);
     }
 
-    let config = Arc::new(RwLock::new(load_config()));
+    let mut current_config = load_config();
+    let mut profiles_changed = false;
+    if let Ok(entries) = std::fs::read_dir("dicts") {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if !current_config.files.profiles.iter().any(|p| p.name == name) {
+                    println!("[Main] 发现新词库方案: {}", name);
+                    current_config.files.profiles.push(config::Profile {
+                        name: name.clone(),
+                        path: format!("data/{}/trie", name),
+                    });
+                    profiles_changed = true;
+                }
+            }
+        }
+    }
+    if profiles_changed { let _ = save_config(&current_config); }
+
+    let config = Arc::new(RwLock::new(current_config));
     let (gui_tx, gui_rx) = std::sync::mpsc::channel();
     let (tray_tx, tray_rx) = std::sync::mpsc::channel();
     let (notify_tx, notify_rx) = std::sync::mpsc::channel();
