@@ -566,45 +566,42 @@ impl Processor {
     }
 
     fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String)> {
-        let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
+        let mut pool = Vec::new();
+        let mut seen = std::collections::HashSet::new();
 
-        // 如果有辅码，我们额外搜索前缀，以便支持 "拼音前缀 + 辅码" 的匹配方式
-        // 比如输入 dajiangY，需要命中 dajiangdongqu (Yangtze...)
-        if self.enable_prefix_matching && part.aux_code.is_some() && !part.pinyin.is_empty() {
-            let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
-            let prefix_matches = dict.search_bfs(&part.pinyin, 100); // 适度扩大搜索范围以匹配长词
-            for (word, hint) in prefix_matches {
-                if seen.insert(word.clone()) {
-                    matches.push((word, hint));
-                }
+        // 1. 精准匹配 (最高优先级)
+        if let Some(matches) = dict.get_all_exact(&part.pinyin) {
+            for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } }
+        }
+
+        // 2. 简拼匹配 (次高)
+        if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
+            if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) {
+                for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } }
             }
         }
 
-        // 简拼支持
-        if self.enable_abbreviation_matching && part.aux_code.is_some() && part.pinyin.len() <= 4 {
-            let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
-            if let Some(abbr_matches) = dict.get_all_abbrev(&part.pinyin) {
-                for (word, hint) in abbr_matches {
-                    if seen.insert(word.clone()) {
-                        matches.push((word, hint));
-                    }
-                }
-            }
+        // 3. 前缀联想 (联想优先级最低)
+        if self.enable_prefix_matching && !part.pinyin.is_empty() {
+            let limit = if part.aux_code.is_some() { 100 } else { 20 };
+            let prefix_matches = dict.search_bfs(&part.pinyin, limit);
+            for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } }
         }
 
+        // 4. 应用辅码过滤
         if let Some(ref code) = part.aux_code {
             let code_lower = code.to_lowercase();
-            matches.retain(|(_, hint)| {
+            pool.retain(|(_, hint)| {
                 let hint_lower = hint.to_lowercase();
                 if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                    // 仅匹配 Hint 中第一个单词的开头，避免误伤
+                    // 核心修改：仅匹配第一个单词的首字母，防止“年富力强”命中 'P'
                     hint_lower.split_whitespace().next().map_or(false, |first| first.starts_with(&code_lower))
                 } else {
                     hint_lower.contains(&code_lower)
                 }
             });
         }
-        matches
+        pool
     }
 
     pub fn lookup(&mut self) {
@@ -626,7 +623,7 @@ impl Processor {
                 Vec::new()
             };
 
-            // Select by Index
+            // 句子组装
             let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
             if let Some((w, _)) = matches.get(idx) {
                 greedy_sentence.push_str(w);
@@ -642,68 +639,18 @@ impl Processor {
         self.joined_sentence = greedy_sentence;
         self.best_segmentation = all_raw_segments;
 
-        // --- 2. 填充候选词列表 ---
-        let mut final_candidates: Vec<(String, String)> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        
-        if let Some(d) = dict {
-            let buffer_normalized = strip_tones(&self.buffer);
-            let internal_uppercase = self.buffer.chars().skip(1).any(|c| c.is_ascii_uppercase());
-            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || internal_uppercase);
-
-            let mut exact_matches = Vec::new();
-            let mut prefix_matches = Vec::new();
-            let mut abbr_matches = Vec::new();
-
-            if !is_precise_mode {
-                let full_pinyin = buffer_normalized.to_lowercase();
-                
-                // 2.1 精准匹配
-                if let Some(exact) = d.get_all_exact(&full_pinyin) {
-                    exact_matches = exact;
-                }
-
-                // 2.3 简拼匹配
-                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 4 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    if let Some(abbr) = d.get_all_abbrev(&full_pinyin) {
-                        abbr_matches = abbr;
-                    }
-                }
-
-                // 2.2 前缀匹配 (联想)
-                if self.enable_prefix_matching && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
-                }
-            } else {
-                // 精准/辅码模式：已经由上面的循环处理了 last_matches
-                // 此时 last_matches 包含了基于当前段（可能带辅码）的精准和前缀结果
-                exact_matches = last_matches;
-            }
-
-            // 合并并去重
-            let mut all_raw = exact_matches;
-            all_raw.extend(abbr_matches);
-            all_raw.extend(prefix_matches);
-
-            for (word, hint) in all_raw {
-                if seen.insert(word.clone()) {
-                    final_candidates.push((word, hint));
-                }
-            }
-        }
-
+        // --- 填充候选词列表 ---
         self.candidates.clear();
         self.candidate_hints.clear();
-        self.has_dict_match = !final_candidates.is_empty();
-        for (cand, raw_hint) in final_candidates {
+        self.has_dict_match = !last_matches.is_empty();
+
+        for (cand, raw_hint) in last_matches {
             self.candidates.push(cand);
             
             // 动态处理 Hint
             let mut final_hint = String::new();
             if !raw_hint.is_empty() {
-                // 尝试拆分声调和英文 (我们在 compiler 中是用空格连接的)
                 let parts: Vec<&str> = raw_hint.splitn(2, ' ').collect();
-                
                 let (tone, en) = if parts.len() == 2 {
                     (parts[0], parts[1])
                 } else if !raw_hint.is_empty() && (raw_hint.chars().any(|c| "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü".contains(c))) {
@@ -712,9 +659,7 @@ impl Processor {
                     ("", raw_hint.as_str())
                 };
 
-                if self.show_tone_hint && !tone.is_empty() {
-                    final_hint.push_str(tone);
-                }
+                if self.show_tone_hint && !tone.is_empty() { final_hint.push_str(tone); }
                 if self.show_en_hint && !en.is_empty() {
                     if !final_hint.is_empty() { final_hint.push(' '); }
                     final_hint.push_str(en);
