@@ -62,20 +62,20 @@ fn load_frequency_map() -> HashMap<String, u64> {
     
     for entry in WalkDir::new(rime_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "yaml") {
+        if path.extension().map_or(false, |ext| ext == "json") {
              if let Ok(file) = File::open(path) {
-                 use std::io::{BufRead, BufReader};
-                 let reader = BufReader::new(file);
-                 let mut in_data = false;
-                 for line in reader.lines() {
-                     if let Ok(l) = line {
-                         if !in_data { if l.starts_with("...") { in_data = true; } continue; }
-                         if l.starts_with('#') || l.trim().is_empty() { continue; }
-                         let parts: Vec<&str> = l.split('\t').collect();
-                         if parts.len() >= 3 {
-                             if let Ok(weight) = parts[2].parse::<u64>() {
-                                 let entry = map.entry(parts[0].to_string()).or_insert(0);
-                                 if weight > *entry { *entry = weight; }
+                 if let Ok(json) = serde_json::from_reader::<_, Value>(file) {
+                     if let Some(obj) = json.as_object() {
+                         for candidates in obj.values() {
+                             if let Some(arr) = candidates.as_array() {
+                                 for v in arr {
+                                     let word = v.get("char").and_then(|c| c.as_str());
+                                     let weight = v.get("weight").and_then(|w| w.as_u64()).unwrap_or(0);
+                                     if let Some(w) = word {
+                                         let entry = map.entry(w.to_string()).or_insert(0);
+                                         if weight > *entry { *entry = weight; }
+                                     }
+                                 }
                              }
                          }
                      }
@@ -177,8 +177,6 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllab
         if path.extension().map_or(false, |ext| ext == "json") {
             if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n == "punctuation.json") { continue; }
             process_json_file(path, &mut entries, &mut abbrev_entries, is_english, syllables)?;
-        } else if path.extension().map_or(false, |ext| ext == "yaml") {
-            process_yaml_file(path, &mut entries, &mut abbrev_entries)?;
         }
     }
     for (_, candidates) in entries.iter_mut() {
@@ -186,29 +184,6 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllab
     }
     let out_dir = Path::new(out_stem).parent().unwrap();
     write_binary_dict(&format!("{}.index", out_stem), &out_dir.join("abbrev.index").to_str().unwrap(), &format!("{}.data", out_stem), entries, abbrev_entries)?;
-    Ok(())
-}
-
-fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String, String)>>, abbrev_entries: &mut BTreeMap<String, Vec<(String, String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::{BufRead, BufReader};
-    let reader = BufReader::new(File::open(path)?);
-    let mut in_data = false;
-    for line in reader.lines() {
-        let line = line?;
-        if !in_data { if line.starts_with("...") { in_data = true; } continue; }
-        if line.starts_with('#') || line.trim().is_empty() { continue; }
-        let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() >= 2 {
-            let pinyin = parts[1].replace(' ', "");
-            // 修复：不将权重存入二进制数据的英文释义字段，仅将其设为空
-            entries.entry(pinyin.clone()).or_default().push((parts[0].to_string(), String::new(), String::new()));
-            
-            let abbrev: String = parts[1].split_whitespace().filter_map(|s| s.chars().next()).collect();
-            if abbrev.len() > 1 && abbrev != pinyin {
-                abbrev_entries.entry(abbrev).or_default().push((parts[0].to_string(), String::new(), String::new()));
-            }
-        }
-    }
     Ok(())
 }
 

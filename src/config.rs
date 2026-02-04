@@ -82,6 +82,7 @@ pub struct Input {
     pub active_profiles: Vec<String>,
     pub profile_keys: Vec<ProfileKey>,
     pub page_flipping_keys: Vec<String>,
+    pub swap_arrow_keys: bool,
     pub enable_error_sound: bool,
 }
 
@@ -202,6 +203,7 @@ impl Config {
                 active_profiles: vec!["chinese".to_string()],
                 profile_keys: vec![],
                 page_flipping_keys: vec!["arrow".to_string()],
+                swap_arrow_keys: false,
                 enable_error_sound: true,
             },
             hotkeys: Hotkeys {

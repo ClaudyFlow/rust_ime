@@ -115,8 +115,6 @@ impl Trie {
         let mut cursor = offset + 4;
         
         let mut results = Vec::with_capacity(count as usize);
-        let clean = |s: String| s.replace('\0', ""); // 安全过滤：移除空字节
-
         for _ in 0..count {
             if cursor + 2 > data.len() { break; }
             let w_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
@@ -139,7 +137,7 @@ impl Trie {
             let en = String::from_utf8_lossy(&data[cursor..cursor+e_len]).to_string();
             cursor += e_len;
             
-            results.push((clean(word), clean(tone), clean(en)));
+            results.push((word, tone, en));
         }
         results
     }
