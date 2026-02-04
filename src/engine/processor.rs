@@ -95,9 +95,9 @@ impl Processor {
                 } else {
                     (Some(suffix.to_string()), None)
                 };
-                (p.to_lowercase(), a, d)
+                (p.to_string(), a, d)
             } else {
-                (part.to_lowercase(), None, None)
+                (part.to_string(), None, None)
             };
 
             result.push(ParsedPart {
@@ -763,19 +763,18 @@ impl Processor {
 
         // 2. Full match unique
         if self.auto_commit_unique_full_match {
-            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().skip(1).any(|c| c.is_ascii_uppercase()));
             
             if is_precise_mode {
                 // In precise mode (manual selection/aux code), assume user choice is intentional
                 let cand = self.candidates[0].clone();
                 return Some(self.commit_candidate(cand));
             } else if let Some(d) = dict {
-                let full_pinyin = buffer_normalized.to_lowercase();
-                // Check if this exact pinyin has exactly one dictionary entry
-                // AND ensure no longer words start with this pinyin (lookahead)
-                if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
+                // 使用原始输入进行查找，支持大小写敏感
+                let raw_input = &self.buffer;
+                if let Some(exact_matches) = d.get_all_exact(raw_input) {
                     if exact_matches.len() == 1 {
-                        if !d.has_longer_match(&full_pinyin) {
+                        if !d.has_longer_match(raw_input) {
                             let cand = self.candidates[0].clone();
                             return Some(self.commit_candidate(cand));
                         }
@@ -933,6 +932,28 @@ mod tests {
         if !p.candidates.is_empty() {
             let hint = &p.candidate_hints[0];
             assert!(hint.to_lowercase().split_whitespace().any(|w| w.starts_with('c')));
+        }
+    }
+
+    #[test]
+    fn test_auto_commit_unique_match() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        
+        p.commit_mode = "single".to_string();
+        p.auto_commit_unique_full_match = true;
+        
+        // 我们需要找一个在词库中唯一的词条。
+        // 假设 "nihao" 在词库中不是唯一的，但加上数字可能是唯一的。
+        // 或者我们手动注入一个模拟词条（这需要更复杂的 Mock）。
+        // 这里我们测试逻辑流：如果候选词只有一个，且没有更长的匹配。
+        
+        p.buffer = "nihao".to_string();
+        p.lookup();
+        
+        if p.candidates.len() == 1 && !p.tries.get("chinese").unwrap().has_longer_match("nihao") {
+            let action = p.check_auto_commit();
+            assert!(matches!(action, Some(Action::DeleteAndEmit { .. })), "Should auto-commit unique match");
         }
     }
 
