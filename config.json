@@ -45,14 +45,6 @@
     "commit_mode": "single",
     "quick_rimes": [
       {
-        "trigger": "tab+g",
-        "insert": "eng"
-      },
-      {
-        "trigger": "tab+h",
-        "insert": "ang"
-      },
-      {
         "trigger": "tab+j",
         "insert": "iang"
       },
@@ -87,6 +79,26 @@
       {
         "trigger": "tab+u",
         "insert": "uan"
+      },
+      {
+        "trigger": "tab+a",
+        "insert": "ang"
+      },
+      {
+        "trigger": "tab+e",
+        "insert": "eng"
+      },
+      {
+        "trigger": "tab+z",
+        "insert": "zhi"
+      },
+      {
+        "trigger": "tab+c",
+        "insert": "chi"
+      },
+      {
+        "trigger": "tab+s",
+        "insert": "shi"
       }
     ],
     "enable_quick_rime": true,
