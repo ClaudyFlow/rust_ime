@@ -97,6 +97,7 @@
     </aside>
 
     <main>
+        <!-- General -->
         <div id="tab-general" class="tab-content active">
             <h1>系统总览</h1>
             <div class="card">
@@ -112,24 +113,44 @@
                     <div class="info"><div class="title">精准匹配自动上屏</div></div>
                     <label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label>
                 </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">防呆模式</div></div>
+                    <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
+                </div>
             </div>
         </div>
 
+        <!-- Appearance -->
         <div id="tab-appearance" class="tab-content">
             <h1>视觉与样式</h1>
             
-            <h2>传统窗口 (Traditional)</h2>
             <div class="card">
                 <div class="setting-item">
                     <div class="info"><div class="title">显示传统窗口</div></div>
                     <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
                 </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
-                    <div class="setting-item"><div class="info"><div class="title">文字字号</div></div><input type="number" id="candidate_font_size"></div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示卡片窗口</div></div>
+                    <label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">辅码/提示字号 (Hint)</div></div>
+                    <div class="info"><div class="title">显示英文释义 (Hint)</div></div>
+                    <label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示汉字注音 (Tone)</div></div>
+                    <label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label>
+                </div>
+            </div>
+
+            <h2>传统窗口 (Traditional)</h2>
+            <div class="card">
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
+                    <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="candidate_font_size"></div>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">辅码字号</div></div>
                     <input type="number" id="candidate_hint_font_size">
                 </div>
                 <div class="grid-2">
@@ -151,11 +172,7 @@
             <h2>卡片窗口 (Modern)</h2>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">显示卡片窗口</div></div>
-                    <label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">锚定位置</div><div class="desc">卡片在屏幕上的对齐角落</div></div>
+                    <div class="info"><div class="title">锚定位置</div></div>
                     <select id="modern_cand_anchor">
                         <option value="bottom_left">左下角</option>
                         <option value="bottom_right">右下角</option>
@@ -206,7 +223,7 @@
         function linkColor(id) {
             const txt = document.getElementById(id); const picker = document.getElementById(id + '_picker');
             if(!txt || !picker) return;
-            txt.oninput = () => { if(txt.value.startsWith('#')) picker.value = txt.value; };
+            txt.oninput = () => { picker.value = txt.value; };
             picker.oninput = () => { txt.value = picker.value; };
         }
 
@@ -221,8 +238,8 @@
             });
 
             // Checkboxes
-            ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates'].forEach(id => {
-                const el = document.getElementById(id); if(el) el.checked = config.input[id] || config.appearance[id];
+            ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint'].forEach(id => {
+                const el = document.getElementById(id); if(el) el.checked = (config.appearance[id] !== undefined) ? config.appearance[id] : config.input[id];
             });
 
             // Colors
@@ -244,7 +261,7 @@
             config.input.auto_commit_unique_full_match = document.getElementById('auto_commit_unique_full_match').checked;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
             
-            const appIds = ['show_candidates', 'show_modern_candidates', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
+            const appIds = ['show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = el.type === 'number' ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
@@ -259,12 +276,12 @@
         function renderPK() { document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `<div class="setting-item"><input type="text" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value"> ⮕ <input type="text" value="${pk.profile}" onchange="config.input.profile_keys[${i}].profile=this.value"> <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button></div>`).join(''); }
         function addPK() { if(!config.input.profile_keys) config.input.profile_keys=[]; config.input.profile_keys.push({key:'?',profile:''}); renderPK(); }
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
-        async function renderDicts() { const r = await fetch('/api/dicts'); const ds = await r.json(); document.getElementById('dicts-container').innerHTML = ds.map(f => `<div class="card" style="display:flex; justify-content:space-between; ${f.enabled?'':'opacity:0.5'}"><b>${f.name}</b><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join(''); }
+        async function renderDicts() { const ds = await (await fetch('/api/dicts')).json(); document.getElementById('dicts-container').innerHTML = ds.map(f => `<div class="card" style="display:flex; justify-content:space-between; ${f.enabled?'':'opacity:0.5'}"><b>${f.name}</b><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join(''); }
         async function toggleDict(path) { await fetch('/api/dicts/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); renderDicts(); }
         async function compile() { alert('编译开始'); await fetch('/api/dicts/compile', { method: 'POST' }); alert('完成'); }
         async function resetAll() { if(confirm("确定重置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
         let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
-        async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
+        async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('更新成功'); }
 
         load();
     </script>
