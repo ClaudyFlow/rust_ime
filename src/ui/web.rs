@@ -156,7 +156,8 @@ async fn list_dicts() -> Json<Vec<DictFile>> {
         let path = entry.path();
         if path.is_file() {
             let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
+            if filename.ends_with(".json") || filename.ends_with(".json.disabled") || 
+               filename.ends_with(".yaml") || filename.ends_with(".yaml.disabled") {
                 // 计算分组名：取 dicts/ 下的一级目录名
                 let relative = path.strip_prefix(root).unwrap_or(path);
                 let group = relative.components().next()
@@ -209,10 +210,10 @@ async fn toggle_dict(Json(req): Json<ToggleRequest>) -> StatusCode {
     if !path.exists() { return StatusCode::NOT_FOUND; }
 
     let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    let new_path = if filename.ends_with(".json") {
+    let new_path = if filename.ends_with(".json") || filename.ends_with(".yaml") {
         path.with_file_name(format!("{}.disabled", filename))
-    } else if filename.ends_with(".json.disabled") {
-        path.with_file_name(filename.replace(".json.disabled", ".json"))
+    } else if filename.ends_with(".json.disabled") || filename.ends_with(".yaml.disabled") {
+        path.with_file_name(filename.replace(".disabled", ""))
     } else {
         return StatusCode::BAD_REQUEST;
     };

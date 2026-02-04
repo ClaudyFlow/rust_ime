@@ -200,11 +200,12 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
             let pinyin = parts[1].replace(' ', "");
-            let weight = if parts.len() >= 3 { parts[2] } else { "" };
-            entries.entry(pinyin).or_default().push((parts[0].to_string(), String::new(), weight.to_string()));
+            // 修复：不将权重存入二进制数据的英文释义字段，仅将其设为空
+            entries.entry(pinyin.clone()).or_default().push((parts[0].to_string(), String::new(), String::new()));
+            
             let abbrev: String = parts[1].split_whitespace().filter_map(|s| s.chars().next()).collect();
-            if abbrev.len() > 1 && abbrev != parts[1].replace(' ', "") {
-                abbrev_entries.entry(abbrev).or_default().push((parts[0].to_string(), String::new(), weight.to_string()));
+            if abbrev.len() > 1 && abbrev != pinyin {
+                abbrev_entries.entry(abbrev).or_default().push((parts[0].to_string(), String::new(), String::new()));
             }
         }
     }
