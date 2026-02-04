@@ -282,9 +282,17 @@ impl Processor {
 
     fn handle_direct(&mut self, key: Key, shift_pressed: bool) -> Action {
         if let Some(c) = key_to_char(key, shift_pressed) {
+            let old_buffer = self.buffer.clone();
             self.buffer.push(c); 
             self.state = ImeState::Composing; 
             self.lookup();
+            
+            if self.enable_anti_typo && !self.has_dict_match {
+                self.buffer = old_buffer;
+                self.lookup();
+                return Action::Alert;
+            }
+            
             self.update_phantom_action()
         } else if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
             if let Some(zh_puncs) = self.punctuation.get(punc_key) { if let Some(first) = zh_puncs.first() { return Action::Emit(first.clone()); } }
@@ -336,11 +344,40 @@ impl Processor {
             Key::KEY_ESC | Key::KEY_DELETE => { let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } }
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                if self.commit_mode == "single" && digit >= 1 && digit <= self.page_size { let abs_idx = self.page + digit - 1; if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); } }
-                self.buffer.push_str(&digit.to_string()); self.lookup(); if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
+                if self.commit_mode == "single" && digit >= 1 && digit <= self.page_size { 
+                    let abs_idx = self.page + digit - 1; 
+                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); } 
+                }
+                
+                let old_buffer = self.buffer.clone();
+                self.buffer.push_str(&digit.to_string()); 
+                self.lookup(); 
+                
+                if self.enable_anti_typo && !self.has_dict_match {
+                    self.buffer = old_buffer;
+                    self.lookup();
+                    return Action::Alert;
+                }
+                
+                if let Some(act) = self.check_auto_commit() { return act; } 
+                self.update_phantom_action()
             }
             _ if is_letter(key) => {
-                if let Some(c) = key_to_char(key, shift_pressed) { self.buffer.push(c); self.preview_selected_candidate = false; self.lookup(); if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action() } else { Action::Consume }
+                if let Some(c) = key_to_char(key, shift_pressed) { 
+                    let old_buffer = self.buffer.clone();
+                    self.buffer.push(c); 
+                    self.preview_selected_candidate = false; 
+                    self.lookup(); 
+                    
+                    if self.enable_anti_typo && !self.has_dict_match {
+                        self.buffer = old_buffer;
+                        self.lookup();
+                        return Action::Alert;
+                    }
+                    
+                    if let Some(act) = self.check_auto_commit() { return act; } 
+                    self.update_phantom_action() 
+                } else { Action::Consume }
             }
             _ if get_punctuation_key(key, shift_pressed).is_some() => {
                 let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
