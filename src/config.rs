@@ -1,651 +1,263 @@
-use evdev::Key;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
-// --- 1. 外观设置 ---
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Config {
+    pub files: Files,
+    pub appearance: Appearance,
+    pub input: Input,
+    pub hotkeys: Hotkeys,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Files {
+    pub punctuation_file: String,
+    pub profiles: Vec<Profile>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Profile {
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appearance {
-    #[serde(default = "default_enable_notifications")]
-    pub show_notifications: bool,
-    #[serde(default = "default_phantom_mode")]
-    pub preview_mode: String,
-    #[serde(default = "default_show_candidates")]
     pub show_candidates: bool,
-    #[serde(default = "default_show_modern_candidates")]
     pub show_modern_candidates: bool,
-    #[serde(default = "default_show_keystrokes")]
+    pub show_notifications: bool,
     pub show_keystrokes: bool,
-
-    // 1. 传统候选词窗口样式
-    #[serde(default = "default_cand_anchor")]
-    pub candidate_anchor: String,
-    #[serde(default = "default_cand_margin_x")]
-    pub candidate_margin_x: i32,
-    #[serde(default = "default_cand_margin_y")]
-    pub candidate_margin_y: i32,
-    #[serde(default = "default_cand_bg")]
-    pub candidate_bg_color: String,
-    #[serde(default = "default_cand_font_size")]
-    pub candidate_font_size: i32,
-
-    // 2. 极客(Modern)候选词窗口样式
-    #[serde(default = "default_modern_cand_anchor")]
-    pub modern_cand_anchor: String,
-    #[serde(default = "default_modern_cand_margin_x")]
-    pub modern_cand_margin_x: i32,
-    #[serde(default = "default_modern_cand_margin_y")]
-    pub modern_cand_margin_y: i32,
-    #[serde(default = "default_modern_cand_bg")]
-    pub modern_cand_bg_color: String,
-    #[serde(default = "default_modern_cand_text_color")]
-    pub modern_cand_text_color: String,
-    #[serde(default = "default_modern_cand_font_size")]
-    pub modern_cand_font_size: i32,
-
-    // 按键回显窗口样式
-    #[serde(default = "default_key_anchor")]
-    pub keystroke_anchor: String, // bottom_right, bottom_left, top_right, top_left
-    #[serde(default = "default_key_margin_x")]
-    pub keystroke_margin_x: i32,
-    #[serde(default = "default_key_margin_y")]
-    pub keystroke_margin_y: i32,
-    #[serde(default = "default_key_bg")]
-    pub keystroke_bg_color: String,
-    #[serde(default = "default_key_font_size")]
-    pub keystroke_font_size: i32,
-    #[serde(default = "default_key_timeout")]
-    pub keystroke_timeout_ms: u64,
-
-    // 汉字学习模式
-    #[serde(default = "default_learning_mode")]
-    pub learning_mode: bool,
-    #[serde(default = "default_learning_interval")]
-    pub learning_interval_sec: u64,
-        #[serde(default = "default_learning_dict_path")]
-        pub learning_dict_path: String,
-        
-        // 学习模式样式
-        #[serde(default = "default_learn_anchor")]
-        pub learning_anchor: String,
-        #[serde(default = "default_learn_margin_x")]
-        pub learning_margin_x: i32,
-        #[serde(default = "default_learn_margin_y")]
-        pub learning_margin_y: i32,
-        #[serde(default = "default_learn_bg")]
-        pub learning_bg_color: String,
-        #[serde(default = "default_learn_font_size")]
-        pub learning_font_size: i32,
-    
-        #[serde(default = "default_page_size")]
-        pub page_size: usize,
-    
-    #[serde(default = "default_show_tone")]
+    pub page_size: usize,
     pub show_tone_hint: bool,
-    #[serde(default = "default_show_en")]
     pub show_en_hint: bool,
+    pub candidate_anchor: String,
+    pub candidate_font_size: u32,
+    pub candidate_margin_x: i32,
+    pub candidate_margin_y: i32,
+    pub candidate_bg_color: String,
+    pub candidate_text_color: String,
+    pub modern_cand_anchor: String,
+    pub modern_cand_font_size: u32,
+    pub modern_cand_margin_x: i32,
+    pub modern_cand_margin_y: i32,
+    pub modern_cand_text_color: String,
+    pub modern_cand_bg_color: String,
+    pub keystroke_anchor: String,
+    pub keystroke_font_size: u32,
+    pub keystroke_timeout_ms: u64,
+    pub keystroke_bg_color: String,
+    pub keystroke_margin_x: i32,
+    pub keystroke_margin_y: i32,
+    pub learning_mode: bool,
+    pub learning_anchor: String,
+    pub learning_interval_sec: u64,
+    pub learning_font_size: u32,
+    pub learning_margin_x: i32,
+    pub learning_margin_y: i32,
+    pub learning_bg_color: String,
+    pub learning_dict_path: String,
+    pub preview_mode: String,
+    pub learning_interval: u64,
 }
 
-impl Default for Appearance {
-    fn default() -> Self {
-        Appearance {
-            show_notifications: true,
-            preview_mode: "pinyin".to_string(),
-            show_candidates: default_show_candidates(),
-            show_modern_candidates: default_show_modern_candidates(),
-            show_keystrokes: default_show_keystrokes(),
-            candidate_anchor: default_cand_anchor(),
-            candidate_margin_x: default_cand_margin_x(),
-            candidate_margin_y: default_cand_margin_y(),
-            candidate_bg_color: default_cand_bg(),
-            candidate_font_size: default_cand_font_size(),
-            modern_cand_anchor: default_modern_cand_anchor(),
-            modern_cand_margin_x: default_modern_cand_margin_x(),
-            modern_cand_margin_y: default_modern_cand_margin_y(),
-            modern_cand_bg_color: default_modern_cand_bg(),
-            modern_cand_text_color: default_modern_cand_text_color(),
-            modern_cand_font_size: default_modern_cand_font_size(),
-            keystroke_anchor: default_key_anchor(),
-            keystroke_margin_x: default_key_margin_x(),
-            keystroke_margin_y: default_key_margin_y(),
-            keystroke_bg_color: default_key_bg(),
-            keystroke_font_size: default_key_font_size(),
-            keystroke_timeout_ms: default_key_timeout(),
-            learning_mode: false,
-            learning_interval_sec: default_learning_interval(),
-            learning_dict_path: default_learning_dict_path(),
-            learning_anchor: default_learn_anchor(),
-            learning_margin_x: default_learn_margin_x(),
-            learning_margin_y: default_learn_margin_y(),
-            learning_bg_color: default_learn_bg(),
-            learning_font_size: default_learn_font_size(),
-            page_size: default_page_size(),
-            show_tone_hint: true,
-            show_en_hint: true,
-        }
-    }
-}
-
-fn default_show_tone() -> bool { true }
-fn default_show_en() -> bool { true }
-fn default_page_size() -> usize { 9 }
-
-// --- 2. 输入行为 ---
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Input {
-    #[serde(default)]
-    pub enable_fuzzy_pinyin: bool,
-    #[serde(default = "default_autostart")]
     pub autostart: bool,
-    #[serde(default = "default_active_profile")]
-    pub default_profile: String, // 原 active_profile
-    #[serde(default = "default_paste_behavior")]
-    pub paste_method: String, // 原 paste_shortcut.key (ctrl_v/shift_insert...)
-    #[serde(default = "default_clipboard_delay")]
+    pub commit_mode: String,
+    pub default_profile: String,
+    pub paste_method: String,
     pub clipboard_delay_ms: u64,
-    #[serde(default = "default_enable_anti_typo")]
     pub enable_anti_typo: bool,
-    #[serde(default = "default_commit_mode")]
-    pub commit_mode: String, // "single" or "double"
-    #[serde(default = "default_quick_rimes")]
-    pub quick_rimes: Vec<QuickRime>,
-    #[serde(default = "default_enable_quick_rime")]
     pub enable_quick_rime: bool,
-    #[serde(default = "default_enable_error_sound")]
-    pub enable_error_sound: bool,
-    #[serde(default = "default_auto_commit_unique_en_fuzhuma")]
+    pub quick_rimes: Vec<QuickRime>,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
     pub prefix_matching_limit: usize,
     pub enable_abbreviation_matching: bool,
     pub filter_proper_nouns_by_case: bool,
+    pub active_profiles: Vec<String>,
     pub profile_keys: Vec<ProfileKey>,
-    #[serde(default = "default_page_flipping_keys")]
     pub page_flipping_keys: Vec<String>,
+    pub enable_error_sound: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct ProfileKey {
-    pub key: String,    // e.g. "c"
-    pub profile: String, // e.g. "chinese"
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct QuickRime {
-    pub trigger: String, // e.g. "alt+l"
-    pub insert: String,  // e.g. "iang"
+    pub trigger: String,
+    pub insert: String,
 }
 
-impl Default for Input {
-    fn default() -> Self {
-        Input {
-            enable_fuzzy_pinyin: false,
-            autostart: false,
-            default_profile: "Chinese".to_string(),
-            paste_method: "ctrl_v".to_string(),
-            clipboard_delay_ms: 50,
-            enable_anti_typo: true,
-            commit_mode: "double".to_string(),
-            quick_rimes: default_quick_rimes(),
-            enable_quick_rime: true,
-            enable_error_sound: true,
-            auto_commit_unique_en_fuzhuma: false,
-            auto_commit_unique_full_match: false,
-            enable_prefix_matching: true,
-            prefix_matching_limit: 20,
-            enable_abbreviation_matching: true,
-            filter_proper_nouns_by_case: true,
-            profile_keys: default_profile_keys(),
-            page_flipping_keys: default_page_flipping_keys(),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ProfileKey {
+    pub key: String,
+    pub profile: String,
 }
 
-fn default_page_flipping_keys() -> Vec<String> {
-    vec!["arrow".to_string()] // Options: "arrow" (default), "minus_equal"
-}
-
-fn default_enable_prefix_matching() -> bool { true }
-fn default_prefix_matching_limit() -> usize { 20 }
-fn default_enable_abbreviation_matching() -> bool { true }
-
-fn default_auto_commit_unique_en_fuzhuma() -> bool { false }
-fn default_auto_commit_unique_full_match() -> bool { false }
-
-fn default_profile_keys() -> Vec<ProfileKey> {
-    vec![
-        ProfileKey { key: "c".into(), profile: "chinese".into() },
-        ProfileKey { key: "e".into(), profile: "english".into() },
-        ProfileKey { key: "r".into(), profile: "rime-ice".into() },
-        ProfileKey { key: "j".into(), profile: "japanese".into() },
-    ]
-}
-
-fn default_enable_error_sound() -> bool { true }
-fn default_enable_quick_rime() -> bool { true }
-
-fn default_quick_rimes() -> Vec<QuickRime> {
-    vec![
-        // Tab 组合 (仿小鹤双拼韵母键位)
-        QuickRime { trigger: "tab+l".into(), insert: "iang".into() },
-        QuickRime { trigger: "tab+s".into(), insert: "ong".into() },
-        QuickRime { trigger: "tab+g".into(), insert: "eng".into() },
-        QuickRime { trigger: "tab+h".into(), insert: "ang".into() },
-        QuickRime { trigger: "tab+r".into(), insert: "uan".into() },
-        QuickRime { trigger: "tab+k".into(), insert: "uai".into() },
-        // 兼容性/扩展示例
-        QuickRime { trigger: "tab+n".into(), insert: "ing".into() },
-    ]
-}
-
-fn default_commit_mode() -> String { "double".to_string() }
-fn default_enable_anti_typo() -> bool { true }
-fn default_clipboard_delay() -> u64 { 50 }
-
-// --- 3. 词库与文件 ---
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct Files {
-    #[serde(default)]
-    pub device_path: Option<String>,
-    #[serde(default = "default_profiles")]
-    pub profiles: Vec<Profile>,
-    #[serde(default = "default_punctuation_path")]
-    pub punctuation_file: String,
-    #[serde(default = "default_char_defs")]
-    pub char_defs: Vec<String>,
-}
-
-impl Default for Files {
-    fn default() -> Self {
-        Files {
-            device_path: None,
-            profiles: default_profiles(),
-            punctuation_file: default_punctuation_path(),
-            char_defs: default_char_defs(),
-        }
-    }
-}
-
-// --- 4. 快捷键 ---
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Hotkeys {
-    #[serde(default = "default_ime_toggle")]
-    pub switch_language: Shortcut,
-    #[serde(default = "default_ime_toggle_alt")]
-    pub switch_language_alt: Shortcut,
-
-    // 功能切换
-    #[serde(default = "default_phantom_cycle")]
-    pub cycle_preview_mode: Shortcut,
-    #[serde(default = "default_notification_toggle")]
-    pub toggle_notifications: Shortcut,
-    #[serde(default = "default_profile_next")]
-    pub switch_dictionary: Shortcut,
-
-    // 高级/特殊
-    #[serde(default = "default_paste_cycle")]
-    pub cycle_paste_method: Shortcut,
-    #[serde(default = "default_caps_lock_toggle")]
-    pub trigger_caps_lock: Shortcut,
-    #[serde(default = "default_trad_gui_toggle")]
-    pub toggle_traditional_gui: Shortcut,
-    #[serde(default = "default_modern_gui_toggle")]
-    pub toggle_modern_gui: Shortcut,
-    #[serde(default = "default_keystroke_toggle")]
-    pub toggle_keystrokes: Shortcut,
-    #[serde(default = "default_commit_mode_toggle")]
-    pub switch_commit_mode: Shortcut,
+    pub switch_language: Hotkey,
+    pub switch_language_alt: Hotkey,
+    pub switch_dictionary: Hotkey,
+    pub cycle_preview_mode: Hotkey,
+    pub toggle_notifications: Hotkey,
+    pub cycle_paste_method: Hotkey,
+    pub toggle_traditional_gui: Hotkey,
+    pub toggle_modern_gui: Hotkey,
+    pub toggle_keystrokes: Hotkey,
+    pub switch_commit_mode: Hotkey,
 }
 
-impl Default for Hotkeys {
-    fn default() -> Self {
-        Hotkeys {
-            switch_language: default_ime_toggle(),
-            switch_language_alt: default_ime_toggle_alt(),
-            cycle_preview_mode: default_phantom_cycle(),
-            toggle_notifications: default_notification_toggle(),
-            switch_dictionary: default_profile_next(),
-            cycle_paste_method: default_paste_cycle(),
-            trigger_caps_lock: default_caps_lock_toggle(),
-            toggle_traditional_gui: default_trad_gui_toggle(),
-            toggle_modern_gui: default_modern_gui_toggle(),
-            toggle_keystrokes: default_keystroke_toggle(),
-            switch_commit_mode: default_commit_mode_toggle(),
-        }
-    }
-}
-
-// --- 主配置结构 ---
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct Config {
-    #[serde(default = "default_readme", rename = "_help_readme")]
-    pub readme: String,
-
-    #[serde(default)]
-    pub appearance: Appearance, // 外观
-
-    #[serde(default)]
-    pub input: Input, // 输入习惯
-
-    #[serde(default)]
-    pub hotkeys: Hotkeys, // 快捷键
-
-    #[serde(default)]
-    pub files: Files, // 文件路径
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Hotkey {
+    pub key: String,
+    pub description: String,
 }
 
 impl Config {
     pub fn default_config() -> Self {
         Config {
-            readme: default_readme(),
-            appearance: Appearance::default(),
-            input: Input::default(),
-            hotkeys: Hotkeys::default(),
-            files: Files::default(),
+            files: Files {
+                punctuation_file: "dicts/chinese/punctuation.json".to_string(),
+                profiles: vec![
+                    Profile { name: "chinese".to_string(), path: "data/chinese/trie".to_string() },
+                    Profile { name: "english".to_string(), path: "data/english/trie".to_string() },
+                    Profile { name: "japanese".to_string(), path: "data/japanese/trie".to_string() },
+                ],
+            },
+            appearance: Appearance {
+                show_candidates: true,
+                show_modern_candidates: false,
+                show_notifications: true,
+                show_keystrokes: false,
+                page_size: 5,
+                show_tone_hint: false,
+                show_en_hint: true,
+                candidate_anchor: "bottom".to_string(),
+                candidate_font_size: 18,
+                candidate_margin_x: 0,
+                candidate_margin_y: 50,
+                candidate_bg_color: "#ffffff".to_string(),
+                candidate_text_color: "#000000".to_string(),
+                modern_cand_anchor: "bottom_left".to_string(),
+                modern_cand_font_size: 16,
+                modern_cand_margin_x: 40,
+                modern_cand_margin_y: 200,
+                modern_cand_text_color: "#0071e3".to_string(),
+                modern_cand_bg_color: "rgba(255, 255, 255, 0.95)".to_string(),
+                keystroke_anchor: "bottom_right".to_string(),
+                keystroke_font_size: 24,
+                keystroke_timeout_ms: 1500,
+                keystroke_bg_color: "rgba(0, 0, 0, 0.7)".to_string(),
+                keystroke_margin_x: 20,
+                keystroke_margin_y: 20,
+                learning_mode: false,
+                learning_anchor: "top_right".to_string(),
+                learning_interval_sec: 10,
+                learning_font_size: 24,
+                learning_margin_x: 20,
+                learning_margin_y: 40,
+                learning_bg_color: "rgba(20, 20, 20, 0.85)".to_string(),
+                learning_dict_path: "dicts/chinese/words/words.json".to_string(),
+                preview_mode: "pinyin".to_string(),
+                learning_interval: 10,
+            },
+            input: Input {
+                autostart: false,
+                commit_mode: "single".to_string(),
+                default_profile: "chinese".to_string(),
+                paste_method: "shift_insert".to_string(),
+                clipboard_delay_ms: 10,
+                enable_anti_typo: true,
+                enable_quick_rime: true,
+                quick_rimes: vec![
+                    QuickRime { trigger: "caps+j".to_string(), insert: "iang".to_string() },
+                    QuickRime { trigger: "caps+k".to_string(), insert: "uai".to_string() },
+                    QuickRime { trigger: "caps+l".to_string(), insert: "uang".to_string() },
+                    QuickRime { trigger: "caps+i".to_string(), insert: "ing".to_string() },
+                    QuickRime { trigger: "caps+o".to_string(), insert: "ong".to_string() },
+                    QuickRime { trigger: "caps+p".to_string(), insert: "un".to_string() },
+                    QuickRime { trigger: "caps+n".to_string(), insert: "ian".to_string() },
+                    QuickRime { trigger: "caps+m".to_string(), insert: "ian".to_string() },
+                    QuickRime { trigger: "caps+u".to_string(), insert: "sh".to_string() },
+                    QuickRime { trigger: "caps+a".to_string(), insert: "ch".to_string() },
+                    QuickRime { trigger: "caps+e".to_string(), insert: "zh".to_string() },
+                    QuickRime { trigger: "caps+z".to_string(), insert: "ou".to_string() },
+                    QuickRime { trigger: "caps+c".to_string(), insert: "ao".to_string() },
+                    QuickRime { trigger: "caps+s".to_string(), insert: "ai".to_string() },
+                ],
+                auto_commit_unique_en_fuzhuma: false,
+                auto_commit_unique_full_match: false,
+                enable_prefix_matching: true,
+                prefix_matching_limit: 20,
+                enable_abbreviation_matching: true,
+                filter_proper_nouns_by_case: true,
+                active_profiles: vec!["chinese".to_string()],
+                profile_keys: vec![],
+                page_flipping_keys: vec!["arrow".to_string()],
+                enable_error_sound: true,
+            },
+            hotkeys: Hotkeys {
+                switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
+                switch_language_alt: Hotkey { key: "ctrl+space".to_string(), description: "核心: 切换中/英文模式 (备选)".to_string() },
+                switch_dictionary: Hotkey { key: "ctrl+alt+s".to_string(), description: "功能: 切换输入方案/词库".to_string() },
+                cycle_preview_mode: Hotkey { key: "ctrl+alt+p".to_string(), description: "界面: 切换屏幕预览模式".to_string() },
+                toggle_notifications: Hotkey { key: "ctrl+alt+n".to_string(), description: "界面: 开启/关闭系统通知".to_string() },
+                cycle_paste_method: Hotkey { key: "ctrl+alt+v".to_string(), description: "兼容: 切换粘贴注入方式".to_string() },
+                toggle_traditional_gui: Hotkey { key: "ctrl+alt+g".to_string(), description: "界面: 显示/隐藏传统候选窗".to_string() },
+                toggle_modern_gui: Hotkey { key: "ctrl+alt+h".to_string(), description: "界面: 显示/隐藏卡片候选词".to_string() },
+                toggle_keystrokes: Hotkey { key: "ctrl+alt+k".to_string(), description: "功能: 开启/关闭按键显示".to_string() },
+                switch_commit_mode: Hotkey { key: "ctrl+alt+m".to_string(), description: "模式: 切换单/双空格上屏".to_string() },
+            },
         }
     }
 }
 
-// --- Helper Structs & Defaults ---
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-pub struct Profile {
-    pub name: String,
-    pub description: String,
-    pub dicts: Vec<String>,
-}
-
-impl Default for Profile {
-    fn default() -> Self {
-        Profile {
-            name: "Chinese".to_string(),
-
-            description: "默认中文输入".to_string(),
-
-            dicts: vec![
-                "dicts/chinese/basic_words.json".to_string(),
-                "dicts/chinese/chars.json".to_string(),
-            ],
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-
-pub struct Shortcut {
-    pub key: String,
-
-    pub description: String,
-}
-
-impl Shortcut {
-    pub fn new(key: &str, desc: &str) -> Self {
-        Self {
-            key: key.to_string(),
-
-            description: desc.to_string(),
-        }
-    }
-}
-
-impl Default for Shortcut {
-    fn default() -> Self {
-        Shortcut::new("none", "未设置")
-    }
-}
-
-// Default Value Generators
-
-fn default_readme() -> String {
-    "本配置文件已优化。请修改 'key' 字段来更改快捷键。'paste_method' 可选值: ctrl_v, ctrl_shift_v, shift_insert".to_string()
-}
-
-fn default_enable_notifications() -> bool {
-    true
-}
-
-fn default_show_candidates() -> bool {
-    true
-}
-
-fn default_show_modern_candidates() -> bool {
-    false
-}
-
-fn default_show_keystrokes() -> bool {
-    false
-}
-
-fn default_phantom_mode() -> String { "pinyin".to_string() }
-
-fn default_cand_anchor() -> String {
-    "bottom".to_string()
-}
-
-fn default_cand_margin_x() -> i32 {
-    0
-}
-
-fn default_cand_margin_y() -> i32 {
-    120
-}
-
-fn default_cand_bg() -> String {
-    "rgba(20, 20, 20, 0.85)".to_string()
-}
-
-fn default_cand_font_size() -> i32 {
-    14
-}
-
-fn default_modern_cand_anchor() -> String {
-    "bottom_left".to_string()
-}
-
-fn default_modern_cand_margin_x() -> i32 {
-    40
-}
-
-fn default_modern_cand_margin_y() -> i32 {
-    200
-}
-
-fn default_modern_cand_bg() -> String {
-    "rgba(10, 10, 10, 0.95)".to_string()
-}
-
-fn default_modern_cand_text_color() -> String {
-    "#2ecc71".to_string() // Manjaro Green
-}
-
-fn default_modern_cand_font_size() -> i32 {
-    16
-}
-
-fn default_key_anchor() -> String {
-    "bottom_right".to_string()
-}
-
-fn default_key_margin_x() -> i32 {
-    40
-}
-
-fn default_key_margin_y() -> i32 {
-    120
-}
-
-fn default_key_bg() -> String {
-    "rgba(20, 20, 20, 0.85)".to_string()
-}
-
-fn default_key_font_size() -> i32 {
-    11
-}
-
-fn default_key_timeout() -> u64 {
-    1000
-}
-
-fn default_learning_mode() -> bool {
-    false
-}
-
-fn default_learning_interval() -> u64 {
-    10
-}
-
-fn default_learning_dict_path() -> String {
-    "dicts/chinese/chars.json".to_string()
-}
-
-fn default_learn_anchor() -> String { "top_right".to_string() }
-fn default_learn_margin_x() -> i32 { 40 }
-fn default_learn_margin_y() -> i32 { 40 }
-fn default_learn_bg() -> String { "rgba(20, 20, 20, 0.85)".to_string() }
-fn default_learn_font_size() -> i32 { 24 }
-
-fn default_autostart() -> bool {
-    false
-}
-
-fn default_active_profile() -> String {
-    "Chinese".to_string()
-}
-
-fn default_paste_behavior() -> String {
-    "shift_insert".to_string()
-}
-
-fn default_profiles() -> Vec<Profile> {
-    vec![
-        Profile::default(),
-        Profile {
-            name: "Japanese".to_string(),
-
-            description: "日语输入方案".to_string(),
-
-            dicts: vec!["dicts/japanese".to_string()],
-        },
-    ]
-}
-
-fn default_punctuation_path() -> String {
-    "dicts/chinese/punctuation.json".to_string()
-}
-
-fn default_char_defs() -> Vec<String> {
-    vec!["dicts/chinese/chars.json".to_string()]
-}
-
-// Shortcuts Defaults
-fn default_ime_toggle() -> Shortcut {
-    Shortcut::new("caps_lock", "核心: 切换中/英文模式")
-}
-fn default_ime_toggle_alt() -> Shortcut {
-    Shortcut::new("ctrl+space", "核心: 切换中/英文模式 (备选)")
-}
-
-fn default_phantom_cycle() -> Shortcut {
-    Shortcut::new("ctrl+alt+p", "功能: 切换输入预览模式 (无 -> 拼音 -> 汉字)")
-}
-fn default_notification_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+n", "功能: 开启/关闭桌面候选词通知")
-}
-fn default_profile_next() -> Shortcut {
-    Shortcut::new("ctrl+alt+s", "功能: 切换词库 (如 中文 -> 日语)")
-}
-
-fn default_paste_cycle() -> Shortcut {
-    Shortcut::new(
-        "ctrl+alt+v",
-        "高级: 循环切换自动粘贴的方式 (如在终端无法上屏时使用)",
-    )
-}
-fn default_caps_lock_toggle() -> Shortcut {
-    Shortcut::new(
-        "caps_lock+tab",
-        "高级: 发送真实的 CapsLock 键 (因 CapsLock 被占用于切换输入法)",
-    )
-}
-fn default_trad_gui_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+g", "功能: 显示/隐藏 传统候选窗")
-}
-fn default_modern_gui_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+h", "功能: 显示/隐藏 卡片式候选词")
-}
-fn default_keystroke_toggle() -> Shortcut {
-    Shortcut::new("ctrl+alt+k", "功能: 显示/隐藏 按键显示")
-}
-
-fn default_commit_mode_toggle() -> Shortcut {
-    Shortcut::new("alt+space", "功能: 切换上屏模式 (词模式/长句模式)")
-}
-
-// Helper for parse (unchanged)
-#[allow(dead_code)]
-pub fn parse_key(s: &str) -> Vec<Vec<Key>> {
-    s.split('+')
-        .map(|k| {
-            let k = k.to_lowercase().trim().to_string();
+pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
+    let mut combinations = Vec::new();
+    for combo_str in s.split('|') {
+        let mut requirements = Vec::new();
+        for part in combo_str.split('+') {
+            let k = part.to_lowercase().trim().to_string();
+            let mut keys = Vec::new();
             match k.as_str() {
-                "ctrl" => vec![Key::KEY_LEFTCTRL, Key::KEY_RIGHTCTRL],
-                "alt" => vec![Key::KEY_LEFTALT, Key::KEY_RIGHTALT],
-                "shift" => vec![Key::KEY_LEFTSHIFT, Key::KEY_RIGHTSHIFT],
-                "meta" | "super" | "win" => vec![Key::KEY_LEFTMETA, Key::KEY_RIGHTMETA],
-                "space" => vec![Key::KEY_SPACE],
-                "caps_lock" | "caps" => vec![Key::KEY_CAPSLOCK],
-                "tab" => vec![Key::KEY_TAB],
-                "enter" => vec![Key::KEY_ENTER],
-                "esc" => vec![Key::KEY_ESC],
-                "backspace" => vec![Key::KEY_BACKSPACE],
-                "insert" => vec![Key::KEY_INSERT],
-                "delete" => vec![Key::KEY_DELETE],
-                "home" => vec![Key::KEY_HOME],
-                "end" => vec![Key::KEY_END],
-                "page_up" => vec![Key::KEY_PAGEUP],
-                "page_down" => vec![Key::KEY_PAGEDOWN],
-                s if s.len() == 1 => {
-                    s.chars().next().and_then(|c| match c {
-                        'a' => Some(vec![Key::KEY_A]),
-                        'b' => Some(vec![Key::KEY_B]),
-                        'c' => Some(vec![Key::KEY_C]),
-                        'd' => Some(vec![Key::KEY_D]),
-                        'e' => Some(vec![Key::KEY_E]),
-                        'f' => Some(vec![Key::KEY_F]),
-                        'g' => Some(vec![Key::KEY_G]),
-                        'h' => Some(vec![Key::KEY_H]),
-                        'i' => Some(vec![Key::KEY_I]),
-                        'j' => Some(vec![Key::KEY_J]),
-                        'k' => Some(vec![Key::KEY_K]),
-                        'l' => Some(vec![Key::KEY_L]),
-                        'm' => Some(vec![Key::KEY_M]),
-                        'n' => Some(vec![Key::KEY_N]),
-                        'o' => Some(vec![Key::KEY_O]),
-                        'p' => Some(vec![Key::KEY_P]),
-                        'q' => Some(vec![Key::KEY_Q]),
-                        'r' => Some(vec![Key::KEY_R]),
-                        's' => Some(vec![Key::KEY_S]),
-                        't' => Some(vec![Key::KEY_T]),
-                        'u' => Some(vec![Key::KEY_U]),
-                        'v' => Some(vec![Key::KEY_V]),
-                        'w' => Some(vec![Key::KEY_W]),
-                        'x' => Some(vec![Key::KEY_X]),
-                        'y' => Some(vec![Key::KEY_Y]),
-                        'z' => Some(vec![Key::KEY_Z]),
-                        '0' => Some(vec![Key::KEY_0]),
-                        '1' => Some(vec![Key::KEY_1]),
-                        '2' => Some(vec![Key::KEY_2]),
-                        '3' => Some(vec![Key::KEY_3]),
-                        '4' => Some(vec![Key::KEY_4]),
-                        '5' => Some(vec![Key::KEY_5]),
-                        '6' => Some(vec![Key::KEY_6]),
-                        '7' => Some(vec![Key::KEY_7]),
-                        '8' => Some(vec![Key::KEY_8]),
-                        '9' => Some(vec![Key::KEY_9]),
-                        _ => None,
-                    }).unwrap_or_default()
-                }
-                _ => vec![],
+                "ctrl" => { keys.push(evdev::Key::KEY_LEFTCTRL); keys.push(evdev::Key::KEY_RIGHTCTRL); }
+                "shift" => { keys.push(evdev::Key::KEY_LEFTSHIFT); keys.push(evdev::Key::KEY_RIGHTSHIFT); }
+                "alt" => { keys.push(evdev::Key::KEY_LEFTALT); keys.push(evdev::Key::KEY_RIGHTALT); }
+                "meta" | "win" => { keys.push(evdev::Key::KEY_LEFTMETA); keys.push(evdev::Key::KEY_RIGHTMETA); }
+                _ => { if let Some(key) = string_to_key(&k) { keys.push(key); } }
             }
-        })
-        .collect()
+            if !keys.is_empty() { requirements.push(keys); }
+        }
+        if !requirements.is_empty() { combinations.push(requirements); }
+    }
+    combinations
+}
+
+fn string_to_key(s: &str) -> Option<evdev::Key> {
+    match s {
+        "ctrl" | "lctrl" | "rctrl" => Some(evdev::Key::KEY_LEFTCTRL),
+        "shift" | "lshift" | "rshift" => Some(evdev::Key::KEY_LEFTSHIFT),
+        "alt" | "lalt" | "ralt" => Some(evdev::Key::KEY_LEFTALT),
+        "meta" | "win" | "command" => Some(evdev::Key::KEY_LEFTMETA),
+        "space" => Some(evdev::Key::KEY_SPACE),
+        "enter" => Some(evdev::Key::KEY_ENTER),
+        "tab" => Some(evdev::Key::KEY_TAB),
+        "backspace" => Some(evdev::Key::KEY_BACKSPACE),
+        "esc" | "escape" => Some(evdev::Key::KEY_ESC),
+        "caps_lock" | "caps" => Some(evdev::Key::KEY_CAPSLOCK),
+        "a" => Some(evdev::Key::KEY_A), "b" => Some(evdev::Key::KEY_B), "c" => Some(evdev::Key::KEY_C),
+        "d" => Some(evdev::Key::KEY_D), "e" => Some(evdev::Key::KEY_E), "f" => Some(evdev::Key::KEY_F),
+        "g" => Some(evdev::Key::KEY_G), "h" => Some(evdev::Key::KEY_H), "i" => Some(evdev::Key::KEY_I),
+        "j" => Some(evdev::Key::KEY_J), "k" => Some(evdev::Key::KEY_K), "l" => Some(evdev::Key::KEY_L),
+        "m" => Some(evdev::Key::KEY_M), "n" => Some(evdev::Key::KEY_N), "o" => Some(evdev::Key::KEY_O),
+        "p" => Some(evdev::Key::KEY_P), "q" => Some(evdev::Key::KEY_Q), "r" => Some(evdev::Key::KEY_R),
+        "s" => Some(evdev::Key::KEY_S), "t" => Some(evdev::Key::KEY_T), "u" => Some(evdev::Key::KEY_U),
+        "v" => Some(evdev::Key::KEY_V), "w" => Some(evdev::Key::KEY_W), "x" => Some(evdev::Key::KEY_X),
+        "y" => Some(evdev::Key::KEY_Y), "z" => Some(evdev::Key::KEY_Z),
+        "0" => Some(evdev::Key::KEY_0), "1" => Some(evdev::Key::KEY_1), "2" => Some(evdev::Key::KEY_2),
+        "3" => Some(evdev::Key::KEY_3), "4" => Some(evdev::Key::KEY_4), "5" => Some(evdev::Key::KEY_5),
+        "6" => Some(evdev::Key::KEY_6), "7" => Some(evdev::Key::KEY_7), "8" => Some(evdev::Key::KEY_8),
+        "9" => Some(evdev::Key::KEY_9),
+        _ => None,
+    }
 }
