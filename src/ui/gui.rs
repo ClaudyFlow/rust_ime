@@ -324,10 +324,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 border-right: 1px solid rgba(255, 255, 255, 0.1);
             }}
             .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
-            .candidate-selected {{ background-color: #0071e3; }}
+            .candidate-selected {{ background-color: {cand_hl}; }}
             .candidate-selected .candidate-text, .candidate-selected .hint-text, .candidate-selected .index {{ color: #ffffff !important; opacity: 1.0; }}
             .candidate-text {{ color: {cand_text}; font-size: {cand_font}pt; font-weight: 500; }}
-            .hint-text {{ color: {cand_text}; opacity: 0.5; font-size: 10pt; margin-left: 8px; }}
+            .hint-text {{ color: {cand_text}; opacity: 0.5; font-size: {cand_hint_font}pt; margin-left: 8px; }}
             .index {{ font-size: 10pt; color: {cand_text}; opacity: 0.5; margin-right: 6px; }}
 
             /* 极客(Modern)卡片样式 */
@@ -350,13 +350,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
             }}
             .modern-selected {{
-                background-color: {m_text};
-                box-shadow: 0 0 20px {m_text}66;
-                border: 1px solid {m_text};
+                background-color: {m_hl};
+                box-shadow: 0 0 20px {m_hl}66;
+                border: 1px solid {m_hl};
             }}
             .modern-text {{ color: {m_text}; font-size: {m_font}pt; font-weight: 700; }}
             .modern-selected .modern-text {{ color: #ffffff; }}
-            .m-index {{ font-size: 10pt; font-weight: 900; color: rgba(0, 0, 0, 0.2); margin-right: 12px; }}
+            .m-index {{ font-size: {m_hint_font}pt; font-weight: 900; color: rgba(0, 0, 0, 0.2); margin-right: 12px; }}
             .modern-selected .m-index {{ color: rgba(255, 255, 255, 0.4); }}
 
             /* 按键回显 */
@@ -398,11 +398,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         "#, 
         cand_bg = app.candidate_bg_color,
         cand_text = app.candidate_text_color,
+        cand_hl = app.candidate_highlight_color,
         cand_font = app.candidate_font_size,
+        cand_hint_font = app.candidate_hint_font_size,
         s_font = app.candidate_font_size - 2,
         m_bg = app.modern_cand_bg_color,
         m_text = app.modern_cand_text_color,
+        m_hl = app.modern_cand_highlight_color,
         m_font = app.modern_cand_font_size,
+        m_hint_font = app.modern_cand_hint_font_size,
         key_bg = app.keystroke_bg_color,
         key_font = app.keystroke_font_size);
         

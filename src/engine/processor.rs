@@ -69,6 +69,7 @@ pub struct Processor {
     pub prefix_matching_limit: usize,
     pub enable_abbreviation_matching: bool,
     pub filter_proper_nouns_by_case: bool,
+    pub enable_error_sound: bool,
     pub has_dict_match: bool,
     pub page_flipping_style: String,
 }
@@ -140,16 +141,17 @@ impl Processor {
             switch_mode: false,
             cursor_pos: 0,
             profile_keys: Vec::new(),
-            page_size: 9,
-            show_tone_hint: true,
-            show_en_hint: true,
             auto_commit_unique_en_fuzhuma: false,
             auto_commit_unique_full_match: false,
             enable_prefix_matching: true,
             prefix_matching_limit: 20,
             enable_abbreviation_matching: true,
             filter_proper_nouns_by_case: true,
+            enable_error_sound: true,
             has_dict_match: false,
+            page_size: 5,
+            show_tone_hint: false,
+            show_en_hint: true,
             page_flipping_style: "arrow".to_string(),
         }
     }
@@ -166,6 +168,7 @@ impl Processor {
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
         self.auto_commit_unique_full_match = conf.input.auto_commit_unique_full_match;
+        self.enable_error_sound = conf.input.enable_error_sound;
         self.enable_prefix_matching = conf.input.enable_prefix_matching;
         self.prefix_matching_limit = conf.input.prefix_matching_limit;
         self.enable_abbreviation_matching = conf.input.enable_abbreviation_matching;
@@ -419,11 +422,16 @@ impl Processor {
     }
 
     fn check_auto_commit(&mut self) -> Option<Action> {
-        if self.commit_mode != "single" || self.candidates.len() != 1 || !self.has_dict_match || self.state == ImeState::NoMatch { return None; }
+        if !self.auto_commit_unique_full_match || self.candidates.len() != 1 || !self.has_dict_match || self.state == ImeState::NoMatch { return None; }
+        
         let raw_input = &self.buffer;
-        let mut total_exact = 0; let mut total_longer = 0;
-        for p in &self.active_profiles { if let Some(d) = self.tries.get(p) { if let Some(ex) = d.get_all_exact(raw_input) { total_exact += ex.len(); } if d.has_longer_match(raw_input) { total_longer += 1; } } }
-        if total_exact == 1 && total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone())); }
+        let mut total_longer = 0;
+        for p in &self.active_profiles {
+            if let Some(d) = self.tries.get(p) {
+                if d.has_longer_match(raw_input) { total_longer += 1; break; }
+            }
+        }
+        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone())); }
         None
     }
 }
@@ -458,8 +466,18 @@ mod tests {
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
             preview_selected_candidate: false, enable_anti_typo: true, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0, profile_keys: Vec::new(),
-            page_size: 5, show_tone_hint: true, show_en_hint: true, auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true,
-            prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, has_dict_match: false, page_flipping_style: "arrow".to_string(),
+            auto_commit_unique_en_fuzhuma: false,
+            auto_commit_unique_full_match: false,
+            enable_prefix_matching: true,
+            prefix_matching_limit: 20,
+            enable_abbreviation_matching: true,
+            filter_proper_nouns_by_case: true,
+            enable_error_sound: true,
+            has_dict_match: false,
+            page_size: 5,
+            show_tone_hint: false,
+            show_en_hint: true,
+            page_flipping_style: "arrow".to_string(),
         }
     }
 
