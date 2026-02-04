@@ -158,7 +158,7 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("桌面通知: {}", if self.show_notifications { "开启" } else { "关闭" }),
+                label: format!("系统通知候选词: {}", if self.show_notifications { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleNotify); }),
                 ..Default::default()
             }.into(),

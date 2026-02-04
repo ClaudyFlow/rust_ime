@@ -47,7 +47,7 @@
 
         .card { background: var(--apple-card); border-radius: 20px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--apple-border); box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
 
-        .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #efefef; }
+        .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid #efefef; }
         .setting-item:last-child { border-bottom: none; }
 
         .info { flex: 1; margin-right: 20px; }
@@ -99,7 +99,6 @@
     </aside>
 
     <main>
-        <!-- General -->
         <div id="tab-general" class="tab-content active">
             <h1>系统总览</h1>
             <div class="card">
@@ -136,7 +135,6 @@
             </div>
         </div>
 
-        <!-- Matching -->
         <div id="tab-matching" class="tab-content">
             <h1>搜索与匹配</h1>
             <div class="card">
@@ -167,7 +165,6 @@
             </div>
         </div>
 
-        <!-- Appearance -->
         <div id="tab-appearance" class="tab-content">
             <h1>视觉与样式</h1>
             
@@ -177,12 +174,12 @@
                     <div class="setting-item"><div class="info"><div class="title">显示卡片窗</div></div><label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">按键回显</div></div><label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">系统通知候选词</div><div class="desc">在托盘通知区域显示候选词</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">拼音预览开关</div><div class="desc">在输入位置实时预览拼音</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">系统通知</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">屏幕预览</div></div><select id="preview_mode"><option value="pinyin">拼音预览</option><option value="none">关闭</option></select></div>
+                    <div class="setting-item"><div class="info"><div class="title">按键回显</div></div><label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">显示英文释义</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
@@ -241,7 +238,7 @@
             <h2>汉字学习模式</h2>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">学习模式词典</div><div class="desc">选择用于轮播学习的 JSON 词库</div></div>
+                    <div class="info"><div class="title">学习模式词典</div></div>
                     <select id="learning_dict_path" style="width: 300px;"></select>
                 </div>
                 <div class="grid-2">
@@ -263,7 +260,7 @@
         <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索词条..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
     </main>
 
-    <div id="toast" class="status-toast">已应用更改</div>
+    <div id="toast" class="status-toast">已保存并应用</div>
 
     <script>
         let config = null;
@@ -285,20 +282,17 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // 填充方案选择
             const dp = document.getElementById('default_profile');
             dp.innerHTML = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
             dp.value = config.input.default_profile;
 
-            // 填充词典选择 (学习模式)
             const d_r = await fetch('/api/dicts'); const dicts = await d_r.json();
             const ls = document.getElementById('learning_dict_path');
             ls.innerHTML = dicts.filter(d => d.path.endsWith('.json')).map(d => `<option value="${d.path}">${d.name}</option>`).join('');
             ls.value = config.appearance.learning_dict_path;
 
-            // 所有数字、选择框、文本框
             const allIds = [
-                'commit_mode', 'page_size', 'paste_method', 'preview_mode',
+                'commit_mode', 'page_size', 'paste_method',
                 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size',
                 'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size',
                 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_margin_x', 'keystroke_margin_y',
@@ -310,13 +304,14 @@
                 el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] !== undefined ? config.input[id] : "");
             });
 
-            // 所有复选框
             const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint'];
             checkIds.forEach(id => {
                 const el = document.getElementById(id); if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id];
             });
+            
+            // 拼音预览开关逻辑映射
+            document.getElementById('preview_mode_toggle').checked = (config.appearance.preview_mode === 'pinyin');
 
-            // 颜色
             const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
             colorIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
@@ -329,19 +324,20 @@
         }
 
         async function saveAll() {
-            // 系统与匹配
             ['commit_mode', 'default_profile', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });
             config.input.page_flipping_keys = [document.getElementById('page_flipping_keys').value];
 
-            // 视觉与样式
-            const appIds = ['page_size', 'preview_mode', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_margin_x', 'keystroke_margin_y', 'keystroke_bg_color', 'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_x', 'learning_margin_y', 'learning_bg_color', 'learning_dict_path'];
+            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_margin_x', 'keystroke_margin_y', 'keystroke_bg_color', 'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_x', 'learning_margin_y', 'learning_bg_color', 'learning_dict_path'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = (el.type === 'number') ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
             });
+            
+            // 拼音预览开关逻辑反向映射
+            config.appearance.preview_mode = document.getElementById('preview_mode_toggle').checked ? 'pinyin' : 'none';
 
             await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
             const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
