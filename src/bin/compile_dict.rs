@@ -11,13 +11,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all("data")?;
 
     // 0. Ensure Jianpin Dictionary is up-to-date
-    // Try both old and new paths for compatibility, but prioritize new structure
     let chars_path = if Path::new("dicts/chinese/chars/chars.json").exists() { "dicts/chinese/chars/chars.json" } else { "dicts/chinese/chars.json" };
     let words_path = if Path::new("dicts/chinese/words/words.json").exists() { "dicts/chinese/words/words.json" } else { "dicts/chinese/words.json" };
     let jianpin_path = if Path::new("dicts/chinese/words/words_jianpin.json").exists() { "dicts/chinese/words/words_jianpin.json" } else { "dicts/chinese/words_jianpin.json" };
 
+    let freq_map = load_frequency_map();
+
     if Path::new(chars_path).exists() && Path::new(words_path).exists() {
-        ensure_jianpin_up_to_date(chars_path, words_path, jianpin_path)?;
+        ensure_jianpin_up_to_date(chars_path, words_path, jianpin_path, &freq_map)?;
     }
 
     // 1. 自动提取并加载音节表
@@ -48,7 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // 3. 检查是否需要编译 Trie
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
                     let is_english = dir_name.contains("english");
-                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english, &syllables)?;
+                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english, &syllables, &freq_map)?;
                 } else {
                     println!("[Compiler] Skipping Trie for: {} (No changes detected)", dir_name);
                 }
@@ -74,10 +75,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn load_frequency_map() -> HashMap<String, u64> {
+    let mut map = HashMap::new();
+    let rime_dir = Path::new("dicts/rime-ice");
+    if !rime_dir.exists() { return map; }
+    
+    println!("[Compiler] Loading frequency data from {}...", rime_dir.display());
+    for entry in WalkDir::new(rime_dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "yaml") {
+             if let Ok(file) = File::open(path) {
+                 use std::io::{BufRead, BufReader};
+                 let reader = BufReader::new(file);
+                 let mut in_data = false;
+                 for line in reader.lines() {
+                     if let Ok(l) = line {
+                         if !in_data {
+                             if l.starts_with("...") { in_data = true; }
+                             continue;
+                         }
+                         if l.starts_with('#') || l.trim().is_empty() { continue; }
+                         let parts: Vec<&str> = l.split('\t').collect();
+                         if parts.len() >= 3 {
+                             let word = parts[0];
+                             if let Ok(weight) = parts[2].parse::<u64>() {
+                                 let entry = map.entry(word.to_string()).or_insert(0);
+                                 if weight > *entry { *entry = weight; }
+                             }
+                         }
+                     }
+                 }
+             }
+        }
+    }
+    map
+}
+
+fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &str, freq_map: &HashMap<String, u64>) -> Result<(), Box<dyn std::error::Error>> {
     let words = Path::new(words_path);
     let jianpin = Path::new(jianpin_path);
     
+    let force_regen = std::env::var("FORCE_REGEN_JIANPIN").is_ok();
+
     if !words.exists() { return Ok(()); }
     
     let words_mtime = words.metadata()?.modified()?;
@@ -87,8 +126,8 @@ fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &
         SystemTime::UNIX_EPOCH
     };
     
-    if words_mtime > jianpin_mtime {
-        println!("[Compiler] Regenerating {} from {}...", jianpin_path, words_path);
+    if force_regen || words_mtime > jianpin_mtime {
+        println!("[Compiler] Regenerating {} from {} with sorting...", jianpin_path, words_path);
         
         let mut syllables = HashSet::new();
         if let Ok(file) = File::open(chars_path) {
@@ -110,10 +149,6 @@ fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &
                  let entry = jianpin_map.entry(abbr).or_default();
                  if let Some(arr) = val.as_array() {
                      for v in arr { 
-                         // Simple deduplication for JSON values is hard, but we assume exact structure match
-                         // For simplicity, we just append if not present (inefficient but works)
-                         // Actually, checking if Vec<Value> contains Value is slow.
-                         // Let's just push and rely on uniqueness of input if possible, or simple check.
                          let v_str = v.to_string();
                          if !entry.iter().any(|e| e.to_string() == v_str) {
                              entry.push(v.clone());
@@ -126,6 +161,24 @@ fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &
                      }
                  }
              }
+        }
+
+        // Sort candidates
+        for (_, candidates) in jianpin_map.iter_mut() {
+            candidates.sort_by(|a, b| {
+                let get_weight = |v: &Value| -> u64 {
+                    if let Some(s) = v.as_str() { return *freq_map.get(s).unwrap_or(&0); }
+                    if let Some(o) = v.as_object() {
+                        if let Some(c) = o.get("char").and_then(|s| s.as_str()) {
+                            return *freq_map.get(c).unwrap_or(&0);
+                        }
+                    }
+                    0
+                };
+                let w_a = get_weight(a);
+                let w_b = get_weight(b);
+                w_b.cmp(&w_a) // Descending
+            });
         }
         
         let out_file = File::create(jianpin_path)?;
@@ -203,7 +256,7 @@ fn extract_syllables_to_file(src_json: &str, out_txt: &str) -> Result<(), Box<dy
     Ok(())
 }
 
-fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllables: &HashSet<String>) -> Result<(), Box<dyn std::error::Error>> {
+fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllables: &HashSet<String>, freq_map: &HashMap<String, u64>) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     let mut abbrev_entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     println!("[Compiler] Compiling dictionary from {} -> {}...", src_dir, out_stem);
@@ -218,6 +271,15 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllab
         } else if path.extension().map_or(false, |ext| ext == "yaml") {
             process_yaml_file(path, &mut entries, &mut abbrev_entries)?;
         }
+    }
+
+    // Sort entries by frequency
+    for (_, candidates) in entries.iter_mut() {
+        candidates.sort_by(|(word_a, _), (word_b, _)| {
+            let w_a = freq_map.get(word_a).unwrap_or(&0);
+            let w_b = freq_map.get(word_b).unwrap_or(&0);
+            w_b.cmp(w_a)
+        });
     }
     
     let idx_path = format!("{}.index", out_stem);
@@ -249,7 +311,7 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
             let word = parts[0].to_string();
             let pinyin_raw = parts[1].to_lowercase();
             let pinyin = pinyin_raw.replace(' ', "");
-            // Rime 格式: 词 \t 拼音 \t 权重
+            // Rime 格式: 词 	 拼音 	 权重
             let weight = if parts.len() >= 3 { parts[2] } else { "" };
             entries.entry(pinyin).or_default().push((word.clone(), weight.to_string()));
 
