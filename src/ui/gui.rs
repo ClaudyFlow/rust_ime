@@ -503,7 +503,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             GuiEvent::ClearKeystrokes => {
                 ks_c.clear();
             }
-            GuiEvent::Update { pinyin, candidates, hints, selected, sentence } => {
+            GuiEvent::Update { pinyin, candidates, hints, selected, sentence: _ } => {
                 let show_trad = current_config.appearance.show_candidates;
                 let show_modern = current_config.appearance.show_modern_candidates;
 
