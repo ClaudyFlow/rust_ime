@@ -347,11 +347,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 margin: 6px 0;
                 background: {m_bg};
                 border: 1px solid rgba(255, 255, 255, 0.08);
-                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+                box-shadow: none;
             }}
             .modern-selected {{
                 background-color: {m_hl};
-                box-shadow: 0 0 20px {m_hl}66;
+                box-shadow: none;
                 border: 1px solid {m_hl};
             }}
             .modern-text {{ color: {m_text}; font-size: {m_font}pt; font-weight: 700; }}
