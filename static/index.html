@@ -54,7 +54,6 @@
         .info .title { font-weight: 600; font-size: 16px; }
         .info .desc { font-size: 13px; color: var(--apple-secondary); margin-top: 4px; }
 
-        /* 输入框强可见性 */
         input[type="text"], input[type="number"], select {
             background: #ffffff; border: 2px solid #8e8e93; border-radius: 10px;
             padding: 10px 14px; font-size: 14px; min-width: 120px; width: 120px; outline: none; transition: all 0.2s;
@@ -62,7 +61,6 @@
         }
         input:focus { border-color: var(--apple-accent); box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
 
-        /* 颜色选择器交互 */
         .color-picker-group { display: flex; align-items: center; gap: 12px; }
         .color-preview { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--apple-border); cursor: pointer; padding: 0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .color-preview input[type="color"] { width: 100%; height: 100%; transform: scale(1.5); cursor: pointer; border: none; background: none; }
@@ -99,96 +97,89 @@
     </aside>
 
     <main>
-        <!-- General -->
         <div id="tab-general" class="tab-content active">
             <h1>系统总览</h1>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">上屏模式</div><div class="desc">词模式（单空格）更轻快，句模式（双空格）更精准</div></div>
+                    <div class="info"><div class="title">上屏模式</div></div>
                     <select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">候选词数量</div><div class="desc">每页展示的词条个数</div></div>
+                    <div class="info"><div class="title">候选词数量</div></div>
                     <input type="number" id="page_size">
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">精准匹配自动上屏</div><div class="desc">完全匹配词库且唯一时自动提交</div></div>
+                    <div class="info"><div class="title">精准匹配自动上屏</div></div>
                     <label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">防呆模式</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
                 </div>
             </div>
         </div>
 
-        <!-- Appearance -->
         <div id="tab-appearance" class="tab-content">
             <h1>视觉与样式</h1>
+            
+            <h2>传统窗口 (Traditional)</h2>
             <div class="card">
                 <div class="setting-item">
                     <div class="info"><div class="title">显示传统窗口</div></div>
                     <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
                 </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">显示卡片窗口</div></div>
-                    <label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
+                    <div class="setting-item"><div class="info"><div class="title">文字字号</div></div><input type="number" id="candidate_font_size"></div>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">显示英文提示</div></div>
-                    <label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label>
-                </div>
-            </div>
-
-            <h2>传统窗口 (Traditional)</h2>
-            <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">垂直边距 (Y)</div><div class="desc">控制窗口与光标的距离</div></div>
-                    <input type="number" id="candidate_margin_y">
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">主候选词字号</div></div>
-                    <input type="number" id="candidate_font_size">
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">辅码/提示字号 (Hint)</div><div class="desc">控制候选词右侧解释文字的大小</div></div>
+                    <div class="info"><div class="title">辅码/提示字号 (Hint)</div></div>
                     <input type="number" id="candidate_hint_font_size">
                 </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">背景颜色</div></div>
-                    <div class="color-picker-group">
-                        <input type="text" id="candidate_bg_color" style="width: 100px;">
-                        <div class="color-preview"><input type="color" id="candidate_bg_color_picker"></div>
+                <div class="grid-2">
+                    <div class="setting-item">
+                        <div class="info"><div class="title">背景颜色</div></div>
+                        <div class="color-picker-group"><input type="text" id="candidate_bg_color" style="width: 80px;"><div class="color-preview"><input type="color" id="candidate_bg_color_picker"></div></div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">文字颜色</div></div>
+                        <div class="color-picker-group"><input type="text" id="candidate_text_color" style="width: 80px;"><div class="color-preview"><input type="color" id="candidate_text_color_picker"></div></div>
                     </div>
                 </div>
                 <div class="setting-item">
                     <div class="info"><div class="title">高亮颜色</div></div>
-                    <div class="color-picker-group">
-                        <input type="text" id="candidate_highlight_color" style="width: 100px;">
-                        <div class="color-preview"><input type="color" id="candidate_highlight_color_picker"></div>
-                    </div>
+                    <div class="color-picker-group"><input type="text" id="candidate_highlight_color" style="width: 80px;"><div class="color-preview"><input type="color" id="candidate_highlight_color_picker"></div></div>
                 </div>
             </div>
 
             <h2>卡片窗口 (Modern)</h2>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">辅码/提示字号 (Hint)</div></div>
-                    <input type="number" id="modern_cand_hint_font_size">
+                    <div class="info"><div class="title">显示卡片窗口</div></div>
+                    <label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">锚定位置</div><div class="desc">卡片在屏幕上的对齐角落</div></div>
+                    <select id="modern_cand_anchor">
+                        <option value="bottom_left">左下角</option>
+                        <option value="bottom_right">右下角</option>
+                        <option value="top_left">左上角</option>
+                        <option value="top_right">右上角</option>
+                    </select>
+                </div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">文字字号</div></div><input type="number" id="modern_cand_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">辅码字号</div></div><input type="number" id="modern_cand_hint_font_size"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="setting-item">
+                        <div class="info"><div class="title">文字颜色</div></div>
+                        <div class="color-picker-group"><input type="text" id="modern_cand_text_color" style="width: 80px;"><div class="color-preview"><input type="color" id="modern_cand_text_color_picker"></div></div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">高亮颜色</div></div>
+                        <div class="color-picker-group"><input type="text" id="modern_cand_highlight_color" style="width: 80px;"><div class="color-preview"><input type="color" id="modern_cand_highlight_color_picker"></div></div>
+                    </div>
                 </div>
                 <div class="setting-item">
                     <div class="info"><div class="title">背景颜色</div></div>
-                    <div class="color-picker-group">
-                        <input type="text" id="modern_cand_bg_color" style="width: 100px;">
-                        <div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div>
-                    </div>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">高亮颜色</div></div>
-                    <div class="color-picker-group">
-                        <input type="text" id="modern_cand_highlight_color" style="width: 100px;">
-                        <div class="color-preview"><input type="color" id="modern_cand_highlight_color_picker"></div>
-                    </div>
+                    <div class="color-picker-group"><input type="text" id="modern_cand_bg_color" style="width: 80px;"><div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div></div>
                 </div>
             </div>
         </div>
@@ -214,6 +205,7 @@
 
         function linkColor(id) {
             const txt = document.getElementById(id); const picker = document.getElementById(id + '_picker');
+            if(!txt || !picker) return;
             txt.oninput = () => { if(txt.value.startsWith('#')) picker.value = txt.value; };
             picker.oninput = () => { txt.value = picker.value; };
         }
@@ -221,23 +213,23 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // Sync values
-            const ids = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_hint_font_size'];
+            // Numbers & Selects
+            const ids = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size'];
             ids.forEach(id => { 
                 const el = document.getElementById(id);
-                if(el) {
-                    const val = (id.includes('font_size') || id.includes('margin')) ? (config.appearance[id] || config.input[id] || 0) : (config.input[id] || config.appearance[id]);
-                    el.value = val;
-                }
+                if(el) el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] !== undefined ? config.input[id] : "");
             });
 
-            const checks = ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_en_hint'];
-            checks.forEach(id => { const el = document.getElementById(id); if(el) el.checked = config.input[id] || config.appearance[id]; });
+            // Checkboxes
+            ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates'].forEach(id => {
+                const el = document.getElementById(id); if(el) el.checked = config.input[id] || config.appearance[id];
+            });
 
             // Colors
-            const colors = ['candidate_bg_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_highlight_color'];
+            const colors = ['candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
             colors.forEach(id => {
-                const el = document.getElementById(id); el.value = config.appearance[id];
+                const el = document.getElementById(id); if(!el) return;
+                el.value = config.appearance[id] || "#ffffff";
                 linkColor(id);
                 const picker = document.getElementById(id + '_picker');
                 if(el.value.startsWith('#')) picker.value = el.value;
@@ -247,22 +239,16 @@
         }
 
         async function saveAll() {
-            // Collect
             config.input.commit_mode = document.getElementById('commit_mode').value;
             config.appearance.page_size = parseInt(document.getElementById('page_size').value);
             config.input.auto_commit_unique_full_match = document.getElementById('auto_commit_unique_full_match').checked;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
-            config.appearance.show_candidates = document.getElementById('show_candidates').checked;
-            config.appearance.show_modern_candidates = document.getElementById('show_modern_candidates').checked;
-            config.appearance.show_en_hint = document.getElementById('show_en_hint').checked;
-            config.appearance.candidate_margin_y = parseInt(document.getElementById('candidate_margin_y').value);
-            config.appearance.candidate_font_size = parseInt(document.getElementById('candidate_font_size').value);
-            config.appearance.candidate_hint_font_size = parseInt(document.getElementById('candidate_hint_font_size').value);
-            config.appearance.modern_cand_hint_font_size = parseInt(document.getElementById('modern_cand_hint_font_size').value);
-            config.appearance.candidate_bg_color = document.getElementById('candidate_bg_color').value;
-            config.appearance.candidate_highlight_color = document.getElementById('candidate_highlight_color').value;
-            config.appearance.modern_cand_bg_color = document.getElementById('modern_cand_bg_color').value;
-            config.appearance.modern_cand_highlight_color = document.getElementById('modern_cand_highlight_color').value;
+            
+            const appIds = ['show_candidates', 'show_modern_candidates', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
+            appIds.forEach(id => {
+                const el = document.getElementById(id); if(!el) return;
+                config.appearance[id] = el.type === 'number' ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
+            });
 
             await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
             const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
@@ -273,12 +259,12 @@
         function renderPK() { document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `<div class="setting-item"><input type="text" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value"> ⮕ <input type="text" value="${pk.profile}" onchange="config.input.profile_keys[${i}].profile=this.value"> <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button></div>`).join(''); }
         function addPK() { if(!config.input.profile_keys) config.input.profile_keys=[]; config.input.profile_keys.push({key:'?',profile:''}); renderPK(); }
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
-        async function renderDicts() { const ds = await (await fetch('/api/dicts')).json(); document.getElementById('dicts-container').innerHTML = ds.map(f => `<div class="card" style="display:flex; justify-content:space-between; ${f.enabled?'':'opacity:0.5'}"><b>${f.name}</b><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join(''); }
+        async function renderDicts() { const r = await fetch('/api/dicts'); const ds = await r.json(); document.getElementById('dicts-container').innerHTML = ds.map(f => `<div class="card" style="display:flex; justify-content:space-between; ${f.enabled?'':'opacity:0.5'}"><b>${f.name}</b><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join(''); }
         async function toggleDict(path) { await fetch('/api/dicts/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); renderDicts(); }
         async function compile() { alert('编译开始'); await fetch('/api/dicts/compile', { method: 'POST' }); alert('完成'); }
         async function resetAll() { if(confirm("确定重置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
-        let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" style="padding:5px 15px;" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
-        async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('更新成功'); }
+        let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
+        async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
 
         load();
     </script>
