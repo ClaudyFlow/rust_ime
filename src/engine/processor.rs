@@ -272,17 +272,25 @@ impl Processor {
     }
 
     fn handle_direct(&mut self, key: Key, shift_pressed: bool) -> Action {
-        if let Some(c) = key_to_char(key, shift_pressed) {
-            let old_buffer = self.buffer.clone();
-            self.buffer.push(c); 
-            self.state = ImeState::Composing; 
-            self.lookup();
-            if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
-            self.update_phantom_action()
-        } else if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
-            if let Some(zh_puncs) = self.punctuation.get(punc_key) { if let Some(first) = zh_puncs.first() { return Action::Emit(first.clone()); } } // Use first punctuation if available
-            Action::PassThrough
-        } else { Action::PassThrough } 
+        // 如果是字母，则开始拼写
+        if is_letter(key) {
+            if let Some(c) = key_to_char(key, shift_pressed) {
+                let old_buffer = self.buffer.clone();
+                self.buffer.push(c); 
+                self.state = ImeState::Composing; 
+                self.lookup();
+                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
+                return self.update_phantom_action();
+            }
+        }
+
+        // 否则，如果是标点符号（包含 , . - =），直接上屏
+        if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
+            if let Some(zh_puncs) = self.punctuation.get(punc_key) { if let Some(first) = zh_puncs.first() { return Action::Emit(first.clone()); } }
+            return Action::Emit(punc_key.to_string());
+        }
+
+        Action::PassThrough
     }
 
     fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
@@ -357,13 +365,15 @@ impl Processor {
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
             }
             // Fallback: all keys recognized as characters
-            _ if let Some(c) = key_to_char(key, shift_pressed) => {
-                let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; self.lookup(); 
-                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
-                if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action() 
+            _ => {
+                if let Some(c) = key_to_char(key, shift_pressed) {
+                    let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; self.lookup(); 
+                    if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
+                    if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action() 
+                } else if get_punctuation_key(key, shift_pressed).is_some() {
+                    self.handle_punctuation(key, shift_pressed)
+                } else { Action::PassThrough }
             }
-            _ if get_punctuation_key(key, shift_pressed).is_some() => { self.handle_punctuation(key, shift_pressed) }
-            _ => Action::PassThrough,
         }
     }
 
@@ -480,7 +490,14 @@ impl Processor {
     }
 }
 
-pub fn is_letter(key: Key) -> bool { key_to_char(key, false).is_some() }
+pub fn is_letter(key: Key) -> bool { 
+    matches!(key, 
+        Key::KEY_Q | Key::KEY_W | Key::KEY_E | Key::KEY_R | Key::KEY_T | Key::KEY_Y | Key::KEY_U | Key::KEY_I | Key::KEY_O | Key::KEY_P |
+        Key::KEY_A | Key::KEY_S | Key::KEY_D | Key::KEY_F | Key::KEY_G | Key::KEY_H | Key::KEY_J | Key::KEY_K | Key::KEY_L |
+        Key::KEY_Z | Key::KEY_X | Key::KEY_C | Key::KEY_V | Key::KEY_B | Key::KEY_N | Key::KEY_M |
+        Key::KEY_APOSTROPHE
+    )
+}
 pub fn is_digit(key: Key) -> bool { matches!(key, Key::KEY_1 | Key::KEY_2 | Key::KEY_3 | Key::KEY_4 | Key::KEY_5 | Key::KEY_6 | Key::KEY_7 | Key::KEY_8 | Key::KEY_9 | Key::KEY_0) }
 pub fn key_to_digit(key: Key) -> Option<usize> { match key { Key::KEY_1 => Some(1), Key::KEY_2 => Some(2), Key::KEY_3 => Some(3), Key::KEY_4 => Some(4), Key::KEY_5 => Some(5), Key::KEY_6 => Some(6), Key::KEY_7 => Some(7), Key::KEY_8 => Some(8), Key::KEY_9 => Some(9), Key::KEY_0 => Some(0), _ => None } }
 pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
