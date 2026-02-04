@@ -348,7 +348,26 @@
         function renderPK() { document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `<div class="setting-item"><input type="text" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value"> ⮕ <input type="text" value="${pk.profile}" onchange="config.input.profile_keys[${i}].profile=this.value"> <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button></div>`).join(''); }
         function addPK() { if(!config.input.profile_keys) config.input.profile_keys=[]; config.input.profile_keys.push({key:'?',profile:''}); renderPK(); }
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
-        function renderDictsList(ds) { document.getElementById('dicts-container').innerHTML = ds.map(f => `<div class="card" style="display:flex; justify-content:space-between; ${f.enabled?'':'opacity:0.5'}"><b>${f.name}</b><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join(''); }
+        function renderDictsList(ds) {
+            const groups = {};
+            ds.forEach(d => { if(!groups[d.group]) groups[d.group] = []; groups[d.group].push(d); });
+            
+            const container = document.getElementById('dicts-container');
+            container.innerHTML = Object.entries(groups).sort().map(([group, files]) => `
+                <div class="card">
+                    <h3 style="margin-top:0; text-transform:capitalize; color:var(--apple-accent);">${group}</h3>
+                    ${files.map(f => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px dashed #eee; ${f.enabled?'':'opacity:0.5'}">
+                            <div>
+                                <div style="font-weight:600;">${f.name.replace('.disabled','')}</div>
+                                <div style="font-size:11px; color:#888;">${f.entry_count.toLocaleString()} 词条</div>
+                            </div>
+                            <label class="switch" style="transform: scale(0.8);"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
         async function toggleDict(path) { await fetch('/api/dicts/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); load(); }
         async function compile() { alert('编译开始'); await fetch('/api/dicts/compile', { method: 'POST' }); alert('完成'); }
         async function resetAll() { if(confirm("重置所有设置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }

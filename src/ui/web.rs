@@ -141,6 +141,7 @@ async fn reset_config(
 struct DictFile {
     name: String,
     path: String,
+    group: String,
     size: u64,
     entry_count: u64,
     enabled: bool,
@@ -149,24 +150,22 @@ struct DictFile {
 async fn list_dicts() -> Json<Vec<DictFile>> {
     let mut list = Vec::new();
     let root = "dicts";
-    if let Ok(entries) = std::fs::read_dir(root) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                if let Ok(sub_entries) = std::fs::read_dir(entry.path()) {
-                    for sub_entry in sub_entries.flatten() {
-                        let path = sub_entry.path();
-                        let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                        if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
-                            list.push(process_dict_entry(path));
-                        }
-                    }
-                }
-            } else {
-                let path = entry.path();
-                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
-                    list.push(process_dict_entry(path));
-                }
+    let walker = walkdir::WalkDir::new(root).into_iter();
+    
+    for entry in walker.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_file() {
+            let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            if filename.ends_with(".json") || filename.ends_with(".json.disabled") {
+                // 计算分组名：取 dicts/ 下的一级目录名
+                let relative = path.strip_prefix(root).unwrap_or(path);
+                let group = relative.components().next()
+                    .map(|c| c.as_os_str().to_string_lossy().to_string())
+                    .unwrap_or_else(|| "other".to_string());
+                
+                let mut dict = process_dict_entry(path.to_path_buf());
+                dict.group = group;
+                list.push(dict);
             }
         }
     }
@@ -184,21 +183,16 @@ fn process_dict_entry(path: std::path::PathBuf) -> DictFile {
         if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
             if let Some(obj) = json.as_object() {
                 for val in obj.values() {
-                    if let Some(arr) = val.as_array() {
-                        entry_count += arr.len() as u64;
-                    } else {
-                        entry_count += 1;
-                    }
+                    if let Some(arr) = val.as_array() { entry_count += arr.len() as u64; } else { entry_count += 1; }
                 }
-            } else if let Some(arr) = json.as_array() {
-                entry_count = arr.len() as u64;
-            }
+            } else if let Some(arr) = json.as_array() { entry_count = arr.len() as u64; }
         }
     }
 
     DictFile {
         name: filename,
         path: path.to_string_lossy().to_string(),
+        group: String::new(),
         size,
         entry_count,
         enabled,
