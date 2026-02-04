@@ -1,9 +1,9 @@
 import os
 
 def capitalize_pinyin(pinyin_str):
-    syllables = pinyin_str.split()
-    capitalized = [s.capitalize() for s in syllables]
-    return " ".join(capitalized)
+    # 先删除所有空格，然后仅首字母大写
+    joined = pinyin_str.replace(" ", "")
+    return joined.capitalize()
 
 def process_directory(base_path):
     if not os.path.exists(base_path):
