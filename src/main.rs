@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let (profile, enabled) = {
                         let mut p = processor_clone.lock().unwrap();
                         let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
-                        (p.current_profile.clone(), p.chinese_enabled)
+                        (p.get_current_profile_display(), p.chinese_enabled)
                     };
                     let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
