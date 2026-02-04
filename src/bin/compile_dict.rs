@@ -182,7 +182,8 @@ fn split_syllables(pinyin: &str, syllables: &HashSet<String>) -> Vec<String> {
         for len in (1..=7).rev() {
             if i + len <= pinyin.len() && pinyin.is_char_boundary(i + len) {
                 let sub = &pinyin[i..i+len];
-                if syllables.contains(sub) {
+                // 注意：这里比较时使用小写，因为 syllables.txt 通常是小写，但我们要保留原始 pinyin 大小写
+                if syllables.contains(&sub.to_lowercase()) {
                     res.push(sub.to_string());
                     i += len;
                     found = true;
@@ -291,17 +292,23 @@ fn process_txt_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, Str
 
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
-            let word = parts[0].to_string();
-            let pinyin_raw = parts[1].to_lowercase();
+            let word = parts[0].trim().to_string();
+            let pinyin_raw = parts[1].trim();
+            // 索引键：保留原始大小写，去掉空格
             let pinyin = pinyin_raw.replace(' ', "");
-            // TXT 格式: 词 \t 拼音 \t [权重]
-            let weight = if parts.len() >= 3 { parts[2] } else { "" };
-            entries.entry(pinyin).or_default().push((word.clone(), weight.to_string()));
+            
+            let hint = if parts.len() >= 3 { 
+                parts[2].trim().to_string() 
+            } else { 
+                pinyin_raw.to_string()
+            };
 
-            // Extract jianpin from space-separated syllables
+            entries.entry(pinyin).or_default().push((word.clone(), hint.clone()));
+
+            // 提取简拼：保留原始大小写
             let abbrev: String = pinyin_raw.split_whitespace().filter_map(|s| s.chars().next()).collect();
             if abbrev.len() > 1 && abbrev != pinyin_raw.replace(' ', "") {
-                abbrev_entries.entry(abbrev).or_default().push((word, weight.to_string()));
+                abbrev_entries.entry(abbrev).or_default().push((word, hint));
             }
         }
     }
@@ -325,13 +332,11 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
             let word = parts[0].to_string();
-            let pinyin_raw = parts[1].to_lowercase();
+            let pinyin_raw = parts[1].trim();
             let pinyin = pinyin_raw.replace(' ', "");
-            // Rime 格式: 词 	 拼音 	 权重
             let weight = if parts.len() >= 3 { parts[2] } else { "" };
             entries.entry(pinyin).or_default().push((word.clone(), weight.to_string()));
 
-            // Extract jianpin from space-separated syllables
             let abbrev: String = pinyin_raw.split_whitespace().filter_map(|s| s.chars().next()).collect();
             if abbrev.len() > 1 && abbrev != pinyin_raw.replace(' ', "") {
                 abbrev_entries.entry(abbrev).or_default().push((word, weight.to_string()));
@@ -346,23 +351,22 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
         for (key, val) in obj {
-            let key_lower = key.to_lowercase();
+            let key_raw = key.as_str();
             
-            // Extract jianpin for non-english
             let abbrev = if !is_english {
-                let syls = split_syllables(&key_lower, syllables);
+                let syls = split_syllables(key_raw, syllables);
                 let a: String = syls.iter().filter_map(|s| s.chars().next()).collect();
-                if a.len() > 1 && a != key_lower { Some(a) } else { None }
+                if a.len() > 1 && a != key_raw { Some(a) } else { None }
             } else { None };
 
             if let Some(arr) = val.as_array() {
                 if is_english {
                     let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
-                    entries.entry(key_lower).or_default().push((key.clone(), hint));
+                    entries.entry(key.clone()).or_default().push((key.clone(), hint));
                 } else {
                     for v in arr {
                         if let Some(s) = v.as_str() { 
-                            entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); 
+                            entries.entry(key.clone()).or_default().push((s.to_string(), String::new())); 
                             if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((s.to_string(), String::new())); }
                         }
                         else if let Some(o) = v.as_object() {
@@ -376,7 +380,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
                                     combined_hint.push_str(en_hint);
                                 }
                                 
-                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), combined_hint.clone()));
+                                entries.entry(key.clone()).or_default().push((c.to_string(), combined_hint.clone()));
                                 if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((c.to_string(), combined_hint)); }
                             }
                         }
@@ -384,9 +388,9 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
                 }
             } else if let Some(s) = val.as_str() {
                 if is_english {
-                    entries.entry(key_lower).or_default().push((key.clone(), s.to_string()));
+                    entries.entry(key.clone()).or_default().push((key.clone(), s.to_string()));
                 } else {
-                    entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new()));
+                    entries.entry(key.clone()).or_default().push((s.to_string(), String::new()));
                     if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((s.to_string(), String::new())); }
                 }
             }

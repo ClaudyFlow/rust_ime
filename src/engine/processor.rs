@@ -644,46 +644,44 @@ impl Processor {
         
         if let Some(d) = dict {
             let buffer_normalized = strip_tones(&self.buffer);
-            let has_uppercase = self.buffer.chars().any(|c| c.is_ascii_uppercase());
-            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+            let internal_uppercase = self.buffer.chars().skip(1).any(|c| c.is_ascii_uppercase());
+            let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || internal_uppercase);
 
-            let filter_by_case = |_word: &String, hint: &String| -> bool {
-                if !self.filter_proper_nouns_by_case || has_uppercase { return true; }
-                // 如果输入全小写，且提示中包含大写字母（人名/地名标识），则过滤
-                !hint.chars().any(|c| c.is_ascii_uppercase())
-            };
+            let mut exact_matches = Vec::new();
+            let mut prefix_matches = Vec::new();
+            let mut abbr_matches = Vec::new();
 
             if !is_precise_mode {
-                let full_pinyin = buffer_normalized.to_lowercase();
-                // --- 2.1 精准匹配 (Exact Match) ---
-                if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
-                    for (word, hint) in exact_matches {
-                        if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                let raw_input = &self.buffer;
+                
+                // 2.1 精准匹配 (大小写敏感)
+                if let Some(exact) = d.get_all_exact(raw_input) {
+                    exact_matches = exact;
+                }
+
+                // 2.3 简拼匹配 (大小写敏感)
+                if self.enable_abbreviation_matching && raw_input.len() >= 2 && raw_input.len() <= 4 {
+                    if let Some(abbr) = d.get_all_abbrev(raw_input) {
+                        abbr_matches = abbr;
                     }
                 }
 
-                // --- 2.2 前缀匹配 (Prefix Matching / Suggestions) ---
-                if self.enable_prefix_matching && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    let prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
-                    for (word, hint) in prefix_matches {
-                        if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                    }
-                }
-
-                // --- 2.3 简拼匹配 (Abbreviation Matching) ---
-                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 4 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    if final_candidates.len() < 5 {
-                        if let Some(abbr_matches) = d.get_all_abbrev(&full_pinyin) {
-                            for (word, hint) in abbr_matches {
-                                if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
-                            }
-                        }
-                    }
+                // 2.2 前缀匹配 (联想)
+                if self.enable_prefix_matching && raw_input.len() >= 2 {
+                    prefix_matches = d.search_bfs(raw_input, self.prefix_matching_limit);
                 }
             } else {
-                // 精准模式
-                for (word, hint) in last_matches {
-                    if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                exact_matches = last_matches;
+            }
+
+            // 合并并去重
+            let mut all_raw = exact_matches;
+            all_raw.extend(abbr_matches);
+            all_raw.extend(prefix_matches);
+
+            for (word, hint) in all_raw {
+                if seen.insert(word.clone()) {
+                    final_candidates.push((word, hint));
                 }
             }
         }
