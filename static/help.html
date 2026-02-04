@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>rust-ime 使用帮助</title>
+    <title>rust-ime 终极使用指南</title>
     <style>
         :root {
             --apple-bg: #f5f5f7;
@@ -16,171 +16,196 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--apple-bg);
-            color: var(--apple-text);
-            margin: 0;
-            display: flex;
-            line-height: 1.6;
+            background-color: var(--apple-bg); color: var(--apple-text); margin: 0; display: flex; line-height: 1.6;
         }
 
-        /* 目录导览 */
         aside {
-            width: 240px;
-            height: 100vh;
-            position: sticky;
-            top: 0;
-            background: rgba(245, 245, 247, 0.8);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid var(--apple-border);
-            padding: 40px 20px;
-            box-sizing: border-box;
+            width: 260px; height: 100vh; position: sticky; top: 0; background: rgba(245, 245, 247, 0.85);
+            backdrop-filter: blur(25px); border-right: 1px solid var(--apple-border); padding: 40px 20px; box-sizing: border-box;
         }
 
-        aside h3 { font-size: 18px; margin-bottom: 20px; }
+        aside h3 { font-size: 18px; margin-bottom: 20px; padding-left: 15px; }
         aside nav a {
-            display: block;
-            color: var(--apple-text);
-            text-decoration: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 5px;
-            transition: all 0.2s;
+            display: block; color: var(--apple-text); text-decoration: none; padding: 12px 15px;
+            border-radius: 10px; font-size: 14px; margin-bottom: 5px; transition: all 0.2s;
         }
         aside nav a:hover { background: rgba(0,0,0,0.05); }
-        aside nav a.active { color: var(--apple-accent); font-weight: 600; }
+        aside nav a.active { color: var(--apple-accent); font-weight: 600; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 
-        /* 内容区 */
-        main {
-            flex: 1;
-            padding: 60px 100px;
-            max-width: 900px;
-        }
+        main { flex: 1; padding: 60px 10%; max-width: 1000px; }
 
-        h1 { font-size: 40px; font-weight: 700; margin-bottom: 10px; }
-        .subtitle { color: var(--apple-secondary); font-size: 18px; margin-bottom: 50px; }
+        h1 { font-size: 44px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1.5px; }
+        .subtitle { color: var(--apple-secondary); font-size: 20px; margin-bottom: 60px; }
 
-        section { margin-bottom: 60px; scroll-margin-top: 60px; }
-        h2 { font-size: 28px; font-weight: 600; margin-bottom: 20px; border-bottom: 1px solid var(--apple-border); padding-bottom: 10px; }
+        section { margin-bottom: 80px; scroll-margin-top: 60px; }
+        h2 { font-size: 32px; font-weight: 700; margin-bottom: 25px; border-bottom: 2px solid var(--apple-accent); display: inline-block; padding-bottom: 5px; }
         
         .feature-card {
-            background: var(--apple-card);
-            border-radius: 18px;
-            padding: 25px;
-            margin-bottom: 20px;
-            border: 1px solid var(--apple-border);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+            background: var(--apple-card); border-radius: 24px; padding: 35px; margin-bottom: 30px;
+            border: 1px solid var(--apple-border); box-shadow: 0 10px 40px rgba(0,0,0,0.03);
         }
 
-        .feature-card h3 { margin-top: 0; color: var(--apple-accent); }
+        .feature-card h3 { margin-top: 0; font-size: 22px; color: var(--apple-accent); margin-bottom: 15px; }
         
-        code {
-            background: #f0f0f0;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: "SF Mono", monospace;
-            font-size: 0.9em;
+        .example-box {
+            background: #f8f9fa; border-left: 4px solid var(--apple-accent); padding: 15px 20px;
+            margin: 20px 0; border-radius: 0 12px 12px 0;
+        }
+        .example-box code { color: #d70022; font-weight: 700; font-size: 1.1em; }
+
+        .pro-tip {
+            background: #fff9e6; border: 1px solid #ffe58f; padding: 15px; border-radius: 12px;
+            font-size: 14px; color: #856404; margin-top: 15px;
         }
 
-        .tag {
-            font-size: 12px;
-            background: #e1f0ff;
-            color: #0071e3;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-weight: 600;
-            margin-left: 10px;
-        }
-
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: "SF Mono", monospace; }
+        .tag { font-size: 12px; background: #e1f0ff; color: #0071e3; padding: 3px 10px; border-radius: 12px; font-weight: 600; margin-left: 10px; }
         ul { padding-left: 20px; }
-        li { margin-bottom: 10px; }
+        li { margin-bottom: 12px; }
+        b { color: var(--apple-accent); }
     </style>
 </head>
 <body>
     <aside>
-        <h3>目录导览</h3>
+        <h3>文档导航</h3>
         <nav>
-            <a href="#intro">产品概览</a>
-            <a href="#core-features">特色功能</a>
-            <a href="#mixed-input">多方案混输</a>
-            <a href="#quick-rime">长韵母输入</a>
-            <a href="#sentence-mode">长句模式</a>
-            <a href="#extra-tools">附加工具</a>
+            <a href="#intro">1. 产品定位</a>
+            <a href="#aux-code">2. 核心：英文辅助码</a>
+            <a href="#proper-nouns">3. 专有名词原生隔离</a>
+            <a href="#mixed-input">4. 多方案混输</a>
+            <a href="#quick-rime">5. 长韵母双快输入</a>
+            <a href="#sentence-mode">6. 智能长句模式</a>
+            <a href="#ui-custom">7. 视觉与样式定制</a>
+            <a href="#extra-tools">8. 屏幕演示与学习</a>
         </nav>
     </aside>
 
     <main>
-        <h1>使用帮助</h1>
-        <div class="subtitle">让输入回归高效与简单</div>
+        <h1>rust-ime 终极指南</h1>
+        <div class="subtitle">一款专为程序员与效率极客设计的拼音输入法</div>
 
         <section id="intro">
-            <h2>产品概览</h2>
+            <h2>产品定位</h2>
             <div class="feature-card">
-                <p>首先，这是一款拼音输入法。它的使用体验与您熟悉的普通拼音输入几乎没有区别：全拼、简拼、甚至模糊音（视词库配置）都一应俱全。</p>
-                <p>您完全可以把它当成一个普通输入法来用，唯一的两个主要区别是：</p>
+                <p>rust-ime 是一款基于 Rust 编写的高性能拼音输入法。它的设计核心是<b>“零干扰”</b>与<b>“极致效率”</b>。</p>
+                <p>对于普通用户，它表现得像任何主流输入法一样：支持全拼、简拼、模糊音。但为了效率，我们做了两个果断的选择：</p>
                 <ul>
-                    <li><strong>Tab 键切换</strong>：默认使用 <code>Tab</code> 键在“中文输入”和“直通模式”之间快速切换。</li>
-                    <li><strong>固定候选框</strong>：为了追求性能和视觉的极致统一，候选框目前不会跟随光标移动，而是固定在屏幕底部或您设置的位置。</li>
+                    <li><b>Tab 键即正义</b>：摒弃了复杂的切换键，默认使用 <code>Tab</code> 键（单按）瞬间切换中英文。</li>
+                    <li><b>位置固定</b>：候选框不跟随光标（减少视觉抖动），默认固定在屏幕底部（位置可完全自定义）。</li>
                 </ul>
             </div>
         </section>
 
-        <section id="core-features">
-            <h2>特色功能</h2>
-            
+        <section id="aux-code">
+            <h2>核心：英文辅助码</h2>
             <div class="feature-card">
-                <h3>英文辅助码 <span class="tag">效率提升</span></h3>
-                <p>在输入拼音后，可以通过输入一个大写字母（辅码）来过滤同音字或提升候选词权重。例如输入 <code>liL</code> 可以让“礼”等相关词汇排在前面，极大地提高了在重码较多时的选词效率。</p>
-            </div>
+                <p>这是 rust-ime 的灵魂功能。在拼音重码极多（如同音字、简拼）时，您无需翻页，只需输入一个<b>大写字母</b>即可精准定位。</p>
+                
+                <h3>它是如何工作的？</h3>
+                <p>输入法会自动扫描候选词对应的<b>英文翻译/释义</b>。当您输入一个大写字母时，它会匹配释义中第一个大写单词的首字母。</p>
 
+                <div class="example-box">
+                    <p><b>场景 A：解决同音字重码</b></p>
+                    <p>输入 <code>li</code>，候选词可能有“里、离、礼、理...”。</p>
+                    <ul>
+                        <li>输入 <code>liC</code> ⮕ <b>礼</b> (Ceremony) 瞬间排到第一。</li>
+                        <li>输入 <code>liL</code> ⮕ <b>理</b> (Logic) 瞬间排到第一。</li>
+                    </ul>
+                </div>
+
+                <div class="example-box">
+                    <p><b>场景 B：简拼精准定位</b></p>
+                    <p>输入 <code>sh</code>，候选词可能有“书、水、数、树...”。</p>
+                    <ul>
+                        <li>输入 <code>shB</code> ⮕ <b>书</b> (Book) 瞬间出现。</li>
+                        <li>输入 <code>shW</code> ⮕ <b>水</b> (Water) 瞬间出现。</li>
+                        <li>输入 <code>shT</code> ⮕ <b>树</b> (Tree) 瞬间出现。</li>
+                    </ul>
+                </div>
+
+                <div class="example-box">
+                    <p><b>场景 C：长词组过滤</b></p>
+                    <p>输入 <code>ha</code>，想输入“号”。</p>
+                    <ul>
+                        <li>输入 <code>haN</code> ⮕ <b>号</b> (Number) 排除掉“好、哈”。</li>
+                    </ul>
+                </div>
+
+                <div class="pro-tip">
+                    <b>技巧：</b>该功能会自动跳过声调符号。例如翻译是 "ne Particle"，输入 <code>P</code> 即可精准匹配 "Particle"。
+                </div>
+            </div>
+        </section>
+
+        <section id="proper-nouns">
+            <h2>专有名词原生隔离</h2>
             <div class="feature-card">
-                <h3>防呆模式 (Anti-Typo)</h3>
-                <p>系统会自动识别非法的拼音组合。如果您输入了词库中完全无法匹配的拼音，输入法将拦截这些输入，防止因为手快造成的无效拼写堆积。</p>
+                <p>在普通输入法中，输入 <code>beijing</code> 可能会混杂“背景”和“北京”。在 rust-ime 中：</p>
+                <ul>
+                    <li><b>全小写</b>：<code>beijing</code> 只会匹配普通词汇（如：背景）。</li>
+                    <li><b>首字母大写</b>：<code>Beijing</code> 或 <code>Be</code> 将触发<b>专有名词索引</b>，精准匹配“北京”，完全隔离干扰。</li>
+                </ul>
+                <p>这对于输入人名、地名、软件名非常有效，实现了索引层面的清爽。</p>
             </div>
         </section>
 
         <section id="mixed-input">
             <h2>多方案混输</h2>
             <div class="feature-card">
-                <p>rust-ime 支持真正的**原生多方案混输**。您不仅可以输入纯中文，还可以同时启用英文和日文方案：</p>
+                <p>rust-ime 允许您在网页端自由组合活跃方案（如 <b>中文+英文</b>）。</p>
                 <ul>
-                    <li><strong>计算机命令</strong>：在中文输入过程中，无需切换即可快速输入 <code>git</code>, <code>ls</code>, <code>sudo</code> 等命令。</li>
-                    <li><strong>多语种共存</strong>：中、英、日候选词会根据匹配度自动汇总、去重并展示。</li>
+                    <li><b>程序员友好</b>：在写注释时，不需要切换模式，直接输入 <code>git</code>, <code>cargo</code>, <code>sudo</code>，它们会出现在候选词中。</li>
+                    <li><b>英文自动补全</b>：支持英文前缀联想。输入 <code>com</code> 即可选择 <code>complete</code>, <code>command</code> 等词。</li>
                 </ul>
             </div>
         </section>
 
         <section id="quick-rime">
-            <h2>长韵母快速输入</h2>
+            <h2>长韵母双快输入</h2>
             <div class="feature-card">
-                <p>针对 <code>iang</code>, <code>uang</code>, <code>uai</code> 等较长的韵母，您可以设置快捷映射。通过 <code>Caps</code> + 字母的组合，一键注入长韵母，减少按键次数。</p>
+                <p>觉得 <code>iang</code>, <code>uang</code> 太难打？</p>
+                <p>开启“双快”模式，您可以自定义映射。默认配置下：</p>
+                <ul>
+                    <li><code>Caps</code> + <code>L</code> ⮕ 注入 <code>uang</code></li>
+                    <li><code>Caps</code> + <code>J</code> ⮕ 注入 <code>iang</code></li>
+                </ul>
+                <p>配合 Tab 键的角色互换（Tab 单击切模式，CapsLock 做修饰键），这种操作比传统双拼更符合肌肉记忆。</p>
             </div>
         </section>
 
         <section id="sentence-mode">
-            <h2>长句模式 <span class="tag">完善中</span></h2>
+            <h2>智能长句模式</h2>
             <div class="feature-card">
-                <p>我们正在积极开发更智能的长句模式。后续我们将引入基于 N-Gram 或 AI 的智能纠错功能，能够根据上下文自动判断您想要输出的句子，让长句输入更加行云流水。</p>
+                <p>在“系统总览”中将上屏模式切换为<b>“双空格上屏”</b>即可进入长句模式。</p>
+                <p>在此模式下，输入法会尝试进行全句切分和联想。虽然目前仍处于完善阶段，但我们计划在未来引入基于语境的智能纠错，让长篇大论的输入更加流畅。</p>
+            </div>
+        </section>
+
+        <section id="ui-custom">
+            <h2>视觉与样式定制</h2>
+            <div class="feature-card">
+                <p>我们提供了一个极致自由的皮肤引擎，全部可通过网页控制中心调节：</p>
+                <ul>
+                    <li><b>双模选择</b>：传统横向窗 vs 现代侧边卡片窗。</li>
+                    <li><b>精准调色</b>：点击颜色球，为背景、高亮、文字选择任何您喜欢的颜色（支持透明度）。</li>
+                    <li><b>字号调节</b>：主词条与辅助码（Hint）的字号可以分开控制，满足不同的视力习惯。</li>
+                </ul>
             </div>
         </section>
 
         <section id="extra-tools">
-            <h2>附加工具</h2>
-            
+            <h2>屏幕演示与学习</h2>
             <div class="feature-card">
                 <h3>按键回显 (Keystroke)</h3>
-                <p>适合用于**录制屏幕演示**或软件教学。开启后，您的每一次物理按键都会在屏幕角落实时显示，方便观众看清您的操作。</p>
-            </div>
-
-            <div class="feature-card">
+                <p>专为 Up 主和讲师设计。开启后，屏幕角落实时显示按键名称（如 <code>Ctrl</code>, <code>Alt</code>, <code>S</code>），且支持自定义消失延迟。</p>
+                
                 <h3>学习模式 (Learning Mode)</h3>
-                <p>您可以把输入法当成一个**背单词的小软件**。选择一个 JSON 格式的单词本词库，输入法会在您闲暇时（或按设置间隔）在屏幕角落轮播展示单词及其释义，利用碎片时间潜移默化地学习。</p>
+                <p>利用碎片时间背单词。您可以指定任何一个 JSON 词库（如 CET-4, GRE），输入法会在固定间隔轮播单词。支持自定义位置和颜色，让学习无处不在。</p>
             </div>
         </section>
     </main>
 
     <script>
-        // 简单的目录跟踪逻辑
         const links = document.querySelectorAll('aside nav a');
         const sections = document.querySelectorAll('section');
 
@@ -188,7 +213,7 @@
             let current = "";
             sections.forEach(s => {
                 const top = s.offsetTop;
-                if (pageYOffset >= top - 100) { current = s.getAttribute('id'); }
+                if (pageYOffset >= top - 150) { current = s.getAttribute('id'); }
             });
             links.forEach(l => {
                 l.classList.remove('active');
