@@ -325,7 +325,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             }}
             .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
             .candidate-selected {{ background-color: {cand_hl}; }}
-            .candidate-selected .candidate-text, .candidate-selected .hint-text, .candidate-selected .index {{ color: #ffffff !important; opacity: 1.0; }}
+            .candidate-selected .candidate-text, .candidate-selected .hint-text, .candidate-selected .index {{ color: white; opacity: 1.0; }}
             .candidate-text {{ color: {cand_text}; font-size: {cand_font}pt; font-weight: 500; }}
             .hint-text {{ color: {cand_text}; opacity: 0.5; font-size: {cand_hint_font}pt; margin-left: 8px; }}
             .index {{ font-size: 10pt; color: {cand_text}; opacity: 0.5; margin-right: 6px; }}
@@ -379,15 +379,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             window.learning-window {{
             }}
             #learning-container {{
-                background-color: {key_bg};
+                background-color: {learn_bg};
                 border-radius: 16px;
                 padding: 12px 20px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                box-shadow: none;
                 border: 1px solid rgba(255,255,255,0.1);
             }}
             #learning-word {{
                 color: #f5f5f7;
-                font-size: 24pt;
+                font-size: {learn_font}pt;
                 font-weight: 800;
             }}
             #learning-hint {{
@@ -408,7 +408,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         m_font = app.modern_cand_font_size,
         m_hint_font = app.modern_cand_hint_font_size,
         key_bg = app.keystroke_bg_color,
-        key_font = app.keystroke_font_size);
+        key_font = app.keystroke_font_size,
+        learn_bg = app.learning_bg_color,
+        learn_font = app.learning_font_size);
         
         css.load_from_data(&css_data);
 
@@ -512,6 +514,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             GuiEvent::Update { pinyin, candidates, hints, selected, sentence: _ } => {
                 let show_trad = current_config.appearance.show_candidates;
                 let show_modern = current_config.appearance.show_modern_candidates;
+                let safe = |s: &str| s.replace('\0', ""); // 安全过滤闭包
 
                 if pinyin.is_empty() && candidates.is_empty() {
                     window_c.set_opacity(0.0); window_c.hide();
@@ -522,7 +525,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 if show_trad {
                     window_c.show();
                     window_c.set_opacity(1.0);
-                    pinyin_label_c.set_text(&pinyin);
+                    pinyin_label_c.set_text(&safe(&pinyin));
                     // sentence_label_c.set_text(&sentence);
                     // if sentence.is_empty() { sentence_label_c.set_opacity(0.0); } else { sentence_label_c.set_opacity(1.0); }
                     sentence_label_c.hide(); // Explicitly hide it
@@ -536,13 +539,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         if i == selected { item.add_css_class("candidate-selected"); }
                         let idx_lbl = Label::new(Some(&format!("{}", (i % current_config.appearance.page_size) + 1)));
                         idx_lbl.add_css_class("index");
-                        let txt_lbl = Label::new(Some(&candidates[i]));
+                        let txt_lbl = Label::new(Some(&safe(&candidates[i])));
                         txt_lbl.add_css_class("candidate-text");
                         item.append(&idx_lbl);
                         item.append(&txt_lbl);
                         if let Some(hint) = hints.get(i) {
                             if !hint.is_empty() {
-                                let hint_lbl = Label::new(Some(hint));
+                                let hint_lbl = Label::new(Some(&safe(hint)));
                                 hint_lbl.add_css_class("hint-text");
                                 item.append(&hint_lbl);
                             }
@@ -564,13 +567,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         if i == selected { item.add_css_class("modern-selected"); }
                         let idx_lbl = Label::new(Some(&format!("{}", (i % current_config.appearance.page_size) + 1)));
                         idx_lbl.add_css_class("m-index");
-                        let txt_lbl = Label::new(Some(&candidates[i]));
+                        let txt_lbl = Label::new(Some(&safe(&candidates[i])));
                         txt_lbl.add_css_class("modern-text");
                         item.append(&idx_lbl);
                         item.append(&txt_lbl);
                         if let Some(hint) = hints.get(i) {
                             if !hint.is_empty() {
-                                let hint_lbl = Label::new(Some(hint));
+                                let hint_lbl = Label::new(Some(&safe(hint)));
                                 hint_lbl.add_css_class("hint-text");
                                 item.append(&hint_lbl);
                             }
