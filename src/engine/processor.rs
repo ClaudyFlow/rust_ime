@@ -569,23 +569,24 @@ impl Processor {
         let mut matches = dict.get_all_exact(&part.pinyin).unwrap_or_default();
 
         // 如果有辅码，我们额外搜索前缀，以便支持 "拼音前缀 + 辅码" 的匹配方式
+        // 比如输入 dajiangY，需要命中 dajiangdongqu (Yangtze...)
         if self.enable_prefix_matching && part.aux_code.is_some() && !part.pinyin.is_empty() {
             let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
-            // 搜索范围根据配置动态调整
-            let prefix_matches = dict.search_bfs(&part.pinyin, self.prefix_matching_limit.max(100));
+            let prefix_matches = dict.search_bfs(&part.pinyin, 100); // 适度扩大搜索范围以匹配长词
             for (word, hint) in prefix_matches {
                 if seen.insert(word.clone()) {
                     matches.push((word, hint));
                 }
             }
+        }
 
-            // 支持 "简拼 + 辅码"
-            if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
-                if let Some(abbr_matches) = dict.get_all_abbrev(&part.pinyin) {
-                    for (word, hint) in abbr_matches {
-                        if seen.insert(word.clone()) {
-                            matches.push((word, hint));
-                        }
+        // 简拼支持
+        if self.enable_abbreviation_matching && part.aux_code.is_some() && part.pinyin.len() <= 4 {
+            let mut seen: std::collections::HashSet<String> = matches.iter().map(|(w, _)| w.clone()).collect();
+            if let Some(abbr_matches) = dict.get_all_abbrev(&part.pinyin) {
+                for (word, hint) in abbr_matches {
+                    if seen.insert(word.clone()) {
+                        matches.push((word, hint));
                     }
                 }
             }
@@ -655,25 +656,27 @@ impl Processor {
             let mut abbr_matches = Vec::new();
 
             if !is_precise_mode {
-                let raw_input = &self.buffer;
+                let full_pinyin = buffer_normalized.to_lowercase();
                 
-                // 2.1 精准匹配 (大小写敏感)
-                if let Some(exact) = d.get_all_exact(raw_input) {
+                // 2.1 精准匹配
+                if let Some(exact) = d.get_all_exact(&full_pinyin) {
                     exact_matches = exact;
                 }
 
-                // 2.3 简拼匹配 (大小写敏感)
-                if self.enable_abbreviation_matching && raw_input.len() >= 2 && raw_input.len() <= 4 {
-                    if let Some(abbr) = d.get_all_abbrev(raw_input) {
+                // 2.3 简拼匹配
+                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 4 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    if let Some(abbr) = d.get_all_abbrev(&full_pinyin) {
                         abbr_matches = abbr;
                     }
                 }
 
                 // 2.2 前缀匹配 (联想)
-                if self.enable_prefix_matching && raw_input.len() >= 2 {
-                    prefix_matches = d.search_bfs(raw_input, self.prefix_matching_limit);
+                if self.enable_prefix_matching && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                    prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
                 }
             } else {
+                // 精准/辅码模式：已经由上面的循环处理了 last_matches
+                // 此时 last_matches 包含了基于当前段（可能带辅码）的精准和前缀结果
                 exact_matches = last_matches;
             }
 
