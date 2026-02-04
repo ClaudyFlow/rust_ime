@@ -107,7 +107,7 @@
                     <select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">默认输入方案</div></div>
+                    <div class="info"><div class="title">当前活跃方案</div><div class="desc">选择初始启动或快捷键循环的起点方案</div></div>
                     <select id="default_profile"></select>
                 </div>
                 <div class="setting-item">
@@ -175,15 +175,15 @@
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">系统通知候选词</div><div class="desc">在托盘通知区域显示候选词</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">拼音预览开关</div><div class="desc">在输入位置实时预览拼音</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">拼音预览开关</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">按键回显</div></div><label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label></div>
                     <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">显示英文释义</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示汉字注音</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示英文释义 (Hint)</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示汉字注音 (Tone)</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
                 </div>
             </div>
 
@@ -222,7 +222,7 @@
                 <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="modern_cand_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div></div></div>
             </div>
 
-            <h2>按键显示 (Keystroke)</h2>
+            <h2>按键回显 (Keystroke)</h2>
             <div class="card">
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">消失延迟 (ms)</div></div><input type="number" id="keystroke_timeout_ms"></div>
@@ -238,12 +238,12 @@
             <h2>汉字学习模式</h2>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">学习模式词典</div></div>
+                    <div class="info"><div class="title">轮播学习词典</div><div class="desc">选择用于显示学习内容的 JSON 词库</div></div>
                     <select id="learning_dict_path" style="width: 300px;"></select>
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">轮播间隔 (秒)</div></div><input type="number" id="learning_interval_sec"></div>
-                    <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="learning_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="learning_font_size"></div>
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">水平偏移 (X)</div></div><input type="number" id="learning_margin_x"></div>
@@ -257,7 +257,7 @@
         <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
-        <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索词条..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
+        <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
     </main>
 
     <div id="toast" class="status-toast">已保存并应用</div>
@@ -282,10 +282,14 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
+            // 填充方案选择（并加入混合模式项）
             const dp = document.getElementById('default_profile');
-            dp.innerHTML = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-            dp.value = config.input.default_profile;
+            let opts = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`);
+            opts.push('<option value="mixed">Mixed (中英日全混输)</option>');
+            dp.innerHTML = opts.join('');
+            dp.value = config.input.active_profiles.length > 1 ? "mixed" : config.input.default_profile;
 
+            // 填充词典选择
             const d_r = await fetch('/api/dicts'); const dicts = await d_r.json();
             const ls = document.getElementById('learning_dict_path');
             ls.innerHTML = dicts.filter(d => d.path.endsWith('.json')).map(d => `<option value="${d.path}">${d.name}</option>`).join('');
@@ -308,8 +312,6 @@
             checkIds.forEach(id => {
                 const el = document.getElementById(id); if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id];
             });
-            
-            // 拼音预览开关逻辑映射
             document.getElementById('preview_mode_toggle').checked = (config.appearance.preview_mode === 'pinyin');
 
             const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
@@ -324,7 +326,16 @@
         }
 
         async function saveAll() {
-            ['commit_mode', 'default_profile', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
+            // 特殊处理活跃方案
+            const dpVal = document.getElementById('default_profile').value;
+            if(dpVal === 'mixed') {
+                config.input.active_profiles = config.files.profiles.map(p => p.name);
+            } else {
+                config.input.default_profile = dpVal;
+                config.input.active_profiles = [dpVal];
+            }
+
+            ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });
@@ -335,8 +346,6 @@
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = (el.type === 'number') ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
             });
-            
-            // 拼音预览开关逻辑反向映射
             config.appearance.preview_mode = document.getElementById('preview_mode_toggle').checked ? 'pinyin' : 'none';
 
             await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
@@ -349,28 +358,12 @@
         function addPK() { if(!config.input.profile_keys) config.input.profile_keys=[]; config.input.profile_keys.push({key:'?',profile:''}); renderPK(); }
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
         function renderDictsList(ds) {
-            const groups = {};
-            ds.forEach(d => { if(!groups[d.group]) groups[d.group] = []; groups[d.group].push(d); });
-            
-            const container = document.getElementById('dicts-container');
-            container.innerHTML = Object.entries(groups).sort().map(([group, files]) => `
-                <div class="card">
-                    <h3 style="margin-top:0; text-transform:capitalize; color:var(--apple-accent);">${group}</h3>
-                    ${files.map(f => `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px dashed #eee; ${f.enabled?'':'opacity:0.5'}">
-                            <div>
-                                <div style="font-weight:600;">${f.name.replace('.disabled','')}</div>
-                                <div style="font-size:11px; color:#888;">${f.entry_count.toLocaleString()} 词条</div>
-                            </div>
-                            <label class="switch" style="transform: scale(0.8);"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label>
-                        </div>
-                    `).join('')}
-                </div>
-            `).join('');
+            const groups = {}; ds.forEach(d => { if(!groups[d.group]) groups[d.group] = []; groups[d.group].push(d); });
+            document.getElementById('dicts-container').innerHTML = Object.entries(groups).sort().map(([group, files]) => `<div class="card"><h3 style="margin-top:0; color:var(--apple-accent); text-transform:capitalize;">${group}</h3>${files.map(f => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed #eee; ${f.enabled?'':'opacity:0.5'}"><div><b>${f.name.replace('.disabled','')}</b><br><small>${f.entry_count.toLocaleString()} 条</small></div><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join('')}</div>`).join('');
         }
         async function toggleDict(path) { await fetch('/api/dicts/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); load(); }
         async function compile() { alert('编译开始'); await fetch('/api/dicts/compile', { method: 'POST' }); alert('完成'); }
-        async function resetAll() { if(confirm("重置所有设置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
+        async function resetAll() { if(confirm("确定重置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
         let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
         async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
 

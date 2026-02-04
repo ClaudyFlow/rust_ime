@@ -415,10 +415,30 @@ impl Processor {
         let mut all: Vec<String> = self.tries.keys().cloned().collect();
         if all.is_empty() { return String::new(); }
         all.sort();
-        let current = if self.active_profiles.len() == 1 { self.active_profiles[0].clone() } else { "mixed".to_string() };
+
+        // 如果当前是混合模式（多于1个方案），切回第一个单方案
+        if self.active_profiles.len() > 1 {
+            let next = all[0].clone();
+            self.active_profiles = vec![next.clone()];
+            self.reset();
+            return next;
+        }
+
+        // 如果当前是单方案，尝试切到下一个单方案，或者切到全混输
+        let current = self.active_profiles.get(0).cloned().unwrap_or_default();
         let idx = all.iter().position(|p| p == &current).unwrap_or(0);
-        let next = all[(idx + 1) % all.len()].clone();
-        self.active_profiles = vec![next.clone()]; self.reset(); next
+        
+        if idx + 1 < all.len() {
+            let next = all[idx + 1].clone();
+            self.active_profiles = vec![next.clone()];
+            self.reset();
+            next
+        } else {
+            // 已经是最后一个单方案了，切换到全选混合模式
+            self.active_profiles = all.clone();
+            self.reset();
+            "Mixed (All)".to_string()
+        }
     }
 
     fn check_auto_commit(&mut self) -> Option<Action> {
