@@ -75,6 +75,15 @@
         input:checked + .slider { background-color: #34c759; }
         input:checked + .slider:before { transform: translateX(22px); }
 
+        /* 方案选择样式 */
+        .profile-chip-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .profile-chip { 
+            display: flex; align-items: center; gap: 8px; background: white; border: 2px solid var(--apple-border); 
+            padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-weight: 600;
+        }
+        .profile-chip.active { border-color: var(--apple-accent); background: rgba(0,113,227,0.05); color: var(--apple-accent); }
+        .profile-chip input { display: none; }
+
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .status-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 14px 34px; border-radius: 20px; display: none; z-index: 1000; backdrop-filter: blur(10px); }
     </style>
@@ -102,13 +111,16 @@
         <div id="tab-general" class="tab-content active">
             <h1>系统总览</h1>
             <div class="card">
+                <div class="setting-item" style="display: block;">
+                    <div class="info">
+                        <div class="title">活跃输入方案 (多选混输)</div>
+                        <div class="desc">您可以勾选多个方案进行混合输入（如：中+英，英+日等）</div>
+                    </div>
+                    <div id="active_profiles_container" class="profile-chip-group"></div>
+                </div>
                 <div class="setting-item">
                     <div class="info"><div class="title">上屏模式</div></div>
                     <select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">当前活跃方案</div><div class="desc">选择初始启动或快捷键循环的起点方案</div></div>
-                    <select id="default_profile"></select>
                 </div>
                 <div class="setting-item">
                     <div class="info"><div class="title">候选词数量</div></div>
@@ -174,7 +186,7 @@
                     <div class="setting-item"><div class="info"><div class="title">显示卡片窗</div></div><label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">系统通知候选词</div><div class="desc">在托盘通知区域显示候选词</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">系统通知候选词</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
                     <div class="setting-item"><div class="info"><div class="title">拼音预览开关</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
@@ -182,8 +194,8 @@
                     <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">显示英文释义 (Hint)</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示汉字注音 (Tone)</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示英文释义</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示汉字注音</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
                 </div>
             </div>
 
@@ -238,7 +250,7 @@
             <h2>汉字学习模式</h2>
             <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">轮播学习词典</div><div class="desc">选择用于显示学习内容的 JSON 词库</div></div>
+                    <div class="info"><div class="title">轮播学习词典</div></div>
                     <select id="learning_dict_path" style="width: 300px;"></select>
                 </div>
                 <div class="grid-2">
@@ -257,7 +269,7 @@
         <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
-        <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
+        <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索词条..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
     </main>
 
     <div id="toast" class="status-toast">已保存并应用</div>
@@ -282,14 +294,15 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // 填充方案选择（并加入混合模式项）
-            const dp = document.getElementById('default_profile');
-            let opts = config.files.profiles.map(p => `<option value="${p.name}">${p.name}</option>`);
-            opts.push('<option value="mixed">Mixed (中英日全混输)</option>');
-            dp.innerHTML = opts.join('');
-            dp.value = config.input.active_profiles.length > 1 ? "mixed" : config.input.default_profile;
+            // 方案选择组 (多选)
+            const pc = document.getElementById('active_profiles_container');
+            pc.innerHTML = config.files.profiles.map(p => `
+                <div class="profile-chip ${config.input.active_profiles.includes(p.name)?'active':''}" onclick="toggleProfileChip(this, '${p.name}')">
+                    <span>${p.name}</span>
+                    <input type="checkbox" value="${p.name}" ${config.input.active_profiles.includes(p.name)?'checked':''}>
+                </div>
+            `).join('');
 
-            // 填充词典选择
             const d_r = await fetch('/api/dicts'); const dicts = await d_r.json();
             const ls = document.getElementById('learning_dict_path');
             ls.innerHTML = dicts.filter(d => d.path.endsWith('.json')).map(d => `<option value="${d.path}">${d.name}</option>`).join('');
@@ -325,14 +338,18 @@
             renderQR(); renderPK(); renderHK(); renderDictsList(dicts);
         }
 
+        function toggleProfileChip(el, name) {
+            const cb = el.querySelector('input');
+            cb.checked = !cb.checked;
+            el.classList.toggle('active', cb.checked);
+        }
+
         async function saveAll() {
-            // 特殊处理活跃方案
-            const dpVal = document.getElementById('default_profile').value;
-            if(dpVal === 'mixed') {
-                config.input.active_profiles = config.files.profiles.map(p => p.name);
-            } else {
-                config.input.default_profile = dpVal;
-                config.input.active_profiles = [dpVal];
+            // 保存活跃方案组
+            const checked = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
+            if(checked.length > 0) {
+                config.input.active_profiles = checked;
+                config.input.default_profile = checked[0]; // 将第一个选中的设为默认
             }
 
             ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
