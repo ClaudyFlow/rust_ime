@@ -91,12 +91,13 @@
         <nav id="main-nav">
             <button id="nav-general" class="active" onclick="showTab('general')">系统总览</button>
             <button id="nav-matching" onclick="showTab('matching')">搜索与匹配</button>
-            <button id="nav-quickrime" onclick="showTab('quickrime')">长韵母映射</button>
-            <button id="nav-profilekeys" onclick="showTab('profilekeys')">快捷切换映射</button>
             <button id="nav-appearance" onclick="showTab('appearance')">视觉与样式</button>
-            <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
             <button id="nav-dicts" onclick="showTab('dicts')">词库管理</button>
             <button id="nav-dict-editor" onclick="showTab('dict-editor')">词典编辑器</button>
+            <button id="nav-quickrime" onclick="showTab('quickrime')">长韵母映射</button>
+            <button id="nav-profilekeys" onclick="showTab('profilekeys')">快捷切换映射</button>
+            <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
+            <button id="nav-help" onclick="window.open('/static/help.html')">使用帮助</button>
         </nav>
         <div style="margin-top: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
             <button class="btn" onclick="saveAll()">保存更改</button>
@@ -105,6 +106,7 @@
     </aside>
 
     <main>
+        <!-- General -->
         <div id="tab-general" class="tab-content active">
             <h1>系统总览</h1>
             <div class="card">
@@ -116,33 +118,24 @@
                 <div class="setting-item"><div class="info"><div class="title">候选词数量</div></div><input type="number" id="page_size"></div>
                 <div class="setting-item"><div class="info"><div class="title">粘贴注入方式</div></div><select id="paste_method"><option value="ctrl_v">标准 (Ctrl+V)</option><option value="ctrl_shift_v">终端 (Ctrl+Shift+V)</option><option value="shift_insert">X11 (Shift+Insert)</option></select></div>
                 <div class="setting-item"><div class="info"><div class="title">登录时自动启动</div></div><label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">按键错误提示音</div></div><label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label></div>
             </div>
         </div>
 
+        <!-- Matching -->
         <div id="tab-matching" class="tab-content">
             <h1>搜索与匹配</h1>
             <div class="card">
                 <div class="setting-item"><div class="info"><div class="title">精准匹配自动上屏</div></div><label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label></div>
                 <div class="setting-item"><div class="info"><div class="title">开启前缀联想</div></div><label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">联想结果上限</div></div><input type="number" id="prefix_matching_limit"></div>
                 <div class="setting-item"><div class="info"><div class="title">开启简拼匹配</div></div><label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label></div>
                 <div class="setting-item"><div class="info"><div class="title">区分专有名词大小写</div></div><label class="switch"><input type="checkbox" id="filter_proper_nouns_by_case"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">防呆模式</div></div><label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label></div>
             </div>
         </div>
 
-        <div id="tab-quickrime" class="tab-content">
-            <h1>长韵母映射</h1>
-            <div class="card"><div id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加新映射</button></div>
-        </div>
-
-        <div id="tab-profilekeys" class="tab-content">
-            <h1>快捷切换映射</h1>
-            <div class="card">
-                <div class="info" style="margin-bottom: 20px;"><div class="desc">设置按下 ` (反引号) 后，再按哪个字母切换到哪个方案组合</div></div>
-                <div id="pk-container"></div>
-                <button class="btn" onclick="addPK()">+ 添加新映射</button>
-            </div>
-        </div>
-
+        <!-- Appearance -->
         <div id="tab-appearance" class="tab-content">
             <h1>视觉与样式</h1>
             <div class="card">
@@ -219,9 +212,11 @@
             </div>
         </div>
 
-        <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
         <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索词条..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
+        <div id="tab-quickrime" class="tab-content"><h1>长韵母映射</h1><div class="card" id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加新映射</button></div>
+        <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加新映射</button></div>
+        <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
     </main>
 
     <div id="toast" class="status-toast">已保存并应用</div>
@@ -232,8 +227,10 @@
         function showTab(id) {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-            document.getElementById('tab-' + id).classList.add('active');
-            document.getElementById('nav-' + id).classList.add('active');
+            const target = document.getElementById('tab-' + id);
+            if(target) target.classList.add('active');
+            const navBtn = document.getElementById('nav-' + id);
+            if(navBtn) navBtn.classList.add('active');
         }
 
         function linkColor(id) {
@@ -261,7 +258,8 @@
 
             const allIds = [
                 'commit_mode', 'page_size', 'paste_method', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size',
-                'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'keystroke_timeout_ms', 'keystroke_font_size', 'learning_interval_sec', 'learning_font_size'
+                'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size',
+                'keystroke_timeout_ms', 'keystroke_font_size', 'learning_interval_sec', 'learning_font_size', 'prefix_matching_limit'
             ];
             allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] || ""); });
 
@@ -287,12 +285,12 @@
             const checked = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
             if(checked.length > 0) { config.input.active_profiles = checked; config.input.default_profile = checked[0]; }
 
-            ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
+            ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });
 
-            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_bg_color', 'learning_interval_sec', 'learning_font_size', 'learning_bg_color', 'learning_dict_path'];
+            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_bg_color', 'learning_interval_sec', 'learning_font_size', 'learning_bg_color', 'learning_dict_path'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = (el.type === 'number') ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
