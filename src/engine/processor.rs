@@ -80,7 +80,10 @@ impl Processor {
         let mut result = Vec::new();
 
         for part in parts {
-            let split_pos = part.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase());
+            // 使用 char_indices 获取正确的字节偏移量，并跳过首位大写检查
+            let split_pos = part.char_indices().find(|(i, c)| {
+                c.is_ascii_digit() || (*i > 0 && c.is_ascii_uppercase())
+            }).map(|(i, _)| i);
             
             let (pinyin, aux, idx) = if let Some(pos) = split_pos {
                 let (p, suffix) = part.split_at(pos);
@@ -569,35 +572,39 @@ impl Processor {
         let mut pool = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        // 1. 精准匹配 (最高优先级)
+        // 1. 收集候选词 (优先级: 精准 > 简拼 > 前缀)
         if let Some(matches) = dict.get_all_exact(&part.pinyin) {
-            for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } }
+            for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } } 
         }
 
-        // 2. 简拼匹配 (次高)
         if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
             if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) {
-                for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } }
+                for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } } 
             }
         }
 
-        // 3. 前缀联想 (联想优先级最低)
         if self.enable_prefix_matching && !part.pinyin.is_empty() {
-            let limit = if part.aux_code.is_some() { 100 } else { 20 };
+            // 有辅码时限制前缀数量，防止干扰
+            let limit = if part.aux_code.is_some() { 50 } else { 20 };
             let prefix_matches = dict.search_bfs(&part.pinyin, limit);
-            for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } }
+            for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } } 
         }
 
-        // 4. 应用辅码过滤
+        // 2. 辅码过滤 (大小写特征驱动)
         if let Some(ref code) = part.aux_code {
+            let is_single_upper = code.len() == 1 && code.chars().next().unwrap().is_ascii_uppercase();
             let code_lower = code.to_lowercase();
+
             pool.retain(|(_, hint)| {
-                let hint_lower = hint.to_lowercase();
-                if code.chars().all(|c| c.is_ascii_uppercase()) && code.len() == 1 {
-                    // 核心修改：仅匹配第一个单词的首字母，防止“年富力强”命中 'P'
-                    hint_lower.split_whitespace().next().map_or(false, |first| first.starts_with(&code_lower))
+                if is_single_upper {
+                    // 策略：匹配提示中第一个大写字母开头的单词（通常是英文翻译）
+                    // 这能完美跳过小写的声调提示 (如 "ne Particle")
+                    let first_upper_word = hint.split_whitespace()
+                        .find(|w| w.chars().next().map_or(false, |c| c.is_ascii_uppercase()));
+                    
+                    first_upper_word.map_or(false, |w| w.to_lowercase().starts_with(&code_lower))
                 } else {
-                    hint_lower.contains(&code_lower)
+                    hint.to_lowercase().contains(&code_lower)
                 }
             });
         }
