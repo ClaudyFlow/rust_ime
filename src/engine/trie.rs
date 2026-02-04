@@ -13,21 +13,43 @@ impl AsRef<[u8]> for MmapData {
 #[derive(Clone)]
 pub struct Trie {
     index: Map<MmapData>,
+    abbrev_index: Option<Map<MmapData>>,
     data: MmapData,
 }
 
 impl Trie {
     pub fn load<P: AsRef<Path>>(index_path: P, data_path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let index_file = File::open(index_path)?;
-        let data_file = File::open(data_path)?;
+        let index_file = File::open(&index_path)?;
+        let data_file = File::open(&data_path)?;
         let index_data = MmapData(Arc::new(unsafe { Mmap::map(&index_file)? }));
         let data_data = MmapData(Arc::new(unsafe { Mmap::map(&data_file)? }));
         let index = Map::new(index_data)?;
-        Ok(Self { index, data: data_data })
+
+        // Try to load abbreviation index if it exists in the same directory
+        let abbrev_index = if let Some(parent) = index_path.as_ref().parent() {
+            let abbrev_path = parent.join("abbrev.index");
+            if abbrev_path.exists() {
+                let abbrev_file = File::open(abbrev_path)?;
+                let abbrev_data = MmapData(Arc::new(unsafe { Mmap::map(&abbrev_file)? }));
+                Map::new(abbrev_data).ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(Self { index, abbrev_index, data: data_data })
     }
 
     pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String)>> {
         let offset = self.index.get(pinyin)? as usize;
+        Some(self.read_block(offset))
+    }
+
+    pub fn get_all_abbrev(&self, abbr: &str) -> Option<Vec<(String, String)>> {
+        let abbrev_index = self.abbrev_index.as_ref()?;
+        let offset = abbrev_index.get(abbr)? as usize;
         Some(self.read_block(offset))
     }
 

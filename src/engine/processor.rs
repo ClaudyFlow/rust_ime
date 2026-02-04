@@ -564,7 +564,11 @@ impl Processor {
 
             // 支持 "简拼 + 辅码"
             if self.enable_abbreviation_matching && part.pinyin.len() <= 5 {
-                let abbr_matches = dict.search_abbreviation(&part.pinyin, 50);
+                let abbr_matches = if let Some(matches) = dict.get_all_abbrev(&part.pinyin) {
+                    matches
+                } else {
+                    dict.search_abbreviation(&part.pinyin, 50)
+                };
                 for (word, hint) in abbr_matches {
                     if seen.insert(word.clone()) {
                         matches.push((word, hint));
@@ -652,7 +656,12 @@ impl Processor {
                 if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 5 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
                     // 只有当精准匹配和前缀匹配结果不多时，才补充简拼结果，避免干扰
                     if final_candidates.len() < 5 {
-                        let abbr_matches = d.search_abbreviation(&full_pinyin, 10);
+                        let abbr_matches = if let Some(matches) = d.get_all_abbrev(&full_pinyin) {
+                            matches
+                        } else {
+                            d.search_abbreviation(&full_pinyin, 10)
+                        };
+                        
                         for (word, hint) in abbr_matches {
                             if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                         }
@@ -828,6 +837,12 @@ mod tests {
             page_size: 5,
             show_tone_hint: true,
             show_en_hint: true,
+            auto_commit_unique_en_fuzhuma: false,
+            auto_commit_unique_full_match: false,
+            enable_prefix_matching: true,
+            prefix_matching_limit: 20,
+            enable_abbreviation_matching: true,
+            has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }
     }
@@ -907,6 +922,18 @@ mod tests {
             let hint = &p.candidate_hints[0];
             assert!(hint.to_lowercase().split_whitespace().any(|w| w.starts_with('c')));
         }
+    }
+
+    #[test]
+    fn test_abbreviation_matching() {
+        let mut p = setup_mock_processor();
+        if p.tries.is_empty() { return; }
+        
+        // Test "bj" -> should match "北京"
+        p.buffer = "bj".to_string();
+        p.lookup();
+        
+        assert!(p.candidates.contains(&"北京".to_string()) || p.candidates.contains(&"背景".to_string()), "Candidates should contain '北京' or '背景' for 'bj'");
     }
 
     #[test]

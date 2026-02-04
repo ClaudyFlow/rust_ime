@@ -1,5 +1,5 @@
 use fst::MapBuilder;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -10,7 +10,20 @@ use std::time::SystemTime;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all("data")?;
 
-    // 动态扫描 dicts 目录下的所有子目录并编译
+    // 1. 自动提取并加载音节表 (优先从 chinese/chars.json 提取)
+    if Path::new("dicts/chinese/chars.json").exists() {
+        extract_syllables_to_file("dicts/chinese/chars.json", "dicts/chinese/syllables.txt")?;
+    }
+    
+    let mut syllables = HashSet::new();
+    if let Ok(content) = fs::read_to_string("dicts/chinese/syllables.txt") {
+        for line in content.lines() {
+            let s = line.trim();
+            if !s.is_empty() { syllables.insert(s.to_string()); }
+        }
+    }
+
+    // 2. 动态扫描 dicts 目录下的所有子目录并编译
     if let Ok(entries) = fs::read_dir("dicts") {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
@@ -22,15 +35,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let trie_idx = format!("{}/trie.index", out_dir);
                 let local_ngram_src = format!("{}/n-gram-model", src_path);
                 
-                // 1. 检查是否需要编译 Trie
+                // 3. 检查是否需要编译 Trie
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
                     let is_english = dir_name.contains("english");
-                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
+                    compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english, &syllables)?;
                 } else {
                     println!("[Compiler] Skipping Trie for: {} (No changes detected)", dir_name);
                 }
                 
-                // 2. 检查并编译 N-gram
+                // 4. 检查并编译 N-gram
                 let ngram_idx = format!("{}/ngram.index", out_dir);
                 if Path::new(&local_ngram_src).exists() {
                     if should_compile(Path::new(&local_ngram_src), Path::new(&ngram_idx)) {
@@ -48,12 +61,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    // 自动提取音节表 (优先从 chinese/chars.json 提取)
-    if Path::new("dicts/chinese/chars.json").exists() {
-        extract_syllables_to_file("dicts/chinese/chars.json", "dicts/chinese/syllables.txt")?;
-    }
-    
     Ok(())
+}
+
+fn split_syllables(pinyin: &str, syllables: &HashSet<String>) -> Vec<String> {
+    let mut res = Vec::new();
+    let mut i = 0;
+    while i < pinyin.len() {
+        let mut found = false;
+        // Try longest match first (max syllable length is usually 6 like 'zhuang')
+        for len in (1..=7).rev() {
+            if i + len <= pinyin.len() && pinyin.is_char_boundary(i + len) {
+                let sub = &pinyin[i..i+len];
+                if syllables.contains(sub) {
+                    res.push(sub.to_string());
+                    i += len;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if !found {
+            if let Some(c) = pinyin[i..].chars().next() {
+                res.push(c.to_string());
+                i += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+    }
+    res
 }
 
 fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
@@ -94,8 +131,9 @@ fn extract_syllables_to_file(src_json: &str, out_txt: &str) -> Result<(), Box<dy
     Ok(())
 }
 
-fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllables: &HashSet<String>) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    let mut abbrev_entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     println!("[Compiler] Compiling dictionary from {} -> {}...", src_dir, out_stem);
     
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
@@ -104,20 +142,23 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Res
             if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n == "punctuation.json") {
                 continue;
             }
-            process_json_file(path, &mut entries, is_english)?;
+            process_json_file(path, &mut entries, &mut abbrev_entries, is_english, syllables)?;
         } else if path.extension().map_or(false, |ext| ext == "yaml") {
-            process_yaml_file(path, &mut entries)?;
+            process_yaml_file(path, &mut entries, &mut abbrev_entries)?;
         }
     }
     
     let idx_path = format!("{}.index", out_stem);
     let dat_path = format!("{}.data", out_stem);
-    write_binary_dict(&idx_path, &dat_path, entries)?;
+    let out_dir = Path::new(out_stem).parent().unwrap();
+    let abbrev_idx_path = out_dir.join("abbrev.index").to_str().unwrap().to_string();
+
+    write_binary_dict(&idx_path, &abbrev_idx_path, &dat_path, entries, abbrev_entries)?;
     println!("[Compiler] Finished: {}", out_stem);
     Ok(())
 }
 
-fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, abbrev_entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
     use std::io::{BufRead, BufReader};
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -134,28 +175,46 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
             let word = parts[0].to_string();
-            let pinyin = parts[1].replace(' ', "").to_lowercase();
+            let pinyin_raw = parts[1].to_lowercase();
+            let pinyin = pinyin_raw.replace(' ', "");
             // Rime 格式: 词 \t 拼音 \t 权重
             let weight = if parts.len() >= 3 { parts[2] } else { "" };
-            entries.entry(pinyin).or_default().push((word, weight.to_string()));
+            entries.entry(pinyin).or_default().push((word.clone(), weight.to_string()));
+
+            // Extract jianpin from space-separated syllables
+            let abbrev: String = pinyin_raw.split_whitespace().filter_map(|s| s.chars().next()).collect();
+            if abbrev.len() > 1 && abbrev != pinyin_raw.replace(' ', "") {
+                abbrev_entries.entry(abbrev).or_default().push((word, weight.to_string()));
+            }
         }
     }
     Ok(())
 }
 
-fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, abbrev_entries: &mut BTreeMap<String, Vec<(String, String)>>, is_english: bool, syllables: &HashSet<String>) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
         for (key, val) in obj {
             let key_lower = key.to_lowercase();
+            
+            // Extract jianpin for non-english
+            let abbrev = if !is_english {
+                let syls = split_syllables(&key_lower, syllables);
+                let a: String = syls.iter().filter_map(|s| s.chars().next()).collect();
+                if a.len() > 1 && a != key_lower { Some(a) } else { None }
+            } else { None };
+
             if let Some(arr) = val.as_array() {
                 if is_english {
                     let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
                     entries.entry(key_lower).or_default().push((key.clone(), hint));
                 } else {
                     for v in arr {
-                        if let Some(s) = v.as_str() { entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); }
+                        if let Some(s) = v.as_str() { 
+                            entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); 
+                            if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((s.to_string(), String::new())); }
+                        }
                         else if let Some(o) = v.as_object() {
                             if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
                                 let en_hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("");
@@ -167,7 +226,8 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
                                     combined_hint.push_str(en_hint);
                                 }
                                 
-                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), combined_hint));
+                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), combined_hint.clone()));
+                                if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((c.to_string(), combined_hint)); }
                             }
                         }
                     }
@@ -176,7 +236,8 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
                 if is_english {
                     entries.entry(key_lower).or_default().push((key.clone(), s.to_string()));
                 } else {
-                    entries.entry(key_lower).or_default().push((s.to_string(), String::new()));
+                    entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new()));
+                    if let Some(ref a) = abbrev { abbrev_entries.entry(a.clone()).or_default().push((s.to_string(), String::new())); }
                 }
             }
         }
@@ -184,34 +245,56 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
     Ok(())
 }
 
-fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn write_binary_dict(idx_path: &str, abbrev_idx_path: &str, dat_path: &str, entries: BTreeMap<String, Vec<(String, String)>>, abbrev_entries: BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
     let data_file = File::create(dat_path)?;
     let mut data_writer = BufWriter::new(data_file);
     let mut index_builder = MapBuilder::new(File::create(idx_path)?)?;
+    let mut abbrev_index_builder = MapBuilder::new(File::create(abbrev_idx_path)?)?;
 
     let mut current_offset = 0u64;
+    
+    // Write normal entries
     for (pinyin, mut pairs) in entries {
         let mut seen = std::collections::HashSet::new();
         pairs.retain(|(c, _)| seen.insert(c.clone()));
 
         index_builder.insert(&pinyin, current_offset)?;
-        let mut block = Vec::new();
-        block.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
-        for (word, hint) in pairs {
-            let w_bytes = word.as_bytes();
-            let h_bytes = hint.as_bytes();
-            block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(w_bytes);
-            block.extend_from_slice(&(h_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(h_bytes);
-        }
+        let block = encode_block(&pairs);
         data_writer.write_all(&block)?;
         current_offset += block.len() as u64;
     }
+
+    // Write abbrev entries
+    for (abbr, mut pairs) in abbrev_entries {
+        let mut seen = std::collections::HashSet::new();
+        pairs.retain(|(c, _)| seen.insert(c.clone()));
+
+        abbrev_index_builder.insert(&abbr, current_offset)?;
+        let block = encode_block(&pairs);
+        data_writer.write_all(&block)?;
+        current_offset += block.len() as u64;
+    }
+
     index_builder.finish()?;
+    abbrev_index_builder.finish()?;
     data_writer.flush()?;
     Ok(())
 }
+
+fn encode_block(pairs: &[(String, String)]) -> Vec<u8> {
+    let mut block = Vec::new();
+    block.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
+    for (word, hint) in pairs {
+        let w_bytes = word.as_bytes();
+        let h_bytes = hint.as_bytes();
+        block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
+        block.extend_from_slice(w_bytes);
+        block.extend_from_slice(&(h_bytes.len() as u16).to_le_bytes());
+        block.extend_from_slice(h_bytes);
+    }
+    block
+}
+
 
 fn compile_ngram_for_path(src_dir: &str, out_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut transitions: BTreeMap<String, HashMap<String, u32>> = BTreeMap::new();
