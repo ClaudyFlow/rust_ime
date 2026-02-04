@@ -568,123 +568,104 @@ impl Processor {
         Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
     }
 
-    fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String)> {
-        let mut pool = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-
-        // 1. 收集候选词 (优先级: 精准 > 简拼 > 前缀)
-        if let Some(matches) = dict.get_all_exact(&part.pinyin) {
-            for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } } 
-        }
-
-        if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
-            if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) {
-                for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } } 
+        fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String, String)> {
+            let mut pool = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+    
+            // 1. 收集候选词 (优先级: 精准 > 简拼 > 前缀)
+            if let Some(matches) = dict.get_all_exact(&part.pinyin) {
+                for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } }
             }
+    
+                    // 2. 简拼匹配 (次高)
+                    if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
+                        if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) {
+                            for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } } 
+                        }
+                    }    
+            if self.enable_prefix_matching && !part.pinyin.is_empty() {
+                // 有辅码时限制前缀数量，防止干扰
+                let limit = if part.aux_code.is_some() { 50 } else { 20 };
+                let prefix_matches = dict.search_bfs(&part.pinyin, limit);
+                for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } } 
+            }
+    
+            // 2. 辅码过滤
+            if let Some(ref code) = part.aux_code {
+                let code_lower = code.to_lowercase();
+                let is_single_upper = code.len() == 1 && code.chars().next().unwrap().is_ascii_uppercase();
+    
+                pool.retain(|(_, _tone, en)| {
+                    if is_single_upper {
+                        // 物理分离后，直接精准匹配英文翻译的首字母
+                        en.to_lowercase().starts_with(&code_lower)
+                    } else {
+                        en.to_lowercase().contains(&code_lower)
+                    }
+                });
+            }
+            pool
         }
-
-        if self.enable_prefix_matching && !part.pinyin.is_empty() {
-            // 有辅码时限制前缀数量，防止干扰
-            let limit = if part.aux_code.is_some() { 50 } else { 20 };
-            let prefix_matches = dict.search_bfs(&part.pinyin, limit);
-            for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } } 
-        }
-
-        // 2. 辅码过滤 (大小写特征驱动)
-        if let Some(ref code) = part.aux_code {
-            let is_single_upper = code.len() == 1 && code.chars().next().unwrap().is_ascii_uppercase();
-            let code_lower = code.to_lowercase();
-
-            pool.retain(|(_, hint)| {
-                if is_single_upper {
-                    // 策略：匹配提示中第一个大写字母开头的单词（通常是英文翻译）
-                    // 这能完美跳过小写的声调提示 (如 "ne Particle")
-                    let first_upper_word = hint.split_whitespace()
-                        .find(|w| w.chars().next().map_or(false, |c| c.is_ascii_uppercase()));
-                    
-                    first_upper_word.map_or(false, |w| w.to_lowercase().starts_with(&code_lower))
+    
+        pub fn lookup(&mut self) {
+            if self.buffer.is_empty() { self.reset(); return; }
+            let dict_key = self.current_profile.to_lowercase();
+            let dict = self.tries.get(&dict_key);
+    
+            let parsed_parts = self.parse_buffer();
+            let mut greedy_sentence = String::new();
+            let mut all_raw_segments = Vec::new();
+            let mut last_matches: Vec<(String, String, String)> = Vec::new();
+    
+            for (i, part) in parsed_parts.iter().enumerate() {
+                all_raw_segments.push(part.raw.clone());
+                
+                let matches = if let Some(d) = dict {
+                    self.lookup_part(d, part)
                 } else {
-                    hint.to_lowercase().contains(&code_lower)
-                }
-            });
-        }
-        pool
-    }
-
-    pub fn lookup(&mut self) {
-        if self.buffer.is_empty() { self.reset(); return; }
-        let dict_key = self.current_profile.to_lowercase();
-        let dict = self.tries.get(&dict_key);
-
-        let parsed_parts = self.parse_buffer();
-        let mut greedy_sentence = String::new();
-        let mut all_raw_segments = Vec::new();
-        let mut last_matches: Vec<(String, String)> = Vec::new();
-
-        for (i, part) in parsed_parts.iter().enumerate() {
-            all_raw_segments.push(part.raw.clone());
-            
-            let matches = if let Some(d) = dict {
-                self.lookup_part(d, part)
-            } else {
-                Vec::new()
-            };
-
-            // 句子组装
-            let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _)) = matches.get(idx) {
-                greedy_sentence.push_str(w);
-            } else {
-                greedy_sentence.push_str(&part.raw);
-            }
-
-            if i == parsed_parts.len() - 1 {
-                last_matches = matches;
-            }
-        }
-
-        self.joined_sentence = greedy_sentence;
-        self.best_segmentation = all_raw_segments;
-
-        // --- 填充候选词列表 ---
-        self.candidates.clear();
-        self.candidate_hints.clear();
-        self.has_dict_match = !last_matches.is_empty();
-
-        for (cand, raw_hint) in last_matches {
-            self.candidates.push(cand);
-            
-            // 动态处理 Hint
-            let mut final_hint = String::new();
-            if !raw_hint.is_empty() {
-                // 检查第一个单词是否包含声调符号
-                let first_word = raw_hint.split_whitespace().next().unwrap_or("");
-                let has_tones = first_word.chars().any(|c| "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü".contains(c));
-
-                let (tone, en) = if has_tones {
-                    let parts: Vec<&str> = raw_hint.splitn(2, ' ').collect();
-                    if parts.len() == 2 { (parts[0], parts[1]) } else { (parts[0], "") }
-                } else {
-                    ("", raw_hint.as_str())
+                    Vec::new()
                 };
-
-                if self.show_tone_hint && !tone.is_empty() { final_hint.push_str(tone); }
+    
+                // 句子组装
+                let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
+                if let Some((w, _, _)) = matches.get(idx) {
+                    greedy_sentence.push_str(w);
+                } else {
+                    greedy_sentence.push_str(&part.raw);
+                }
+    
+                if i == parsed_parts.len() - 1 {
+                    last_matches = matches;
+                }
+            }
+    
+            self.joined_sentence = greedy_sentence;
+            self.best_segmentation = all_raw_segments;
+    
+            // --- 填充候选词列表 ---
+            self.candidates.clear();
+            self.candidate_hints.clear();
+            self.has_dict_match = !last_matches.is_empty();
+    
+            for (cand, tone, en) in last_matches {
+                self.candidates.push(cand);
+                
+                let mut final_hint = String::new();
+                if self.show_tone_hint && !tone.is_empty() { final_hint.push_str(&tone); }
                 if self.show_en_hint && !en.is_empty() {
                     if !final_hint.is_empty() { final_hint.push(' '); }
-                    final_hint.push_str(en);
+                    final_hint.push_str(&en);
                 }
+                self.candidate_hints.push(final_hint);
             }
-            self.candidate_hints.push(final_hint);
+    
+            if self.candidates.is_empty() { 
+                self.candidates.push(self.buffer.clone()); 
+                self.candidate_hints.push(String::new()); 
+            }
+            self.selected = 0; self.page = 0;
+            self.update_state();
         }
-
-        if self.candidates.is_empty() { 
-            self.candidates.push(self.buffer.clone()); 
-            self.candidate_hints.push(String::new()); 
-        }
-        self.selected = 0; self.page = 0;
-        self.update_state();
-    }
-
     fn update_state(&mut self) {
         if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
         else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
@@ -891,6 +872,7 @@ mod tests {
         // 验证第一个候选词是否满足辅码 (C 开头单词)
         if !p.candidates.is_empty() {
             let hint = &p.candidate_hints[0];
+            // 物理分离后，提示信息中可能包含声调，我们需要检查其中是否包含以 c 开头的单词
             assert!(hint.to_lowercase().split_whitespace().any(|w| w.starts_with('c')));
         }
     }

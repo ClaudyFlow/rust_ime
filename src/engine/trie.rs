@@ -42,12 +42,12 @@ impl Trie {
         Ok(Self { index, abbrev_index, data: data_data })
     }
 
-    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String)>> {
+    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String, String)>> {
         let offset = self.index.get(pinyin)? as usize;
         Some(self.read_block(offset))
     }
 
-    pub fn get_all_abbrev(&self, abbr: &str) -> Option<Vec<(String, String)>> {
+    pub fn get_all_abbrev(&self, abbr: &str) -> Option<Vec<(String, String, String)>> {
         let abbrev_index = self.abbrev_index.as_ref()?;
         let offset = abbrev_index.get(abbr)? as usize;
         Some(self.read_block(offset))
@@ -69,7 +69,7 @@ impl Trie {
         false
     }
 
-    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String)> {
+    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String, String)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
@@ -77,7 +77,7 @@ impl Trie {
         while let Some((_, offset)) = stream.next() {
             let pairs = self.read_block(offset as usize);
             for pair in pairs {
-                if !results.iter().any(|(w, _)| w == &pair.0) {
+                if !results.iter().any(|(w, _, _)| w == &pair.0) {
                     results.push(pair);
                     if results.len() >= limit { return results; }
                 }
@@ -87,7 +87,7 @@ impl Trie {
     }
 
     #[allow(dead_code)]
-    pub fn get_random_entry(&self) -> Option<(String, String)> {
+    pub fn get_random_entry(&self) -> Option<(String, String, String)> {
         let len = self.index.len();
         if len == 0 { return None; }
         
@@ -107,7 +107,7 @@ impl Trie {
         None
     }
 
-    fn read_block(&self, offset: usize) -> Vec<(String, String)> {
+    fn read_block(&self, offset: usize) -> Vec<(String, String, String)> {
         let data = self.data.as_ref();
         if offset + 4 > data.len() { return Vec::new(); }
         
@@ -119,20 +119,25 @@ impl Trie {
             if cursor + 2 > data.len() { break; }
             let w_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
-            
             if cursor + w_len > data.len() { break; }
             let word = String::from_utf8_lossy(&data[cursor..cursor+w_len]).to_string();
             cursor += w_len;
             
             if cursor + 2 > data.len() { break; }
-            let h_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
+            let t_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
+            if cursor + t_len > data.len() { break; }
+            let tone = String::from_utf8_lossy(&data[cursor..cursor+t_len]).to_string();
+            cursor += t_len;
+
+            if cursor + 2 > data.len() { break; }
+            let e_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
+            cursor += 2;
+            if cursor + e_len > data.len() { break; }
+            let en = String::from_utf8_lossy(&data[cursor..cursor+e_len]).to_string();
+            cursor += e_len;
             
-            if cursor + h_len > data.len() { break; }
-            let hint = String::from_utf8_lossy(&data[cursor..cursor+h_len]).to_string();
-            cursor += h_len;
-            
-            results.push((word, hint));
+            results.push((word, tone, en));
         }
         results
     }
