@@ -10,9 +10,19 @@ use std::time::SystemTime;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all("data")?;
 
-    // 1. 自动提取并加载音节表 (优先从 chinese/chars.json 提取)
-    if Path::new("dicts/chinese/chars.json").exists() {
-        extract_syllables_to_file("dicts/chinese/chars.json", "dicts/chinese/syllables.txt")?;
+    // 0. Ensure Jianpin Dictionary is up-to-date
+    // Try both old and new paths for compatibility, but prioritize new structure
+    let chars_path = if Path::new("dicts/chinese/chars/chars.json").exists() { "dicts/chinese/chars/chars.json" } else { "dicts/chinese/chars.json" };
+    let words_path = if Path::new("dicts/chinese/words/words.json").exists() { "dicts/chinese/words/words.json" } else { "dicts/chinese/words.json" };
+    let jianpin_path = if Path::new("dicts/chinese/words/words_jianpin.json").exists() { "dicts/chinese/words/words_jianpin.json" } else { "dicts/chinese/words_jianpin.json" };
+
+    if Path::new(chars_path).exists() && Path::new(words_path).exists() {
+        ensure_jianpin_up_to_date(chars_path, words_path, jianpin_path)?;
+    }
+
+    // 1. 自动提取并加载音节表
+    if Path::new(chars_path).exists() {
+        extract_syllables_to_file(chars_path, "dicts/chinese/syllables.txt")?;
     }
     
     let mut syllables = HashSet::new();
@@ -59,6 +69,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+    }
+    
+    Ok(())
+}
+
+fn ensure_jianpin_up_to_date(chars_path: &str, words_path: &str, jianpin_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let words = Path::new(words_path);
+    let jianpin = Path::new(jianpin_path);
+    
+    if !words.exists() { return Ok(()); }
+    
+    let words_mtime = words.metadata()?.modified()?;
+    let jianpin_mtime = if jianpin.exists() {
+        jianpin.metadata()?.modified().unwrap_or(SystemTime::UNIX_EPOCH)
+    } else {
+        SystemTime::UNIX_EPOCH
+    };
+    
+    if words_mtime > jianpin_mtime {
+        println!("[Compiler] Regenerating {} from {}...", jianpin_path, words_path);
+        
+        let mut syllables = HashSet::new();
+        if let Ok(file) = File::open(chars_path) {
+             let json: Value = serde_json::from_reader(file)?;
+             if let Some(obj) = json.as_object() {
+                 for k in obj.keys() { syllables.insert(k.clone()); }
+             }
+        }
+        
+        let file = File::open(words_path)?;
+        let words_data: HashMap<String, Value> = serde_json::from_reader(file)?;
+        let mut jianpin_map: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        
+        for (pinyin, val) in words_data {
+             let syls = split_syllables(&pinyin, &syllables);
+             let abbr: String = syls.iter().filter_map(|s| s.chars().next()).collect();
+             
+             if abbr.len() > 1 && abbr != pinyin {
+                 let entry = jianpin_map.entry(abbr).or_default();
+                 if let Some(arr) = val.as_array() {
+                     for v in arr { 
+                         // Simple deduplication for JSON values is hard, but we assume exact structure match
+                         // For simplicity, we just append if not present (inefficient but works)
+                         // Actually, checking if Vec<Value> contains Value is slow.
+                         // Let's just push and rely on uniqueness of input if possible, or simple check.
+                         let v_str = v.to_string();
+                         if !entry.iter().any(|e| e.to_string() == v_str) {
+                             entry.push(v.clone());
+                         }
+                     }
+                 } else {
+                     let v_str = val.to_string();
+                     if !entry.iter().any(|e| e.to_string() == v_str) {
+                         entry.push(val.clone());
+                     }
+                 }
+             }
+        }
+        
+        let out_file = File::create(jianpin_path)?;
+        serde_json::to_writer_pretty(out_file, &jianpin_map)?;
+        println!("[Compiler] Generated {}.", jianpin_path);
     }
     
     Ok(())
