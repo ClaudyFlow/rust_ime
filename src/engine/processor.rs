@@ -338,6 +338,10 @@ impl Processor {
                 self.buffer.push(' '); self.preview_selected_candidate = false; self.lookup(); self.update_phantom_action()
             }
             Key::KEY_ENTER => {
+                if self.commit_mode == "single" {
+                    let out = self.buffer.clone();
+                    return self.commit_candidate(out);
+                }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
             }
