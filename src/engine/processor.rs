@@ -68,6 +68,7 @@ pub struct Processor {
     pub enable_prefix_matching: bool,
     pub prefix_matching_limit: usize,
     pub enable_abbreviation_matching: bool,
+    pub filter_proper_nouns_by_case: bool,
     pub has_dict_match: bool,
     pub page_flipping_style: String,
 }
@@ -144,11 +145,11 @@ impl Processor {
             enable_prefix_matching: true,
             prefix_matching_limit: 20,
             enable_abbreviation_matching: true,
+            filter_proper_nouns_by_case: true,
             has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }
     }
-
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
         self.show_candidates = conf.appearance.show_candidates;
         self.show_modern_candidates = conf.appearance.show_modern_candidates;
@@ -164,6 +165,7 @@ impl Processor {
         self.enable_prefix_matching = conf.input.enable_prefix_matching;
         self.prefix_matching_limit = conf.input.prefix_matching_limit;
         self.enable_abbreviation_matching = conf.input.enable_abbreviation_matching;
+        self.filter_proper_nouns_by_case = conf.input.filter_proper_nouns_by_case;
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         if let Some(style) = conf.input.page_flipping_keys.first() {
             self.page_flipping_style = style.clone();
@@ -642,41 +644,46 @@ impl Processor {
         
         if let Some(d) = dict {
             let buffer_normalized = strip_tones(&self.buffer);
+            let has_uppercase = self.buffer.chars().any(|c| c.is_ascii_uppercase());
             let is_precise_mode = buffer_normalized.contains(' ') || buffer_normalized.chars().any(|c| c.is_ascii_digit() || buffer_normalized.chars().any(|c| c.is_ascii_uppercase()));
+
+            let filter_by_case = |_word: &String, hint: &String| -> bool {
+                if !self.filter_proper_nouns_by_case || has_uppercase { return true; }
+                // 如果输入全小写，且提示中包含大写字母（人名/地名标识），则过滤
+                !hint.chars().any(|c| c.is_ascii_uppercase())
+            };
 
             if !is_precise_mode {
                 let full_pinyin = buffer_normalized.to_lowercase();
                 // --- 2.1 精准匹配 (Exact Match) ---
                 if let Some(exact_matches) = d.get_all_exact(&full_pinyin) {
                     for (word, hint) in exact_matches {
-                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                        if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
                 }
 
                 // --- 2.2 前缀匹配 (Prefix Matching / Suggestions) ---
-                // 当输入长度 >= 2 且为纯小写时，开启前缀联想
                 if self.enable_prefix_matching && full_pinyin.len() >= 2 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
                     let prefix_matches = d.search_bfs(&full_pinyin, self.prefix_matching_limit);
                     for (word, hint) in prefix_matches {
-                        if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                        if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                     }
                 }
 
                 // --- 2.3 简拼匹配 (Abbreviation Matching) ---
                 if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 4 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
-                    // 只有当精准匹配和前缀匹配结果不多时，才补充简拼结果，避免干扰
                     if final_candidates.len() < 5 {
                         if let Some(abbr_matches) = d.get_all_abbrev(&full_pinyin) {
                             for (word, hint) in abbr_matches {
-                                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                                if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                             }
                         }
                     }
                 }
             } else {
-                // 精准模式：候选词列表显示最后一部分经过辅码过滤后的候选
+                // 精准模式
                 for (word, hint) in last_matches {
-                    if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                    if filter_by_case(&word, &hint) && seen.insert(word.clone()) { final_candidates.push((word, hint)); }
                 }
             }
         }
@@ -848,6 +855,7 @@ mod tests {
             enable_prefix_matching: true,
             prefix_matching_limit: 20,
             enable_abbreviation_matching: true,
+            filter_proper_nouns_by_case: true,
             has_dict_match: false,
             page_flipping_style: "arrow".to_string(),
         }

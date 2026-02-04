@@ -153,15 +153,11 @@ pub struct Input {
     pub enable_error_sound: bool,
     #[serde(default = "default_auto_commit_unique_en_fuzhuma")]
     pub auto_commit_unique_en_fuzhuma: bool,
-    #[serde(default = "default_auto_commit_unique_full_match")]
     pub auto_commit_unique_full_match: bool,
-    #[serde(default = "default_enable_prefix_matching")]
     pub enable_prefix_matching: bool,
-    #[serde(default = "default_prefix_matching_limit")]
     pub prefix_matching_limit: usize,
-    #[serde(default = "default_enable_abbreviation_matching")]
     pub enable_abbreviation_matching: bool,
-    #[serde(default = "default_profile_keys")]
+    pub filter_proper_nouns_by_case: bool,
     pub profile_keys: Vec<ProfileKey>,
     #[serde(default = "default_page_flipping_keys")]
     pub page_flipping_keys: Vec<String>,
@@ -197,6 +193,7 @@ impl Default for Input {
             enable_prefix_matching: true,
             prefix_matching_limit: 20,
             enable_abbreviation_matching: true,
+            filter_proper_nouns_by_case: true,
             profile_keys: default_profile_keys(),
             page_flipping_keys: default_page_flipping_keys(),
         }
