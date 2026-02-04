@@ -75,12 +75,8 @@
         input:checked + .slider { background-color: #34c759; }
         input:checked + .slider:before { transform: translateX(22px); }
 
-        /* 方案选择样式 */
         .profile-chip-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .profile-chip { 
-            display: flex; align-items: center; gap: 8px; background: white; border: 2px solid var(--apple-border); 
-            padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-weight: 600;
-        }
+        .profile-chip { display: flex; align-items: center; gap: 8px; background: white; border: 2px solid var(--apple-border); padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
         .profile-chip.active { border-color: var(--apple-accent); background: rgba(0,113,227,0.05); color: var(--apple-accent); }
         .profile-chip input { display: none; }
 
@@ -112,74 +108,42 @@
             <h1>系统总览</h1>
             <div class="card">
                 <div class="setting-item" style="display: block;">
-                    <div class="info">
-                        <div class="title">活跃输入方案 (多选混输)</div>
-                        <div class="desc">您可以勾选多个方案进行混合输入（如：中+英，英+日等）</div>
-                    </div>
+                    <div class="info"><div class="title">默认启动方案 (多选混输)</div><div class="desc">开机默认加载的方案组合</div></div>
                     <div id="active_profiles_container" class="profile-chip-group"></div>
                 </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">上屏模式</div></div>
-                    <select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">候选词数量</div></div>
-                    <input type="number" id="page_size">
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">粘贴注入方式</div></div>
-                    <select id="paste_method">
-                        <option value="ctrl_v">标准 (Ctrl+V)</option><option value="ctrl_shift_v">终端 (Ctrl+Shift+V)</option><option value="shift_insert">X11 (Shift+Insert)</option>
-                    </select>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">翻页按键</div></div>
-                    <select id="page_flipping_keys"><option value="arrow">方向键</option><option value="minus_equal">减等号 (-/=)</option></select>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">登录时自动启动</div></div>
-                    <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">按键错误提示音</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label>
-                </div>
+                <div class="setting-item"><div class="info"><div class="title">上屏模式</div></div><select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select></div>
+                <div class="setting-item"><div class="info"><div class="title">候选词数量</div></div><input type="number" id="page_size"></div>
+                <div class="setting-item"><div class="info"><div class="title">粘贴注入方式</div></div><select id="paste_method"><option value="ctrl_v">标准 (Ctrl+V)</option><option value="ctrl_shift_v">终端 (Ctrl+Shift+V)</option><option value="shift_insert">X11 (Shift+Insert)</option></select></div>
+                <div class="setting-item"><div class="info"><div class="title">登录时自动启动</div></div><label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label></div>
             </div>
         </div>
 
         <div id="tab-matching" class="tab-content">
             <h1>搜索与匹配</h1>
             <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">精准匹配自动上屏</div><div class="desc">唯一精准项自动提交</div></div>
-                    <label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">开启前缀联想</div><div class="desc">根据拼音开头自动补全长词</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">联想结果上限</div></div>
-                    <input type="number" id="prefix_matching_limit">
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">开启简拼匹配</div><div class="desc">只输入声母匹配词条 (如 'bj' 匹配 '北京')</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">区分专有名词大小写</div><div class="desc">开启后，TitleCase 输入精准匹配人名地名</div></div>
-                    <label class="switch"><input type="checkbox" id="filter_proper_nouns_by_case"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">防呆模式</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
-                </div>
+                <div class="setting-item"><div class="info"><div class="title">精准匹配自动上屏</div></div><label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">开启前缀联想</div></div><label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">开启简拼匹配</div></div><label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">区分专有名词大小写</div></div><label class="switch"><input type="checkbox" id="filter_proper_nouns_by_case"><span class="slider"></span></label></div>
+            </div>
+        </div>
+
+        <div id="tab-quickrime" class="tab-content">
+            <h1>长韵母映射</h1>
+            <div class="card"><div id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加新映射</button></div>
+        </div>
+
+        <div id="tab-profilekeys" class="tab-content">
+            <h1>快捷切换映射</h1>
+            <div class="card">
+                <div class="info" style="margin-bottom: 20px;"><div class="desc">设置按下 ` (反引号) 后，再按哪个字母切换到哪个方案组合</div></div>
+                <div id="pk-container"></div>
+                <button class="btn" onclick="addPK()">+ 添加新映射</button>
             </div>
         </div>
 
         <div id="tab-appearance" class="tab-content">
             <h1>视觉与样式</h1>
-            
             <div class="card">
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">显示传统窗</div></div><label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label></div>
@@ -187,15 +151,15 @@
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">系统通知候选词</div></div><label class="switch"><input type="checkbox" id="show_notifications"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">拼音预览开关</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">拼音预览</div></div><label class="switch"><input type="checkbox" id="preview_mode_toggle"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">按键回显</div></div><label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label></div>
                     <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">显示英文释义</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示汉字注音</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示提示 (Hint)</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
+                    <div class="setting-item"><div class="info"><div class="title">显示注音 (Tone)</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
                 </div>
             </div>
 
@@ -220,10 +184,6 @@
             <div class="card">
                 <div class="setting-item"><div class="info"><div class="title">锚定位置</div></div><select id="modern_cand_anchor"><option value="bottom_left">左下角</option><option value="bottom_right">右下角</option><option value="top_left">左上角</option><option value="top_right">右上角</option></select></div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="modern_cand_margin_y"></div>
-                    <div class="setting-item"><div class="info"><div class="title">水平偏移 (X)</div></div><input type="number" id="modern_cand_margin_x"></div>
-                </div>
-                <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="modern_cand_font_size"></div>
                     <div class="setting-item"><div class="info"><div class="title">辅码字号</div></div><input type="number" id="modern_cand_hint_font_size"></div>
                 </div>
@@ -234,39 +194,26 @@
                 <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="modern_cand_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div></div></div>
             </div>
 
-            <h2>按键回显 (Keystroke)</h2>
+            <h2>按键显示 (Keystroke)</h2>
             <div class="card">
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">消失延迟 (ms)</div></div><input type="number" id="keystroke_timeout_ms"></div>
                     <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="keystroke_font_size"></div>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">水平偏移 (X)</div></div><input type="number" id="keystroke_margin_x"></div>
-                    <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="keystroke_margin_y"></div>
                 </div>
                 <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="keystroke_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="keystroke_bg_color_picker"></div></div></div>
             </div>
 
             <h2>汉字学习模式</h2>
             <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">轮播学习词典</div></div>
-                    <select id="learning_dict_path" style="width: 300px;"></select>
-                </div>
+                <div class="setting-item"><div class="info"><div class="title">学习模式词典</div></div><select id="learning_dict_path" style="width: 300px;"></select></div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">轮播间隔 (秒)</div></div><input type="number" id="learning_interval_sec"></div>
-                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="learning_font_size"></div>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">水平偏移 (X)</div></div><input type="number" id="learning_margin_x"></div>
-                    <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="learning_margin_y"></div>
+                    <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="learning_font_size"></div>
                 </div>
                 <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="learning_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="learning_bg_color_picker"></div></div></div>
             </div>
         </div>
 
-        <div id="tab-quickrime" class="tab-content"><h1>长韵母映射</h1><div class="card" id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加</button></div>
-        <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
         <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索词条..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
@@ -294,7 +241,7 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // 方案选择组 (多选)
+            // 方案多选 Chip
             const pc = document.getElementById('active_profiles_container');
             pc.innerHTML = config.files.profiles.map(p => `
                 <div class="profile-chip ${config.input.active_profiles.includes(p.name)?'active':''}" onclick="toggleProfileChip(this, '${p.name}')">
@@ -309,56 +256,39 @@
             ls.value = config.appearance.learning_dict_path;
 
             const allIds = [
-                'commit_mode', 'page_size', 'paste_method',
-                'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size',
-                'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size',
-                'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_margin_x', 'keystroke_margin_y',
-                'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_x', 'learning_margin_y',
-                'prefix_matching_limit'
+                'commit_mode', 'page_size', 'paste_method', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size',
+                'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'keystroke_timeout_ms', 'keystroke_font_size', 'learning_interval_sec', 'learning_font_size'
             ];
-            allIds.forEach(id => {
-                const el = document.getElementById(id); if(!el) return;
-                el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] !== undefined ? config.input[id] : "");
-            });
+            allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] || ""); });
 
             const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint'];
-            checkIds.forEach(id => {
-                const el = document.getElementById(id); if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id];
-            });
+            checkIds.forEach(id => { const el = document.getElementById(id); if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id]; });
             document.getElementById('preview_mode_toggle').checked = (config.appearance.preview_mode === 'pinyin');
 
             const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
             colorIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 el.value = config.appearance[id]; linkColor(id);
-                const picker = document.getElementById(id + '_picker');
-                if(el.value.startsWith('#')) picker.value = el.value;
+                const picker = document.getElementById(id + '_picker'); if(el.value.startsWith('#')) picker.value = el.value;
             });
 
             renderQR(); renderPK(); renderHK(); renderDictsList(dicts);
         }
 
         function toggleProfileChip(el, name) {
-            const cb = el.querySelector('input');
-            cb.checked = !cb.checked;
-            el.classList.toggle('active', cb.checked);
+            const cb = el.querySelector('input'); cb.checked = !cb.checked; el.classList.toggle('active', cb.checked);
         }
 
         async function saveAll() {
-            // 保存活跃方案组
             const checked = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
-            if(checked.length > 0) {
-                config.input.active_profiles = checked;
-                config.input.default_profile = checked[0]; // 将第一个选中的设为默认
-            }
+            if(checked.length > 0) { config.input.active_profiles = checked; config.input.default_profile = checked[0]; }
 
-            ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'prefix_matching_limit', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
+            ['commit_mode', 'paste_method', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'filter_proper_nouns_by_case', 'enable_anti_typo'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });
-            config.input.page_flipping_keys = [document.getElementById('page_flipping_keys').value];
 
-            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_margin_x', 'modern_cand_margin_y', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_margin_x', 'keystroke_margin_y', 'keystroke_bg_color', 'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_x', 'learning_margin_y', 'learning_bg_color', 'learning_dict_path'];
+            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_x', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_bg_color', 'learning_interval_sec', 'learning_font_size', 'learning_bg_color', 'learning_dict_path'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = (el.type === 'number') ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
@@ -369,10 +299,33 @@
             const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
         }
 
-        function renderQR() { document.getElementById('qr-container').innerHTML = (config.input.quick_rimes||[]).map((qr, i) => `<div class="setting-item"><input type="text" value="${qr.trigger}" onchange="config.input.quick_rimes[${i}].trigger=this.value"> ⮕ <input type="text" value="${qr.insert}" onchange="config.input.quick_rimes[${i}].insert=this.value"> <button onclick="config.input.quick_rimes.splice(${i},1);renderQR()">✕</button></div>`).join(''); }
-        function addQR() { if(!config.input.quick_rimes) config.input.quick_rimes=[]; config.input.quick_rimes.push({trigger:'caps+?',insert:''}); renderQR(); }
-        function renderPK() { document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `<div class="setting-item"><input type="text" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value"> ⮕ <input type="text" value="${pk.profile}" onchange="config.input.profile_keys[${i}].profile=this.value"> <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button></div>`).join(''); }
-        function addPK() { if(!config.input.profile_keys) config.input.profile_keys=[]; config.input.profile_keys.push({key:'?',profile:''}); renderPK(); }
+        function renderQR() { document.getElementById('qr-container').innerHTML = (config.input.quick_rimes||[]).map((qr, i) => `<div class="setting-item"><input type="text" value="${qr.trigger}" onchange="config.input.quick_rimes[${i}].trigger=this.value" style="width:60px;"> ⮕ <input type="text" value="${qr.insert}" onchange="config.input.quick_rimes[${i}].insert=this.value" style="width:100px;"> <button onclick="config.input.quick_rimes.splice(${i},1);renderQR()">✕</button></div>`).join(''); }
+        function addQR() { config.input.quick_rimes.push({trigger:'caps+?',insert:''}); renderQR(); }
+
+        function renderPK() {
+            // 获取所有可用方案名
+            const available = config.files.profiles.map(p => p.name);
+            // 生成组合选项
+            const combinations = [...available];
+            if(available.includes('chinese') && available.includes('english')) combinations.push('chinese,english');
+            if(available.includes('chinese') && available.includes('japanese')) combinations.push('chinese,japanese');
+            if(available.includes('english') && available.includes('japanese')) combinations.push('english,japanese');
+            if(available.length >= 3) combinations.push(available.join(','));
+
+            document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `
+                <div class="setting-item">
+                    <input type="text" placeholder="字母" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value" style="width:50px; text-align:center;">
+                    ⮕ 
+                    <select onchange="config.input.profile_keys[${i}].profile=this.value" style="width:200px;">
+                        ${combinations.map(c => `<option value="${c}" ${pk.profile===c?'selected':''}>${c}</option>`).join('')}
+                        <option value="${pk.profile}" ${!combinations.includes(pk.profile)?'selected':''}>${combinations.includes(pk.profile)?'':'自定义: ' + pk.profile}</option>
+                    </select>
+                    <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button>
+                </div>
+            `).join('');
+        }
+        function addPK() { config.input.profile_keys.push({key:'?',profile:config.files.profiles[0].name}); renderPK(); }
+
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
         function renderDictsList(ds) {
             const groups = {}; ds.forEach(d => { if(!groups[d.group]) groups[d.group] = []; groups[d.group].push(d); });
