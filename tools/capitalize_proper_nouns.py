@@ -1,21 +1,23 @@
 import os
 
-def capitalize_pinyin(pinyin_str):
-    # 先删除所有空格，然后仅首字母大写
+def process_pinyin(pinyin_str, mode="capitalize"):
+    # 删除所有空格
     joined = pinyin_str.replace(" ", "")
-    return joined.capitalize()
+    if mode == "capitalize":
+        return joined.capitalize()
+    else:
+        return joined.lower()
 
-def process_directory(base_path):
+def process_directory(base_path, mode="capitalize"):
     if not os.path.exists(base_path):
         print(f"跳过不存在的目录: {base_path}")
         return
 
-    print(f"正在处理目录: {base_path}")
+    print(f"正在处理目录: {base_path} (模式: {mode})")
     for root, dirs, files in os.walk(base_path):
         for file in files:
             if file.endswith('.txt'):
                 file_path = os.path.join(root, file)
-                print(f"  处理文件: {file}")
                 
                 new_lines = []
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -28,9 +30,9 @@ def process_directory(base_path):
                         if len(parts) >= 2:
                             word = parts[0]
                             pinyin = parts[1].strip()
-                            rest = parts[2:] # 保留可能存在的权重或其他列
+                            rest = parts[2:]
                             
-                            new_pinyin = capitalize_pinyin(pinyin)
+                            new_pinyin = process_pinyin(pinyin, mode)
                             
                             new_line = f"{word}\t{new_pinyin}"
                             for r in rest:
@@ -44,12 +46,10 @@ def process_directory(base_path):
                     f.writelines(new_lines)
 
 if __name__ == "__main__":
-    proper_noun_dirs = [
-        "dicts/chinese/words/capital_word/人名",
-        "dicts/chinese/words/capital_word/地名"
-    ]
+    # 1. 处理专有名词 (去空格 + 首字母大写)
+    process_directory("dicts/chinese/words/capital_word", mode="capitalize")
     
-    for target_dir in proper_noun_dirs:
-        process_directory(target_dir)
+    # 2. 处理普通词库 (仅去空格)
+    process_directory("dicts/chinese/words/readable_lexicon", mode="lowercase")
     
     print("\n处理完成！")
