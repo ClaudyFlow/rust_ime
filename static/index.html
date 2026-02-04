@@ -60,6 +60,7 @@
             color: #000; font-weight: 600;
         }
         input:focus { border-color: var(--apple-accent); box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
+        input::placeholder { color: #ccc; font-weight: 400; }
 
         .color-picker-group { display: flex; align-items: center; gap: 12px; }
         .color-preview { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--apple-border); cursor: pointer; padding: 0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -184,6 +185,10 @@
             <div class="card">
                 <div class="setting-item"><div class="info"><div class="title">锚定位置</div></div><select id="modern_cand_anchor"><option value="bottom_left">左下角</option><option value="bottom_right">右下角</option><option value="top_left">左上角</option><option value="top_right">右上角</option></select></div>
                 <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="modern_cand_margin_y"></div>
+                    <div class="setting-item"><div class="info"><div class="title">水平偏移 (X)</div></div><input type="number" id="modern_cand_margin_x"></div>
+                </div>
+                <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="modern_cand_font_size"></div>
                     <div class="setting-item"><div class="info"><div class="title">辅码字号</div></div><input type="number" id="modern_cand_hint_font_size"></div>
                 </div>
@@ -241,7 +246,6 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // 方案多选 Chip
             const pc = document.getElementById('active_profiles_container');
             pc.innerHTML = config.files.profiles.map(p => `
                 <div class="profile-chip ${config.input.active_profiles.includes(p.name)?'active':''}" onclick="toggleProfileChip(this, '${p.name}')">
@@ -299,22 +303,27 @@
             const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
         }
 
-        function renderQR() { document.getElementById('qr-container').innerHTML = (config.input.quick_rimes||[]).map((qr, i) => `<div class="setting-item"><input type="text" value="${qr.trigger}" onchange="config.input.quick_rimes[${i}].trigger=this.value" style="width:60px;"> ⮕ <input type="text" value="${qr.insert}" onchange="config.input.quick_rimes[${i}].insert=this.value" style="width:100px;"> <button onclick="config.input.quick_rimes.splice(${i},1);renderQR()">✕</button></div>`).join(''); }
-        function addQR() { config.input.quick_rimes.push({trigger:'caps+?',insert:''}); renderQR(); }
+        function renderQR() { 
+            document.getElementById('qr-container').innerHTML = (config.input.quick_rimes||[]).map((qr, i) => `
+                <div class="setting-item">
+                    <input type="text" placeholder="caps+字母" value="${qr.trigger}" onchange="config.input.quick_rimes[${i}].trigger=this.value" style="width:80px;"> 
+                    ⮕ 
+                    <input type="text" placeholder="输入内容" value="${qr.insert}" onchange="config.input.quick_rimes[${i}].insert=this.value" style="width:100px;"> 
+                    <button onclick="config.input.quick_rimes.splice(${i},1);renderQR()">✕</button>
+                </div>`).join(''); 
+        }
+        function addQR() { config.input.quick_rimes.push({trigger:'',insert:''}); renderQR(); }
 
         function renderPK() {
-            // 获取所有可用方案名
             const available = config.files.profiles.map(p => p.name);
-            // 生成组合选项
             const combinations = [...available];
             if(available.includes('chinese') && available.includes('english')) combinations.push('chinese,english');
             if(available.includes('chinese') && available.includes('japanese')) combinations.push('chinese,japanese');
-            if(available.includes('english') && available.includes('japanese')) combinations.push('english,japanese');
             if(available.length >= 3) combinations.push(available.join(','));
 
             document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `
                 <div class="setting-item">
-                    <input type="text" placeholder="字母" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value" style="width:50px; text-align:center;">
+                    <input type="text" placeholder="按键" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value" style="width:60px; text-align:center;">
                     ⮕ 
                     <select onchange="config.input.profile_keys[${i}].profile=this.value" style="width:200px;">
                         ${combinations.map(c => `<option value="${c}" ${pk.profile===c?'selected':''}>${c}</option>`).join('')}
@@ -324,7 +333,7 @@
                 </div>
             `).join('');
         }
-        function addPK() { config.input.profile_keys.push({key:'?',profile:config.files.profiles[0].name}); renderPK(); }
+        function addPK() { config.input.profile_keys.push({key:'',profile:config.files.profiles[0].name}); renderPK(); }
 
         function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
         function renderDictsList(ds) {
