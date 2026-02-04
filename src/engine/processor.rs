@@ -563,15 +563,12 @@ impl Processor {
             }
 
             // 支持 "简拼 + 辅码"
-            if self.enable_abbreviation_matching && part.pinyin.len() <= 5 {
-                let abbr_matches = if let Some(matches) = dict.get_all_abbrev(&part.pinyin) {
-                    matches
-                } else {
-                    dict.search_abbreviation(&part.pinyin, 50)
-                };
-                for (word, hint) in abbr_matches {
-                    if seen.insert(word.clone()) {
-                        matches.push((word, hint));
+            if self.enable_abbreviation_matching && part.pinyin.len() <= 4 {
+                if let Some(abbr_matches) = dict.get_all_abbrev(&part.pinyin) {
+                    for (word, hint) in abbr_matches {
+                        if seen.insert(word.clone()) {
+                            matches.push((word, hint));
+                        }
                     }
                 }
             }
@@ -653,17 +650,13 @@ impl Processor {
                 }
 
                 // --- 2.3 简拼匹配 (Abbreviation Matching) ---
-                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 5 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
+                if self.enable_abbreviation_matching && full_pinyin.len() >= 2 && full_pinyin.len() <= 4 && full_pinyin.chars().all(|c| c.is_ascii_lowercase()) {
                     // 只有当精准匹配和前缀匹配结果不多时，才补充简拼结果，避免干扰
                     if final_candidates.len() < 5 {
-                        let abbr_matches = if let Some(matches) = d.get_all_abbrev(&full_pinyin) {
-                            matches
-                        } else {
-                            d.search_abbreviation(&full_pinyin, 10)
-                        };
-                        
-                        for (word, hint) in abbr_matches {
-                            if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                        if let Some(abbr_matches) = d.get_all_abbrev(&full_pinyin) {
+                            for (word, hint) in abbr_matches {
+                                if seen.insert(word.clone()) { final_candidates.push((word, hint)); }
+                            }
                         }
                     }
                 }

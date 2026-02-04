@@ -69,60 +69,6 @@ impl Trie {
         false
     }
 
-    pub fn search_abbreviation(&self, abbr: &str, limit: usize) -> Vec<(String, String)> {
-        let mut results = Vec::new();
-        if abbr.is_empty() { return results; }
-        
-        // 性能优化：只搜索以 abbr 第一个字母开头的路径
-        let first_char = abbr.chars().next().unwrap().to_string();
-        let matcher = fst::automaton::Str::new(&first_char).starts_with();
-        let mut stream = self.index.search(matcher).into_stream();
-
-        while let Some((key_bytes, offset)) = stream.next() {
-            let key = String::from_utf8_lossy(key_bytes);
-            if self.is_abbreviation_match(abbr, &key) {
-                let pairs = self.read_block(offset as usize);
-                for pair in pairs {
-                    if !results.iter().any(|(w, _)| w == &pair.0) {
-                        results.push(pair);
-                        if results.len() >= limit { return results; }
-                    }
-                }
-            }
-        }
-        results
-    }
-
-    fn is_abbreviation_match(&self, abbr: &str, pinyin: &str) -> bool {
-        let abbr_chars: Vec<char> = abbr.chars().collect();
-        let py_chars: Vec<char> = pinyin.chars().collect();
-        
-        // 规则 1：首字母必须绝对匹配
-        if abbr_chars[0] != py_chars[0] { return false; }
-        
-        let mut py_idx = 1;
-        for &ac in &abbr_chars[1..] {
-            let mut found = false;
-            while py_idx < py_chars.len() {
-                if py_chars[py_idx] == ac {
-                    // 启发式：判断当前 py_chars[py_idx] 是否可能是音节开头
-                    // 1. 如果是 'h'，且前一个字母是 'z/c/s'，则它属于 zh/ch/sh，不是新音节开头
-                    let is_h_of_zh_ch_sh = ac == 'h' && py_idx > 0 && 
-                        (py_chars[py_idx-1] == 'z' || py_chars[py_idx-1] == 'c' || py_chars[py_idx-1] == 's');
-                    
-                    if !is_h_of_zh_ch_sh {
-                        found = true;
-                        py_idx += 1; // 匹配成功，继续寻找下一个
-                        break;
-                    }
-                }
-                py_idx += 1;
-            }
-            if !found { return false; }
-        }
-        true
-    }
-
     pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();
