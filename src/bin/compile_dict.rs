@@ -254,6 +254,10 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllab
             process_json_file(path, &mut entries, &mut abbrev_entries, is_english, syllables)?;
         } else if path.extension().map_or(false, |ext| ext == "yaml") {
             process_yaml_file(path, &mut entries, &mut abbrev_entries)?;
+        } else if path.extension().map_or(false, |ext| ext == "txt") {
+            let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if filename == "syllables.txt" || filename == "basic_tokens.txt" { continue; }
+            process_txt_file(path, &mut entries, &mut abbrev_entries)?;
         }
     }
 
@@ -273,6 +277,34 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool, syllab
 
     write_binary_dict(&idx_path, &abbrev_idx_path, &dat_path, entries, abbrev_entries)?;
     println!("[Compiler] Finished: {}", out_stem);
+    Ok(())
+}
+
+fn process_txt_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, abbrev_entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::{BufRead, BufReader};
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with('#') || line.trim().is_empty() { continue; }
+
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 2 {
+            let word = parts[0].to_string();
+            let pinyin_raw = parts[1].to_lowercase();
+            let pinyin = pinyin_raw.replace(' ', "");
+            // TXT 格式: 词 \t 拼音 \t [权重]
+            let weight = if parts.len() >= 3 { parts[2] } else { "" };
+            entries.entry(pinyin).or_default().push((word.clone(), weight.to_string()));
+
+            // Extract jianpin from space-separated syllables
+            let abbrev: String = pinyin_raw.split_whitespace().filter_map(|s| s.chars().next()).collect();
+            if abbrev.len() > 1 && abbrev != pinyin_raw.replace(' ', "") {
+                abbrev_entries.entry(abbrev).or_default().push((word, weight.to_string()));
+            }
+        }
+    }
     Ok(())
 }
 
