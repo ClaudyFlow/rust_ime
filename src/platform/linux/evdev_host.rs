@@ -117,7 +117,8 @@ pub struct EvdevHost {
     notify_tx: Sender<NotifyEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
-    pending_tab: bool,
+    pending_caps: bool,
+    tab_held_and_not_used: bool,
 }
 
 impl EvdevHost {
@@ -138,7 +139,8 @@ impl EvdevHost {
             notify_tx,
             should_exit: Arc::new(AtomicBool::new(false)),
             config,
-            pending_tab: false,
+            pending_caps: false,
+            tab_held_and_not_used: false,
         })
     }
 }
@@ -173,48 +175,65 @@ impl InputMethodHost for EvdevHost {
                     let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
                     let has_mod = ctrl || alt || meta;
 
-                    // --- 特殊处理: Tab 键 Dual-Role 逻辑 ---
-                    // 仅在无其他修饰键、中文模式且开启长韵母映射时启用
+                    // --- 特殊处理: Tab / CapsLock Roles ---
                     let (chinese_mode, quick_rime_enabled) = {
                         let p = self.processor.lock().unwrap();
                         let conf = self.config.read().unwrap();
                         (p.chinese_enabled, conf.input.enable_quick_rime)
                     };
 
-                    if key == Key::KEY_TAB && !has_mod && chinese_mode && quick_rime_enabled {
-                        if val == 1 { // Press
-                            self.pending_tab = true;
-                            continue; // 暂不发送，拦截
-                        } else if val == 0 { // Release
-                            if self.pending_tab {
-                                // Tab 未被消费，原样发送
-                                if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_TAB); }
-                                self.pending_tab = false;
+                    // 1. Tab Interception (for IME Toggle and Tab+Caps combo)
+                    if key == Key::KEY_TAB && !has_mod {
+                        if val == 1 {
+                            self.tab_held_and_not_used = true;
+                        } else if val == 0 {
+                            if self.tab_held_and_not_used {
+                                // Toggle IME
+                                let mut p = self.processor.lock().unwrap();
+                                let _action = p.toggle();
+                                let enabled = p.chinese_enabled;
+                                let msg = if enabled { "中文模式" } else { "直通模式" };
+                                let summary = p.current_profile.clone();
+                                let _ = self.notify_tx.send(NotifyEvent::Close);
+                                let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                                drop(p);
+                                self.update_gui();
                             }
-                            continue;
+                            self.tab_held_and_not_used = false;
                         }
+                        continue;
+                    }
+
+                    // 2. CapsLock Interception (for Quick Rime and Tab+Caps combo)
+                    if key == Key::KEY_CAPSLOCK && !has_mod {
+                        if val == 1 {
+                            if held_keys.contains(&Key::KEY_TAB) {
+                                // Combo: Tab + CapsLock -> Real CapsLock toggle
+                                self.tab_held_and_not_used = false;
+                                if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_CAPSLOCK); }
+                            } else if chinese_mode && quick_rime_enabled {
+                                self.pending_caps = true;
+                            }
+                        } else if val == 0 {
+                            self.pending_caps = false;
+                        }
+                        continue;
                     }
 
                     // --- 快捷键检测 ---
                     if val == 1 {
-                        // 0. 优先检测：Tab 组合键 / 快速韵母 (Quick Rime)
-                        if self.pending_tab {
+                        // 0. Quick Rime (Triggered by CapsLock)
+                        if self.pending_caps {
                              let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
                              let mut handled_quick_rime = false;
-                             
-                             // 构造虚拟触发键名，例如 "tab+l"
-                             // 这里简化匹配：直接查找 trigger 字符串包含 "tab+" 且以当前按键名结尾的配置
                              let key_name = map_key_to_display_name(key).to_lowercase();
-                             let trigger_target = format!("tab+{}", key_name);
+                             let trigger_target = format!("caps+{}", key_name);
 
                              for qr in quick_rimes {
                                  if qr.trigger.to_lowercase() == trigger_target {
                                      let mut p = self.processor.lock().unwrap();
                                      if p.chinese_enabled {
-                                         // 消费 pending_tab
-                                         self.pending_tab = false;
-                                         
-                                         // 注入韵母
+                                         self.pending_caps = false;
                                          let action = p.inject_text(&qr.insert);
                                          match action {
                                             Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
@@ -226,7 +245,6 @@ impl InputMethodHost for EvdevHost {
                                             }
                                             Action::Consume => {}
                                             Action::Alert => {
-                                                // QuickRime 注入导致警报
                                                 if self.config.read().unwrap().input.enable_error_sound {
                                                     let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn();
                                                 }
@@ -244,17 +262,14 @@ impl InputMethodHost for EvdevHost {
                                          self.notify_preview();
                                          break; 
                                      }
-                                                                  }
-                                     
+                                 }
                              }
 
                              if handled_quick_rime {
-                                 continue; // 按键已被处理，跳过后续逻辑
+                                 continue;
                              } else {
-                                 // Tab 被按下了，但当前键不是组合键的一部分 -> 立即补发 Tab
-                                 if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_TAB); }
-                                 self.pending_tab = false;
-                                 // 然后继续处理当前按键（fall through）
+                                 // Not a quick rime combo, proceed with normal key handling
+                                 self.pending_caps = false;
                              }
                         }
 

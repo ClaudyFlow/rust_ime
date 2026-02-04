@@ -45,59 +45,59 @@
     "commit_mode": "single",
     "quick_rimes": [
       {
-        "trigger": "tab+j",
+        "trigger": "caps+j",
         "insert": "iang"
       },
       {
-        "trigger": "tab+k",
+        "trigger": "caps+k",
         "insert": "uai"
       },
       {
-        "trigger": "tab+l",
+        "trigger": "caps+l",
         "insert": "uang"
       },
       {
-        "trigger": "tab+i",
+        "trigger": "caps+i",
         "insert": "ing"
       },
       {
-        "trigger": "tab+o",
+        "trigger": "caps+o",
         "insert": "ong"
       },
       {
-        "trigger": "tab+p",
+        "trigger": "caps+p",
         "insert": "iong"
       },
       {
-        "trigger": "tab+n",
+        "trigger": "caps+n",
         "insert": "iao"
       },
       {
-        "trigger": "tab+m",
+        "trigger": "caps+m",
         "insert": "ian"
       },
       {
-        "trigger": "tab+u",
+        "trigger": "caps+u",
         "insert": "uan"
       },
       {
-        "trigger": "tab+a",
+        "trigger": "caps+a",
         "insert": "ang"
       },
       {
-        "trigger": "tab+e",
+        "trigger": "caps+e",
         "insert": "eng"
       },
       {
-        "trigger": "tab+z",
+        "trigger": "caps+z",
         "insert": "zhi"
       },
       {
-        "trigger": "tab+c",
+        "trigger": "caps+c",
         "insert": "chi"
       },
       {
-        "trigger": "tab+s",
+        "trigger": "caps+s",
         "insert": "shi"
       }
     ],
@@ -132,7 +132,7 @@
   },
   "hotkeys": {
     "switch_language": {
-      "key": "caps_lock",
+      "key": "tab",
       "description": "核心: 切换中/英文模式"
     },
     "switch_language_alt": {
