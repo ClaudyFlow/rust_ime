@@ -657,11 +657,13 @@ impl Processor {
             // 动态处理 Hint
             let mut final_hint = String::new();
             if !raw_hint.is_empty() {
-                let parts: Vec<&str> = raw_hint.splitn(2, ' ').collect();
-                let (tone, en) = if parts.len() == 2 {
-                    (parts[0], parts[1])
-                } else if !raw_hint.is_empty() && (raw_hint.chars().any(|c| "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü".contains(c))) {
-                    (raw_hint.as_str(), "")
+                // 检查第一个单词是否包含声调符号
+                let first_word = raw_hint.split_whitespace().next().unwrap_or("");
+                let has_tones = first_word.chars().any(|c| "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜü".contains(c));
+
+                let (tone, en) = if has_tones {
+                    let parts: Vec<&str> = raw_hint.splitn(2, ' ').collect();
+                    if parts.len() == 2 { (parts[0], parts[1]) } else { (parts[0], "") }
                 } else {
                     ("", raw_hint.as_str())
                 };
