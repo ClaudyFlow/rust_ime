@@ -194,6 +194,13 @@ impl Processor {
             "pinyin" => PhantomMode::Pinyin,
             _ => PhantomMode::None,
         };
+
+        // 关键修复：应用配置后强制同步一次状态
+        if self.buffer.is_empty() {
+            self.reset();
+        } else {
+            self.lookup();
+        }
     }
 
     pub fn toggle(&mut self) -> Action {
