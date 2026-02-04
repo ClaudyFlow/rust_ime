@@ -134,7 +134,15 @@
                     <label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">显示英文释义 (Hint)</div></div>
+                    <div class="info"><div class="title">按键回显 (Keystroke)</div></div>
+                    <label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">汉字学习模式</div></div>
+                    <label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示英文提示 (Hint)</div></div>
                     <label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
@@ -143,15 +151,11 @@
                 </div>
             </div>
 
-            <h2>传统窗口 (Traditional)</h2>
+            <h2>传统窗口样式</h2>
             <div class="card">
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
                     <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="candidate_font_size"></div>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">辅码字号</div></div>
-                    <input type="number" id="candidate_hint_font_size">
                 </div>
                 <div class="grid-2">
                     <div class="setting-item">
@@ -169,7 +173,7 @@
                 </div>
             </div>
 
-            <h2>卡片窗口 (Modern)</h2>
+            <h2>卡片窗口样式</h2>
             <div class="card">
                 <div class="setting-item">
                     <div class="info"><div class="title">锚定位置</div></div>
@@ -197,6 +201,47 @@
                 <div class="setting-item">
                     <div class="info"><div class="title">背景颜色</div></div>
                     <div class="color-picker-group"><input type="text" id="modern_cand_bg_color" style="width: 80px;"><div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div></div>
+                </div>
+            </div>
+
+            <h2>按键显示回显 (Keystroke)</h2>
+            <div class="card">
+                <div class="grid-2">
+                    <div class="setting-item">
+                        <div class="info"><div class="title">显示位置</div></div>
+                        <select id="keystroke_anchor">
+                            <option value="bottom_right">右下角</option><option value="bottom_left">左下角</option><option value="top_right">右上角</option><option value="top_left">左上角</option>
+                        </select>
+                    </div>
+                    <div class="setting-item"><div class="info"><div class="title">消失延迟 (ms)</div></div><input type="number" id="keystroke_timeout_ms"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="keystroke_font_size"></div>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">背景颜色</div></div>
+                        <div class="color-picker-group"><input type="text" id="keystroke_bg_color" style="width: 80px;"><div class="color-preview"><input type="color" id="keystroke_bg_color_picker"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <h2>汉字学习模式</h2>
+            <div class="card">
+                <div class="grid-2">
+                    <div class="setting-item">
+                        <div class="info"><div class="title">显示位置</div></div>
+                        <select id="learning_anchor">
+                            <option value="top_right">右上角</option><option value="top_left">左上角</option><option value="bottom_right">右下角</option><option value="bottom_left">左下角</option>
+                        </select>
+                    </div>
+                    <div class="setting-item"><div class="info"><div class="title">轮播间隔 (秒)</div></div><input type="number" id="learning_interval_sec"></div>
+                </div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="learning_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="learning_margin_y"></div>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">背景颜色</div></div>
+                    <div class="color-picker-group"><input type="text" id="learning_bg_color" style="width: 80px;"><div class="color-preview"><input type="color" id="learning_bg_color_picker"></div></div>
                 </div>
             </div>
         </div>
@@ -230,20 +275,17 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
-            // Numbers & Selects
-            const ids = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size'];
+            const ids = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_y'];
             ids.forEach(id => { 
                 const el = document.getElementById(id);
                 if(el) el.value = config.appearance[id] !== undefined ? config.appearance[id] : (config.input[id] !== undefined ? config.input[id] : "");
             });
 
-            // Checkboxes
-            ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint'].forEach(id => {
+            ['auto_commit_unique_full_match', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint', 'show_keystrokes', 'learning_mode'].forEach(id => {
                 const el = document.getElementById(id); if(el) el.checked = (config.appearance[id] !== undefined) ? config.appearance[id] : config.input[id];
             });
 
-            // Colors
-            const colors = ['candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
+            const colors = ['candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'keystroke_bg_color', 'learning_bg_color'];
             colors.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 el.value = config.appearance[id] || "#ffffff";
@@ -261,10 +303,10 @@
             config.input.auto_commit_unique_full_match = document.getElementById('auto_commit_unique_full_match').checked;
             config.input.enable_anti_typo = document.getElementById('enable_anti_typo').checked;
             
-            const appIds = ['show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color'];
+            const appIds = ['show_candidates', 'show_modern_candidates', 'show_en_hint', 'show_tone_hint', 'show_keystrokes', 'learning_mode', 'candidate_margin_y', 'candidate_font_size', 'candidate_hint_font_size', 'modern_cand_anchor', 'modern_cand_font_size', 'modern_cand_hint_font_size', 'candidate_bg_color', 'candidate_text_color', 'candidate_highlight_color', 'modern_cand_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'keystroke_anchor', 'keystroke_timeout_ms', 'keystroke_font_size', 'keystroke_bg_color', 'learning_anchor', 'learning_interval_sec', 'learning_font_size', 'learning_margin_y', 'learning_bg_color'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
-                config.appearance[id] = el.type === 'number' ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
+                config.appearance[id] = (el.type === 'number') ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
             });
 
             await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
