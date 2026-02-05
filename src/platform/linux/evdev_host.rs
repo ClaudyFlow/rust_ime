@@ -140,7 +140,14 @@ impl InputMethodHost for EvdevHost {
                                  if let Some(c) = key_to_char(key, false) {
                                      let mut p = self.processor.lock().unwrap();
                                      if p.chinese_enabled && !p.buffer.is_empty() { // 只有在中文输入状态下才尝试选词
-                                         p.enter_page_filter(c);
+                                         if let Some(action) = p.enter_page_filter(c) {
+                                             self.pending_caps = false;
+                                             match action {
+                                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
+                                                _ => {}
+                                             }
+                                         }
                                          handled = true;
                                      }
                                      drop(p);
