@@ -348,69 +348,70 @@ impl Processor {
         Action::PassThrough
     }
 
-        fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
-            let has_cand = !self.candidates.is_empty();
-            let now = Instant::now();
-    
-            // 1. 字母键处理
-            if is_letter(key) {
-                // 如果已经处于筛选模式，直接追加筛选码 (忽略 shift_pressed，统一转小写存储)
-                if self.filter_mode != FilterMode::None {
-                    if let Some(c) = key_to_char(key, false) {
-                        self.aux_filter.push(c);
-                        self.selected = 0;
-                        if self.filter_mode == FilterMode::Global { self.page = 0; }
-                        if let Some(act) = self.lookup() { return act; }
-                        return self.update_phantom_action();
-                    }
+    fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
+        let has_cand = !self.candidates.is_empty();
+        let now = Instant::now();
+
+        // 1. 字母键优先处理 (筛选 或 双击)
+        if is_letter(key) {
+            // A. 如果已经处于筛选模式，直接追加筛选码 (忽略双击)
+            if self.filter_mode != FilterMode::None {
+                if let Some(c) = key_to_char(key, false) {
+                    self.aux_filter.push(c);
+                    self.selected = 0;
+                    if self.filter_mode == FilterMode::Global { self.page = 0; }
+                    if let Some(act) = self.lookup() { return act; }
+                    return self.update_phantom_action();
                 }
-                
-                // 否则，如果是普通输入且未按 Shift，执行双击逻辑
-                if !shift_pressed && self.enable_double_tap {
-                    if let Some(last_k) = self.last_tap_key {
-                        if last_k == key {
-                            if let Some(last_t) = self.last_tap_time {
-                                if now.duration_since(last_t) <= self.double_tap_timeout {
-                                    if let Some(c) = key_to_char(key, false) {
-                                        let key_char = c.to_string();
-                                        if let Some(replacement) = self.double_taps.get(&key_char) {
-                                            if self.buffer.ends_with(c) {
-                                                self.buffer.pop();
-                                                self.buffer.push_str(replacement);
-                                                self.last_tap_key = None;
-                                                self.last_tap_time = None;
-                                                if let Some(act) = self.lookup() { return act; }
-                                                return self.update_phantom_action();
-                                            }
+            }
+            
+            // B. 尝试双击逻辑 (仅在非 Shift 且开启时)
+            if !shift_pressed && self.enable_double_tap {
+                if let Some(last_k) = self.last_tap_key {
+                    if last_k == key {
+                        if let Some(last_t) = self.last_tap_time {
+                            if now.duration_since(last_t) <= self.double_tap_timeout {
+                                if let Some(c) = key_to_char(key, false) {
+                                    if let Some(replacement) = self.double_taps.get(&c.to_string()) {
+                                        if self.buffer.ends_with(c) {
+                                            self.buffer.pop();
+                                            self.buffer.push_str(replacement);
+                                            self.last_tap_key = None;
+                                            self.last_tap_time = None;
+                                            if let Some(act) = self.lookup() { return act; }
+                                            return self.update_phantom_action();
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    self.last_tap_key = Some(key);
-                    self.last_tap_time = Some(now);
-                } else {
-                    self.last_tap_key = None;
-                    self.last_tap_time = None;
                 }
+                // 更新状态供下次双击判断
+                self.last_tap_key = Some(key);
+                self.last_tap_time = Some(now);
             } else {
                 self.last_tap_key = None;
                 self.last_tap_time = None;
             }
-    
-            let styles = &self.page_flipping_styles;
-            let flip_me = styles.contains(&"minus_equal".to_string());
-            let flip_cd = styles.contains(&"comma_dot".to_string());
-            let flip_arrow = styles.contains(&"arrow".to_string());
-    
-            match key {
-                Key::KEY_BACKSPACE => {                if self.filter_mode != FilterMode::None {
+        } else {
+            self.last_tap_key = None;
+            self.last_tap_time = None;
+        }
+
+        let styles = &self.page_flipping_styles;
+        let flip_me = styles.contains(&"minus_equal".to_string());
+        let flip_cd = styles.contains(&"comma_dot".to_string());
+        let flip_arrow = styles.contains(&"arrow".to_string());
+
+        match key {
+            Key::KEY_BACKSPACE => {
+                if self.filter_mode != FilterMode::None {
                     self.aux_filter.pop();
                     if self.aux_filter.is_empty() {
                         self.filter_mode = FilterMode::None;
                         self.page_snapshot.clear();
-                        self.page = 0;
+                        self.page = 0; 
                     } else {
                         self.selected = 0;
                         if self.filter_mode == FilterMode::Global { self.page = 0; }
@@ -446,11 +447,7 @@ impl Processor {
                 } else if key == page_next && flip_arrow {
                     if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume
                 } else {
-                    if let Some(c) = key_to_char(key, shift_pressed) {
-                        let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
-                        if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
-                        if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
-                    } else { self.handle_punctuation(key, shift_pressed) }
+                    Action::PassThrough
                 }
             }
 
