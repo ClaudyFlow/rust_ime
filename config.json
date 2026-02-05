@@ -19,7 +19,7 @@
   "appearance": {
     "show_candidates": true,
     "show_modern_candidates": false,
-    "show_notifications": true,
+    "show_notifications": false,
     "show_keystrokes": false,
     "page_size": 5,
     "show_tone_hint": false,
@@ -63,7 +63,7 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": true,
+    "enable_anti_typo": false,
     "enable_quick_rime": true,
     "quick_rimes": [
       {
@@ -130,9 +130,7 @@
     "enable_abbreviation_matching": true,
     "filter_proper_nouns_by_case": true,
     "active_profiles": [
-      "chinese",
-      "english",
-      "japanese"
+      "chinese"
     ],
     "profile_keys": [],
     "page_flipping_keys": [

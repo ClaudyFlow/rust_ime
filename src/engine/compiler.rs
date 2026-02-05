@@ -67,7 +67,7 @@ fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
 }
 
 fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut entries: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    let mut entries: BTreeMap<String, Vec<DictEntry>> = BTreeMap::new();
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().map_or(false, |ext| ext == "json") {
@@ -80,7 +80,14 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Res
     write_binary_dict(&format!("{}.index", out_stem), &format!("{}.data", out_stem), entries)
 }
 
-fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
+struct DictEntry {
+    word: String,
+    tone: String,
+    en: String,
+    weight: u32,
+}
+
+fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
@@ -88,26 +95,35 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
             let key_lower = key.to_lowercase();
             if let Some(arr) = val.as_array() {
                 if is_english {
-                    // 英语逻辑: 上屏 Key (单词)，提示 Value (翻译)
-                    let hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
-                    entries.entry(key_lower.clone()).or_default().push((key.clone(), hint));
+                    let en_hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
+                    entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                        word: key.clone(),
+                        tone: String::new(),
+                        en: en_hint,
+                        weight: 0,
+                    });
                 } else {
-                    // 普通逻辑: 上屏 Value (汉字)，提示包含声调和英文
                     for v in arr {
-                        if let Some(s) = v.as_str() { entries.entry(key_lower.clone()).or_default().push((s.to_string(), String::new())); }
+                        if let Some(s) = v.as_str() { 
+                            entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                                word: s.to_string(),
+                                tone: String::new(),
+                                en: String::new(),
+                                weight: 0,
+                            });
+                        }
                         else if let Some(o) = v.as_object() {
                             if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
                                 let en_hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("");
                                 let tone_hint = o.get("tone").and_then(|t| t.as_str()).unwrap_or("");
+                                let weight = o.get("weight").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                                 
-                                // 合并声调和英文提示
-                                let mut combined_hint = tone_hint.to_string();
-                                if !en_hint.is_empty() {
-                                    if !combined_hint.is_empty() { combined_hint.push(' '); }
-                                    combined_hint.push_str(en_hint);
-                                }
-                                
-                                entries.entry(key_lower.clone()).or_default().push((c.to_string(), combined_hint));
+                                entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                                    word: c.to_string(),
+                                    tone: tone_hint.to_string(),
+                                    en: en_hint.to_string(),
+                                    weight,
+                                });
                             }
                         }
                     }
@@ -118,7 +134,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
     Ok(())
 }
 
-fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>) -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut in_data = false;
@@ -129,29 +145,41 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<(String, St
         if parts.len() >= 2 {
             let word = parts[0].to_string();
             let pinyin = parts[1].replace(' ', "").to_lowercase();
-            let weight = if parts.len() >= 3 { parts[2] } else { "" };
-            entries.entry(pinyin).or_default().push((word, weight.to_string()));
+            let weight = if parts.len() >= 3 { parts[2].parse::<u32>().unwrap_or(0) } else { 0 };
+            entries.entry(pinyin).or_default().push(DictEntry {
+                word,
+                tone: String::new(),
+                en: String::new(),
+                weight,
+            });
         }
     }
     Ok(())
 }
 
-fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, Vec<(String, String)>>) -> Result<(), Box<dyn std::error::Error>> {
+fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, Vec<DictEntry>>) -> Result<(), Box<dyn std::error::Error>> {
     let mut data_writer = BufWriter::new(File::create(dat_path)?);
     let mut index_builder = MapBuilder::new(File::create(idx_path)?)?;
     let mut current_offset = 0u64;
     for (pinyin, mut pairs) in entries {
         let mut seen = std::collections::HashSet::new();
-        pairs.retain(|(c, _)| seen.insert(c.clone()));
+        pairs.retain(|e| seen.insert(e.word.clone()));
+        
         index_builder.insert(&pinyin, current_offset)?;
         let mut block = Vec::new();
         block.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
-        for (word, hint) in pairs {
-            let w_bytes = word.as_bytes(); let h_bytes = hint.as_bytes();
+        for entry in pairs {
+            let w_bytes = entry.word.as_bytes(); 
+            let t_bytes = entry.tone.as_bytes();
+            let e_bytes = entry.en.as_bytes();
+            
             block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
             block.extend_from_slice(w_bytes);
-            block.extend_from_slice(&(h_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(h_bytes);
+            block.extend_from_slice(&(t_bytes.len() as u16).to_le_bytes());
+            block.extend_from_slice(t_bytes);
+            block.extend_from_slice(&(e_bytes.len() as u16).to_le_bytes());
+            block.extend_from_slice(e_bytes);
+            block.extend_from_slice(&entry.weight.to_le_bytes());
         }
         data_writer.write_all(&block)?;
         current_offset += block.len() as u64;

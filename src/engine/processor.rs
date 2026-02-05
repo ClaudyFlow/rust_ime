@@ -100,9 +100,9 @@ impl Processor {
                 } else {
                     (Some(suffix.to_string()), None)
                 };
-                (p.to_string(), a, d)
+                (p.to_lowercase(), a, d)
             } else {
-                (part.to_string(), None, None)
+                (part.to_lowercase(), None, None)
             };
 
             result.push(ParsedPart {
@@ -410,15 +410,27 @@ impl Processor {
         Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
     }
 
-    fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String, String)> {
+    fn lookup_part(&self, dict: &Trie, part: &ParsedPart) -> Vec<(String, String, String, u32)> {
         let mut pool = Vec::new(); let mut seen = std::collections::HashSet::new();
         if let Some(matches) = dict.get_all_exact(&part.pinyin) { for m in matches { if seen.insert(m.0.clone()) { pool.push(m); } } }
         if self.enable_abbreviation_matching && part.pinyin.len() <= 4 { if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) { for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } } } }
         if self.enable_prefix_matching && !part.pinyin.is_empty() { let limit = if part.aux_code.is_some() { 50 } else { 20 }; let prefix_matches = dict.search_bfs(&part.pinyin, limit); for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } } }
+        
+        // 大小写敏感过滤逻辑
+        if self.filter_proper_nouns_by_case {
+            let first_char_is_upper = part.raw.chars().next().map_or(false, |c| c.is_ascii_uppercase());
+            if !first_char_is_upper {
+                // 如果输入是小写，过滤掉候选词中首字母是大写的词 (Proper Nouns)
+                pool.retain(|(word, _, _, _)| {
+                    word.chars().next().map_or(true, |c| !c.is_ascii_uppercase())
+                });
+            }
+        }
+
         if let Some(ref code) = part.aux_code {
             let is_single_upper = code.len() == 1 && code.chars().next().unwrap().is_ascii_uppercase();
             let code_lower = code.to_lowercase();
-            pool.retain(|(_, _, en)| { if is_single_upper { en.to_lowercase().starts_with(&code_lower) } else { en.to_lowercase().contains(&code_lower) } });
+            pool.retain(|(_, _, en, _)| { if is_single_upper { en.to_lowercase().starts_with(&code_lower) } else { en.to_lowercase().contains(&code_lower) } });
         }
         pool
     }
@@ -426,18 +438,36 @@ impl Processor {
     pub fn lookup(&mut self) {
         if self.buffer.is_empty() { self.reset(); return; }
         let parsed_parts = self.parse_buffer();
-        let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String)> = Vec::new();
+        let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String, u32)> = Vec::new();
         for (i, part) in parsed_parts.iter().enumerate() {
             all_raw_segments.push(part.raw.clone());
             let mut combined_matches = Vec::new(); let mut seen = std::collections::HashSet::new();
             for profile in &self.active_profiles { if let Some(d) = self.tries.get(profile) { for m in self.lookup_part(d, part) { if seen.insert(m.0.clone()) { combined_matches.push(m); } } } }
+            
+            // 优化排序逻辑：
+            // 1. 优先考虑词长（短词优先，特别是单字）
+            // 2. 在长度相同的情况下，按权重降序排列
+            combined_matches.sort_by(|a, b| {
+                let a_len = a.0.chars().count();
+                let b_len = b.0.chars().count();
+                
+                if a_len != b_len {
+                    // 如果一个是单字，另一个是多字，给单字极大的权重加成
+                    // 这里我们简单地先按长度排，再按权重排
+                    a_len.cmp(&b_len).then_with(|| b.3.cmp(&a.3))
+                } else {
+                    // 长度相同时，纯看权重
+                    b.3.cmp(&a.3)
+                }
+            });
+
             let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _, _)) = combined_matches.get(idx) { greedy_sentence.push_str(w); } else { greedy_sentence.push_str(&part.raw); }
+            if let Some((w, _, _, _)) = combined_matches.get(idx) { greedy_sentence.push_str(w); } else { greedy_sentence.push_str(&part.raw); }
             if i == parsed_parts.len() - 1 { last_matches = combined_matches; }
         }
         self.joined_sentence = greedy_sentence; self.best_segmentation = all_raw_segments;
         self.candidates.clear(); self.candidate_hints.clear(); self.has_dict_match = !last_matches.is_empty();
-        for (cand, tone, en) in last_matches {
+        for (cand, tone, en, _) in last_matches {
             self.candidates.push(cand);
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
