@@ -100,9 +100,9 @@ impl Processor {
                 } else {
                     (Some(suffix.to_string()), None)
                 };
-                (p.to_lowercase(), a, d)
+                (p.to_string(), a, d)
             } else {
-                (part.to_lowercase(), None, None)
+                (part.to_string(), None, None)
             };
 
             result.push(ParsedPart {
@@ -416,17 +416,6 @@ impl Processor {
         if self.enable_abbreviation_matching && part.pinyin.len() <= 4 { if let Some(abbrs) = dict.get_all_abbrev(&part.pinyin) { for m in abbrs { if seen.insert(m.0.clone()) { pool.push(m); } } } }
         if self.enable_prefix_matching && !part.pinyin.is_empty() { let limit = if part.aux_code.is_some() { 50 } else { 20 }; let prefix_matches = dict.search_bfs(&part.pinyin, limit); for m in prefix_matches { if seen.insert(m.0.clone()) { pool.push(m); } } }
         
-        // 大小写敏感过滤逻辑
-        if self.filter_proper_nouns_by_case {
-            let first_char_is_upper = part.raw.chars().next().map_or(false, |c| c.is_ascii_uppercase());
-            if !first_char_is_upper {
-                // 如果输入是小写，过滤掉候选词中首字母是大写的词 (Proper Nouns)
-                pool.retain(|(word, _, _, _)| {
-                    word.chars().next().map_or(true, |c| !c.is_ascii_uppercase())
-                });
-            }
-        }
-
         if let Some(ref code) = part.aux_code {
             let is_single_upper = code.len() == 1 && code.chars().next().unwrap().is_ascii_uppercase();
             let code_lower = code.to_lowercase();

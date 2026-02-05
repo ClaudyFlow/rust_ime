@@ -92,11 +92,11 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
         for (key, val) in obj {
-            let key_lower = key.to_lowercase();
+            // 不再转为小写，保留原始 Key
             if let Some(arr) = val.as_array() {
                 if is_english {
                     let en_hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
-                    entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                    entries.entry(key.clone()).or_default().push(DictEntry {
                         word: key.clone(),
                         tone: String::new(),
                         en: en_hint,
@@ -105,7 +105,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                 } else {
                     for v in arr {
                         if let Some(s) = v.as_str() { 
-                            entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                            entries.entry(key.clone()).or_default().push(DictEntry {
                                 word: s.to_string(),
                                 tone: String::new(),
                                 en: String::new(),
@@ -118,7 +118,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                                 let tone_hint = o.get("tone").and_then(|t| t.as_str()).unwrap_or("");
                                 let weight = o.get("weight").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                                 
-                                entries.entry(key_lower.clone()).or_default().push(DictEntry {
+                                entries.entry(key.clone()).or_default().push(DictEntry {
                                     word: c.to_string(),
                                     tone: tone_hint.to_string(),
                                     en: en_hint.to_string(),
@@ -144,7 +144,8 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
             let word = parts[0].to_string();
-            let pinyin = parts[1].replace(' ', "").to_lowercase();
+            // 不再转为小写，保留原始拼音大小写
+            let pinyin = parts[1].replace(' ', "");
             let weight = if parts.len() >= 3 { parts[2].parse::<u32>().unwrap_or(0) } else { 0 };
             entries.entry(pinyin).or_default().push(DictEntry {
                 word,

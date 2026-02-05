@@ -220,17 +220,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         window.set_keyboard_mode(KeyboardMode::None);
     }
     window.add_css_class("ime-window");
-    let main_box = Box::new(Orientation::Horizontal, 8);
+    
+    // 改为垂直布局，让拼音和候选词分行
+    let main_box = Box::new(Orientation::Vertical, 4);
     main_box.set_widget_name("main-container");
     window.set_child(Some(&main_box));
 
     let pinyin_label = Label::new(None);
     pinyin_label.set_widget_name("pinyin-label");
+    pinyin_label.set_halign(gtk4::Align::Start); // 拼音左对齐
     main_box.append(&pinyin_label);
-
-    let sentence_label = Label::new(None);
-    sentence_label.set_widget_name("sentence-label");
-    main_box.append(&sentence_label);
 
     let candidates_box = Box::new(Orientation::Horizontal, 12);
     candidates_box.set_widget_name("candidates-box");
@@ -306,24 +305,24 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 background-color: {cand_bg};
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 12px;
-                padding: 8px 14px;
+                padding: 10px 14px;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             }}
             #pinyin-label {{
                 color: #0071e3;
                 font-size: {cand_font}pt;
                 font-weight: 700;
-                margin-right: 4px;
+                margin-bottom: 6px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             }}
             #sentence-label {{
                 color: rgba(255, 255, 255, 0.7);
                 font-size: {s_font}pt;
                 font-weight: 400;
                 margin-right: 12px;
-                padding-right: 12px;
-                border-right: 1px solid rgba(255, 255, 255, 0.1);
             }}
-            .candidate-item {{ padding: 4px 10px; border-radius: 6px; }}
+            .candidate-item {{ padding: 6px 10px; border-radius: 8px; }}
             .candidate-selected {{ background-color: {cand_hl}; }}
             .candidate-selected .candidate-text, .candidate-selected .hint-text, .candidate-selected .index {{ color: white; opacity: 1.0; }}
             .candidate-text {{ color: {cand_text}; font-size: {cand_font}pt; font-weight: 500; }}
