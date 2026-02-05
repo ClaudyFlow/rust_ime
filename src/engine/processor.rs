@@ -74,6 +74,11 @@ pub struct Processor {
     pub has_dict_match: bool,
     pub page_flipping_styles: Vec<String>,
     pub swap_arrow_keys: bool,
+    // 新增字段
+    pub aux_filter: String,
+    pub enable_english_filter: bool,
+    pub enable_caps_selection: bool,
+    pub enable_number_selection: bool,
 }
 
 impl Processor {
@@ -156,6 +161,10 @@ impl Processor {
             show_en_hint: true,
             page_flipping_styles: vec!["arrow".to_string()],
             swap_arrow_keys: false,
+            aux_filter: String::new(),
+            enable_english_filter: true,
+            enable_caps_selection: true,
+            enable_number_selection: true,
         }
     }
 
@@ -181,6 +190,10 @@ impl Processor {
         self.page_flipping_styles = conf.input.page_flipping_keys.iter().map(|s| s.to_lowercase()).collect();
         self.swap_arrow_keys = conf.input.swap_arrow_keys;
         
+        self.enable_english_filter = conf.input.enable_english_filter;
+        self.enable_caps_selection = conf.input.enable_caps_selection;
+        self.enable_number_selection = conf.input.enable_number_selection;
+
         if !conf.input.active_profiles.is_empty() {
             self.active_profiles = conf.input.active_profiles.iter().map(|p| p.to_lowercase()).collect();
         } else {
@@ -231,6 +244,7 @@ impl Processor {
         self.preview_selected_candidate = false;
         self.switch_mode = false;
         self.cursor_pos = 0;
+        self.aux_filter.clear();
     }
 
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
@@ -302,6 +316,18 @@ impl Processor {
 
     fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
+        
+        // 1. 处理 Shift + 字母 (筛选模式)
+        if shift_pressed && self.enable_english_filter && is_letter(key) {
+            if let Some(c) = key_to_char(key, false) { // 使用小写
+                self.aux_filter.push(c);
+                self.selected = 0;
+                self.page = 0;
+                self.lookup();
+                return self.update_phantom_action();
+            }
+        }
+
         let styles = &self.page_flipping_styles;
         let flip_me = styles.contains(&"minus_equal".to_string());
         let flip_cd = styles.contains(&"comma_dot".to_string());
@@ -309,6 +335,15 @@ impl Processor {
 
         match key {
             Key::KEY_BACKSPACE => {
+                // 优先回退筛选字符
+                if !self.aux_filter.is_empty() {
+                    self.aux_filter.pop();
+                    self.selected = 0;
+                    self.page = 0;
+                    self.lookup();
+                    return self.update_phantom_action();
+                }
+
                 self.buffer.pop();
                 if self.buffer.is_empty() { 
                     let del = self.phantom_text.chars().count(); self.reset(); 
@@ -366,7 +401,13 @@ impl Processor {
             
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                if self.commit_mode == "single" && digit >= 1 && digit <= self.page_size { let abs_idx = self.page + digit - 1; if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); } }
+                // 只有开启了数字选词，才尝试选词
+                if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size { 
+                    let abs_idx = self.page + digit - 1; 
+                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); } 
+                }
+                
+                // 否则作为普通字符处理
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); self.lookup();
                 if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
@@ -480,6 +521,31 @@ impl Processor {
             if self.show_en_hint && !en.is_empty() { if !h.is_empty() { h.push(' '); } h.push_str(&en); }
             self.candidate_hints.push(h);
         }
+
+        // 应用 aux_filter 筛选 (Shift + 字母)
+        if !self.aux_filter.is_empty() {
+            let filter_lower = self.aux_filter.to_lowercase();
+            let mut filtered_candidates = Vec::new();
+            let mut filtered_hints = Vec::new();
+
+            for (i, hint) in self.candidate_hints.iter().enumerate() {
+                // 简单的检查 hint 中是否包含过滤词，或者如果你的 hint 结构是 "pinyin english"，你需要提取 english 部分
+                // 假设 hint 包含了 english，我们检查它是否包含或者以它开头
+                // 这里为了更精准，我们假设 hint 后半部分是英文，尝试匹配
+                // 或者直接粗暴匹配 hint 包含该字母序列
+                if hint.to_lowercase().contains(&filter_lower) {
+                    filtered_candidates.push(self.candidates[i].clone());
+                    filtered_hints.push(hint.clone());
+                }
+            }
+            
+            // 如果筛选结果不为空，则替换当前列表
+            if !filtered_candidates.is_empty() {
+                self.candidates = filtered_candidates;
+                self.candidate_hints = filtered_hints;
+            }
+        }
+
         if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
         self.selected = 0; self.page = 0; self.update_state();
     }
@@ -529,6 +595,38 @@ impl Processor {
             }
         }
         if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone())); }
+        None
+    }
+
+    pub fn select_by_english_key(&mut self, key_char: char) -> Option<Action> {
+        if self.state == ImeState::Direct || self.candidates.is_empty() { return None; }
+
+        let start = self.page;
+        let end = (start + self.page_size).min(self.candidates.len());
+        let target_char = key_char.to_ascii_lowercase();
+
+        for i in start..end {
+            if let Some(hint) = self.candidate_hints.get(i) {
+                // 检查 hint 的英文部分是否以 key_char 开头
+                // hint 格式可能是 "tone english" 或者直接 "english"
+                // 简单起见，我们查找 hint 中任何以空格分隔的单词首字母，或者 hint 本身首字母
+                let hint_lower = hint.to_lowercase();
+                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
+                
+                // 如果任意部分的第一个字母匹配
+                let mut matched = false;
+                for part in parts {
+                    if part.starts_with(target_char) {
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if matched {
+                    return Some(self.commit_candidate(self.candidates[i].clone()));
+                }
+            }
+        }
         None
     }
 }

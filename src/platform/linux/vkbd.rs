@@ -218,13 +218,24 @@ impl Vkbd {
     }
 
     fn send_via_fcitx(&self, text: &str) -> bool {
-        let status = Command::new("fcitx5-remote")
+        let output = Command::new("fcitx5-remote")
             .arg("-c")
             .arg(text)
-            .status();
-        match status {
-            Ok(s) => s.success(),
-            Err(_) => false,
+            .output();
+            
+        match output {
+            Ok(o) => {
+                if !o.status.success() {
+                    let stderr = String::from_utf8_lossy(&o.stderr);
+                    eprintln!("[Vkbd] fcitx5-remote failed: {}", stderr);
+                    return false;
+                }
+                true
+            },
+            Err(e) => {
+                eprintln!("[Vkbd] Failed to execute fcitx5-remote: {}", e);
+                false
+            }
         }
     }
 

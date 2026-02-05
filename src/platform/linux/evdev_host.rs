@@ -1,5 +1,5 @@
 use crate::engine::Processor;
-use crate::engine::processor::Action;
+use crate::engine::processor::{Action, is_letter, key_to_char};
 use crate::platform::traits::{InputMethodHost, Rect};
 use crate::platform::linux::vkbd::Vkbd;
 use crate::config::Config;
@@ -133,9 +133,12 @@ impl InputMethodHost for EvdevHost {
                     if val == 1 {
                         if self.pending_caps {
                              let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
+                             let caps_selection_enabled = self.config.read().unwrap().input.enable_caps_selection;
                              let mut handled = false;
                              let key_name = map_key_to_display_name(key).to_lowercase();
                              let target = format!("caps+{}", key_name);
+                             
+                             // 1. 尝试 QuickRime
                              for qr in quick_rimes {
                                  if qr.trigger.to_lowercase() == target {
                                      let mut p = self.processor.lock().unwrap();
@@ -153,6 +156,27 @@ impl InputMethodHost for EvdevHost {
                                      drop(p); if handled { self.update_gui(); self.notify_preview(); break; }
                                  }
                              }
+
+                             // 2. 尝试 CapsLock 选词
+                             if !handled && caps_selection_enabled && is_letter(key) {
+                                 if let Some(c) = key_to_char(key, false) {
+                                     let mut p = self.processor.lock().unwrap();
+                                     if p.chinese_enabled && !p.buffer.is_empty() { // 只有在中文输入状态下才尝试选词
+                                         if let Some(action) = p.select_by_english_key(c) {
+                                             self.pending_caps = false;
+                                             match action {
+                                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
+                                                _ => {}
+                                             }
+                                             handled = true;
+                                         }
+                                     }
+                                     drop(p);
+                                     if handled { self.update_gui(); self.notify_preview(); }
+                                 }
+                             }
+                             
                              if handled { continue; } else { self.pending_caps = false; }
                         }
 

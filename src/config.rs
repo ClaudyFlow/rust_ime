@@ -84,6 +84,9 @@ pub struct Input {
     pub page_flipping_keys: Vec<String>,
     pub swap_arrow_keys: bool,
     pub enable_error_sound: bool,
+    pub enable_english_filter: bool,
+    pub enable_caps_selection: bool,
+    pub enable_number_selection: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -205,6 +208,9 @@ impl Config {
                 page_flipping_keys: vec!["arrow".to_string()],
                 swap_arrow_keys: false,
                 enable_error_sound: true,
+                enable_english_filter: true,
+                enable_caps_selection: true,
+                enable_number_selection: true,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
