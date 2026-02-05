@@ -140,15 +140,8 @@ impl InputMethodHost for EvdevHost {
                                  if let Some(c) = key_to_char(key, false) {
                                      let mut p = self.processor.lock().unwrap();
                                      if p.chinese_enabled && !p.buffer.is_empty() { // 只有在中文输入状态下才尝试选词
-                                         if let Some(action) = p.select_by_english_key(c) {
-                                             self.pending_caps = false;
-                                             match action {
-                                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                                                _ => {}
-                                             }
-                                             handled = true;
-                                         }
+                                         p.enter_page_filter(c);
+                                         handled = true;
                                      }
                                      drop(p);
                                      if handled { self.update_gui(); self.notify_preview(); }
@@ -280,10 +273,15 @@ impl EvdevHost {
                 return; 
             }
             
-            // 构造显示用的拼音串，包含 aux_filter
+            // 构造显示用的拼音串，包含 aux_filter (首字母大写)
             let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
             if !p.aux_filter.is_empty() {
-                pinyin.push_str(&p.aux_filter.to_uppercase());
+                let mut display_aux = String::new();
+                for (i, c) in p.aux_filter.chars().enumerate() {
+                    if i == 0 { display_aux.push(c.to_ascii_uppercase()); }
+                    else { display_aux.push(c.to_ascii_lowercase()); }
+                }
+                pinyin.push_str(&display_aux);
             }
 
             if !p.candidates.is_empty() || !p.joined_sentence.is_empty() {

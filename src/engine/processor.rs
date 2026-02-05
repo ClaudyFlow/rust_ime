@@ -29,6 +29,13 @@ pub enum PhantomMode {
     Pinyin,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum FilterMode {
+    None,
+    Global, // Shift + 字母 (全局筛选)
+    Page,   // Caps + 字母 (当前页筛选)
+}
+
 struct ParsedPart {
     pinyin: String,
     aux_code: Option<String>,
@@ -75,8 +82,12 @@ pub struct Processor {
     pub has_dict_match: bool,
     pub page_flipping_styles: Vec<String>,
     pub swap_arrow_keys: bool,
-    // 新增字段
+    
+    // 筛选模式相关
     pub aux_filter: String,
+    pub filter_mode: FilterMode,
+    pub page_snapshot: Vec<(String, String)>, // (candidate, hint)
+    
     pub enable_english_filter: bool,
     pub enable_caps_selection: bool,
     pub enable_number_selection: bool,
@@ -170,6 +181,9 @@ impl Processor {
             page_flipping_styles: vec!["arrow".to_string()],
             swap_arrow_keys: false,
             aux_filter: String::new(),
+            filter_mode: FilterMode::None,
+            page_snapshot: Vec::new(),
+            
             enable_english_filter: true,
             enable_caps_selection: true,
             enable_number_selection: true,
@@ -266,6 +280,8 @@ impl Processor {
         self.switch_mode = false;
         self.cursor_pos = 0;
         self.aux_filter.clear();
+        self.filter_mode = FilterMode::None;
+        self.page_snapshot.clear();
     }
 
     pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
@@ -338,53 +354,84 @@ impl Processor {
     fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
         let now = Instant::now();
-        
-        // 0. 双击快速输入 (Double Tap) - 仅在非 Shift 状态下生效
-        if self.enable_double_tap && !shift_pressed && is_letter(key) {
-            if let Some(last_k) = self.last_tap_key {
-                if last_k == key {
-                    if let Some(last_t) = self.last_tap_time {
-                        if now.duration_since(last_t) <= self.double_tap_timeout {
-                            // 触发双击
-                            if let Some(c) = key_to_char(key, false) {
-                                let key_char = c.to_string();
-                                if let Some(replacement) = self.double_taps.get(&key_char) {
-                                    // 只有当 buffer 最后一个字符确实是该键对应的字符时才替换
-                                    if self.buffer.ends_with(c) {
-                                        self.buffer.pop(); // 删除上一个 'i'
-                                        self.buffer.push_str(replacement); // 插入 'ing'
-                                        self.last_tap_key = None; // 重置防止三连击触发
-                                        self.last_tap_time = None;
-                                        
-                                        self.lookup();
-                                        return self.update_phantom_action();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // 如果没有触发双击替换，更新状态
-            self.last_tap_key = Some(key);
-            self.last_tap_time = Some(now);
-        } else {
-            // 非字母按键或Shift按下，重置双击状态
-            self.last_tap_key = None;
-            self.last_tap_time = None;
-        }
-        
-        // 1. 处理 Shift + 字母 (筛选模式)
+
+        // 1. Shift + 字母 (开启全局筛选模式)
         if shift_pressed && self.enable_english_filter && is_letter(key) {
-            if let Some(c) = key_to_char(key, false) { // 使用小写
-                self.aux_filter.push(c);
+            if let Some(c) = key_to_char(key, false) {
+                // 如果已经在 Page 模式，切换到 Global? 或者重置?
+                // 用户说 Shift 只要按一次，这里处理第一次按下
+                self.filter_mode = FilterMode::Global;
+                self.aux_filter.push(c); // 这里存小写，显示时首字母大写
                 self.selected = 0;
                 self.page = 0;
                 self.lookup();
                 return self.update_phantom_action();
             }
         }
+        
+        // 2. 字母键 (非 Shift)
+        if is_letter(key) && !shift_pressed {
+            // 如果处于筛选模式，继续追加筛选码
+            if self.filter_mode != FilterMode::None {
+                if let Some(c) = key_to_char(key, false) {
+                    self.aux_filter.push(c);
+                    self.selected = 0;
+                    // 如果是 Page 模式，不需要重置 page，因为是在当前页筛选
+                    if self.filter_mode == FilterMode::Global {
+                        self.page = 0;
+                    }
+                    
+                    self.lookup(); // lookup 内部会处理 auto-commit
+                    
+                    // 如果 lookup 后触发了 auto-commit (buffer 变空)，则操作结束
+                    if self.buffer.is_empty() {
+                         return Action::DeleteAndEmit { delete: self.phantom_text.chars().count(), insert: self.joined_sentence.clone() }; // 这里其实已经被 reset 了，joined_sentence 为空
+                         // commit_candidate 会 reset，所以这里其实应该返回结果
+                         // 但 lookup 内部没办法直接返回 Action，所以我们在 handle_composing 结尾检查
+                    }
+                    return self.update_phantom_action();
+                }
+            }
+            
+            // 否则进入普通输入的双击检测逻辑
+            if self.enable_double_tap {
+                if let Some(last_k) = self.last_tap_key {
+                    if last_k == key {
+                        if let Some(last_t) = self.last_tap_time {
+                            if now.duration_since(last_t) <= self.double_tap_timeout {
+                                // 触发双击
+                                if let Some(c) = key_to_char(key, false) {
+                                    let key_char = c.to_string();
+                                    if let Some(replacement) = self.double_taps.get(&key_char) {
+                                        if self.buffer.ends_with(c) {
+                                            self.buffer.pop(); 
+                                            self.buffer.push_str(replacement); 
+                                            self.last_tap_key = None; 
+                                            self.last_tap_time = None;
+                                            
+                                            self.lookup();
+                                            return self.update_phantom_action();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                self.last_tap_key = Some(key);
+                self.last_tap_time = Some(now);
+            } else {
+                self.last_tap_key = None;
+                self.last_tap_time = None;
+            }
+        } else {
+            // 非字母按键，重置双击状态
+            self.last_tap_key = None;
+            self.last_tap_time = None;
+        }
+        
+        // 此处移除了旧的 Shift+字母 逻辑块
 
         let styles = &self.page_flipping_styles;
         let flip_me = styles.contains(&"minus_equal".to_string());
@@ -394,10 +441,17 @@ impl Processor {
         match key {
             Key::KEY_BACKSPACE => {
                 // 优先回退筛选字符
-                if !self.aux_filter.is_empty() {
+                if self.filter_mode != FilterMode::None {
                     self.aux_filter.pop();
-                    self.selected = 0;
-                    self.page = 0;
+                    if self.aux_filter.is_empty() {
+                        // 退出筛选模式
+                        self.filter_mode = FilterMode::None;
+                        self.page_snapshot.clear();
+                        self.page = 0; // Global 模式下回退可能需要重置页码，Page 模式下需要恢复
+                    } else {
+                        self.selected = 0;
+                        if self.filter_mode == FilterMode::Global { self.page = 0; }
+                    }
                     self.lookup();
                     return self.update_phantom_action();
                 }
@@ -511,6 +565,53 @@ impl Processor {
 
     pub fn lookup(&mut self) {
         if self.buffer.is_empty() { self.reset(); return; }
+
+        // 如果是 Page 模式，我们不重新查词典，只在快照内过滤
+        if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
+            let filter_lower = self.aux_filter.to_lowercase();
+            let mut filtered_cands = Vec::new();
+            let mut filtered_hints = Vec::new();
+
+            for (cand, hint) in &self.page_snapshot {
+                // 检查 hint 的每一部分是否符合 aux_filter 的前缀匹配
+                let hint_lower = hint.to_lowercase();
+                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
+                
+                let mut matched = false;
+                // 注意：这里需要支持累积匹配，比如 "P" 匹配 "People", "Po" 继续匹配 "People"
+                for part in parts {
+                    if part.starts_with(&filter_lower) {
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if matched {
+                    filtered_cands.push(cand.clone());
+                    filtered_hints.push(hint.clone());
+                }
+            }
+
+            if !filtered_cands.is_empty() {
+                self.candidates = filtered_cands;
+                self.candidate_hints = filtered_hints;
+                
+                // 唯一定位自动上屏 (Caps 逻辑)
+                if self.candidates.len() == 1 {
+                    let word = self.candidates[0].clone();
+                    self.commit_candidate(word); // 提交会 reset 状态
+                    return;
+                }
+            } else {
+                // 如果过滤结果为空，可能输入错了，保留上一状态或清空
+                self.candidates.clear();
+                self.candidate_hints.clear();
+            }
+            self.selected = 0;
+            self.update_state();
+            return;
+        }
+
         let parsed_parts = self.parse_buffer();
         let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
         
@@ -580,27 +681,38 @@ impl Processor {
             self.candidate_hints.push(h);
         }
 
-        // 应用 aux_filter 筛选 (Shift + 字母)
-        if !self.aux_filter.is_empty() {
+        // Global 筛选模式 (Shift 逻辑)
+        if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_candidates = Vec::new();
             let mut filtered_hints = Vec::new();
 
             for (i, hint) in self.candidate_hints.iter().enumerate() {
-                // 简单的检查 hint 中是否包含过滤词，或者如果你的 hint 结构是 "pinyin english"，你需要提取 english 部分
-                // 假设 hint 包含了 english，我们检查它是否包含或者以它开头
-                // 这里为了更精准，我们假设 hint 后半部分是英文，尝试匹配
-                // 或者直接粗暴匹配 hint 包含该字母序列
-                if hint.to_lowercase().contains(&filter_lower) {
+                let hint_lower = hint.to_lowercase();
+                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
+                let mut matched = false;
+                for part in parts {
+                    if part.starts_with(&filter_lower) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if matched {
                     filtered_candidates.push(self.candidates[i].clone());
                     filtered_hints.push(hint.clone());
                 }
             }
             
-            // 如果筛选结果不为空，则替换当前列表
             if !filtered_candidates.is_empty() {
                 self.candidates = filtered_candidates;
                 self.candidate_hints = filtered_hints;
+                
+                // 唯一定位自动上屏 (Shift 筛选后的自动提交)
+                if self.candidates.len() == 1 {
+                    let word = self.candidates[0].clone();
+                    self.commit_candidate(word);
+                    return;
+                }
             }
         }
 
@@ -656,36 +768,23 @@ impl Processor {
         None
     }
 
-    pub fn select_by_english_key(&mut self, key_char: char) -> Option<Action> {
-        if self.state == ImeState::Direct || self.candidates.is_empty() { return None; }
+    pub fn enter_page_filter(&mut self, key_char: char) {
+        if self.state == ImeState::Direct || self.candidates.is_empty() { return; }
 
+        // 1. 快照当前页
         let start = self.page;
         let end = (start + self.page_size).min(self.candidates.len());
-        let target_char = key_char.to_ascii_lowercase();
-
+        self.page_snapshot.clear();
         for i in start..end {
-            if let Some(hint) = self.candidate_hints.get(i) {
-                // 检查 hint 的英文部分是否以 key_char 开头
-                // hint 格式可能是 "tone english" 或者直接 "english"
-                // 简单起见，我们查找 hint 中任何以空格分隔的单词首字母，或者 hint 本身首字母
-                let hint_lower = hint.to_lowercase();
-                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
-                
-                // 如果任意部分的第一个字母匹配
-                let mut matched = false;
-                for part in parts {
-                    if part.starts_with(target_char) {
-                        matched = true;
-                        break;
-                    }
-                }
-
-                if matched {
-                    return Some(self.commit_candidate(self.candidates[i].clone()));
-                }
-            }
+            self.page_snapshot.push((self.candidates[i].clone(), self.candidate_hints[i].clone()));
         }
-        None
+
+        // 2. 进入 Page 筛选模式
+        self.filter_mode = FilterMode::Page;
+        self.aux_filter.push(key_char.to_ascii_lowercase());
+
+        // 3. 执行过滤判断
+        self.lookup();
     }
 }
 
