@@ -59,7 +59,7 @@
   },
   "input": {
     "autostart": false,
-    "commit_mode": "single",
+    "commit_mode": "double",
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
