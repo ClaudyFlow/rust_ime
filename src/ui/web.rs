@@ -16,6 +16,7 @@ use rust_embed::RustEmbed;
 #[folder = "static/"]
 struct Assets;
 
+// Web server implementation for IME configuration
 pub struct WebServer {
     pub port: u16,
     pub config: Arc<RwLock<Config>>,

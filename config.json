@@ -64,63 +64,40 @@
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
     "enable_anti_typo": false,
-    "enable_quick_rime": true,
-    "quick_rimes": [
+    "enable_double_tap": true,
+    "double_tap_timeout_ms": 250,
+    "double_taps": [
       {
-        "trigger": "caps+j",
-        "insert": "iang"
+        "trigger_key": "j",
+        "insert_text": "iang"
       },
       {
-        "trigger": "caps+k",
-        "insert": "uai"
+        "trigger_key": "k",
+        "insert_text": "uai"
       },
       {
-        "trigger": "caps+l",
-        "insert": "uang"
+        "trigger_key": "l",
+        "insert_text": "uang"
       },
       {
-        "trigger": "caps+i",
-        "insert": "ing"
+        "trigger_key": "i",
+        "insert_text": "ing"
       },
       {
-        "trigger": "caps+o",
-        "insert": "ong"
+        "trigger_key": "o",
+        "insert_text": "ong"
       },
       {
-        "trigger": "caps+p",
-        "insert": "un"
+        "trigger_key": "m",
+        "insert_text": "ian"
       },
       {
-        "trigger": "caps+n",
-        "insert": "ian"
+        "trigger_key": "a",
+        "insert_text": "ang"
       },
       {
-        "trigger": "caps+m",
-        "insert": "ian"
-      },
-      {
-        "trigger": "caps+u",
-        "insert": "sh"
-      },
-      {
-        "trigger": "caps+a",
-        "insert": "ch"
-      },
-      {
-        "trigger": "caps+e",
-        "insert": "zh"
-      },
-      {
-        "trigger": "caps+z",
-        "insert": "ou"
-      },
-      {
-        "trigger": "caps+c",
-        "insert": "ao"
-      },
-      {
-        "trigger": "caps+s",
-        "insert": "ai"
+        "trigger_key": "e",
+        "insert_text": "eng"
       }
     ],
     "auto_commit_unique_en_fuzhuma": false,
@@ -129,15 +106,21 @@
     "prefix_matching_limit": 20,
     "enable_abbreviation_matching": true,
     "filter_proper_nouns_by_case": true,
-    "active_profiles": [
-      "chinese"
+    "active_profiles": [],
+    "profile_keys": [
+      {
+        "key": "",
+        "profile": ""
+      }
     ],
-    "profile_keys": [],
     "page_flipping_keys": [
       "arrow"
     ],
     "swap_arrow_keys": false,
-    "enable_error_sound": true
+    "enable_error_sound": true,
+    "enable_english_filter": true,
+    "enable_caps_selection": true,
+    "enable_number_selection": true
   },
   "hotkeys": {
     "switch_language": {
