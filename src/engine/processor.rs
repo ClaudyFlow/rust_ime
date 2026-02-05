@@ -673,13 +673,13 @@ impl Processor {
     }
 
     pub fn start_global_filter(&mut self) {
-        if self.state != ImeState::Composing { return; }
+        if self.state == ImeState::Direct { return; }
         self.filter_mode = FilterMode::Global;
         self.aux_filter.clear();
     }
 
     pub fn start_page_filter(&mut self) {
-        if self.state != ImeState::Composing || self.candidates.is_empty() { return; }
+        if self.state == ImeState::Direct || self.candidates.is_empty() { return; }
         let start = self.page;
         let end = (start + self.page_size).min(self.candidates.len());
         self.page_snapshot.clear();

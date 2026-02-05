@@ -115,15 +115,17 @@ impl InputMethodHost for EvdevHost {
                     if (key == Key::KEY_CAPSLOCK || key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
                         if val == 1 {
                             let mut p = self.processor.lock().unwrap();
-                            if p.chinese_enabled && p.state == crate::engine::processor::ImeState::Composing {
+                            if p.chinese_enabled && p.state != crate::engine::processor::ImeState::Direct {
                                 if key == Key::KEY_CAPSLOCK {
+                                    println!("[Host] Triggering Page Filter");
                                     p.start_page_filter();
                                 } else {
+                                    println!("[Host] Triggering Global Filter");
                                     p.start_global_filter();
                                 }
                                 drop(p);
                                 self.update_gui();
-                                continue; // 消费掉按键，防止切换大小写
+                                continue; 
                             }
                         }
                     }
