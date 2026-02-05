@@ -243,11 +243,10 @@ impl Processor {
             _ => PhantomMode::None,
         };
 
-        // 关键修复：应用配置后强制同步一次状态
         if self.buffer.is_empty() {
             self.reset();
         } else {
-            self.lookup();
+            let _ = self.lookup();
         }
     }
 
@@ -261,7 +260,7 @@ impl Processor {
         self.buffer.push_str(text);
         if self.state == ImeState::Direct { self.state = ImeState::Composing; }
         self.preview_selected_candidate = false;
-        self.lookup();
+        if let Some(act) = self.lookup() { return act; }
         if let Some(act) = self.check_auto_commit() { return act; }
         self.update_phantom_action()
     }
@@ -311,13 +310,13 @@ impl Processor {
                         if !profiles.is_empty() {
                             self.active_profiles = profiles;
                             let display = self.get_current_profile_display();
-                            self.lookup();
+                            let _ = self.lookup();
                             self.switch_mode = false;
                             return Action::Notify("输入方案".into(), format!("已切换至: {}", display));
                         }
                     }
                 }
-                _ => {} // Do nothing for other keys in switch mode
+                _ => {} 
             }
             return Action::Consume;
         }
@@ -330,19 +329,17 @@ impl Processor {
     }
 
     fn handle_direct(&mut self, key: Key, shift_pressed: bool) -> Action {
-        // 如果是字母，则开始拼写
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
                 let old_buffer = self.buffer.clone();
-                self.buffer.push(c); 
-                self.state = ImeState::Composing; 
-                self.lookup();
-                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
+                self.buffer.push(c);
+                self.state = ImeState::Composing;
+                if let Some(act) = self.lookup() { return act; }
+                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
                 return self.update_phantom_action();
             }
         }
 
-        // 否则，如果是标点符号（包含 , . - =），直接上屏
         if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
             if let Some(zh_puncs) = self.punctuation.get(punc_key) { if let Some(first) = zh_puncs.first() { return Action::Emit(first.clone()); } }
             return Action::Emit(punc_key.to_string());
@@ -351,124 +348,88 @@ impl Processor {
         Action::PassThrough
     }
 
-    fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
-        let has_cand = !self.candidates.is_empty();
-        let now = Instant::now();
-
-        // 1. Shift + 字母 (开启全局筛选模式)
-        if shift_pressed && self.enable_english_filter && is_letter(key) {
-            if let Some(c) = key_to_char(key, false) {
-                // 如果已经在 Page 模式，切换到 Global? 或者重置?
-                // 用户说 Shift 只要按一次，这里处理第一次按下
-                self.filter_mode = FilterMode::Global;
-                self.aux_filter.push(c); // 这里存小写，显示时首字母大写
-                self.selected = 0;
-                self.page = 0;
-                self.lookup();
-                return self.update_phantom_action();
-            }
-        }
-        
-        // 2. 字母键 (非 Shift)
-        if is_letter(key) && !shift_pressed {
-            // 如果处于筛选模式，继续追加筛选码
-            if self.filter_mode != FilterMode::None {
-                if let Some(c) = key_to_char(key, false) {
-                    self.aux_filter.push(c);
-                    self.selected = 0;
-                    // 如果是 Page 模式，不需要重置 page，因为是在当前页筛选
-                    if self.filter_mode == FilterMode::Global {
-                        self.page = 0;
+        fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
+            let has_cand = !self.candidates.is_empty();
+            let now = Instant::now();
+    
+            // 1. 字母键处理
+            if is_letter(key) {
+                // 如果已经处于筛选模式，直接追加筛选码 (忽略 shift_pressed，统一转小写存储)
+                if self.filter_mode != FilterMode::None {
+                    if let Some(c) = key_to_char(key, false) {
+                        self.aux_filter.push(c);
+                        self.selected = 0;
+                        if self.filter_mode == FilterMode::Global { self.page = 0; }
+                        if let Some(act) = self.lookup() { return act; }
+                        return self.update_phantom_action();
                     }
-                    
-                    self.lookup(); // lookup 内部会处理 auto-commit
-                    
-                    // 如果 lookup 后触发了 auto-commit (buffer 变空)，则操作结束
-                    if self.buffer.is_empty() {
-                         return Action::DeleteAndEmit { delete: self.phantom_text.chars().count(), insert: self.joined_sentence.clone() }; // 这里其实已经被 reset 了，joined_sentence 为空
-                         // commit_candidate 会 reset，所以这里其实应该返回结果
-                         // 但 lookup 内部没办法直接返回 Action，所以我们在 handle_composing 结尾检查
-                    }
-                    return self.update_phantom_action();
                 }
-            }
-            
-            // 否则进入普通输入的双击检测逻辑
-            if self.enable_double_tap {
-                if let Some(last_k) = self.last_tap_key {
-                    if last_k == key {
-                        if let Some(last_t) = self.last_tap_time {
-                            if now.duration_since(last_t) <= self.double_tap_timeout {
-                                // 触发双击
-                                if let Some(c) = key_to_char(key, false) {
-                                    let key_char = c.to_string();
-                                    if let Some(replacement) = self.double_taps.get(&key_char) {
-                                        if self.buffer.ends_with(c) {
-                                            self.buffer.pop(); 
-                                            self.buffer.push_str(replacement); 
-                                            self.last_tap_key = None; 
-                                            self.last_tap_time = None;
-                                            
-                                            self.lookup();
-                                            return self.update_phantom_action();
+                
+                // 否则，如果是普通输入且未按 Shift，执行双击逻辑
+                if !shift_pressed && self.enable_double_tap {
+                    if let Some(last_k) = self.last_tap_key {
+                        if last_k == key {
+                            if let Some(last_t) = self.last_tap_time {
+                                if now.duration_since(last_t) <= self.double_tap_timeout {
+                                    if let Some(c) = key_to_char(key, false) {
+                                        let key_char = c.to_string();
+                                        if let Some(replacement) = self.double_taps.get(&key_char) {
+                                            if self.buffer.ends_with(c) {
+                                                self.buffer.pop();
+                                                self.buffer.push_str(replacement);
+                                                self.last_tap_key = None;
+                                                self.last_tap_time = None;
+                                                if let Some(act) = self.lookup() { return act; }
+                                                return self.update_phantom_action();
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                    self.last_tap_key = Some(key);
+                    self.last_tap_time = Some(now);
+                } else {
+                    self.last_tap_key = None;
+                    self.last_tap_time = None;
                 }
-                
-                self.last_tap_key = Some(key);
-                self.last_tap_time = Some(now);
             } else {
                 self.last_tap_key = None;
                 self.last_tap_time = None;
             }
-        } else {
-            // 非字母按键，重置双击状态
-            self.last_tap_key = None;
-            self.last_tap_time = None;
-        }
-        
-        // 此处移除了旧的 Shift+字母 逻辑块
-
-        let styles = &self.page_flipping_styles;
-        let flip_me = styles.contains(&"minus_equal".to_string());
-        let flip_cd = styles.contains(&"comma_dot".to_string());
-        let flip_arrow = styles.contains(&"arrow".to_string());
-
-        match key {
-            Key::KEY_BACKSPACE => {
-                // 优先回退筛选字符
-                if self.filter_mode != FilterMode::None {
+    
+            let styles = &self.page_flipping_styles;
+            let flip_me = styles.contains(&"minus_equal".to_string());
+            let flip_cd = styles.contains(&"comma_dot".to_string());
+            let flip_arrow = styles.contains(&"arrow".to_string());
+    
+            match key {
+                Key::KEY_BACKSPACE => {                if self.filter_mode != FilterMode::None {
                     self.aux_filter.pop();
                     if self.aux_filter.is_empty() {
-                        // 退出筛选模式
                         self.filter_mode = FilterMode::None;
                         self.page_snapshot.clear();
-                        self.page = 0; // Global 模式下回退可能需要重置页码，Page 模式下需要恢复
+                        self.page = 0;
                     } else {
                         self.selected = 0;
                         if self.filter_mode == FilterMode::Global { self.page = 0; }
                     }
-                    self.lookup();
+                    if let Some(act) = self.lookup() { return act; }
                     return self.update_phantom_action();
                 }
 
                 self.buffer.pop();
-                if self.buffer.is_empty() { 
-                    let del = self.phantom_text.chars().count(); self.reset(); 
+                if self.buffer.is_empty() {
+                    let del = self.phantom_text.chars().count(); self.reset();
                     if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
-                } else { self.lookup(); self.update_phantom_action() }
+                } else { if let Some(act) = self.lookup() { return act; } self.update_phantom_action() }
             }
-            // Page flipping logic
             Key::KEY_MINUS if flip_me && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             Key::KEY_EQUAL if flip_me && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
             Key::KEY_COMMA if flip_cd && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             Key::KEY_DOT if flip_cd && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            
-            // Arrow key logic (supports role swapping)
+
             Key::KEY_LEFT | Key::KEY_RIGHT | Key::KEY_UP | Key::KEY_DOWN => {
                 let (move_prev, move_next, page_prev, page_next) = if self.swap_arrow_keys {
                     (Key::KEY_UP, Key::KEY_DOWN, Key::KEY_LEFT, Key::KEY_RIGHT)
@@ -485,11 +446,10 @@ impl Processor {
                 } else if key == page_next && flip_arrow {
                     if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume
                 } else {
-                    // If not page flipping or candidate selection, try to input as character
                     if let Some(c) = key_to_char(key, shift_pressed) {
-                        let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; self.lookup(); 
-                        if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
-                        if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action() 
+                        let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
+                        if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
+                        if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
                     } else { self.handle_punctuation(key, shift_pressed) }
                 }
             }
@@ -498,11 +458,11 @@ impl Processor {
             Key::KEY_PAGEDOWN => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
             Key::KEY_HOME => { if shift_pressed { self.selected = 0; self.page = 0; } else { self.selected = self.page; } Action::Consume }
             Key::KEY_END => { if has_cand { if shift_pressed { self.selected = self.candidates.len() - 1; self.page = (self.selected / self.page_size) * self.page_size; } else { self.selected = (self.page + self.page_size - 1).min(self.candidates.len() - 1); } } Action::Consume }
-            
+
             Key::KEY_SPACE => {
                 if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone()); }
-                self.buffer.push(' '); self.preview_selected_candidate = false; self.lookup(); self.update_phantom_action()
+                self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
             }
             Key::KEY_ENTER => {
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out); }
@@ -510,26 +470,22 @@ impl Processor {
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
             }
             Key::KEY_ESC | Key::KEY_DELETE => { let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } }
-            
+
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                // 只有开启了数字选词，才尝试选词
-                if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size { 
-                    let abs_idx = self.page + digit - 1; 
-                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); } 
+                if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
+                    let abs_idx = self.page + digit - 1;
+                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); }
                 }
-                
-                // 否则作为普通字符处理
-                let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); self.lookup();
-                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
+                let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
+                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
             }
-            // Fallback: all keys recognized as characters
             _ => {
                 if let Some(c) = key_to_char(key, shift_pressed) {
-                    let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; self.lookup(); 
-                    if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; self.lookup(); return Action::Alert; }
-                    if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action() 
+                    let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
+                    if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
+                    if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
                 } else if get_punctuation_key(key, shift_pressed).is_some() {
                     self.handle_punctuation(key, shift_pressed)
                 } else { Action::PassThrough }
@@ -563,116 +519,76 @@ impl Processor {
         Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
     }
 
-    pub fn lookup(&mut self) {
-        if self.buffer.is_empty() { self.reset(); return; }
+    pub fn lookup(&mut self) -> Option<Action> {
+        if self.buffer.is_empty() { self.reset(); return None; }
 
-        // 如果是 Page 模式，我们不重新查词典，只在快照内过滤
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_cands = Vec::new();
             let mut filtered_hints = Vec::new();
-
             for (cand, hint) in &self.page_snapshot {
-                // 检查 hint 的每一部分是否符合 aux_filter 的前缀匹配
                 let hint_lower = hint.to_lowercase();
                 let parts: Vec<&str> = hint_lower.split_whitespace().collect();
-                
                 let mut matched = false;
-                // 注意：这里需要支持累积匹配，比如 "P" 匹配 "People", "Po" 继续匹配 "People"
-                for part in parts {
-                    if part.starts_with(&filter_lower) {
-                        matched = true;
-                        break;
-                    }
-                }
-
+                for part in parts { if part.starts_with(&filter_lower) { matched = true; break; } }
                 if matched {
                     filtered_cands.push(cand.clone());
                     filtered_hints.push(hint.clone());
                 }
             }
-
             if !filtered_cands.is_empty() {
                 self.candidates = filtered_cands;
                 self.candidate_hints = filtered_hints;
-                
-                // 唯一定位自动上屏 (Caps 逻辑)
                 if self.candidates.len() == 1 {
                     let word = self.candidates[0].clone();
-                    self.commit_candidate(word); // 提交会 reset 状态
-                    return;
+                    return Some(self.commit_candidate(word));
                 }
             } else {
-                // 如果过滤结果为空，可能输入错了，保留上一状态或清空
                 self.candidates.clear();
                 self.candidate_hints.clear();
             }
             self.selected = 0;
             self.update_state();
-            return;
+            return None;
         }
 
         let parsed_parts = self.parse_buffer();
         let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
-        
-        // 记录 buffer 是否以空格结尾，用于预览显示
         let has_trailing_space = self.buffer.ends_with(' ');
 
         for (i, part) in parsed_parts.iter().enumerate() {
             all_raw_segments.push(part.raw.clone());
-            let mut combined_matches = Vec::new(); 
+            let mut combined_matches = Vec::new();
             let mut seen = std::collections::HashSet::new();
-            
-            for profile in &self.active_profiles { 
-                if let Some(d) = self.tries.get(profile) { 
-                    // 1. 先找精确匹配
+            for profile in &self.active_profiles {
+                if let Some(d) = self.tries.get(profile) {
                     if let Some(matches) = d.get_all_exact(&part.pinyin) {
                         for (w, t, e, weight) in matches {
-                            if seen.insert(w.clone()) {
-                                combined_matches.push((w, t, e, weight, true)); // true 表示精确匹配
-                            }
+                            if seen.insert(w.clone()) { combined_matches.push((w, t, e, weight, true)); }
                         }
                     }
-                    // 2. 再找前缀匹配
                     if self.enable_prefix_matching && !part.pinyin.is_empty() {
                         let limit = if part.aux_code.is_some() { 50 } else { 20 };
                         let prefix_matches = d.search_bfs(&part.pinyin, limit);
                         for (w, t, e, weight) in prefix_matches {
-                            if seen.insert(w.clone()) {
-                                combined_matches.push((w, t, e, weight, false)); // false 表示前缀匹配
-                            }
+                            if seen.insert(w.clone()) { combined_matches.push((w, t, e, weight, false)); }
                         }
                     }
-                } 
+                }
             }
-            
-            // 优化排序逻辑：
-            // 1. 优先 精确匹配 (is_exact)
-            // 2. 其次考虑 词长 (短词优先)
-            // 3. 最后考虑 权重 (权重降序)
             combined_matches.sort_by(|a, b| {
-                b.4.cmp(&a.4) // 精确匹配排在前面 (true > false)
-                    .then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
-                    .then_with(|| b.3.cmp(&a.3))
+                b.4.cmp(&a.4).then_with(|| a.0.chars().count().cmp(&b.0.chars().count())).then_with(|| b.3.cmp(&a.3))
             });
-
             let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _, _, _, _)) = combined_matches.get(idx) { 
-                greedy_sentence.push_str(w); 
-            } else { 
-                greedy_sentence.push_str(&part.raw); 
-            }
+            if let Some((w, _, _, _, _)) = combined_matches.get(idx) { greedy_sentence.push_str(w); } else { greedy_sentence.push_str(&part.raw); }
             if i == parsed_parts.len() - 1 { last_matches = combined_matches; }
         }
 
-        if has_trailing_space && !greedy_sentence.is_empty() {
-            greedy_sentence.push(' ');
-        }
-
-        self.joined_sentence = greedy_sentence; 
+        if has_trailing_space && !greedy_sentence.is_empty() { greedy_sentence.push(' '); }
+        self.joined_sentence = greedy_sentence;
         self.best_segmentation = all_raw_segments;
         self.candidates.clear(); self.candidate_hints.clear(); self.has_dict_match = !last_matches.is_empty();
-        
+
         for (cand, tone, en, _, _) in last_matches {
             self.candidates.push(cand);
             let mut h = String::new();
@@ -681,43 +597,33 @@ impl Processor {
             self.candidate_hints.push(h);
         }
 
-        // Global 筛选模式 (Shift 逻辑)
         if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_candidates = Vec::new();
             let mut filtered_hints = Vec::new();
-
             for (i, hint) in self.candidate_hints.iter().enumerate() {
                 let hint_lower = hint.to_lowercase();
                 let parts: Vec<&str> = hint_lower.split_whitespace().collect();
                 let mut matched = false;
-                for part in parts {
-                    if part.starts_with(&filter_lower) {
-                        matched = true;
-                        break;
-                    }
-                }
+                for part in parts { if part.starts_with(&filter_lower) { matched = true; break; } }
                 if matched {
                     filtered_candidates.push(self.candidates[i].clone());
                     filtered_hints.push(hint.clone());
                 }
             }
-            
             if !filtered_candidates.is_empty() {
                 self.candidates = filtered_candidates;
                 self.candidate_hints = filtered_hints;
-                
-                // 唯一定位自动上屏 (Shift 筛选后的自动提交)
                 if self.candidates.len() == 1 {
                     let word = self.candidates[0].clone();
-                    self.commit_candidate(word);
-                    return;
+                    return Some(self.commit_candidate(word));
                 }
             }
         }
 
         if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
         self.selected = 0; self.page = 0; self.update_state();
+        None
     }
 
     pub fn get_current_profile_display(&self) -> String {
@@ -760,36 +666,31 @@ impl Processor {
         let raw_input = &self.buffer;
         let mut total_longer = 0;
         for p in &self.active_profiles {
-            if let Some(d) = self.tries.get(p) {
-                if d.has_longer_match(raw_input) { total_longer += 1; break; }
-            }
+            if let Some(d) = self.tries.get(p) { if d.has_longer_match(raw_input) { total_longer += 1; break; } }
         }
         if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone())); }
         None
     }
 
-    pub fn enter_page_filter(&mut self, key_char: char) {
-        if self.state == ImeState::Direct || self.candidates.is_empty() { return; }
+    pub fn start_global_filter(&mut self) {
+        if self.state != ImeState::Composing { return; }
+        self.filter_mode = FilterMode::Global;
+        self.aux_filter.clear();
+    }
 
-        // 1. 快照当前页
+    pub fn start_page_filter(&mut self) {
+        if self.state != ImeState::Composing || self.candidates.is_empty() { return; }
         let start = self.page;
         let end = (start + self.page_size).min(self.candidates.len());
         self.page_snapshot.clear();
-        for i in start..end {
-            self.page_snapshot.push((self.candidates[i].clone(), self.candidate_hints[i].clone()));
-        }
-
-        // 2. 进入 Page 筛选模式
+        for i in start..end { self.page_snapshot.push((self.candidates[i].clone(), self.candidate_hints[i].clone())); }
         self.filter_mode = FilterMode::Page;
-        self.aux_filter.push(key_char.to_ascii_lowercase());
-
-        // 3. 执行过滤判断
-        self.lookup();
+        self.aux_filter.clear();
     }
 }
 
-pub fn is_letter(key: Key) -> bool { 
-    matches!(key, 
+pub fn is_letter(key: Key) -> bool {
+    matches!(key,
         Key::KEY_Q | Key::KEY_W | Key::KEY_E | Key::KEY_R | Key::KEY_T | Key::KEY_Y | Key::KEY_U | Key::KEY_I | Key::KEY_O | Key::KEY_P |
         Key::KEY_A | Key::KEY_S | Key::KEY_D | Key::KEY_F | Key::KEY_G | Key::KEY_H | Key::KEY_J | Key::KEY_K | Key::KEY_L |
         Key::KEY_Z | Key::KEY_X | Key::KEY_C | Key::KEY_V | Key::KEY_B | Key::KEY_N | Key::KEY_M |
@@ -807,7 +708,8 @@ pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }
 fn get_punctuation_key(key: Key, shift: bool) -> Option<&'static str> {
-    match (key, shift) { (Key::KEY_GRAVE, false) => Some("`"), (Key::KEY_GRAVE, true) => Some("~"), (Key::KEY_MINUS, false) => Some("-"), (Key::KEY_MINUS, true) => Some("_"), (Key::KEY_EQUAL, false) => Some("="), (Key::KEY_EQUAL, true) => Some("+"), (Key::KEY_LEFTBRACE, false) => Some("["), (Key::KEY_LEFTBRACE, true) => Some("{"), (Key::KEY_RIGHTBRACE, false) => Some("]"), (Key::KEY_RIGHTBRACE, true) => Some("}"), (Key::KEY_BACKSLASH, false) => Some("\\"), (Key::KEY_BACKSLASH, true) => Some("|"), (Key::KEY_SEMICOLON, false) => Some(";"), (Key::KEY_SEMICOLON, true) => Some(":"), (Key::KEY_APOSTROPHE, false) => Some("'"), (Key::KEY_APOSTROPHE, true) => Some("\""), (Key::KEY_COMMA, false) => Some(","), (Key::KEY_COMMA, true) => Some("<"), (Key::KEY_DOT, false) => Some("."), (Key::KEY_DOT, true) => Some(">"), (Key::KEY_SLASH, false) => Some("/"), (Key::KEY_SLASH, true) => Some("?"), (Key::KEY_1, true) => Some("!"), (Key::KEY_2, true) => Some("@"), (Key::KEY_3, true) => Some("#"), (Key::KEY_4, true) => Some("$"), (Key::KEY_5, true) => Some("%"), (Key::KEY_6, true) => Some("^"), (Key::KEY_7, true) => Some("&"), (Key::KEY_8, true) => Some("*"), (Key::KEY_9, true) => Some("("), (Key::KEY_0, true) => Some(")"), _ => None } }
+    match (key, shift) { (Key::KEY_GRAVE, false) => Some("`"), (Key::KEY_GRAVE, true) => Some("~"), (Key::KEY_MINUS, false) => Some("-"), (Key::KEY_MINUS, true) => Some("_"), (Key::KEY_EQUAL, false) => Some("="), (Key::KEY_EQUAL, true) => Some("+"), (Key::KEY_LEFTBRACE, false) => Some("["), (Key::KEY_LEFTBRACE, true) => Some("{"), (Key::KEY_RIGHTBRACE, false) => Some("]"), (Key::KEY_RIGHTBRACE, true) => Some("}"), (Key::KEY_BACKSLASH, false) => Some("\\"), (Key::KEY_BACKSLASH, true) => Some("|"), (Key::KEY_SEMICOLON, false) => Some(";"), (Key::KEY_SEMICOLON, true) => Some(":"), (Key::KEY_APOSTROPHE, false) => Some("'"), (Key::KEY_APOSTROPHE, true) => Some("\""), (Key::KEY_COMMA, false) => Some(","), (Key::KEY_COMMA, true) => Some("<"), (Key::KEY_DOT, false) => Some("."), (Key::KEY_DOT, true) => Some(">"), (Key::KEY_SLASH, false) => Some("/"), (Key::KEY_SLASH, true) => Some("?"), (Key::KEY_1, true) => Some("!"), (Key::KEY_2, true) => Some("@"), (Key::KEY_3, true) => Some("#"), (Key::KEY_4, true) => Some("$"), (Key::KEY_5, true) => Some("%"), (Key::KEY_6, true) => Some("^"), (Key::KEY_7, true) => Some("&"), (Key::KEY_8, true) => Some("*"), (Key::KEY_9, true) => Some("("), (Key::KEY_0, true) => Some(")"), _ => None }
+}
 pub fn strip_tones(s: &str) -> String {
     let mut res = String::new();
     for c in s.chars() { match c { 'ā'|'á'|'ǎ'|'à' => res.push('a'), 'ē'|'é'|'ě'|'è' => res.push('e'), 'ī'|'í'|'ǐ'|'ì' => res.push('i'), 'ō'|'ó'|'ǒ'|'ò' => res.push('o'), 'ū'|'ú'|'ǔ'|'ù' => res.push('u'), 'ǖ'|'ǘ'|'ǚ'|'ǜ' => res.push('v'), 'Ā'|'Á'|'Ǎ'|'À' => res.push('A'), 'Ē'|'É'|'Ě'|'È' => res.push('E'), 'Ī'|'Í'|'Ǐ'|'Ì' => res.push('I'), 'Ō'|'Ó'|'Ǒ'|'Ò' => res.push('O'), 'Ū'|'Ú'|'Ǔ'|'Ù' => res.push('U'), 'Ǖ'|'Ǘ'|'Ǚ'|'Ǜ' => res.push('V'), _ => res.push(c) } } 
@@ -823,8 +725,11 @@ mod tests {
             state: ImeState::Direct, buffer: String::new(), tries, active_profiles: vec!["chinese".to_string()], punctuation: HashMap::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
-            preview_selected_candidate: false, enable_anti_typo: true, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0, profile_keys: Vec::new(),
-            auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
+            preview_selected_candidate: false, enable_anti_typo: true, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
+            aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
+            enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
+            enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
+            profile_keys: Vec::new(), auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
     }
     #[test] fn test_dummy() { let _p = setup_mock_processor(); }

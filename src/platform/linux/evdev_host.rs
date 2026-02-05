@@ -1,5 +1,5 @@
 use crate::engine::Processor;
-use crate::engine::processor::{Action, is_letter, key_to_char};
+use crate::engine::processor::Action;
 use crate::platform::traits::{InputMethodHost, Rect};
 use crate::platform::linux::vkbd::Vkbd;
 use crate::config::Config;
@@ -45,7 +45,6 @@ pub struct EvdevHost {
     notify_tx: Sender<NotifyEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
-    pending_caps: bool,
     tab_held_and_not_used: bool,
 }
 
@@ -65,7 +64,7 @@ impl EvdevHost {
         }
         Ok(Self {
             processor, vkbd: Mutex::new(vkbd), dev: Mutex::new(dev), gui_tx, notify_tx,
-            should_exit: Arc::new(AtomicBool::new(false)), config, pending_caps: false, tab_held_and_not_used: false,
+            should_exit: Arc::new(AtomicBool::new(false)), config, tab_held_and_not_used: false,
         })
     }
 }
@@ -95,12 +94,6 @@ impl InputMethodHost for EvdevHost {
                     let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
                     let has_mod = ctrl || alt || meta;
 
-                    let (chinese_mode, caps_selection_enabled) = {
-                        let p = self.processor.lock().unwrap();
-                        let conf = self.config.read().unwrap();
-                        (p.chinese_enabled, conf.input.enable_caps_selection)
-                    };
-
                     if key == Key::KEY_TAB && !has_mod {
                         if val == 1 { self.tab_held_and_not_used = true; } 
                         else if val == 0 {
@@ -118,46 +111,34 @@ impl InputMethodHost for EvdevHost {
                         continue;
                     }
 
+                    // 拦截 CapsLock 和 Shift 触发筛选
+                    if (key == Key::KEY_CAPSLOCK || key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
+                        if val == 1 {
+                            let mut p = self.processor.lock().unwrap();
+                            if p.chinese_enabled && p.state == crate::engine::processor::ImeState::Composing {
+                                if key == Key::KEY_CAPSLOCK {
+                                    p.start_page_filter();
+                                } else {
+                                    p.start_global_filter();
+                                }
+                                drop(p);
+                                self.update_gui();
+                                continue; // 消费掉按键，防止切换大小写
+                            }
+                        }
+                    }
+
                     if key == Key::KEY_CAPSLOCK && !has_mod {
                         if val == 1 {
                             if held_keys.contains(&Key::KEY_TAB) {
                                 self.tab_held_and_not_used = false;
                                 if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_CAPSLOCK); }
-                            } else if chinese_mode && caps_selection_enabled {
-                                self.pending_caps = true;
                             }
-                        } else if val == 0 { self.pending_caps = false; }
+                        }
                         continue;
                     }
 
                     if val == 1 {
-                        if self.pending_caps {
-                             let caps_selection_enabled = self.config.read().unwrap().input.enable_caps_selection;
-                             let mut handled = false;
-
-                             // 尝试 CapsLock 选词
-                             if caps_selection_enabled && is_letter(key) {
-                                 if let Some(c) = key_to_char(key, false) {
-                                     let mut p = self.processor.lock().unwrap();
-                                     if p.chinese_enabled && !p.buffer.is_empty() { // 只有在中文输入状态下才尝试选词
-                                         if let Some(action) = p.enter_page_filter(c) {
-                                             self.pending_caps = false;
-                                             match action {
-                                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                                                _ => {}
-                                             }
-                                         }
-                                         handled = true;
-                                     }
-                                     drop(p);
-                                     if handled { self.update_gui(); self.notify_preview(); }
-                                 }
-                             }
-                             
-                             if handled { continue; } else { self.pending_caps = false; }
-                        }
-
                         let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit) = {
                             let conf = self.config.read().unwrap();
                             (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_modern_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key))
