@@ -256,6 +256,7 @@ impl Processor {
         Action::Consume
     }
 
+    #[allow(dead_code)]
     pub fn inject_text(&mut self, text: &str) -> Action {
         self.buffer.push_str(text);
         if self.state == ImeState::Direct { self.state = ImeState::Composing; }
