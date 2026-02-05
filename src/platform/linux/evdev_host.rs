@@ -261,7 +261,18 @@ impl EvdevHost {
     fn update_gui(&self) {
         if let Some(ref tx) = self.gui_tx {
             let p = self.processor.lock().unwrap();
-            if p.buffer.is_empty() || !p.chinese_enabled { let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() }); return; }
+            if p.buffer.is_empty() || !p.chinese_enabled { 
+                let _ = tx.send(GuiEvent::Update { 
+                    pinyin: "".into(), 
+                    candidates: vec![], 
+                    hints: vec![], 
+                    selected: 0, 
+                    sentence: "".into(),
+                    cursor_pos: 0,
+                    commit_mode: p.commit_mode.clone(),
+                }); 
+                return; 
+            }
             let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
             if !p.candidates.is_empty() || !p.joined_sentence.is_empty() {
                 let start = p.page; let end = (start + p.page_size).min(p.candidates.len());
@@ -273,8 +284,26 @@ impl EvdevHost {
                 }
             }
             if p.show_candidates || p.show_modern_candidates {
-                let _ = tx.send(GuiEvent::Update { pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), selected: p.selected, sentence: p.joined_sentence.clone() });
-            } else { let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() }); }
+                let _ = tx.send(GuiEvent::Update { 
+                    pinyin, 
+                    candidates: p.candidates.clone(), 
+                    hints: p.candidate_hints.clone(), 
+                    selected: p.selected, 
+                    sentence: p.joined_sentence.clone(),
+                    cursor_pos: p.cursor_pos,
+                    commit_mode: p.commit_mode.clone(),
+                });
+            } else { 
+                let _ = tx.send(GuiEvent::Update { 
+                    pinyin: "".into(), 
+                    candidates: vec![], 
+                    hints: vec![], 
+                    selected: 0, 
+                    sentence: "".into(),
+                    cursor_pos: 0,
+                    commit_mode: p.commit_mode.clone(),
+                }); 
+            }
         }
     }
 

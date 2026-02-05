@@ -311,7 +311,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into() });
+                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { 
+                        pinyin: "".into(), 
+                        candidates: vec![], 
+                        hints: vec![], 
+                        selected: 0, 
+                        sentence: "".into(),
+                        cursor_pos: 0,
+                        commit_mode: "single".into(),
+                    });
                 }
                 ui::tray::TrayEvent::NextProfile => {
                     let profile = {

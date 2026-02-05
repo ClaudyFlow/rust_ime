@@ -14,6 +14,8 @@ pub enum GuiEvent {
         hints: Vec<String>,
         selected: usize,
         sentence: String,
+        cursor_pos: usize,
+        commit_mode: String,
     },
     #[allow(dead_code)]
     MoveTo { x: i32, y: i32 },
@@ -518,7 +520,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             GuiEvent::ClearKeystrokes => {
                 ks_c.clear();
             }
-            GuiEvent::Update { pinyin, candidates, hints, selected, sentence } => {
+            GuiEvent::Update { pinyin, candidates, hints, selected, sentence, cursor_pos: _, commit_mode } => {
                 let show_trad = current_config.appearance.show_candidates;
                 let show_modern = current_config.appearance.show_modern_candidates;
 
@@ -532,9 +534,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     window_c.show();
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
-                    sentence_label_c.set_text(&sentence);
-                    // 如果 sentence 为空，可以隐藏 label，或者保留空位
-                    sentence_label_c.set_visible(!sentence.is_empty());
+
+                    // 只有长句模式（非 single）才显示 sentence_label
+                    if commit_mode != "single" {
+                        sentence_label_c.set_visible(true);
+                        // 显示光标，暂时简单的在末尾加一个 |
+                        sentence_label_c.set_text(&format!("{}|", sentence));
+                    } else {
+                        sentence_label_c.set_visible(false);
+                        sentence_label_c.set_text("");
+                    }
 
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
                     let start = (selected / current_config.appearance.page_size) * current_config.appearance.page_size;
