@@ -3,6 +3,7 @@ use evdev::{AttributeSet, InputEvent, Key, Device, EventType};
 use std::thread;
 use std::time::Duration;
 use std::process::Command;
+use zbus::blocking::Connection;
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -14,13 +15,14 @@ pub enum PasteMode {
     ShiftInsert,
     #[allow(dead_code)]
     UnicodeHex, // Ctrl+Shift+U method
-    Fcitx5,     // fcitx5-remote -c method
+    Fcitx5,     // Native D-Bus CommitString method
 }
 
 pub struct Vkbd {
     pub dev: VirtualDevice,
     pub paste_mode: PasteMode,
     pub clipboard_delay_ms: u64,
+    dbus_conn: Option<Connection>,
 }
 
 impl Vkbd {
@@ -55,10 +57,14 @@ impl Vkbd {
             .with_keys(&keys)?
             .build()?;
 
+        // 尝试建立 D-Bus 连接 (Fcitx5)
+        let dbus_conn = Connection::session().ok();
+
         Ok(Self { 
             dev,
             paste_mode: PasteMode::ShiftInsert, // Standard universal mode
             clipboard_delay_ms: 50,
+            dbus_conn,
         })
     }
 
@@ -218,6 +224,30 @@ impl Vkbd {
     }
 
     fn send_via_fcitx(&self, text: &str) -> bool {
+        if let Some(ref conn) = self.dbus_conn {
+            // 调用 org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.CommitString
+            let res = conn.call_method(
+                Some("org.fcitx.Fcitx5"),
+                "/controller",
+                Some("org.fcitx.Fcitx.Controller1"),
+                "CommitString",
+                &(text),
+            );
+
+            match res {
+                Ok(_) => true,
+                Err(e) => {
+                    eprintln!("[Vkbd] Native Fcitx5 D-Bus call failed: {}", e);
+                    // 尝试回退到外部命令
+                    self.send_via_fcitx_remote(text)
+                }
+            }
+        } else {
+            self.send_via_fcitx_remote(text)
+        }
+    }
+
+    fn send_via_fcitx_remote(&self, text: &str) -> bool {
         let output = Command::new("fcitx5-remote")
             .arg("-c")
             .arg(text)
