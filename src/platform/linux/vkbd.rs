@@ -225,7 +225,6 @@ impl Vkbd {
 
     fn send_via_fcitx(&self, text: &str) -> bool {
         if let Some(ref conn) = self.dbus_conn {
-            // 调用 org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.CommitString
             let res = conn.call_method(
                 Some("org.fcitx.Fcitx5"),
                 "/controller",
@@ -237,35 +236,16 @@ impl Vkbd {
             match res {
                 Ok(_) => true,
                 Err(e) => {
-                    eprintln!("[Vkbd] Native Fcitx5 D-Bus call failed: {}", e);
-                    // 尝试回退到外部命令
-                    self.send_via_fcitx_remote(text)
+                    if e.to_string().contains("UnknownMethod") {
+                        eprintln!("[Vkbd] Fcitx5 CommitString 接口未找到。请在 Fcitx5 配置中开启 'Remote Control' (远程控制) 插件。");
+                    } else {
+                        eprintln!("[Vkbd] Native Fcitx5 D-Bus call failed: {}", e);
+                    }
+                    false
                 }
             }
         } else {
-            self.send_via_fcitx_remote(text)
-        }
-    }
-
-    fn send_via_fcitx_remote(&self, text: &str) -> bool {
-        let output = Command::new("fcitx5-remote")
-            .arg("-c")
-            .arg(text)
-            .output();
-            
-        match output {
-            Ok(o) => {
-                if !o.status.success() {
-                    let stderr = String::from_utf8_lossy(&o.stderr);
-                    eprintln!("[Vkbd] fcitx5-remote failed: {}", stderr);
-                    return false;
-                }
-                true
-            },
-            Err(e) => {
-                eprintln!("[Vkbd] Failed to execute fcitx5-remote: {}", e);
-                false
-            }
+            false
         }
     }
 
@@ -287,20 +267,23 @@ impl Vkbd {
         self.emit(Key::KEY_LEFTCTRL, false);
         self.emit(Key::KEY_LEFTSHIFT, false);
 
-        thread::sleep(Duration::from_millis(40));
+        // 减小初始化延迟
+        thread::sleep(Duration::from_millis(15));
 
         let hex_str = format!("{:x}", ch as u32);
         for hex_char in hex_str.chars() {
              if let Some(key) = hex_char_to_key(hex_char) {
                  self.tap(key);
-                 thread::sleep(Duration::from_millis(2));
+                 // 物理延迟降至最低
+                 thread::sleep(Duration::from_micros(500));
              } else {
                  return false;
              }
         }
 
         self.tap(Key::KEY_ENTER);
-        thread::sleep(Duration::from_millis(20));
+        // 减小结束延迟
+        thread::sleep(Duration::from_millis(10));
         true
     }
 
