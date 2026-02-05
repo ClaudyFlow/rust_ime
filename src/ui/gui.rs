@@ -327,6 +327,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 color: {cand_text};
                 font-size: {cand_font}pt;
                 font-weight: 400;
+                font-family: "JetBrains Mono", "Noto Sans Mono", "Monospace";
+                letter-spacing: 0.5px;
                 background-color: rgba(0, 0, 0, 0.2);
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 6px;
@@ -538,8 +540,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     // 只有长句模式（非 single）才显示 sentence_label
                     if commit_mode != "single" {
                         sentence_label_c.set_visible(true);
-                        // 显示光标，暂时简单的在末尾加一个 |
-                        sentence_label_c.set_text(&format!("{}|", sentence));
+                        // 如果有空格，空格可能在 Label 中不可见，用特殊占位符或者确保样式支持
+                        // 这里我们使用一个更像输入光标的符号，并且如果末尾是空格，确保它占据空间
+                        let display_text = if sentence.ends_with(' ') {
+                            format!("{} ", &sentence[..sentence.len()-1])
+                        } else {
+                            sentence.clone()
+                        };
+                        sentence_label_c.set_text(&format!("{}|", display_text));
                     } else {
                         sentence_label_c.set_visible(false);
                         sentence_label_c.set_text("");
