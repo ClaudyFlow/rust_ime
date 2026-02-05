@@ -226,6 +226,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     main_box.set_widget_name("main-container");
     window.set_child(Some(&main_box));
 
+    let sentence_label = Label::new(None);
+    sentence_label.set_widget_name("sentence-label");
+    sentence_label.set_halign(gtk4::Align::Start);
+    main_box.append(&sentence_label);
+
     let pinyin_label = Label::new(None);
     pinyin_label.set_widget_name("pinyin-label");
     pinyin_label.set_halign(gtk4::Align::Start); // 拼音左对齐
@@ -317,10 +322,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             }}
             #sentence-label {{
-                color: rgba(255, 255, 255, 0.7);
-                font-size: {s_font}pt;
+                color: {cand_text};
+                font-size: {cand_font}pt;
                 font-weight: 400;
-                margin-right: 12px;
+                background-color: rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                padding: 6px 10px;
+                margin-bottom: 8px;
             }}
             .candidate-item {{ padding: 6px 10px; border-radius: 8px; }}
             .candidate-selected {{ background-color: {cand_hl}; }}
@@ -400,7 +409,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         cand_hl = app.candidate_highlight_color,
         cand_font = app.candidate_font_size,
         cand_hint_font = app.candidate_hint_font_size,
-        s_font = app.candidate_font_size - 2,
         m_bg = app.modern_cand_bg_color,
         m_text = app.modern_cand_text_color,
         m_hl = app.modern_cand_highlight_color,
@@ -477,6 +485,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     let window_c = window.clone();
     let modern_window_c = modern_window.clone();
+    let sentence_label_c = sentence_label.clone();
     let pinyin_label_c = pinyin_label.clone();
     let candidates_box_c = candidates_box.clone();
     let modern_pinyin_c = modern_pinyin_label.clone();
@@ -509,7 +518,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             GuiEvent::ClearKeystrokes => {
                 ks_c.clear();
             }
-            GuiEvent::Update { pinyin, candidates, hints, selected, sentence: _ } => {
+            GuiEvent::Update { pinyin, candidates, hints, selected, sentence } => {
                 let show_trad = current_config.appearance.show_candidates;
                 let show_modern = current_config.appearance.show_modern_candidates;
 
@@ -523,6 +532,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     window_c.show();
                     window_c.set_opacity(1.0);
                     pinyin_label_c.set_text(&pinyin);
+                    sentence_label_c.set_text(&sentence);
+                    // 如果 sentence 为空，可以隐藏 label，或者保留空位
+                    sentence_label_c.set_visible(!sentence.is_empty());
 
                     while let Some(child) = candidates_box_c.first_child() { candidates_box_c.remove(&child); }
                     let start = (selected / current_config.appearance.page_size) * current_config.appearance.page_size;
