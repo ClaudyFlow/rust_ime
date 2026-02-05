@@ -71,8 +71,9 @@ pub struct Input {
     pub paste_method: String,
     pub clipboard_delay_ms: u64,
     pub enable_anti_typo: bool,
-    pub enable_quick_rime: bool,
-    pub quick_rimes: Vec<QuickRime>,
+    pub enable_double_tap: bool,
+    pub double_tap_timeout_ms: u64,
+    pub double_taps: Vec<DoubleTap>,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
@@ -90,9 +91,9 @@ pub struct Input {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct QuickRime {
-    pub trigger: String,
-    pub insert: String,
+pub struct DoubleTap {
+    pub trigger_key: String,
+    pub insert_text: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -180,22 +181,23 @@ impl Config {
                 paste_method: "shift_insert".to_string(),
                 clipboard_delay_ms: 10,
                 enable_anti_typo: true,
-                enable_quick_rime: true,
-                quick_rimes: vec![
-                    QuickRime { trigger: "caps+j".to_string(), insert: "iang".to_string() },
-                    QuickRime { trigger: "caps+k".to_string(), insert: "uai".to_string() },
-                    QuickRime { trigger: "caps+l".to_string(), insert: "uang".to_string() },
-                    QuickRime { trigger: "caps+i".to_string(), insert: "ing".to_string() },
-                    QuickRime { trigger: "caps+o".to_string(), insert: "ong".to_string() },
-                    QuickRime { trigger: "caps+p".to_string(), insert: "un".to_string() },
-                    QuickRime { trigger: "caps+n".to_string(), insert: "ian".to_string() },
-                    QuickRime { trigger: "caps+m".to_string(), insert: "ian".to_string() },
-                    QuickRime { trigger: "caps+u".to_string(), insert: "sh".to_string() },
-                    QuickRime { trigger: "caps+a".to_string(), insert: "ch".to_string() },
-                    QuickRime { trigger: "caps+e".to_string(), insert: "zh".to_string() },
-                    QuickRime { trigger: "caps+z".to_string(), insert: "ou".to_string() },
-                    QuickRime { trigger: "caps+c".to_string(), insert: "ao".to_string() },
-                    QuickRime { trigger: "caps+s".to_string(), insert: "ai".to_string() },
+                enable_double_tap: true,
+                double_tap_timeout_ms: 250, // 默认 250ms
+                double_taps: vec![
+                    DoubleTap { trigger_key: "j".to_string(), insert_text: "iang".to_string() },
+                    DoubleTap { trigger_key: "k".to_string(), insert_text: "uai".to_string() },
+                    DoubleTap { trigger_key: "l".to_string(), insert_text: "uang".to_string() },
+                    DoubleTap { trigger_key: "i".to_string(), insert_text: "ing".to_string() },
+                    DoubleTap { trigger_key: "o".to_string(), insert_text: "ong".to_string() },
+                    DoubleTap { trigger_key: "p".to_string(), insert_text: "un".to_string() },
+                    DoubleTap { trigger_key: "n".to_string(), insert_text: "ian".to_string() },
+                    DoubleTap { trigger_key: "m".to_string(), insert_text: "ian".to_string() },
+                    DoubleTap { trigger_key: "u".to_string(), insert_text: "sh".to_string() },
+                    DoubleTap { trigger_key: "a".to_string(), insert_text: "ch".to_string() },
+                    DoubleTap { trigger_key: "e".to_string(), insert_text: "zh".to_string() },
+                    DoubleTap { trigger_key: "z".to_string(), insert_text: "ou".to_string() },
+                    DoubleTap { trigger_key: "c".to_string(), insert_text: "ao".to_string() },
+                    DoubleTap { trigger_key: "s".to_string(), insert_text: "ai".to_string() },
                 ],
                 auto_commit_unique_en_fuzhuma: false,
                 auto_commit_unique_full_match: false,

@@ -95,10 +95,10 @@ impl InputMethodHost for EvdevHost {
                     let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
                     let has_mod = ctrl || alt || meta;
 
-                    let (chinese_mode, quick_rime_enabled) = {
+                    let (chinese_mode, caps_selection_enabled) = {
                         let p = self.processor.lock().unwrap();
                         let conf = self.config.read().unwrap();
-                        (p.chinese_enabled, conf.input.enable_quick_rime)
+                        (p.chinese_enabled, conf.input.enable_caps_selection)
                     };
 
                     if key == Key::KEY_TAB && !has_mod {
@@ -123,7 +123,7 @@ impl InputMethodHost for EvdevHost {
                             if held_keys.contains(&Key::KEY_TAB) {
                                 self.tab_held_and_not_used = false;
                                 if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_CAPSLOCK); }
-                            } else if chinese_mode && quick_rime_enabled {
+                            } else if chinese_mode && caps_selection_enabled {
                                 self.pending_caps = true;
                             }
                         } else if val == 0 { self.pending_caps = false; }
@@ -132,33 +132,11 @@ impl InputMethodHost for EvdevHost {
 
                     if val == 1 {
                         if self.pending_caps {
-                             let quick_rimes = self.config.read().unwrap().input.quick_rimes.clone();
                              let caps_selection_enabled = self.config.read().unwrap().input.enable_caps_selection;
                              let mut handled = false;
-                             let key_name = map_key_to_display_name(key).to_lowercase();
-                             let target = format!("caps+{}", key_name);
-                             
-                             // 1. 尝试 QuickRime
-                             for qr in quick_rimes {
-                                 if qr.trigger.to_lowercase() == target {
-                                     let mut p = self.processor.lock().unwrap();
-                                     if p.chinese_enabled {
-                                         self.pending_caps = false;
-                                         match p.inject_text(&qr.insert) {
-                                            Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                                            Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                                            Action::Notify(s, b) => { let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); }
-                                            Action::Alert => { if self.config.read().unwrap().input.enable_error_sound { let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn(); } }
-                                            _ => {}
-                                         }
-                                         handled = true;
-                                     }
-                                     drop(p); if handled { self.update_gui(); self.notify_preview(); break; }
-                                 }
-                             }
 
-                             // 2. 尝试 CapsLock 选词
-                             if !handled && caps_selection_enabled && is_letter(key) {
+                             // 尝试 CapsLock 选词
+                             if caps_selection_enabled && is_letter(key) {
                                  if let Some(c) = key_to_char(key, false) {
                                      let mut p = self.processor.lock().unwrap();
                                      if p.chinese_enabled && !p.buffer.is_empty() { // 只有在中文输入状态下才尝试选词
@@ -301,7 +279,13 @@ impl EvdevHost {
                 }); 
                 return; 
             }
-            let pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
+            
+            // 构造显示用的拼音串，包含 aux_filter
+            let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
+            if !p.aux_filter.is_empty() {
+                pinyin.push_str(&p.aux_filter.to_uppercase());
+            }
+
             if !p.candidates.is_empty() || !p.joined_sentence.is_empty() {
                 let start = p.page; let end = (start + p.page_size).min(p.candidates.len());
                 for (abs_idx, cand) in p.candidates.iter().enumerate().skip(start).take(end - start) {

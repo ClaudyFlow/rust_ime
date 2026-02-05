@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use evdev::Key;
 use crate::engine::trie::Trie;
 use serde_json::Value;
+use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImeState {
@@ -79,6 +80,13 @@ pub struct Processor {
     pub enable_english_filter: bool,
     pub enable_caps_selection: bool,
     pub enable_number_selection: bool,
+    
+    // 双击相关
+    pub enable_double_tap: bool,
+    pub double_tap_timeout: Duration,
+    pub double_taps: HashMap<String, String>,
+    pub last_tap_key: Option<Key>,
+    pub last_tap_time: Option<Instant>,
 }
 
 impl Processor {
@@ -165,6 +173,12 @@ impl Processor {
             enable_english_filter: true,
             enable_caps_selection: true,
             enable_number_selection: true,
+            
+            enable_double_tap: true,
+            double_tap_timeout: Duration::from_millis(250),
+            double_taps: HashMap::new(),
+            last_tap_key: None,
+            last_tap_time: None,
         }
     }
 
@@ -193,6 +207,13 @@ impl Processor {
         self.enable_english_filter = conf.input.enable_english_filter;
         self.enable_caps_selection = conf.input.enable_caps_selection;
         self.enable_number_selection = conf.input.enable_number_selection;
+
+        self.enable_double_tap = conf.input.enable_double_tap;
+        self.double_tap_timeout = Duration::from_millis(conf.input.double_tap_timeout_ms);
+        self.double_taps.clear();
+        for dt in &conf.input.double_taps {
+            self.double_taps.insert(dt.trigger_key.to_lowercase(), dt.insert_text.clone());
+        }
 
         if !conf.input.active_profiles.is_empty() {
             self.active_profiles = conf.input.active_profiles.iter().map(|p| p.to_lowercase()).collect();
@@ -316,6 +337,43 @@ impl Processor {
 
     fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
+        let now = Instant::now();
+        
+        // 0. 双击快速输入 (Double Tap) - 仅在非 Shift 状态下生效
+        if self.enable_double_tap && !shift_pressed && is_letter(key) {
+            if let Some(last_k) = self.last_tap_key {
+                if last_k == key {
+                    if let Some(last_t) = self.last_tap_time {
+                        if now.duration_since(last_t) <= self.double_tap_timeout {
+                            // 触发双击
+                            if let Some(c) = key_to_char(key, false) {
+                                let key_char = c.to_string();
+                                if let Some(replacement) = self.double_taps.get(&key_char) {
+                                    // 只有当 buffer 最后一个字符确实是该键对应的字符时才替换
+                                    if self.buffer.ends_with(c) {
+                                        self.buffer.pop(); // 删除上一个 'i'
+                                        self.buffer.push_str(replacement); // 插入 'ing'
+                                        self.last_tap_key = None; // 重置防止三连击触发
+                                        self.last_tap_time = None;
+                                        
+                                        self.lookup();
+                                        return self.update_phantom_action();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 如果没有触发双击替换，更新状态
+            self.last_tap_key = Some(key);
+            self.last_tap_time = Some(now);
+        } else {
+            // 非字母按键或Shift按下，重置双击状态
+            self.last_tap_key = None;
+            self.last_tap_time = None;
+        }
         
         // 1. 处理 Shift + 字母 (筛选模式)
         if shift_pressed && self.enable_english_filter && is_letter(key) {
