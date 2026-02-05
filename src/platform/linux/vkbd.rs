@@ -14,6 +14,7 @@ pub enum PasteMode {
     ShiftInsert,
     #[allow(dead_code)]
     UnicodeHex, // Ctrl+Shift+U method
+    Fcitx5,     // fcitx5-remote -c method
 }
 
 pub struct Vkbd {
@@ -67,7 +68,8 @@ impl Vkbd {
             PasteMode::ShiftInsert => PasteMode::CtrlV,
             PasteMode::CtrlV => PasteMode::CtrlShiftV,
             PasteMode::CtrlShiftV => PasteMode::UnicodeHex,
-            PasteMode::UnicodeHex => PasteMode::ShiftInsert,
+            PasteMode::UnicodeHex => PasteMode::Fcitx5,
+            PasteMode::Fcitx5 => PasteMode::ShiftInsert,
         };
         
         println!("[Vkbd] Manually switched paste mode to: {:?}", self.paste_mode);
@@ -77,6 +79,7 @@ impl Vkbd {
             PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
             PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
             PasteMode::UnicodeHex => "Unicode编码输入 (Ctrl+Shift+U)".to_string(),
+            PasteMode::Fcitx5 => "Fcitx5 接口".to_string(),
         }
     }
 
@@ -112,6 +115,14 @@ impl Vkbd {
                 self.send_char_via_unicode(c);
             }
             return;
+        }
+
+        // 0. 优先尝试 Fcitx5
+        if self.paste_mode == PasteMode::Fcitx5 {
+            if self.send_via_fcitx(text) {
+                return;
+            }
+            println!("[Vkbd] Fcitx5 fallback to clipboard...");
         }
 
         // 1. 优先尝试剪贴板
@@ -183,7 +194,7 @@ impl Vkbd {
                 thread::sleep(Duration::from_millis(15));
                 self.emit(Key::KEY_LEFTSHIFT, false);
             },
-            PasteMode::UnicodeHex => {} // No-op
+            PasteMode::UnicodeHex | PasteMode::Fcitx5 => {} // No-op
         }
         
         true
@@ -204,6 +215,17 @@ impl Vkbd {
         }
         // 关键同步延迟减小
         thread::sleep(Duration::from_millis(5));
+    }
+
+    fn send_via_fcitx(&self, text: &str) -> bool {
+        let status = Command::new("fcitx5-remote")
+            .arg("-c")
+            .arg(text)
+            .status();
+        match status {
+            Ok(s) => s.success(),
+            Err(_) => false,
+        }
     }
 
     fn send_via_ydotool(&self, text: &str) -> bool {
@@ -292,6 +314,17 @@ impl Vkbd {
         use arboard::Clipboard;
         let mut cb = Clipboard::new().ok()?;
         cb.get_text().ok()
+    }
+
+    pub fn apply_config(&mut self, config: &crate::config::Config) {
+        self.clipboard_delay_ms = config.input.clipboard_delay_ms;
+        self.paste_mode = match config.input.paste_method.as_str() {
+            "ctrl_v" => PasteMode::CtrlV,
+            "ctrl_shift_v" => PasteMode::CtrlShiftV,
+            "unicode" => PasteMode::UnicodeHex,
+            "fcitx5" => PasteMode::Fcitx5,
+            _ => PasteMode::ShiftInsert,
+        };
     }
 }
 

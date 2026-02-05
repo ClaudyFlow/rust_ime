@@ -58,7 +58,11 @@ impl EvdevHost {
         notify_tx: Sender<NotifyEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
-        let vkbd = Vkbd::new(&dev)?;
+        let mut vkbd = Vkbd::new(&dev)?;
+        {
+            let conf = config.read().unwrap();
+            vkbd.apply_config(&conf);
+        }
         Ok(Self {
             processor, vkbd: Mutex::new(vkbd), dev: Mutex::new(dev), gui_tx, notify_tx,
             should_exit: Arc::new(AtomicBool::new(false)), config, pending_caps: false, tab_held_and_not_used: false,
