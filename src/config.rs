@@ -74,6 +74,9 @@ pub struct Input {
     pub enable_double_tap: bool,
     pub double_tap_timeout_ms: u64,
     pub double_taps: Vec<DoubleTap>,
+    pub enable_long_press: bool,
+    pub long_press_timeout_ms: u64,
+    pub long_press_mappings: Vec<LongPressMapping>,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
@@ -92,6 +95,12 @@ pub struct Input {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DoubleTap {
+    pub trigger_key: String,
+    pub insert_text: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct LongPressMapping {
     pub trigger_key: String,
     pub insert_text: String,
 }
@@ -198,6 +207,36 @@ impl Config {
                     DoubleTap { trigger_key: "z".to_string(), insert_text: "ou".to_string() },
                     DoubleTap { trigger_key: "c".to_string(), insert_text: "ao".to_string() },
                     DoubleTap { trigger_key: "s".to_string(), insert_text: "ai".to_string() },
+                ],
+                enable_long_press: true,
+                long_press_timeout_ms: 400,
+                long_press_mappings: vec![
+                    LongPressMapping { trigger_key: "q".to_string(), insert_text: "Q".to_string() },
+                    LongPressMapping { trigger_key: "w".to_string(), insert_text: "W".to_string() },
+                    LongPressMapping { trigger_key: "e".to_string(), insert_text: "E".to_string() },
+                    LongPressMapping { trigger_key: "r".to_string(), insert_text: "R".to_string() },
+                    LongPressMapping { trigger_key: "t".to_string(), insert_text: "T".to_string() },
+                    LongPressMapping { trigger_key: "y".to_string(), insert_text: "Y".to_string() },
+                    LongPressMapping { trigger_key: "u".to_string(), insert_text: "U".to_string() },
+                    LongPressMapping { trigger_key: "i".to_string(), insert_text: "I".to_string() },
+                    LongPressMapping { trigger_key: "o".to_string(), insert_text: "O".to_string() },
+                    LongPressMapping { trigger_key: "p".to_string(), insert_text: "P".to_string() },
+                    LongPressMapping { trigger_key: "a".to_string(), insert_text: "A".to_string() },
+                    LongPressMapping { trigger_key: "s".to_string(), insert_text: "S".to_string() },
+                    LongPressMapping { trigger_key: "d".to_string(), insert_text: "D".to_string() },
+                    LongPressMapping { trigger_key: "f".to_string(), insert_text: "F".to_string() },
+                    LongPressMapping { trigger_key: "g".to_string(), insert_text: "G".to_string() },
+                    LongPressMapping { trigger_key: "h".to_string(), insert_text: "H".to_string() },
+                    LongPressMapping { trigger_key: "j".to_string(), insert_text: "J".to_string() },
+                    LongPressMapping { trigger_key: "k".to_string(), insert_text: "K".to_string() },
+                    LongPressMapping { trigger_key: "l".to_string(), insert_text: "L".to_string() },
+                    LongPressMapping { trigger_key: "z".to_string(), insert_text: "Z".to_string() },
+                    LongPressMapping { trigger_key: "x".to_string(), insert_text: "X".to_string() },
+                    LongPressMapping { trigger_key: "c".to_string(), insert_text: "C".to_string() },
+                    LongPressMapping { trigger_key: "v".to_string(), insert_text: "V".to_string() },
+                    LongPressMapping { trigger_key: "b".to_string(), insert_text: "B".to_string() },
+                    LongPressMapping { trigger_key: "n".to_string(), insert_text: "N".to_string() },
+                    LongPressMapping { trigger_key: "m".to_string(), insert_text: "M".to_string() },
                 ],
                 auto_commit_unique_en_fuzhuma: false,
                 auto_commit_unique_full_match: false,

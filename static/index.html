@@ -83,6 +83,16 @@
 
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .status-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 14px 34px; border-radius: 20px; display: none; z-index: 1000; backdrop-filter: blur(10px); }
+
+        /* Keyboard layout styles */
+        .keyboard { display: flex; flex-direction: column; gap: 10px; background: #d2d2d7; padding: 15px; border-radius: 15px; width: fit-content; margin: 20px auto; }
+        .keyboard-row { display: flex; justify-content: center; gap: 6px; }
+        .kb-key { width: 50px; height: 50px; background: white; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s; user-select: none; position: relative; }
+        .kb-key:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); background: #fdfdfd; }
+        .kb-key.active { border: 2px solid var(--apple-accent); }
+        .kb-key-main { font-size: 16px; font-weight: 700; }
+        .kb-key-sub { font-size: 10px; color: var(--apple-secondary); overflow: hidden; white-space: nowrap; max-width: 45px; text-align: center; }
+        .kb-edit-box { display: none; background: var(--apple-card); border-radius: 15px; padding: 20px; margin-top: 20px; border: 1px solid var(--apple-border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -97,6 +107,7 @@
             <button id="nav-quickrime" onclick="showTab('quickrime')">双击快捷输入</button>
             <button id="nav-profilekeys" onclick="showTab('profilekeys')">快捷切换映射</button>
             <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
+            <button id="nav-keybehavior" onclick="showTab('keybehavior')">按键行为定制</button>
             <button id="nav-help" onclick="window.open('/static/help.html')">使用帮助</button>
         </nav>
         <div style="margin-top: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
@@ -214,6 +225,52 @@
         <div id="tab-quickrime" class="tab-content"><h1>双击快捷输入</h1><div class="card" id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加</button></div>
         <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
+        
+        <div id="tab-keybehavior" class="tab-content">
+            <h1>按键行为定制</h1>
+            
+            <div class="card">
+                <h2>长按行为 (Long Press)</h2>
+                <div class="setting-item">
+                    <div class="info"><div class="title">启用长按功能</div></div>
+                    <label class="switch"><input type="checkbox" id="enable_long_press"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">长按判定时长 (ms)</div></div>
+                    <input type="number" id="long_press_timeout_ms">
+                </div>
+                
+                <div class="keyboard" id="kb-longpress"></div>
+                <div id="edit-longpress" class="kb-edit-box">
+                    <h3 id="lp-edit-title">编辑按键: </h3>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">映射内容</div><div class="desc">长按后输入的文字</div></div>
+                        <input type="text" id="lp-edit-input" style="width: 200px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>双击行为 (Double Click)</h2>
+                <div class="setting-item">
+                    <div class="info"><div class="title">启用双击功能</div></div>
+                    <label class="switch"><input type="checkbox" id="enable_double_tap_alt"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">双击判定时长 (ms)</div></div>
+                    <input type="number" id="double_tap_timeout_ms_alt">
+                </div>
+                
+                <div class="keyboard" id="kb-doubletap"></div>
+                <div id="edit-doubletap" class="kb-edit-box">
+                    <h3 id="dt-edit-title">编辑按键: </h3>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">映射内容</div><div class="desc">双击后输入的文字</div></div>
+                        <input type="text" id="dt-edit-input" style="width: 200px;">
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <div id="toast" class="status-toast">已保存并应用</div>
@@ -271,8 +328,21 @@
             const allIds = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
             allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] || config.input[id] || ""; });
 
-            const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap'];
-            checkIds.forEach(id => { const el = document.getElementById(id); if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id]; });
+            const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press'];
+            checkIds.forEach(id => { 
+                const el = document.getElementById(id); 
+                if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id]; 
+                if(id === 'enable_double_tap') {
+                    const alt = document.getElementById('enable_double_tap_alt');
+                    if(alt) alt.checked = el.checked;
+                }
+            });
+
+            document.getElementById('long_press_timeout_ms').value = config.input.long_press_timeout_ms;
+            document.getElementById('double_tap_timeout_ms_alt').value = config.input.double_tap_timeout_ms;
+
+            renderKeyboard('kb-longpress', 'long_press_mappings');
+            renderKeyboard('kb-doubletap', 'double_taps');
 
             const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
             colorIds.forEach(id => {
@@ -288,10 +358,16 @@
             config.input.active_profiles = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
             config.input.page_flipping_keys = Array.from(document.querySelectorAll('#page_flipping_keys_container input:checked')).map(i => i.value);
             
-            ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap'].forEach(id => {
+            ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'long_press_timeout_ms'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });
+
+            // 特殊处理同步的双击开关和时长
+            const altDtEnable = document.getElementById('enable_double_tap_alt');
+            if(altDtEnable) config.input.enable_double_tap = altDtEnable.checked;
+            const altDtTimeout = document.getElementById('double_tap_timeout_ms_alt');
+            if(altDtTimeout) config.input.double_tap_timeout_ms = parseInt(altDtTimeout.value);
 
             const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color', 'learning_dict_path'];
             appIds.forEach(id => {
@@ -325,6 +401,74 @@
         async function resetAll() { if(confirm("重置所有设置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
         let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
         async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
+
+        const KB_LAYOUT = [
+            ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+            ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+            ['z', 'x', 'c', 'v', 'b', 'n', 'm']
+        ];
+
+        function renderKeyboard(containerId, configKey) {
+            const container = document.getElementById(containerId);
+            const mappings = config.input[configKey];
+            const isArray = Array.isArray(mappings);
+
+            container.innerHTML = KB_LAYOUT.map(row => `
+                <div class="keyboard-row">
+                    ${row.map(key => {
+                        let mapping = "";
+                        if (isArray) {
+                            const entry = mappings.find(m => m.trigger_key === key);
+                            mapping = entry ? entry.insert_text : "";
+                        } else {
+                            // double_taps is currently a Vec in config but used as HashMap in Processor
+                            // Wait, in config.rs it's Vec<DoubleTap>
+                            const entry = mappings.find(m => m.trigger_key === key);
+                            mapping = entry ? entry.insert_text : "";
+                        }
+                        return `
+                            <div class="kb-key ${mapping ? 'active' : ''}" onclick="editKey('${containerId}', '${configKey}', '${key}')">
+                                <div class="kb-key-main">${key.toUpperCase()}</div>
+                                <div class="kb-key-sub">${mapping}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `).join('');
+        }
+
+        function editKey(containerId, configKey, key) {
+            const isLongPress = containerId === 'kb-longpress';
+            const editBoxId = isLongPress ? 'edit-longpress' : 'edit-doubletap';
+            const titleId = isLongPress ? 'lp-edit-title' : 'dt-edit-title';
+            const inputId = isLongPress ? 'lp-edit-input' : 'dt-edit-input';
+            
+            const editBox = document.getElementById(editBoxId);
+            const title = document.getElementById(titleId);
+            const input = document.getElementById(inputId);
+            
+            editBox.style.display = 'block';
+            title.innerText = `编辑按键: ${key.toUpperCase()}`;
+            
+            const mappings = config.input[configKey];
+            const entry = mappings.find(m => m.trigger_key === key);
+            input.value = entry ? entry.insert_text : "";
+            
+            input.oninput = () => {
+                const val = input.value;
+                const idx = mappings.findIndex(m => m.trigger_key === key);
+                if (val === "") {
+                    if (idx !== -1) mappings.splice(idx, 1);
+                } else {
+                    if (idx !== -1) {
+                        mappings[idx].insert_text = val;
+                    } else {
+                        mappings.push({ trigger_key: key, insert_text: val });
+                    }
+                }
+                renderKeyboard(containerId, configKey);
+            };
+        }
 
         load();
     </script>

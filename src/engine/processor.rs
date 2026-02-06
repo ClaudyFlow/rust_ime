@@ -98,6 +98,13 @@ pub struct Processor {
     pub double_taps: HashMap<String, String>,
     pub last_tap_key: Option<Key>,
     pub last_tap_time: Option<Instant>,
+
+    // 长按相关
+    pub enable_long_press: bool,
+    pub long_press_timeout: Duration,
+    pub long_press_mappings: HashMap<String, String>,
+    pub key_press_info: Option<(Key, Instant)>,
+    pub long_press_triggered: bool,
 }
 
 impl Processor {
@@ -193,6 +200,12 @@ impl Processor {
             double_taps: HashMap::new(),
             last_tap_key: None,
             last_tap_time: None,
+
+            enable_long_press: true,
+            long_press_timeout: Duration::from_millis(400),
+            long_press_mappings: HashMap::new(),
+            key_press_info: None,
+            long_press_triggered: false,
         }
     }
 
@@ -227,6 +240,13 @@ impl Processor {
         self.double_taps.clear();
         for dt in &conf.input.double_taps {
             self.double_taps.insert(dt.trigger_key.to_lowercase(), dt.insert_text.clone());
+        }
+
+        self.enable_long_press = conf.input.enable_long_press;
+        self.long_press_timeout = Duration::from_millis(conf.input.long_press_timeout_ms);
+        self.long_press_mappings.clear();
+        for lm in &conf.input.long_press_mappings {
+            self.long_press_mappings.insert(lm.trigger_key.to_lowercase(), lm.insert_text.clone());
         }
 
         if !conf.input.active_profiles.is_empty() {
@@ -284,8 +304,43 @@ impl Processor {
         self.page_snapshot.clear();
     }
 
-    pub fn handle_key(&mut self, key: Key, is_press: bool, shift_pressed: bool) -> Action {
-        if !is_press {
+    pub fn handle_key(&mut self, key: Key, val: i32, shift_pressed: bool) -> Action {
+        let _is_press = val != 0;
+        let is_repeat = val == 2;
+        let is_release = val == 0;
+        let now = Instant::now();
+
+        // 处理长按逻辑
+        if self.enable_long_press && is_letter(key) && !shift_pressed {
+            if val == 1 {
+                self.key_press_info = Some((key, now));
+                self.long_press_triggered = false;
+            } else if is_repeat {
+                if !self.long_press_triggered {
+                    if let Some((press_key, press_time)) = self.key_press_info {
+                        if press_key == key && now.duration_since(press_time) >= self.long_press_timeout {
+                            if let Some(c) = key_to_char(key, false) {
+                                if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
+                                    self.long_press_triggered = true;
+                                    if !self.buffer.is_empty() && self.buffer.ends_with(c) {
+                                        self.buffer.pop();
+                                    }
+                                    return self.inject_text(&replacement);
+                                }
+                            }
+                        }
+                    }
+                }
+                return Action::Consume; 
+            } else if is_release {
+                self.key_press_info = None;
+                if self.long_press_triggered {
+                    return Action::Consume; 
+                }
+            }
+        }
+
+        if is_release {
             if self.buffer.is_empty() { return Action::PassThrough; }
             if key == Key::KEY_GRAVE { return Action::Consume; }
             return Action::Consume;
@@ -727,6 +782,7 @@ mod tests {
             aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
+            enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
             profile_keys: Vec::new(), auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
     }

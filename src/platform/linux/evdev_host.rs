@@ -220,7 +220,7 @@ impl InputMethodHost for EvdevHost {
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
-                        match p.handle_key(key, val != 0, shift) {
+                        match p.handle_key(key, val, shift) {
                             Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
                             Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
                             Action::Notify(s, b) => { let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); }
