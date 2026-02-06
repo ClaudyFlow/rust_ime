@@ -24,7 +24,7 @@
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,
-    "candidate_anchor": "top",
+    "candidate_anchor": "bottom",
     "candidate_font_size": 18,
     "candidate_hint_font_size": 10,
     "candidate_margin_x": 0,
@@ -63,10 +63,30 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": true,
+    "enable_anti_typo": false,
     "enable_double_tap": true,
-    "double_tap_timeout_ms": 300,
+    "double_tap_timeout_ms": 250,
     "double_taps": [
+      {
+        "trigger_key": "i",
+        "insert_text": "ing"
+      },
+      {
+        "trigger_key": "u",
+        "insert_text": "sh"
+      },
+      {
+        "trigger_key": "l",
+        "insert_text": "uang"
+      },
+      {
+        "trigger_key": "o",
+        "insert_text": "ong"
+      },
+      {
+        "trigger_key": "p",
+        "insert_text": "un"
+      },
       {
         "trigger_key": "j",
         "insert_text": "iang"
@@ -76,56 +96,36 @@
         "insert_text": "uai"
       },
       {
-        "trigger_key": "l",
-        "insert_text": "iang"
-      },
-      {
-        "trigger_key": "i",
-        "insert_text": "ing"
-      },
-      {
-        "trigger_key": "o",
-        "insert_text": "ong"
-      },
-      {
         "trigger_key": "n",
-        "insert_text": "iao"
+        "insert_text": "ian"
       },
       {
         "trigger_key": "m",
         "insert_text": "ian"
       },
       {
-        "trigger_key": "u",
-        "insert_text": "unang"
-      },
-      {
-        "trigger_key": "z",
-        "insert_text": "zhi"
-      },
-      {
-        "trigger_key": "s",
-        "insert_text": "shi"
+        "trigger_key": "a",
+        "insert_text": "ch"
       },
       {
         "trigger_key": "e",
-        "insert_text": "eng"
+        "insert_text": "zh"
       },
       {
-        "trigger_key": "a",
-        "insert_text": "ang"
+        "trigger_key": "z",
+        "insert_text": "ou"
       },
       {
         "trigger_key": "c",
-        "insert_text": "chi"
+        "insert_text": "ao"
       },
       {
-        "trigger_key": "r",
-        "insert_text": "uan"
+        "trigger_key": "s",
+        "insert_text": "ai"
       }
     ],
     "enable_long_press": true,
-    "long_press_timeout_ms": 5,
+    "long_press_timeout_ms": 400,
     "long_press_mappings": [
       {
         "trigger_key": "q",
@@ -241,16 +241,7 @@
     "active_profiles": [
       "chinese"
     ],
-    "profile_keys": [
-      {
-        "key": "e",
-        "profile": "english"
-      },
-      {
-        "key": "c",
-        "profile": "chinese"
-      }
-    ],
+    "profile_keys": [],
     "page_flipping_keys": [
       "arrow"
     ],
@@ -258,7 +249,8 @@
     "enable_error_sound": true,
     "enable_english_filter": true,
     "enable_caps_selection": true,
-    "enable_number_selection": true
+    "enable_number_selection": true,
+    "enable_user_dict": true
   },
   "hotkeys": {
     "switch_language": {

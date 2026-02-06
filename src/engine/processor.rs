@@ -112,6 +112,10 @@ pub struct Processor {
     pub enable_user_dict: bool,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
+    
+    // 连续选词记忆
+    pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
+    pub last_commit_time: Instant,
 }
 
 impl Processor {
@@ -217,6 +221,8 @@ impl Processor {
             enable_user_dict: true,
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
+            commit_history: Vec::new(),
+            last_commit_time: Instant::now(),
         }
     }
 
@@ -520,6 +526,11 @@ impl Processor {
                     return self.update_phantom_action();
                 }
 
+                if self.buffer.is_empty() {
+                    self.commit_history.clear(); // 连续退格清空历史
+                    return Action::PassThrough;
+                }
+
                 self.buffer.pop();
                 if self.buffer.is_empty() {
                     let del = self.phantom_text.chars().count(); self.reset();
@@ -569,11 +580,15 @@ impl Processor {
                 self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
             }
             Key::KEY_ENTER => {
+                self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out); }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
             }
-            Key::KEY_ESC | Key::KEY_DELETE => { let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } }
+            Key::KEY_ESC | Key::KEY_DELETE => { 
+                self.commit_history.clear(); // 取消输入，清空历史
+                let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } 
+            }
 
             Key::KEY_SLASH if !self.buffer.is_empty() => {
                 let mut new_buffer = self.buffer.clone();
@@ -635,14 +650,56 @@ impl Processor {
         commit_text.push_str(&zh_punc);
         let del_len = self.phantom_text.chars().count();
         self.reset();
+        self.commit_history.clear(); // 标点断句，清空历史
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
 
     fn commit_candidate(&mut self, mut cand: String) -> Action {
-        if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
-            let py = self.last_lookup_pinyin.clone();
+        let now = Instant::now();
+        let py = self.last_lookup_pinyin.clone();
+
+        if self.enable_user_dict && !py.is_empty() {
+            // 1. 记录单个词的频率
             self.record_usage(&py, &cand);
+
+            // 2. 尝试与历史记录合并组词
+            // 如果距离上次上屏超过 3 秒，清空历史
+            if now.duration_since(self.last_commit_time) > Duration::from_secs(3) {
+                self.commit_history.clear();
+            }
+
+            // 将当前词加入历史
+            self.commit_history.push((py.clone(), cand.clone()));
+
+            // 尝试组合（取最近 2 到 4 个部分进行组合）
+            if self.commit_history.len() >= 2 {
+                let start = if self.commit_history.len() > 4 { self.commit_history.len() - 4 } else { 0 };
+                let mut new_combinations = Vec::new();
+                
+                {
+                    let history_slice = &self.commit_history[start..];
+                    for i in 0..(history_slice.len() - 1) {
+                        let mut combined_py = String::new();
+                        let mut combined_word = String::new();
+                        for j in i..history_slice.len() {
+                            combined_py.push_str(&history_slice[j].0);
+                            combined_word.push_str(&history_slice[j].1);
+                        }
+                        if combined_word.chars().count() <= 8 {
+                            new_combinations.push((combined_py, combined_word));
+                        }
+                    }
+                }
+
+                // 统一写入词库
+                for (py, word) in new_combinations {
+                    self.record_usage(&py, &word);
+                }
+            }
+
+            self.last_commit_time = now;
         }
+
         if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { cand.push(' '); }
         let del = self.phantom_text.chars().count(); self.reset(); Action::DeleteAndEmit { delete: del, insert: cand }
     }
@@ -920,8 +977,10 @@ mod tests {
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
             enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
-            nav_mode: false, enable_user_dict: true, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
-            profile_keys: Vec::new(), auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
+                        nav_mode: false, enable_user_dict: true, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
+                        commit_history: Vec::new(), last_commit_time: Instant::now(),
+                        profile_keys: Vec::new(),
+             auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
     }
     #[test] fn test_dummy() { let _p = setup_mock_processor(); }
