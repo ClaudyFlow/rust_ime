@@ -92,6 +92,7 @@
         .kb-key.active { border: 2px solid var(--apple-accent); }
         .kb-key.type-diacritic { background: #e1f5fe; } /* 变音符号/音调类背景色 */
         .kb-key.type-special { background: #fff9c4; }   /* 特殊符号类背景色 */
+        .kb-key.type-profile { background: #e8f5e9; }   /* 方案切换类背景色 */
         .kb-key-main { font-size: 16px; font-weight: 700; }
         .kb-key-sub { font-size: 10px; color: var(--apple-secondary); overflow: hidden; white-space: nowrap; max-width: 45px; text-align: center; }
         .kb-edit-box { display: none; background: var(--apple-card); border-radius: 15px; padding: 20px; margin-top: 20px; border: 1px solid var(--apple-border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -224,7 +225,25 @@
 
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
         <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
-        <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
+        <div id="tab-profilekeys" class="tab-content">
+            <h1>快捷切换映射</h1>
+            <div class="card">
+                <div class="info">
+                    <div class="desc">在输入缓冲区为空时，按 ` 进入切换模式，随后按下以下映射的按键即可快速切换方案。</div>
+                </div>
+                <div class="keyboard" id="kb-profilekeys"></div>
+                <div id="edit-profilekeys" class="kb-edit-box">
+                    <h3 id="pk-edit-title">编辑切换键: </h3>
+                    <div class="setting-item">
+                        <div class="info">
+                            <div class="title">目标方案</div>
+                            <div class="desc">按下此键后切换到的方案名称（多个用逗号隔开）</div>
+                        </div>
+                        <input type="text" id="pk-edit-input" style="width: 200px;" placeholder="例如: chinese">
+                    </div>
+                </div>
+            </div>
+        </div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         
         <div id="tab-keybehavior" class="tab-content">
@@ -344,6 +363,7 @@
 
             renderKeyboard('kb-longpress', 'long_press_mappings');
             renderKeyboard('kb-doubletap', 'double_taps');
+            renderKeyboard('kb-profilekeys', 'profile_keys');
 
             const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
             colorIds.forEach(id => {
@@ -352,7 +372,7 @@
                 const picker = document.getElementById(id + '_picker'); if(el.value && el.value.startsWith('#')) picker.value = el.value;
             });
 
-            renderPK(); renderHK(); renderDictsList(dicts);
+            renderHK(); renderDictsList(dicts);
         }
 
         async function saveAll() {
@@ -410,20 +430,30 @@
         function renderKeyboard(containerId, configKey) {
             const container = document.getElementById(containerId);
             const mappings = config.input[configKey] || [];
+            const isProfileKeys = configKey === 'profile_keys';
             
             container.innerHTML = KB_LAYOUT.map(row => `
                 <div class="keyboard-row">
                     ${row.map(key => {
-                        const entry = mappings.find(m => m.trigger_key === key);
-                        const mapping = entry ? entry.insert_text : "";
+                        let mapping = "";
+                        if (isProfileKeys) {
+                            const entry = mappings.find(m => m.key === key);
+                            mapping = entry ? entry.profile : "";
+                        } else {
+                            const entry = mappings.find(m => m.trigger_key === key);
+                            mapping = entry ? entry.insert_text : "";
+                        }
                         
                         let typeClass = "";
                         if (mapping) {
-                            // 判断是否包含声调或特殊拉丁字母
-                            const isDiacritic = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(mapping);
-                            const isSpecial = /[^a-zA-Z0-9\s]/.test(mapping) && !isDiacritic;
-                            if (isDiacritic) typeClass = "type-diacritic";
-                            else if (isSpecial) typeClass = "type-special";
+                            if (isProfileKeys) {
+                                typeClass = "type-profile";
+                            } else {
+                                const isDiacritic = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(mapping);
+                                const isSpecial = /[^a-zA-Z0-9\s]/.test(mapping) && !isDiacritic;
+                                if (isDiacritic) typeClass = "type-diacritic";
+                                else if (isSpecial) typeClass = "type-special";
+                            }
                         }
 
                         return `
@@ -439,32 +469,49 @@
 
         function editKey(containerId, configKey, key) {
             const isLongPress = containerId === 'kb-longpress';
-            const editBoxId = isLongPress ? 'edit-longpress' : 'edit-doubletap';
-            const titleId = isLongPress ? 'lp-edit-title' : 'dt-edit-title';
-            const inputId = isLongPress ? 'lp-edit-input' : 'dt-edit-input';
+            const isDoubleTap = containerId === 'kb-doubletap';
+            const isProfileKeys = containerId === 'kb-profilekeys';
+
+            let editBoxId, titleId, inputId;
+            if (isLongPress) {
+                editBoxId = 'edit-longpress'; titleId = 'lp-edit-title'; inputId = 'lp-edit-input';
+            } else if (isDoubleTap) {
+                editBoxId = 'edit-doubletap'; titleId = 'dt-edit-title'; inputId = 'dt-edit-input';
+            } else {
+                editBoxId = 'edit-profilekeys'; titleId = 'pk-edit-title'; inputId = 'pk-edit-input';
+            }
             
             const editBox = document.getElementById(editBoxId);
             const title = document.getElementById(titleId);
             const input = document.getElementById(inputId);
             
+            // 隐藏其他的编辑框
+            document.querySelectorAll('.kb-edit-box').forEach(el => el.style.display = 'none');
+            
             editBox.style.display = 'block';
             title.innerText = `编辑按键: ${key.toUpperCase()}`;
             
             const mappings = config.input[configKey];
-            const entry = mappings.find(m => m.trigger_key === key);
-            input.value = entry ? entry.insert_text : "";
+            let currentVal = "";
+            if (isProfileKeys) {
+                const entry = mappings.find(m => m.key === key);
+                currentVal = entry ? entry.profile : "";
+            } else {
+                const entry = mappings.find(m => m.trigger_key === key);
+                currentVal = entry ? entry.insert_text : "";
+            }
+            input.value = currentVal;
             
             input.oninput = () => {
                 const val = input.value;
-                const idx = mappings.findIndex(m => m.trigger_key === key);
-                if (val === "") {
-                    if (idx !== -1) mappings.splice(idx, 1);
+                if (isProfileKeys) {
+                    const idx = mappings.findIndex(m => m.key === key);
+                    if (val === "") { if (idx !== -1) mappings.splice(idx, 1); }
+                    else { if (idx !== -1) mappings[idx].profile = val; else mappings.push({ key: key, profile: val }); }
                 } else {
-                    if (idx !== -1) {
-                        mappings[idx].insert_text = val;
-                    } else {
-                        mappings.push({ trigger_key: key, insert_text: val });
-                    }
+                    const idx = mappings.findIndex(m => m.trigger_key === key);
+                    if (val === "") { if (idx !== -1) mappings.splice(idx, 1); }
+                    else { if (idx !== -1) mappings[idx].insert_text = val; else mappings.push({ trigger_key: key, insert_text: val }); }
                 }
                 renderKeyboard(containerId, configKey);
             };
