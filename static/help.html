@@ -73,10 +73,11 @@
             <a href="#aux-code">2. 核心：英文辅助码</a>
             <a href="#proper-nouns">3. 专有名词原生隔离</a>
             <a href="#mixed-input">4. 多方案混输</a>
-            <a href="#quick-rime">5. 长韵母双快输入</a>
-            <a href="#sentence-mode">6. 智能长句模式</a>
-            <a href="#ui-custom">7. 视觉与样式定制</a>
-            <a href="#extra-tools">8. 屏幕演示与学习</a>
+            <a href="#quick-rime">5. 长按与双击定制</a>
+            <a href="#nav-mode">6. 智能导航与平卷互换</a>
+            <a href="#sentence-mode">7. 智能长句模式</a>
+            <a href="#ui-custom">8. 视觉与样式定制</a>
+            <a href="#extra-tools">9. 屏幕演示与学习</a>
         </nav>
     </aside>
 
@@ -161,15 +162,42 @@
         </section>
 
         <section id="quick-rime">
-            <h2>长韵母双快输入</h2>
+            <h2>长按与双击定制 <span class="tag">New</span></h2>
             <div class="feature-card">
-                <p>觉得 <code>iang</code>, <code>uang</code> 太难打？</p>
-                <p>开启“双快”模式，您可以自定义映射。默认配置下：</p>
+                <p>rust-ime 提供了极致的按键行为定制能力，您可以利用<b>双击</b>或<b>长按</b>来实现极速输入。</p>
+                
+                <h3>1. 双击快捷输入 (Double-Tap)</h3>
+                <p>快速点击同一个字母键两次，注入长韵母或常用短语。例如：</p>
                 <ul>
-                    <li><code>Caps</code> + <code>L</code> ⮕ 注入 <code>uang</code></li>
-                    <li><code>Caps</code> + <code>J</code> ⮕ 注入 <code>iang</code></li>
+                    <li><code>i, i</code> ⮕ 注入 <code>ing</code></li>
+                    <li><code>u, u</code> ⮕ 注入 <code>sh</code></li>
                 </ul>
-                <p>配合 Tab 键的角色互换（Tab 单击切模式，CapsLock 做修饰键），这种操作比传统双拼更符合肌肉记忆。</p>
+
+                <h3>2. 长按行为定制 (Long Press)</h3>
+                <p>按住字母键不放（约 400ms），触发预设操作。默认映射为该字母的<b>大写形式</b>。</p>
+
+                <div class="pro-tip">
+                    <b>配置提示：</b>访问配置中心，点击可视化键盘上的字母，即可分别为“双击”和“长按”分配任何您想要的字符串、变音字符或音调符号。
+                </div>
+            </div>
+        </section>
+
+        <section id="nav-mode">
+            <h2>智能导航与平卷互换 <span class="tag">New</span></h2>
+            <div class="feature-card">
+                <h3>1. HJKL 导航模式</h3>
+                <p>在输入拼音的过程中，按下 <code>`</code> (反引号) 即可进入导航模式。此时您可以像使用 Vim 一样操作候选词：</p>
+                <ul>
+                    <li><code>H</code> / <code>L</code>：切换上一个/下一个候选词</li>
+                    <li><code>J</code> / <code>K</code>：向下/向上翻页</li>
+                </ul>
+                <p>按任意其他字母键将自动退出导航并继续拼写。</p>
+
+                <h3>2. 平卷舌一键互换 (/)</h3>
+                <p>拼错平/卷舌音时无需删除重打。在输入 <code>zan</code> 时发现应该是 <code>zhan</code>？只需按一下 <code>/</code> 键，系统会自动完成互换。</p>
+
+                <h3>3. 提示词上屏 (Shift + Space)</h3>
+                <p>如果您想直接输入候选词旁边的英文提示或注音，只需按下 <code>Shift + Space</code> 即可将其直接上屏。</p>
             </div>
         </section>
 
