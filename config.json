@@ -63,7 +63,7 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": false,
+    "enable_anti_typo": true,
     "enable_double_tap": true,
     "double_tap_timeout_ms": 250,
     "double_taps": [
@@ -250,7 +250,8 @@
     "enable_english_filter": true,
     "enable_caps_selection": true,
     "enable_number_selection": true,
-    "enable_user_dict": true
+    "enable_user_dict": true,
+    "enable_fixed_first_candidate": false
   },
   "hotkeys": {
     "switch_language": {
