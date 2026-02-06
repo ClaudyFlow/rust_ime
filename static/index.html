@@ -106,7 +106,6 @@
             <button id="nav-appearance" onclick="showTab('appearance')">视觉与样式</button>
             <button id="nav-dicts" onclick="showTab('dicts')">词库管理</button>
             <button id="nav-dict-editor" onclick="showTab('dict-editor')">词典编辑器</button>
-            <button id="nav-quickrime" onclick="showTab('quickrime')">双击快捷输入</button>
             <button id="nav-profilekeys" onclick="showTab('profilekeys')">快捷切换映射</button>
             <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
             <button id="nav-keybehavior" onclick="showTab('keybehavior')">按键行为定制</button>
@@ -225,7 +224,6 @@
 
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
         <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
-        <div id="tab-quickrime" class="tab-content"><h1>双击快捷输入</h1><div class="card" id="qr-container"></div><button class="btn" onclick="addQR()">+ 添加</button></div>
         <div id="tab-profilekeys" class="tab-content"><h1>快捷切换映射</h1><div class="card" id="pk-container"></div><button class="btn" onclick="addPK()">+ 添加</button></div>
         <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
         
@@ -354,7 +352,7 @@
                 const picker = document.getElementById(id + '_picker'); if(el.value && el.value.startsWith('#')) picker.value = el.value;
             });
 
-            renderQR(); renderPK(); renderHK(); renderDictsList(dicts);
+            renderPK(); renderHK(); renderDictsList(dicts);
         }
 
         async function saveAll() {
@@ -382,8 +380,6 @@
             const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
         }
 
-        function renderQR() { document.getElementById('qr-container').innerHTML = (config.input.double_taps||[]).map((dt, i) => `<div class="setting-item"><input type="text" value="${dt.trigger_key}" onchange="config.input.double_taps[${i}].trigger_key=this.value" style="width:80px;"> ⮕ <input type="text" value="${dt.insert_text}" onchange="config.input.double_taps[${i}].insert_text=this.value" style="width:100px;"> <button onclick="config.input.double_taps.splice(${i},1);renderQR()">✕</button></div>`).join(''); }
-        function addQR() { if(!config.input.double_taps) config.input.double_taps = []; config.input.double_taps.push({trigger_key:'',insert_text:''}); renderQR(); }
         function renderPK() { 
             const available = config.files.profiles.map(p => p.name);
             document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `

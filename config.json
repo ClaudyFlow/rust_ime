@@ -77,7 +77,7 @@
       },
       {
         "trigger_key": "l",
-        "insert_text": "uang"
+        "insert_text": "iang"
       },
       {
         "trigger_key": "i",
@@ -88,12 +88,8 @@
         "insert_text": "ong"
       },
       {
-        "trigger_key": "p",
-        "insert_text": "un"
-      },
-      {
         "trigger_key": "n",
-        "insert_text": "ian"
+        "insert_text": "iao"
       },
       {
         "trigger_key": "m",
@@ -101,27 +97,31 @@
       },
       {
         "trigger_key": "u",
-        "insert_text": "sh"
-      },
-      {
-        "trigger_key": "a",
-        "insert_text": "ch"
-      },
-      {
-        "trigger_key": "e",
-        "insert_text": "zh"
+        "insert_text": "unang"
       },
       {
         "trigger_key": "z",
-        "insert_text": "ou"
-      },
-      {
-        "trigger_key": "c",
-        "insert_text": "ao"
+        "insert_text": "zhi"
       },
       {
         "trigger_key": "s",
-        "insert_text": "ai"
+        "insert_text": "shi"
+      },
+      {
+        "trigger_key": "e",
+        "insert_text": "eng"
+      },
+      {
+        "trigger_key": "a",
+        "insert_text": "ang"
+      },
+      {
+        "trigger_key": "c",
+        "insert_text": "chi"
+      },
+      {
+        "trigger_key": "r",
+        "insert_text": "uan"
       }
     ],
     "enable_long_press": true,
