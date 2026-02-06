@@ -581,6 +581,7 @@ impl Processor {
             }
             Key::KEY_ENTER => {
                 self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
+                self.last_lookup_pinyin.clear(); // 清空检索记录，确保不触发学习
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out); }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
