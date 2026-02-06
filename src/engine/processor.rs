@@ -110,6 +110,7 @@ pub struct Processor {
 
     // 用户个人词库相关
     pub enable_user_dict: bool,
+    pub enable_fixed_first_candidate: bool,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -219,6 +220,7 @@ impl Processor {
             long_press_triggered: false,
             nav_mode: false,
             enable_user_dict: true,
+            enable_fixed_first_candidate: false,
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -228,6 +230,7 @@ impl Processor {
 
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
         self.enable_user_dict = conf.input.enable_user_dict;
+        self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -799,16 +802,21 @@ impl Processor {
         // 根据用户词库重排
         if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
             if let Some(user_entries) = self.user_dict.get(&self.last_lookup_pinyin) {
+                let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
+                
                 for (word, _count) in user_entries.iter().rev() {
                     if let Some(pos) = self.candidates.iter().position(|c| c == word) {
+                        // 如果固定首词开启且当前词就是第一名，跳过重排（保持在第一）
+                        if insert_pos == 1 && pos == 0 { continue; }
+                        
                         let c = self.candidates.remove(pos);
                         let h = self.candidate_hints.remove(pos);
-                        self.candidates.insert(0, c);
-                        self.candidate_hints.insert(0, h);
+                        self.candidates.insert(insert_pos, c);
+                        self.candidate_hints.insert(insert_pos, h);
                     } else {
-                        // 如果系统词库没有，但是用户词库有（新词），也加入候选（可选）
-                        self.candidates.insert(0, word.clone());
-                        self.candidate_hints.insert(0, "✨ 用户词".to_string());
+                        // 如果系统词库没有，但是用户词库有（新词），也加入候选
+                        self.candidates.insert(insert_pos, word.clone());
+                        self.candidate_hints.insert(insert_pos, "✨ 用户词".to_string());
                     }
                 }
             }
@@ -977,9 +985,10 @@ mod tests {
             aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
-            enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
-                        nav_mode: false, enable_user_dict: true, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
+                        enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
+                        nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
+            
                         profile_keys: Vec::new(),
              auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
