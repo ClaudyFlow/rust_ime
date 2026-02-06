@@ -241,7 +241,16 @@
     "active_profiles": [
       "chinese"
     ],
-    "profile_keys": [],
+    "profile_keys": [
+      {
+        "key": "e",
+        "profile": "english"
+      },
+      {
+        "key": "c",
+        "profile": "chinese"
+      }
+    ],
     "page_flipping_keys": [
       "arrow"
     ],

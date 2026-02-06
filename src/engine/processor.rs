@@ -544,6 +544,13 @@ impl Processor {
             Key::KEY_END => { if has_cand { if shift_pressed { self.selected = self.candidates.len() - 1; self.page = (self.selected / self.page_size) * self.page_size; } else { self.selected = (self.page + self.page_size - 1).min(self.candidates.len() - 1); } } Action::Consume }
 
             Key::KEY_SPACE => {
+                if shift_pressed {
+                    if let Some(hint) = self.candidate_hints.get(self.selected) {
+                        if !hint.is_empty() {
+                            return self.commit_candidate(hint.clone());
+                        }
+                    }
+                }
                 if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone()); }
                 self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
