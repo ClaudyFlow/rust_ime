@@ -1,6 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{Window, Label, Box, Orientation, CssProvider};
 use gdk4::Display;
+#[cfg(target_os = "linux")]
 use gtk4_layer_shell::{LayerShell, Layer, Edge, KeyboardMode};
 use std::sync::mpsc::Receiver;
 use glib::MainContext;
@@ -211,10 +212,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         return;
     }
 
-    let is_layer_supported = gtk4_layer_shell::is_supported();
+    let is_layer_supported = {
+        #[cfg(target_os = "linux")]
+        { gtk4_layer_shell::is_supported() }
+        #[cfg(not(target_os = "linux"))]
+        { false }
+    };
 
     // --- 1. 传统窗口 (Traditional Window) ---
     let window = Window::builder().title("Rust IME Candidates").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    #[cfg(target_os = "linux")]
     if is_layer_supported {
         window.init_layer_shell();
         window.set_namespace("rust-ime-candidates");
@@ -244,6 +251,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     // --- 2. 极客窗口 (Modern Window) ---
     let modern_window = Window::builder().title("Modern Candidates").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    #[cfg(target_os = "linux")]
     if is_layer_supported {
         modern_window.init_layer_shell();
         modern_window.set_namespace("rust-ime-modern");
@@ -263,6 +271,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     // --- 3. On-Screen Keystrokes (按键显示) 窗口 ---
     let key_window = Window::builder().title("On-Screen Keystrokes (按键显示)").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    #[cfg(target_os = "linux")]
     if is_layer_supported {
         key_window.init_layer_shell();
         key_window.set_namespace("rust-ime-keystrokes");
@@ -276,6 +285,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     // --- 4. 学习模式 (Learning Mode) 窗口 ---
     let learn_window = Window::builder().title("Learning Mode").decorated(false).can_focus(false).focusable(false).resizable(false).build();
+    #[cfg(target_os = "linux")]
     if is_layer_supported {
         learn_window.init_layer_shell();
         learn_window.set_namespace("rust-ime-learning");
@@ -425,52 +435,55 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         
         css.load_from_data(&css_data);
 
-        if gtk4_layer_shell::is_supported() {
-            // 传统位置
-            match app.candidate_anchor.as_str() {
-                "top" => { w.set_anchor(Edge::Bottom, false); w.set_anchor(Edge::Top, true); }
-                _ => { w.set_anchor(Edge::Top, false); w.set_anchor(Edge::Bottom, true); }
-            }
-            w.set_margin(Edge::Bottom, app.candidate_margin_y);
-            w.set_margin(Edge::Top, app.candidate_margin_y);
-            w.set_margin(Edge::Left, app.candidate_margin_x);
+        if is_layer_supported {
+            #[cfg(target_os = "linux")]
+            {
+                // 传统位置
+                match app.candidate_anchor.as_str() {
+                    "top" => { w.set_anchor(Edge::Bottom, false); w.set_anchor(Edge::Top, true); }
+                    _ => { w.set_anchor(Edge::Top, false); w.set_anchor(Edge::Bottom, true); }
+                }
+                w.set_margin(Edge::Bottom, app.candidate_margin_y);
+                w.set_margin(Edge::Top, app.candidate_margin_y);
+                w.set_margin(Edge::Left, app.candidate_margin_x);
 
-            // Modern 位置
-            mw.set_anchor(Edge::Bottom, false); mw.set_anchor(Edge::Top, false);
-            mw.set_anchor(Edge::Left, false); mw.set_anchor(Edge::Right, false);
-            match app.modern_cand_anchor.as_str() {
-                "top_left" => { mw.set_anchor(Edge::Top, true); mw.set_anchor(Edge::Left, true); }
-                "top_right" => { mw.set_anchor(Edge::Top, true); mw.set_anchor(Edge::Right, true); }
-                "bottom_right" => { mw.set_anchor(Edge::Bottom, true); mw.set_anchor(Edge::Right, true); }
-                _ => { mw.set_anchor(Edge::Bottom, true); mw.set_anchor(Edge::Left, true); }
-            }
-            mw.set_margin(Edge::Bottom, app.modern_cand_margin_y);
-            mw.set_margin(Edge::Top, app.modern_cand_margin_y);
-            mw.set_margin(Edge::Left, app.modern_cand_margin_x);
-            mw.set_margin(Edge::Right, app.modern_cand_margin_x);
+                // Modern 位置
+                mw.set_anchor(Edge::Bottom, false); mw.set_anchor(Edge::Top, false);
+                mw.set_anchor(Edge::Left, false); mw.set_anchor(Edge::Right, false);
+                match app.modern_cand_anchor.as_str() {
+                    "top_left" => { mw.set_anchor(Edge::Top, true); mw.set_anchor(Edge::Left, true); }
+                    "top_right" => { mw.set_anchor(Edge::Top, true); mw.set_anchor(Edge::Right, true); }
+                    "bottom_right" => { mw.set_anchor(Edge::Bottom, true); mw.set_anchor(Edge::Right, true); }
+                    _ => { mw.set_anchor(Edge::Bottom, true); mw.set_anchor(Edge::Left, true); }
+                }
+                mw.set_margin(Edge::Bottom, app.modern_cand_margin_y);
+                mw.set_margin(Edge::Top, app.modern_cand_margin_y);
+                mw.set_margin(Edge::Left, app.modern_cand_margin_x);
+                mw.set_margin(Edge::Right, app.modern_cand_margin_x);
 
-            // 按键回显
-            kw.set_anchor(Edge::Bottom, false); kw.set_anchor(Edge::Top, false);
-            match app.keystroke_anchor.as_str() {
-                "top_right" => { kw.set_anchor(Edge::Top, true); kw.set_anchor(Edge::Right, true); }
-                _ => { kw.set_anchor(Edge::Bottom, true); kw.set_anchor(Edge::Right, true); }
-            }
-            kw.set_margin(Edge::Bottom, app.keystroke_margin_y);
-            kw.set_margin(Edge::Right, app.keystroke_margin_x);
+                // 按键回显
+                kw.set_anchor(Edge::Bottom, false); kw.set_anchor(Edge::Top, false);
+                match app.keystroke_anchor.as_str() {
+                    "top_right" => { kw.set_anchor(Edge::Top, true); kw.set_anchor(Edge::Right, true); }
+                    _ => { kw.set_anchor(Edge::Bottom, true); kw.set_anchor(Edge::Right, true); }
+                }
+                kw.set_margin(Edge::Bottom, app.keystroke_margin_y);
+                kw.set_margin(Edge::Right, app.keystroke_margin_x);
 
-            // 学习模式
-            lw.set_anchor(Edge::Top, false); lw.set_anchor(Edge::Bottom, false);
-            lw.set_anchor(Edge::Left, false); lw.set_anchor(Edge::Right, false);
-            match app.learning_anchor.as_str() {
-                "top_left" => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Left, true); }
-                "bottom_left" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Left, true); }
-                "bottom_right" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Right, true); }
-                _ => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Right, true); }
+                // 学习模式
+                lw.set_anchor(Edge::Top, false); lw.set_anchor(Edge::Bottom, false);
+                lw.set_anchor(Edge::Left, false); lw.set_anchor(Edge::Right, false);
+                match app.learning_anchor.as_str() {
+                    "top_left" => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Left, true); }
+                    "bottom_left" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Left, true); }
+                    "bottom_right" => { lw.set_anchor(Edge::Bottom, true); lw.set_anchor(Edge::Right, true); }
+                    _ => { lw.set_anchor(Edge::Top, true); lw.set_anchor(Edge::Right, true); }
+                }
+                lw.set_margin(Edge::Top, app.learning_margin_y);
+                lw.set_margin(Edge::Bottom, app.learning_margin_y);
+                lw.set_margin(Edge::Right, app.learning_margin_x);
+                lw.set_margin(Edge::Left, app.learning_margin_x);
             }
-            lw.set_margin(Edge::Top, app.learning_margin_y);
-            lw.set_margin(Edge::Bottom, app.learning_margin_y);
-            lw.set_margin(Edge::Right, app.learning_margin_x);
-            lw.set_margin(Edge::Left, app.learning_margin_x);
         }
         lw.set_opacity(0.0);
     };

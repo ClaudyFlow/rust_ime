@@ -16,7 +16,6 @@ use std::process::Command;
 
 use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
-use platform::linux::evdev_host::EvdevHost;
 pub use config::Config;
 use serde::Deserialize;
 use serde_json::Value;
@@ -130,28 +129,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if should_daemonize {
-        let stdout = File::create("/tmp/rust-ime.out")?;
-        let stderr = File::create("/tmp/rust-ime.err")?;
-        let daemonize = Daemonize::new()
-            .working_directory(&root)
-            .stdout(stdout)
-            .stderr(stderr);
-        match daemonize.start() {
-            Ok(_) => println!("✅ 已转入后台运行。"),
-            Err(e) => {
-                eprintln!("❌ 无法启动后台模式: {}", e);
-                return Err(e.into());
+        #[cfg(target_os = "linux")]
+        {
+            let stdout = File::create("/tmp/rust-ime.out")?;
+            let stderr = File::create("/tmp/rust-ime.err")?;
+            let daemonize = Daemonize::new()
+                .working_directory(&root)
+                .stdout(stdout)
+                .stderr(stderr);
+            match daemonize.start() {
+                Ok(_) => println!("✅ 已转入后台运行。"),
+                Err(e) => {
+                    eprintln!("❌ 无法启动后台模式: {}", e);
+                    return Err(e.into());
+                }
             }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            println!("⚠️ Windows 暂不支持后台模式，将继续在前台运行。");
         }
     }
 
     // 忽略 SIGHUP，防止终端关闭时程序退出
-    let mut signals = Signals::new(&[SIGHUP])?;
-    std::thread::spawn(move || {
-        for _ in signals.forever() {
-            // 忽略 SIGHUP
-        }
-    });
+    #[cfg(target_os = "linux")]
+    {
+        let mut signals = Signals::new(&[SIGHUP])?;
+        std::thread::spawn(move || {
+            for _ in signals.forever() {
+                // 忽略 SIGHUP
+            }
+        });
+    }
 
     // 0. 自动检查并增量编译词库
     if let Err(e) = engine::compiler::check_and_compile_all() {
@@ -449,14 +458,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 7. 运行 Host
-    println!("[Main] 启动 Evdev 兼容模式 (原生 Wayland 协议暂避)...");
-    let device_path = find_keyboard_device()?;
-    let mut host = EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), notify_tx.clone())?;
+    #[cfg(target_os = "linux")]
+    {
+        println!("[Main] 启动 Evdev 兼容模式 (原生 Wayland 协议暂避)...");
+        let device_path = find_keyboard_device()?;
+        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), notify_tx.clone())?;
+        host.run()?;
+    }
 
-    host.run()?;
+    #[cfg(target_os = "windows")]
+    {
+        println!("[Main] 启动 Windows TSF 模式 (实验中)...");
+        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx_main), config.clone(), notify_tx.clone());
+        host.run()?;
+    }
+
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn find_keyboard_device() -> Result<String, Box<dyn std::error::Error>> {
     let ps = std::fs::read_dir("/dev/input")?;
     for e in ps {
@@ -470,38 +490,98 @@ fn find_keyboard_device() -> Result<String, Box<dyn std::error::Error>> {
     Err("未检测到合适的键盘设备。".into())
 }
 
+#[cfg(target_os = "linux")]
+
 pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
+
     let home = env::var("HOME")?;
+
     let autostart_dir = format!("{}/.config/autostart", home);
+
     std::fs::create_dir_all(&autostart_dir)?;
+
     
+
     let mut desktop_path = PathBuf::from(autostart_dir);
+
     desktop_path.push("rust-ime.desktop");
+
     
+
     let current_exe = env::current_exe()?;
+
     let exe_path = current_exe.to_str().unwrap();
+
     
+
     let content = format!(r#"[Desktop Entry]
+
 Type=Application
+
 Name=Rust-IME
+
 Exec={}
+
 Icon=input-keyboard
+
 Comment=Rust Input Method Engine
+
 Terminal=false
+
 X-GNOME-Autostart-enabled=true
+
 "#, exe_path);
 
+
+
     let mut file = File::create(desktop_path)?;
+
     file.write_all(content.as_bytes())?;
+
     Ok(())
+
 }
 
-pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
-    let home = env::var("HOME")?;
-    let autostart_file = format!("{}/.config/autostart/rust-ime.desktop", home);
-    let path = std::path::Path::new(&autostart_file);
-    if path.exists() {
-        std::fs::remove_file(path)?;
-    }
+
+
+#[cfg(target_os = "windows")]
+
+pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
+
+    println!("⚠️ Windows 暂不支持自动设置开机自启。");
+
     Ok(())
+
+}
+
+
+
+#[cfg(target_os = "linux")]
+
+pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
+
+    let home = env::var("HOME")?;
+
+    let autostart_file = format!("{}/.config/autostart/rust-ime.desktop", home);
+
+    let path = std::path::Path::new(&autostart_file);
+
+    if path.exists() {
+
+        std::fs::remove_file(path)?;
+
+    }
+
+    Ok(())
+
+}
+
+
+
+#[cfg(target_os = "windows")]
+
+pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
+
+    Ok(())
+
 }
