@@ -105,6 +105,8 @@ pub struct Processor {
     pub long_press_mappings: HashMap<String, String>,
     pub key_press_info: Option<(Key, Instant)>,
     pub long_press_triggered: bool,
+
+    pub nav_mode: bool,
 }
 
 impl Processor {
@@ -206,6 +208,7 @@ impl Processor {
             long_press_mappings: HashMap::new(),
             key_press_info: None,
             long_press_triggered: false,
+            nav_mode: false,
         }
     }
 
@@ -302,6 +305,7 @@ impl Processor {
         self.aux_filter.clear();
         self.filter_mode = FilterMode::None;
         self.page_snapshot.clear();
+        self.nav_mode = false;
     }
 
     pub fn handle_key(&mut self, key: Key, val: i32, shift_pressed: bool) -> Action {
@@ -347,8 +351,13 @@ impl Processor {
         }
 
         if key == Key::KEY_GRAVE {
-            self.switch_mode = !self.switch_mode;
-            return if self.switch_mode { Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) } else { Action::Notify("快捷切换".into(), "已退出".into()) };
+            if self.buffer.is_empty() {
+                self.switch_mode = !self.switch_mode;
+                return if self.switch_mode { Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) } else { Action::Notify("快捷切换".into(), "已退出".into()) };
+            } else {
+                self.nav_mode = !self.nav_mode;
+                return if self.nav_mode { Action::Notify("导航模式".into(), "已开启 (HJKL)".into()) } else { Action::Notify("导航模式".into(), "已退出".into()) };
+            }
         }
 
         if self.switch_mode {
@@ -404,9 +413,23 @@ impl Processor {
         Action::PassThrough
     }
 
-    fn handle_composing(&mut self, key: Key, shift_pressed: bool) -> Action {
+    fn handle_composing(&mut self, mut key: Key, shift_pressed: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
         let now = Instant::now();
+
+        // 如果处于导航模式，映射 HJKL 为方向键
+        if self.nav_mode {
+            match key {
+                Key::KEY_H => key = Key::KEY_LEFT,
+                Key::KEY_L => key = Key::KEY_RIGHT,
+                Key::KEY_K => key = Key::KEY_UP,
+                Key::KEY_J => key = Key::KEY_DOWN,
+                Key::KEY_LEFT | Key::KEY_RIGHT | Key::KEY_UP | Key::KEY_DOWN 
+                | Key::KEY_PAGEUP | Key::KEY_PAGEDOWN | Key::KEY_HOME | Key::KEY_END 
+                | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_GRAVE => { /* 保持模式 */ }
+                _ => { self.nav_mode = false; } // 按其他键退出导航模式
+            }
+        }
 
         // 1. 字母键优先处理 (筛选 或 双击)
         if is_letter(key) {

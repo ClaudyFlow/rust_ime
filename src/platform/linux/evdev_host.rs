@@ -265,6 +265,9 @@ impl EvdevHost {
             
             // 构造显示用的拼音串，包含 aux_filter (首字母大写)
             let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
+            if p.nav_mode {
+                pinyin.push_str(" [NAV]");
+            }
             if !p.aux_filter.is_empty() {
                 let mut display_aux = String::new();
                 for (i, c) in p.aux_filter.chars().enumerate() {
