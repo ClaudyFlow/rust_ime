@@ -65,7 +65,7 @@
     "clipboard_delay_ms": 10,
     "enable_anti_typo": true,
     "enable_double_tap": true,
-    "double_tap_timeout_ms": 250,
+    "double_tap_timeout_ms": 300,
     "double_taps": [
       {
         "trigger_key": "j",

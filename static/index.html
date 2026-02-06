@@ -224,7 +224,21 @@
         </div>
 
         <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
-        <div id="tab-dict-editor" class="tab-content"><h1>词典编辑器</h1><div class="card"><input type="text" id="dict-search" placeholder="搜索..." style="width:100%;" oninput="doSearch()"></div><div id="dict-results"></div></div>
+        <div id="tab-dict-editor" class="tab-content">
+            <h1>词典编辑器</h1>
+            <div class="card">
+                <h3>添加新词条</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <div><label><small>拼音</small></label><input type="text" id="add-pinyin" placeholder="例如: nihao" style="width:100%;"></div>
+                    <div><label><small>词汇</small></label><input type="text" id="add-word" placeholder="例如: 你好" style="width:100%;"></div>
+                    <div><label><small>提示/翻译</small></label><input type="text" id="add-hint" placeholder="例如: hello" style="width:100%;"></div>
+                    <div><label><small>保存至词典</small></label><select id="add-target-file" style="width:100%; height: 42px;"></select></div>
+                    <button class="btn" onclick="addNewEntry()">添加</button>
+                </div>
+            </div>
+            <div class="card"><input type="text" id="dict-search" placeholder="搜索现有词条..." style="width:100%;" oninput="doSearch()"></div>
+            <div id="dict-results"></div>
+        </div>
         <div id="tab-profilekeys" class="tab-content">
             <h1>快捷切换映射</h1>
             <div class="card">
@@ -339,10 +353,20 @@
             });
 
             const d_r = await fetch('/api/dicts'); const dicts = await d_r.json();
+            const jsonDicts = dicts.filter(d => d.path.endsWith('.json'));
+
             const ls = document.getElementById('learning_dict_path');
             if(ls) {
-                ls.innerHTML = dicts.filter(d => d.path.endsWith('.json')).map(d => `<option value="${d.path}">${d.name}</option>`).join('');
+                ls.innerHTML = jsonDicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
                 ls.value = config.appearance.learning_dict_path;
+            }
+
+            const ats = document.getElementById('add-target-file');
+            if(ats) {
+                ats.innerHTML = jsonDicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
+                // 默认选择第一个包含 chinese 的词典，如果没有则选第一个
+                const defaultIdx = jsonDicts.findIndex(d => d.path.includes('chinese/words'));
+                if (defaultIdx !== -1) ats.selectedIndex = defaultIdx;
             }
 
             const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
@@ -420,6 +444,32 @@
         async function resetAll() { if(confirm("重置所有设置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
         let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
         async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
+
+        async function addNewEntry() {
+            const pinyin = document.getElementById('add-pinyin').value.trim().toLowerCase();
+            const word = document.getElementById('add-word').value.trim();
+            const hint = document.getElementById('add-hint').value.trim();
+            const file = document.getElementById('add-target-file').value;
+
+            if (!pinyin || !word) { alert('拼音和词汇不能为空'); return; }
+
+            const res = await fetch('/api/dict/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pinyin, word, hint, file })
+            });
+
+            if (res.ok) {
+                alert('词条已成功添加！记得点击“立即编译”以使新词生效。');
+                document.getElementById('add-pinyin').value = '';
+                document.getElementById('add-word').value = '';
+                document.getElementById('add-hint').value = '';
+            } else if (res.status === 409) {
+                alert('该词条在目标文件中已存在。');
+            } else {
+                alert('添加失败，请检查后端日志。');
+            }
+        }
 
         const KB_LAYOUT = [
             ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],

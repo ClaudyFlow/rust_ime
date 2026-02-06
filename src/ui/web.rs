@@ -52,6 +52,7 @@ impl WebServer {
             .route("/api/dicts/toggle", post(toggle_dict))
             .route("/api/dict/search", get(search_dict))
             .route("/api/dict/update", post(update_dict_entry))
+            .route("/api/dict/add", post(add_dict_entry))
             .route("/static/*file", get(static_handler))
             .fallback(index_handler)
             .with_state(state);
@@ -325,6 +326,48 @@ async fn update_dict_entry(Json(req): Json<UpdateEntryRequest>) -> StatusCode {
             if serde_json::to_writer_pretty(f, &data).is_ok() {
                 return StatusCode::OK;
             }
+        }
+    }
+
+    StatusCode::INTERNAL_SERVER_ERROR
+}
+
+#[derive(serde::Deserialize)]
+struct AddEntryRequest {
+    pinyin: String,
+    word: String,
+    hint: String,
+    file: String,
+}
+
+async fn add_dict_entry(Json(req): Json<AddEntryRequest>) -> StatusCode {
+    let path = std::path::Path::new(&req.file);
+    if !path.exists() { return StatusCode::NOT_FOUND; }
+
+    let mut data: serde_json::Value = match std::fs::File::open(path) {
+        Ok(f) => serde_json::from_reader(std::io::BufReader::new(f)).unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+
+    if let Some(obj) = data.as_object_mut() {
+        let entries = obj.entry(req.pinyin).or_insert(serde_json::Value::Array(Vec::new()));
+        if let Some(arr) = entries.as_array_mut() {
+            // 检查是否已存在
+            for item in arr.iter() {
+                if item.get("char").and_then(|c| c.as_str()) == Some(&req.word) {
+                    return StatusCode::CONFLICT;
+                }
+            }
+            let mut new_entry = serde_json::Map::new();
+            new_entry.insert("char".to_string(), serde_json::Value::String(req.word));
+            new_entry.insert("en".to_string(), serde_json::Value::String(req.hint));
+            arr.push(serde_json::Value::Object(new_entry));
+        }
+    }
+
+    if let Ok(f) = std::fs::File::create(path) {
+        if serde_json::to_writer_pretty(f, &data).is_ok() {
+            return StatusCode::OK;
         }
     }
 
