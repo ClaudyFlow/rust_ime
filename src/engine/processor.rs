@@ -524,6 +524,37 @@ impl Processor {
             }
             Key::KEY_ESC | Key::KEY_DELETE => { let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } }
 
+            Key::KEY_SLASH if !self.buffer.is_empty() => {
+                let mut new_buffer = self.buffer.clone();
+                // 找到最后一个音节的起始位置（通常是空格后的部分，或者是整个 buffer）
+                let last_part_start = new_buffer.rfind(' ').map(|i| i + 1).unwrap_or(0);
+                let last_part = &new_buffer[last_part_start..];
+                
+                let transformed = if last_part.starts_with("zh") {
+                    last_part.replacen("zh", "z", 1)
+                } else if last_part.starts_with("ch") {
+                    last_part.replacen("ch", "c", 1)
+                } else if last_part.starts_with("sh") {
+                    last_part.replacen("sh", "s", 1)
+                } else if last_part.starts_with("z") {
+                    last_part.replacen("z", "zh", 1)
+                } else if last_part.starts_with("c") {
+                    last_part.replacen("c", "ch", 1)
+                } else if last_part.starts_with("s") {
+                    last_part.replacen("s", "sh", 1)
+                } else {
+                    last_part.to_string()
+                };
+
+                if transformed != last_part {
+                    new_buffer.replace_range(last_part_start.., &transformed);
+                    self.buffer = new_buffer;
+                    if let Some(act) = self.lookup() { return act; }
+                    return self.update_phantom_action();
+                }
+                Action::PassThrough
+            }
+
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {

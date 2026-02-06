@@ -19,7 +19,7 @@
   "appearance": {
     "show_candidates": true,
     "show_modern_candidates": false,
-    "show_notifications": false,
+    "show_notifications": true,
     "show_keystrokes": false,
     "page_size": 5,
     "show_tone_hint": false,
@@ -63,7 +63,7 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": false,
+    "enable_anti_typo": true,
     "enable_double_tap": true,
     "double_tap_timeout_ms": 250,
     "double_taps": [
@@ -88,16 +88,148 @@
         "insert_text": "ong"
       },
       {
+        "trigger_key": "p",
+        "insert_text": "un"
+      },
+      {
+        "trigger_key": "n",
+        "insert_text": "ian"
+      },
+      {
         "trigger_key": "m",
         "insert_text": "ian"
       },
       {
+        "trigger_key": "u",
+        "insert_text": "sh"
+      },
+      {
         "trigger_key": "a",
-        "insert_text": "ang"
+        "insert_text": "ch"
       },
       {
         "trigger_key": "e",
-        "insert_text": "eng"
+        "insert_text": "zh"
+      },
+      {
+        "trigger_key": "z",
+        "insert_text": "ou"
+      },
+      {
+        "trigger_key": "c",
+        "insert_text": "ao"
+      },
+      {
+        "trigger_key": "s",
+        "insert_text": "ai"
+      }
+    ],
+    "enable_long_press": true,
+    "long_press_timeout_ms": 5,
+    "long_press_mappings": [
+      {
+        "trigger_key": "q",
+        "insert_text": "Q"
+      },
+      {
+        "trigger_key": "w",
+        "insert_text": "W"
+      },
+      {
+        "trigger_key": "e",
+        "insert_text": "E"
+      },
+      {
+        "trigger_key": "r",
+        "insert_text": "R"
+      },
+      {
+        "trigger_key": "t",
+        "insert_text": "T"
+      },
+      {
+        "trigger_key": "y",
+        "insert_text": "Y"
+      },
+      {
+        "trigger_key": "u",
+        "insert_text": "U"
+      },
+      {
+        "trigger_key": "i",
+        "insert_text": "I"
+      },
+      {
+        "trigger_key": "o",
+        "insert_text": "O"
+      },
+      {
+        "trigger_key": "p",
+        "insert_text": "P"
+      },
+      {
+        "trigger_key": "a",
+        "insert_text": "A"
+      },
+      {
+        "trigger_key": "s",
+        "insert_text": "S"
+      },
+      {
+        "trigger_key": "d",
+        "insert_text": "D"
+      },
+      {
+        "trigger_key": "f",
+        "insert_text": "F"
+      },
+      {
+        "trigger_key": "g",
+        "insert_text": "G"
+      },
+      {
+        "trigger_key": "h",
+        "insert_text": "H"
+      },
+      {
+        "trigger_key": "j",
+        "insert_text": "J"
+      },
+      {
+        "trigger_key": "k",
+        "insert_text": "K"
+      },
+      {
+        "trigger_key": "l",
+        "insert_text": "L"
+      },
+      {
+        "trigger_key": "z",
+        "insert_text": "Z"
+      },
+      {
+        "trigger_key": "x",
+        "insert_text": "X"
+      },
+      {
+        "trigger_key": "c",
+        "insert_text": "C"
+      },
+      {
+        "trigger_key": "v",
+        "insert_text": "V"
+      },
+      {
+        "trigger_key": "b",
+        "insert_text": "B"
+      },
+      {
+        "trigger_key": "n",
+        "insert_text": "N"
+      },
+      {
+        "trigger_key": "m",
+        "insert_text": "M"
       }
     ],
     "auto_commit_unique_en_fuzhuma": false,
@@ -106,13 +238,10 @@
     "prefix_matching_limit": 20,
     "enable_abbreviation_matching": true,
     "filter_proper_nouns_by_case": true,
-    "active_profiles": [],
-    "profile_keys": [
-      {
-        "key": "",
-        "profile": ""
-      }
+    "active_profiles": [
+      "chinese"
     ],
+    "profile_keys": [],
     "page_flipping_keys": [
       "arrow"
     ],

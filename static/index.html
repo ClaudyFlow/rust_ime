@@ -90,6 +90,8 @@
         .kb-key { width: 50px; height: 50px; background: white; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s; user-select: none; position: relative; }
         .kb-key:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); background: #fdfdfd; }
         .kb-key.active { border: 2px solid var(--apple-accent); }
+        .kb-key.type-diacritic { background: #e1f5fe; } /* 变音符号/音调类背景色 */
+        .kb-key.type-special { background: #fff9c4; }   /* 特殊符号类背景色 */
         .kb-key-main { font-size: 16px; font-weight: 700; }
         .kb-key-sub { font-size: 10px; color: var(--apple-secondary); overflow: hidden; white-space: nowrap; max-width: 45px; text-align: center; }
         .kb-edit-box { display: none; background: var(--apple-card); border-radius: 15px; padding: 20px; margin-top: 20px; border: 1px solid var(--apple-border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -410,24 +412,25 @@
 
         function renderKeyboard(containerId, configKey) {
             const container = document.getElementById(containerId);
-            const mappings = config.input[configKey];
-            const isArray = Array.isArray(mappings);
-
+            const mappings = config.input[configKey] || [];
+            
             container.innerHTML = KB_LAYOUT.map(row => `
                 <div class="keyboard-row">
                     ${row.map(key => {
-                        let mapping = "";
-                        if (isArray) {
-                            const entry = mappings.find(m => m.trigger_key === key);
-                            mapping = entry ? entry.insert_text : "";
-                        } else {
-                            // double_taps is currently a Vec in config but used as HashMap in Processor
-                            // Wait, in config.rs it's Vec<DoubleTap>
-                            const entry = mappings.find(m => m.trigger_key === key);
-                            mapping = entry ? entry.insert_text : "";
+                        const entry = mappings.find(m => m.trigger_key === key);
+                        const mapping = entry ? entry.insert_text : "";
+                        
+                        let typeClass = "";
+                        if (mapping) {
+                            // 判断是否包含声调或特殊拉丁字母
+                            const isDiacritic = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(mapping);
+                            const isSpecial = /[^a-zA-Z0-9\s]/.test(mapping) && !isDiacritic;
+                            if (isDiacritic) typeClass = "type-diacritic";
+                            else if (isSpecial) typeClass = "type-special";
                         }
+
                         return `
-                            <div class="kb-key ${mapping ? 'active' : ''}" onclick="editKey('${containerId}', '${configKey}', '${key}')">
+                            <div class="kb-key ${mapping ? 'active' : ''} ${typeClass}" onclick="editKey('${containerId}', '${configKey}', '${key}')">
                                 <div class="kb-key-main">${key.toUpperCase()}</div>
                                 <div class="kb-key-sub">${mapping}</div>
                             </div>
