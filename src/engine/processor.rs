@@ -107,6 +107,11 @@ pub struct Processor {
     pub long_press_triggered: bool,
 
     pub nav_mode: bool,
+
+    // 用户个人词库相关
+    pub enable_user_dict: bool,
+    pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
+    pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
 }
 
 impl Processor {
@@ -209,10 +214,18 @@ impl Processor {
             key_press_info: None,
             long_press_triggered: false,
             nav_mode: false,
+            enable_user_dict: true,
+            user_dict: HashMap::new(),
+            last_lookup_pinyin: String::new(),
         }
     }
 
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
+        self.enable_user_dict = conf.input.enable_user_dict;
+        // 如果是初次加载或切换，可以从文件读取
+        if self.enable_user_dict && self.user_dict.is_empty() {
+            self.load_user_dict();
+        }
         self.show_candidates = conf.appearance.show_candidates;
         self.show_modern_candidates = conf.appearance.show_modern_candidates;
         self.show_notifications = conf.appearance.show_notifications;
@@ -626,6 +639,10 @@ impl Processor {
     }
 
     fn commit_candidate(&mut self, mut cand: String) -> Action {
+        if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
+            let py = self.last_lookup_pinyin.clone();
+            self.record_usage(&py, &cand);
+        }
         if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { cand.push(' '); }
         let del = self.phantom_text.chars().count(); self.reset(); Action::DeleteAndEmit { delete: del, insert: cand }
     }
@@ -675,6 +692,8 @@ impl Processor {
         }
 
         let parsed_parts = self.parse_buffer();
+        self.last_lookup_pinyin = parsed_parts.iter().map(|p| p.pinyin.clone()).collect::<Vec<_>>().join("");
+
         let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
         let has_trailing_space = self.buffer.ends_with(' ');
 
@@ -717,6 +736,24 @@ impl Processor {
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
             if self.show_en_hint && !en.is_empty() { if !h.is_empty() { h.push(' '); } h.push_str(&en); }
             self.candidate_hints.push(h);
+        }
+
+        // 根据用户词库重排
+        if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
+            if let Some(user_entries) = self.user_dict.get(&self.last_lookup_pinyin) {
+                for (word, _count) in user_entries.iter().rev() {
+                    if let Some(pos) = self.candidates.iter().position(|c| c == word) {
+                        let c = self.candidates.remove(pos);
+                        let h = self.candidate_hints.remove(pos);
+                        self.candidates.insert(0, c);
+                        self.candidate_hints.insert(0, h);
+                    } else {
+                        // 如果系统词库没有，但是用户词库有（新词），也加入候选（可选）
+                        self.candidates.insert(0, word.clone());
+                        self.candidate_hints.insert(0, "✨ 用户词".to_string());
+                    }
+                }
+            }
         }
 
         if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
@@ -809,6 +846,37 @@ impl Processor {
         self.filter_mode = FilterMode::Page;
         self.aux_filter.clear();
     }
+
+    fn load_user_dict(&mut self) {
+        let path = std::path::Path::new("data/user_dict.json");
+        if path.exists() {
+            if let Ok(file) = std::fs::File::open(path) {
+                if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
+                    self.user_dict = dict;
+                }
+            }
+        }
+    }
+
+    fn save_user_dict(&self) {
+        let path = std::path::Path::new("data/user_dict.json");
+        if let Ok(file) = std::fs::File::create(path) {
+            let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &self.user_dict);
+        }
+    }
+
+    fn record_usage(&mut self, pinyin: &str, word: &str) {
+        if !self.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
+        let entries = self.user_dict.entry(pinyin.to_string()).or_insert(Vec::new());
+        if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
+            entries[pos].1 += 1;
+        } else {
+            entries.push((word.to_string(), 1));
+        }
+        // 简单的排序：按频率降序
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        self.save_user_dict();
+    }
 }
 
 pub fn is_letter(key: Key) -> bool {
@@ -852,6 +920,7 @@ mod tests {
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
             enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
+            nav_mode: false, enable_user_dict: true, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
             profile_keys: Vec::new(), auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
     }

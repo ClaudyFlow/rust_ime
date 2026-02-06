@@ -148,6 +148,7 @@
                 <div class="setting-item"><div class="info"><div class="title">开启前缀联想</div></div><label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label></div>
                 <div class="setting-item"><div class="info"><div class="title">开启简拼匹配</div></div><label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label></div>
                 <div class="setting-item"><div class="info"><div class="title">防呆模式</div></div><label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label></div>
+                <div class="setting-item"><div class="info"><div class="title">启用个人词库 (自学习)</div><div class="desc">记录您的选词习惯，让常用词排在前面</div></div><label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label></div>
                 
                 <h2>快捷功能开关</h2>
                 <div class="setting-item"><div class="info"><div class="title">Shift 筛选模式</div><div class="desc">输入拼音时按一次 Shift 进入全局筛选</div></div><label class="switch"><input type="checkbox" id="enable_english_filter"><span class="slider"></span></label></div>
@@ -372,7 +373,7 @@
             const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
             allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] || config.input[id] || ""; });
 
-            const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press'];
+            const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'enable_user_dict'];
             checkIds.forEach(id => { 
                 const el = document.getElementById(id); 
                 if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id]; 
@@ -403,7 +404,7 @@
             config.input.active_profiles = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
             config.input.page_flipping_keys = Array.from(document.querySelectorAll('#page_flipping_keys_container input:checked')).map(i => i.value);
             
-            ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'long_press_timeout_ms'].forEach(id => {
+            ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'long_press_timeout_ms', 'enable_user_dict'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
             });

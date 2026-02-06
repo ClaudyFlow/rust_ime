@@ -91,6 +91,7 @@ pub struct Input {
     pub enable_english_filter: bool,
     pub enable_caps_selection: bool,
     pub enable_number_selection: bool,
+    pub enable_user_dict: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -252,6 +253,7 @@ impl Config {
                 enable_english_filter: true,
                 enable_caps_selection: true,
                 enable_number_selection: true,
+                enable_user_dict: true,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
