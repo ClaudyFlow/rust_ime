@@ -363,6 +363,14 @@ impl Processor {
         if self.switch_mode {
             match key {
                 Key::KEY_ESC | Key::KEY_SPACE | Key::KEY_ENTER => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
+                Key::KEY_T => {
+                    self.switch_mode = false;
+                    return Action::Notify("位置切换".into(), "窗口已移至顶部".into());
+                }
+                Key::KEY_B => {
+                    self.switch_mode = false;
+                    return Action::Notify("位置切换".into(), "窗口已移至底部".into());
+                }
                 _ if is_letter(key) => {
                     let k = key_to_char(key, false).unwrap_or(' ').to_string();
                     let mut target_profile = None;

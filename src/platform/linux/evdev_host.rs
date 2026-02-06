@@ -223,7 +223,19 @@ impl InputMethodHost for EvdevHost {
                         match p.handle_key(key, val, shift) {
                             Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
                             Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                            Action::Notify(s, b) => { let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); }
+                            Action::Notify(s, b) => { 
+                                if s == "位置切换" {
+                                    let new_pos = if b.contains("顶部") { "top".to_string() } else { "bottom".to_string() };
+                                    if let Ok(mut w) = self.config.write() {
+                                        w.appearance.candidate_anchor = new_pos;
+                                        let _ = crate::save_config(&w);
+                                        if let Some(ref tx) = self.gui_tx {
+                                            let _ = tx.send(GuiEvent::ApplyConfig(w.clone()));
+                                        }
+                                    }
+                                }
+                                let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); 
+                            }
                             Action::Alert => { if self.config.read().unwrap().input.enable_error_sound { let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn(); } }
                             Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
                             _ => {}

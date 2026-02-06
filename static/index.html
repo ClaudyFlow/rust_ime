@@ -179,6 +179,7 @@
 
             <h2>传统窗口样式</h2>
             <div class="card">
+                <div class="setting-item"><div class="info"><div class="title">窗口位置</div></div><select id="candidate_anchor"><option value="bottom">屏幕底部</option><option value="top">屏幕顶部</option></select></div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
                     <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="candidate_font_size"></div>
@@ -327,7 +328,7 @@
                 ls.value = config.appearance.learning_dict_path;
             }
 
-            const allIds = ['commit_mode', 'page_size', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
+            const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
             allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] || config.input[id] || ""; });
 
             const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press'];

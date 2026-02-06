@@ -24,7 +24,7 @@
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,
-    "candidate_anchor": "bottom",
+    "candidate_anchor": "top",
     "candidate_font_size": 18,
     "candidate_hint_font_size": 10,
     "candidate_margin_x": 0,
