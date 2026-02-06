@@ -2653,6 +2653,7 @@ dependencies = [
  "wayland-cursor",
  "wayland-protocols",
  "windows 0.52.0",
+ "windows-core 0.52.0",
  "zbus 4.4.0",
 ]
 

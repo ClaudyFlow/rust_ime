@@ -52,7 +52,12 @@ windows = { version = "0.52", features = [
     "Win32_UI_TextServices",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Ole",
+    "Win32_System_SystemServices",
 ] }
+windows-core = "0.52"
 
 [build-dependencies]
 
@@ -63,3 +68,8 @@ path = "src/main.rs"
 [[bin]]
 name = "compile_dict"
 path = "src/bin/compile_dict.rs"
+
+[lib]
+name = "rust_ime_tsf"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
