@@ -92,7 +92,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     GuiEvent::MoveTo { x, y } => {
                         unsafe {
                             if let Some(ref mut state) = WINDOW_STATE { state.x = x; state.y = y; }
-                            let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 20, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                            // 偏移 25 像素，确保显示在文字下方
+                            let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                         }
                     }
                     _ => {}

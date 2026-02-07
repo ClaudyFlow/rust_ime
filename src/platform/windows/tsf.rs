@@ -143,14 +143,45 @@ impl InputMethodHost for TsfHost {
                                 
                                 if msg_type == 1 {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
-                                    let x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
-                                    let y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
+                                    let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
+                                    let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
+                                    
+                                    // 如果 DLL 没传坐标，尝试通过系统 API 抓取
+                                    if x == 0 && y == 0 {
+                                        if let Some((sx, sy)) = get_system_cursor_pos() {
+                                            x = sx;
+                                            y = sy;
+                                        }
+                                    }
+
                                     if x != 0 || y != 0 {
                                         if let Some(ref tx) = gui_tx {
                                             let _ = tx.send(crate::ui::GuiEvent::MoveTo { x, y });
                                         }
                                     }
                                 }
+// ...
+// 增加辅助函数
+fn get_system_cursor_pos() -> Option<(i32, i32)> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::Win32::Foundation::*;
+        let mut info = GUITHREADINFO::default();
+        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(0, &mut info).as_bool() {
+            let mut pt = POINT {
+                x: info.rcCaret.left,
+                y: info.rcCaret.bottom,
+            };
+            ClientToScreen(info.hwndCaret, &mut pt);
+            if pt.x != 0 || pt.y != 0 {
+                return Some((pt.x, pt.y));
+            }
+        }
+    }
+    None
+}
 
                                 // 检查语言切换热键 (Tab 或 Ctrl+Space)
                                 let is_ctrl_space = key_code == 0x20 && ctrl;
