@@ -104,6 +104,12 @@ pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows::Win32::UI::HiDpi::*;
+        let _ = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    }
+
     let root = if let Ok(mut exe_path) = std::env::current_exe() {
         exe_path.pop();
         if exe_path.join("dicts").exists() {
