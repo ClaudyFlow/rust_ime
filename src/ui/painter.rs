@@ -26,36 +26,48 @@ impl CandidatePainter {
     }
 
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> Vec<u8> {
-        let mut pixmap = Pixmap::new(self.width, self.height).unwrap();
+        // 1. 动态计算宽度：根据拼音长度和候选词大致预估
+        let min_width = 400;
+        let pinyin_width = (pinyin.chars().count() * 15) as u32 + 60;
+        let mut candidates_width = 0;
+        for (i, c) in candidates.iter().enumerate() {
+            candidates_width += (c.chars().count() * 25) as u32 + 40;
+            if let Some(h) = hints.get(i) {
+                candidates_width += (h.chars().count() * 12) as u32;
+            }
+        }
+        let dynamic_width = pinyin_width.max(candidates_width).max(min_width).min(1200); // 限制最大宽度
+
+        let mut pixmap = Pixmap::new(dynamic_width, self.height).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
         let margin = 10.0;
         let radius = 12.0;
 
-        // 1. 绘制阴影
+        // 2. 绘制阴影
         let mut shadow_paint = Paint::default();
         shadow_paint.set_color(Color::from_rgba8(0, 0, 0, 40));
         shadow_paint.anti_alias = true;
-        let shadow_rect = Rect::from_xywh(2.0, 2.0, self.width as f32 - 4.0, self.height as f32 - 4.0).unwrap();
+        let shadow_rect = Rect::from_xywh(2.0, 2.0, dynamic_width as f32 - 4.0, self.height as f32 - 4.0).unwrap();
         let shadow_path = self.create_rounded_rect_path(shadow_rect, radius + 2.0);
         pixmap.fill_path(&shadow_path, &shadow_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 2. 绘制主背景
+        // 3. 绘制主背景
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&config.appearance.candidate_bg_color));
         bg_paint.anti_alias = true;
-        let rect = Rect::from_xywh(margin, margin, self.width as f32 - margin * 2.0, self.height as f32 - margin * 2.0).unwrap();
+        let rect = Rect::from_xywh(margin, margin, dynamic_width as f32 - margin * 2.0, self.height as f32 - margin * 2.0).unwrap();
         let path = self.create_rounded_rect_path(rect, radius);
         pixmap.fill_path(&path, &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 3. 绘制文字 (高清晰度渲染)
+        // 4. 绘制文字 (高清晰度渲染)
         if let Some(ref font) = self.font {
             // A. 绘制拼音
             self.draw_text(&mut pixmap, font, pinyin, 25.0, 20.0, 24.0, Color::from_rgba8(0, 113, 227, 255));
 
-            // B. 绘制候选词与提示 (横向排布)
+            // B. 绘制候选词与提示
             let mut x_offset = 25.0;
-            for (i, cand) in candidates.iter().take(5).enumerate() {
+            for (i, cand) in candidates.iter().enumerate() {
                 let text = format!("{}.{}", i + 1, cand);
                 let color = if i == selected {
                     Color::from_rgba8(0, 113, 227, 255)
@@ -63,19 +75,16 @@ impl CandidatePainter {
                     Color::BLACK
                 };
                 
-                // 绘制汉字
                 let adv = self.draw_text(&mut pixmap, font, &text, x_offset, 65.0, 26.0, color);
                 x_offset += adv;
                 
-                // 绘制提示 (紧跟在汉字后面)
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
                         let hint_adv = self.draw_text(&mut pixmap, font, hint, x_offset + 4.0, 65.0, 16.0, Color::from_rgba8(150, 150, 150, 255));
                         x_offset += hint_adv + 4.0;
                     }
                 }
-                
-                x_offset += 35.0; // 词组间的间距
+                x_offset += 35.0;
             }
         }
 
