@@ -189,7 +189,7 @@ impl InputMethodHost for TsfHost {
                                         let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
                                         update_gui_impl(&gui_tx, &processor);
                                     }
-                                    let mut response = vec![2u8]; // Consume
+                                    let response = vec![2u8]; // Consume
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                     continue;
@@ -226,7 +226,7 @@ impl InputMethodHost for TsfHost {
                                             drop(p);
                                             update_gui_impl(&gui_tx, &processor);
                                         }
-                                        let mut response = vec![2u8]; // Consume
+                                        let response = vec![2u8]; // Consume
                                         let mut bytes_written = 0;
                                         let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                         continue;
@@ -237,7 +237,7 @@ impl InputMethodHost for TsfHost {
                                 if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
                                     let p = processor.lock().unwrap();
                                     if p.buffer.is_empty() {
-                                        let mut response = vec![0u8]; // PassThrough
+                                        let response = vec![0u8]; // PassThrough
                                         let mut bytes_written = 0;
                                         let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                         continue;
@@ -246,7 +246,7 @@ impl InputMethodHost for TsfHost {
 
                                 // 如果是 Shift 键且不是组合键，直接放过 (PassThrough)
                                 if key_code == 0x10 && !ctrl && !alt {
-                                    let mut response = vec![0u8]; 
+                                    let response = vec![0u8]; 
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                     continue;
@@ -319,7 +319,7 @@ impl InputMethodHost for TsfHost {
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                 } else {
-                                    let mut response = vec![0u8]; 
+                                    let response = vec![0u8]; 
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                 }
