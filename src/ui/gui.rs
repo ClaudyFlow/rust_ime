@@ -642,473 +642,172 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 }
 
 #[cfg(target_os = "windows")]
-
 use windows::{
-
     Win32::Foundation::*,
-
     Win32::UI::WindowsAndMessaging::*,
-
     Win32::Graphics::Gdi::*,
-
     core::*,
-
 };
 
-
-
 #[cfg(target_os = "windows")]
-
 static mut WINDOW_STATE: Option<WindowState> = None;
 
-
-
 #[cfg(target_os = "windows")]
-
-
-
 struct WindowState {
-
-
-
     pinyin: String,
-
-
-
     candidates: Vec<String>,
-
-
-
+    hints: Vec<String>,
     selected: usize,
-
-
-
     x: i32,
-
-
-
     y: i32,
-
-
-
 }
 
-
-
-
-
-
-
 #[cfg(target_os = "windows")]
-
-
-
 pub fn start_gui(rx: Receiver<GuiEvent>, _initial_config: Config) {
-
-
-
-    use std::os::windows::ffi::OsStrExt;
-
-
-
-    
-
-
-
     unsafe {
-
-
-
         let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
-
-
-
         let window_class = PCWSTR(
-
-
-
             "RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr()
-
-
-
         );
 
-
-
-
-
-
-
         let wc = WNDCLASSW {
-
-
-
             hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-
-
-
             hInstance: instance.into(),
-
-
-
             lpszClassName: window_class,
-
-
-
             lpfnWndProc: Some(wnd_proc),
-
-
-
             style: CS_HREDRAW | CS_VREDRAW,
-
-
-
             ..Default::default()
-
-
-
         };
-
-
-
-
-
-
 
         RegisterClassW(&wc);
 
-
-
-
-
-
-
         let hwnd = CreateWindowExW(
-
-
-
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-
-
-
             window_class,
-
-
-
             PCWSTR(std::ptr::null()),
-
-
-
             WS_POPUP,
-
-
-
-            100, 100, 400, 80,
-
-
-
+            100, 100, 600, 100, // 增加窗口宽度以适应 hint
             None, None, instance, None,
-
-
-
         );
 
-
-
-
-
-
-
-        SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
-
-
-
-
-
-
+        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
 
         // 启动事件监听线程
-
-
-
         std::thread::spawn(move || {
-
-
-
             while let Ok(event) = rx.recv() {
-
-
-
                 match event {
-
-
-
-                    GuiEvent::Update { pinyin, candidates, selected, .. } => {
-
-
-
+                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         unsafe {
-
-
-
                             if let Some(ref mut state) = WINDOW_STATE {
-
-
-
                                 state.pinyin = pinyin;
-
-
-
                                 state.candidates = candidates;
-
-
-
+                                state.hints = hints;
                                 state.selected = selected;
-
-
-
                             } else {
-
-
-
-                                WINDOW_STATE = Some(WindowState { pinyin, candidates, selected, x: 100, y: 100 });
-
-
-
+                                WINDOW_STATE = Some(WindowState { pinyin, candidates, hints, selected, x: 100, y: 100 });
                             }
-
-
-
                             
-
-
-
                             if WINDOW_STATE.as_ref().unwrap().pinyin.is_empty() {
-
-
-
                                 ShowWindow(hwnd, SW_HIDE);
-
-
-
                             } else {
-
-
-
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-
-
-
                                 InvalidateRect(hwnd, None, true);
-
-
-
                             }
-
-
-
                         }
-
-
-
                     }
-
-
-
                     GuiEvent::MoveTo { x, y } => {
-
-
-
                         unsafe {
-
-
-
                             if let Some(ref mut state) = WINDOW_STATE {
-
-
-
                                 state.x = x;
-
-
-
                                 state.y = y;
-
-
-
                             }
-
-
-
-                            SetWindowPos(hwnd, HWND_TOPMOST, x, y + 20, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-
-
-
+                            let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 20, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                         }
-
-
-
                     }
-
-
-
                     _ => {}
-
-
-
                 }
-
-
-
             }
-
-
-
         });
 
-
-
-
-
-
-
         let mut msg = MSG::default();
-
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-
             TranslateMessage(&msg);
-
             DispatchMessageW(&msg);
-
         }
-
     }
-
 }
-
-
 
 #[cfg(target_os = "windows")]
-
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-
     match msg {
-
         WM_PAINT => {
-
             let mut ps = PAINTSTRUCT::default();
-
             let hdc = BeginPaint(hwnd, &mut ps);
-
             
+            if let Some(state) = &raw const WINDOW_STATE {
+                if let Some(state) = &*state {
+                    // 设置背景
+                    let mut rect = RECT::default();
+                    let _ = GetClientRect(hwnd, &mut rect);
+                    let brush = CreateSolidBrush(COLORREF(0xFFFFFF));
+                    FillRect(hdc, &rect, brush);
+                    DeleteObject(brush);
 
-            if let Some(state) = &WINDOW_STATE {
+                    // 绘制边框
+                    let border_pen = CreatePen(PS_SOLID, 1, COLORREF(0xCCCCCC));
+                    SelectObject(hdc, border_pen);
+                    Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
+                    DeleteObject(border_pen);
 
-                // 设置背景
+                    SetBkMode(hdc, TRANSPARENT);
 
-                let mut rect = RECT::default();
+                    // 绘制拼音
+                    let py_font = CreateFontW(20, 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                    SelectObject(hdc, py_font);
+                    SetTextColor(hdc, COLORREF(0xFF000000));
+                    let py_w: Vec<u16> = state.pinyin.encode_utf16().collect();
+                    TextOutW(hdc, 10, 10, &py_w);
+                    DeleteObject(py_font);
 
-                GetClientRect(hwnd, &mut rect);
-
-                let brush = CreateSolidBrush(COLORREF(0xFFFFFF)); // 白色背景
-
-                FillRect(hdc, &rect, brush);
-
-                DeleteObject(brush);
-
-
-
-                // 绘制边框
-
-                let border_pen = CreatePen(PS_SOLID, 1, COLORREF(0xCCCCCC));
-
-                SelectObject(hdc, border_pen);
-
-                Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
-
-                DeleteObject(border_pen);
-
-
-
-                SetBkMode(hdc, TRANSPARENT);
-
-
-
-                // 绘制拼音
-
-                let py_font = CreateFontW(20, 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
-
-                SelectObject(hdc, py_font);
-
-                SetTextColor(hdc, COLORREF(0xFF000000));
-
-                let py_w: Vec<u16> = state.pinyin.encode_utf16().collect();
-
-                TextOutW(hdc, 10, 10, &py_w);
-
-                DeleteObject(py_font);
-
-
-
-                // 绘制候选词 (简单横向排布)
-
-                let cand_font = CreateFontW(18, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Microsoft YaHei\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
-
-                SelectObject(hdc, cand_font);
-
-                
-
-                let mut x = 10;
-
-                for (i, cand) in state.candidates.iter().take(5).enumerate() {
-
-                    let text = format!("{}.{}", i + 1, cand);
-
-                    let text_w: Vec<u16> = text.encode_utf16().collect();
-
+                    // 绘制候选词与提示
+                    let cand_font = CreateFontW(18, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Microsoft YaHei\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                    let hint_font = CreateFontW(14, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
                     
-
-                    if i == state.selected {
-
-                        SetTextColor(hdc, COLORREF(0x00E37100)); // 蓝色选中
-
-                    } else {
-
-                        SetTextColor(hdc, COLORREF(0x00000000)); // 黑色
-
+                    let mut x = 10;
+                    for (i, cand) in state.candidates.iter().take(5).enumerate() {
+                        let text = format!("{}.{}", i + 1, cand);
+                        let text_w: Vec<u16> = text.encode_utf16().collect();
+                        
+                        SelectObject(hdc, cand_font);
+                        if i == state.selected {
+                            SetTextColor(hdc, COLORREF(0x00E37100)); // 蓝色
+                        } else {
+                            SetTextColor(hdc, COLORREF(0x00000000)); // 黑色
+                        }
+                        TextOutW(hdc, x, 40, &text_w);
+                        
+                        if let Some(hint) = state.hints.get(i) {
+                            if !hint.is_empty() {
+                                SelectObject(hdc, hint_font);
+                                SetTextColor(hdc, COLORREF(0x00888888)); // 灰色提示
+                                let hint_w: Vec<u16> = hint.encode_utf16().collect();
+                                TextOutW(hdc, x, 65, &hint_w);
+                            }
+                        }
+                        x += (text.chars().count() * 20 + 80) as i32;
                     }
-
-                    
-
-                    TextOutW(hdc, x, 40, &text_w);
-
-                    x += (text.chars().count() * 20) as i32;
-
+                    DeleteObject(cand_font);
+                    DeleteObject(hint_font);
                 }
-
-                DeleteObject(cand_font);
-
             }
 
-
-
             EndPaint(hwnd, &ps);
-
             LRESULT(0)
-
         }
-
         WM_DESTROY => {
-
             PostQuitMessage(0);
-
             LRESULT(0)
-
         }
-
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-
     }
-
 }
-
-
