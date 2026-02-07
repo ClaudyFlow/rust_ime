@@ -134,9 +134,9 @@ unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u3
     }
 
     let old_bitmap = SelectObject(hdc_mem, h_bitmap);
-    let mut size = SIZE { cx: width as i32, cy: height as i32 };
-    let mut pt_src = POINT { x: 0, y: 0 };
-    let mut blend = BLENDFUNCTION {
+    let size = SIZE { cx: width as i32, cy: height as i32 };
+    let pt_src = POINT { x: 0, y: 0 };
+    let blend = BLENDFUNCTION {
         BlendOp: AC_SRC_OVER as u8,
         SourceConstantAlpha: 255,
         AlphaFormat: AC_SRC_ALPHA as u8,
