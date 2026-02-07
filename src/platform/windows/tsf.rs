@@ -83,6 +83,28 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
     }
 }
 
+#[cfg(target_os = "windows")]
+fn get_system_cursor_pos() -> Option<(i32, i32)> {
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::Win32::Graphics::Gdi::ClientToScreen;
+        use windows::Win32::Foundation::*;
+        let mut info = GUITHREADINFO::default();
+        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(0, &mut info).is_ok() {
+            let mut pt = POINT {
+                x: info.rcCaret.left,
+                y: info.rcCaret.bottom,
+            };
+            let _ = ClientToScreen(info.hwndCaret, &mut pt);
+            if pt.x != 0 || pt.y != 0 {
+                return Some((pt.x, pt.y));
+            }
+        }
+    }
+    None
+}
+
 impl InputMethodHost for TsfHost {
     fn set_preedit(&self, _text: &str, _cursor_pos: usize) {}
     fn commit_text(&self, _text: &str) {}
@@ -143,10 +165,32 @@ impl InputMethodHost for TsfHost {
                                 
                                 if msg_type == 1 {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+                                }
+
+                                // 1. 优先检查切换热键 (必须排在第一位)
+                                let is_toggle = (key_code == 0x09 && !ctrl && !alt) || (key_code == 0x20 && ctrl);
+                                if is_toggle {
+                                    if msg_type == 1 {
+                                        let mut p = processor.lock().unwrap();
+                                        p.toggle();
+                                        let enabled = p.chinese_enabled;
+                                        let summary = p.get_current_profile_display();
+                                        drop(p);
+                                        println!("[TSF Toggle] Key: 0x{:02X}, Enabled: {}", key_code, enabled);
+                                        let msg = if enabled { "中文模式" } else { "直通模式" };
+                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                                        update_gui_impl(&gui_tx, &processor);
+                                    }
+                                    let mut response = vec![2u8]; // Consume
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                    continue;
+                                }
+
+                                if msg_type == 1 {
                                     let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
                                     let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
                                     
-                                    // 如果 DLL 没传坐标，尝试通过系统 API 抓取
                                     if x == 0 && y == 0 {
                                         if let Some((sx, sy)) = get_system_cursor_pos() {
                                             x = sx;
@@ -156,57 +200,9 @@ impl InputMethodHost for TsfHost {
 
                                     if x != 0 || y != 0 {
                                         if let Some(ref tx) = gui_tx {
-                                            let _ = tx.send(crate::ui::GuiEvent::MoveTo { x, y });
+                                            let _ = tx.send(GuiEvent::MoveTo { x, y });
                                         }
                                     }
-                                }
-// ...
-// 增加辅助函数
-fn get_system_cursor_pos() -> Option<(i32, i32)> {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::*;
-        use windows::Win32::Graphics::Gdi::ClientToScreen;
-        use windows::Win32::Foundation::*;
-        let mut info = GUITHREADINFO::default();
-        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
-        if GetGUIThreadInfo(0, &mut info).is_ok() {
-            let mut pt = POINT {
-                x: info.rcCaret.left,
-                y: info.rcCaret.bottom,
-            };
-            let _ = ClientToScreen(info.hwndCaret, &mut pt);
-            if pt.x != 0 || pt.y != 0 {
-                return Some((pt.x, pt.y));
-            }
-        }
-    }
-    None
-}
-
-                                // 检查语言切换热键 (Tab 或 Ctrl+Space)
-                                let is_ctrl_space = key_code == 0x20 && ctrl;
-                                let is_toggle_key = (key_code == 0x09 && !ctrl && !alt && !shift) || 
-                                                   (is_ctrl_space && !alt && !shift);
-                                
-                                if is_toggle_key {
-                                    if msg_type == 1 {
-                                        let mut p = processor.lock().unwrap();
-                                        p.toggle();
-                                        let enabled = p.chinese_enabled;
-                                        let summary = p.get_current_profile_display();
-                                        drop(p);
-                                        println!("[TSF Toggle] Key: 0x{:02X}, Enabled: {}", key_code, enabled);
-                                        
-                                        let msg = if enabled { "中文模式" } else { "直通模式" };
-                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                                        
-                                        update_gui_impl(&gui_tx, &processor);
-                                    }
-                                    let mut response = vec![2u8]; // Consume
-                                    let mut bytes_written = 0;
-                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-                                    continue;
                                 }
 
                                 // 灵魂功能：CapsLock / Shift 触发筛选
@@ -215,16 +211,13 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
                                     if p.chinese_enabled && !p.buffer.is_empty() {
                                         if msg_type == 1 {
                                             if key_code == 0x14 {
-                                                println!("[TSF Filter] Trigger Page Filter");
                                                 p.start_page_filter();
                                             } else {
-                                                println!("[TSF Filter] Trigger Global Filter");
                                                 p.start_global_filter();
                                             }
                                             drop(p);
                                             update_gui_impl(&gui_tx, &processor);
                                         }
-                                        
                                         let mut response = vec![2u8]; // Consume
                                         let mut bytes_written = 0;
                                         let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
@@ -232,7 +225,7 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
                                     }
                                 }
 
-                                // 处理回车/退格/数字的特殊直通逻辑
+                                // 直通逻辑：如果 buffer 为空且不是切换键，允许常用控制键直通
                                 if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
                                     let p = processor.lock().unwrap();
                                     if p.buffer.is_empty() {
@@ -306,22 +299,19 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
                                             }
                                         }
                                     } else {
-                                        // TestKeyDown: 只有在中文模式且 (buffer 不为空 或 按键是字母) 时才拦截
                                         let p = processor.lock().unwrap();
                                         let is_letter = key_code >= 0x41 && key_code <= 0x5A;
                                         let would_handle = p.chinese_enabled && (!p.buffer.is_empty() || is_letter);
-                                        
                                         if would_handle {
                                             response.push(2);
                                         } else {
                                             response.push(0);
                                         }
                                     }
-                                    
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                 } else {
-                                    let mut response = vec![0u8]; // Action::None
+                                    let mut response = vec![0u8]; 
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                 }
