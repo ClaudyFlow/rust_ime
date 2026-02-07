@@ -143,6 +143,13 @@ impl InputMethodHost for TsfHost {
                                 
                                 if msg_type == 1 {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+                                    let x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
+                                    let y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
+                                    if x != 0 || y != 0 {
+                                        if let Some(ref tx) = gui_tx {
+                                            let _ = tx.send(GuiEvent::MoveTo { x, y });
+                                        }
+                                    }
                                 }
 
                                 // 检查语言切换热键 (最简化逻辑以确保成功)

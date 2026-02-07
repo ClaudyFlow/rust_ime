@@ -39,7 +39,31 @@ impl TextService {
         Ok(())
     }
 
-    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8) -> (u8, String) {
+    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, context: Option<&ITfContext>) -> (u8, String) {
+        let mut x = 0i32;
+        let mut y = 0i32;
+
+        if let Some(ctx) = context {
+            unsafe {
+                if let Ok(view) = ctx.GetActiveView() {
+                    let mut rect = RECT::default();
+                    let mut selection = [TF_SELECTION { ..Default::default() }];
+                    let mut fetched = 0;
+                    
+                    // 获取当前选区 (光标位置)
+                    if ctx.GetSelection(0, TF_DEFAULT_SELECTION, &mut selection, &mut fetched).is_ok() && fetched > 0 {
+                        if let Some(range) = &*selection[0].range {
+                            let mut clipped = BOOL(0);
+                            if view.GetTextExt(range, &mut rect, &mut clipped).is_ok() {
+                                x = rect.left;
+                                y = rect.bottom;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
         unsafe {
             let h_pipe = CreateFileW(
@@ -55,11 +79,13 @@ impl TextService {
             if let Ok(handle) = h_pipe {
                 if handle.is_invalid() { return (0, String::new()); }
 
-                let mut request = [0u8; 6];
-                request[0] = msg_type; // 1=KeyDown, 2=Test
+                let mut request = [0u8; 14]; // 增加长度存放 x, y (各 4 字节)
+                request[0] = msg_type;
                 let code_bytes = key_code.to_le_bytes();
                 request[1..5].copy_from_slice(&code_bytes);
                 request[5] = modifiers;
+                request[6..10].copy_from_slice(&x.to_le_bytes());
+                request[10..14].copy_from_slice(&y.to_le_bytes());
 
                 let mut bytes_written = 0;
                 let _ = WriteFile(handle, Some(&request), Some(&mut bytes_written), None);
@@ -125,7 +151,7 @@ impl ITfKeyEventSink_Impl for TextService {
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
             }
-            let (action, _) = self.send_key_to_server(2, key_code, modifiers); // 2 = Test
+            let (action, _) = self.send_key_to_server(2, key_code, modifiers, context); // 2 = Test
             if action != 0 { return Ok(TRUE); }
         }
         Ok(FALSE)
@@ -149,7 +175,7 @@ impl ITfKeyEventSink_Impl for TextService {
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
             }
-            let (action, text) = self.send_key_to_server(1, key_code, modifiers); // 1 = Actual
+            let (action, text) = self.send_key_to_server(1, key_code, modifiers, context); // 1 = Actual
             if action != 0 {
                 if action == 1 {
                     if let Some(ctx) = context {
