@@ -220,7 +220,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         #[cfg(target_os = "windows")]
         {
-            println!("⚠️ Windows 暂不支持后台模式，将继续在前台运行。");
+            use windows::Win32::System::Console::GetConsoleWindow;
+            use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+            let window = unsafe { GetConsoleWindow() };
+            if !window.is_invalid() {
+                unsafe { ShowWindow(window, SW_HIDE); }
+            }
+            println!("✅ 已转入后台运行 (窗口已隐藏)。");
         }
     }
 

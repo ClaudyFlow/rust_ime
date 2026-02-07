@@ -96,13 +96,15 @@ impl InputMethodHost for TsfHost {
             use windows::Win32::Foundation::*;
             use windows::core::PCWSTR;
 
+            let pipe_name_w = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
+            let pipe_pcwstr = PCWSTR(pipe_name_w.as_ptr());
+
             println!("[TSF Server] 正在启动命名管道: \\\\.\\pipe\\rust_ime_pipe");
 
             loop {
-                let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
                 unsafe {
                     let h_pipe = CreateNamedPipeW(
-                        PCWSTR(pipe_name.as_ptr()),
+                        pipe_pcwstr,
                         PIPE_ACCESS_DUPLEX,
                         PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
                         PIPE_UNLIMITED_INSTANCES,
