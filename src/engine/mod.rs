@@ -5,4 +5,3 @@ pub mod keys;
 
 pub use trie::Trie;
 pub use processor::Processor;
-pub use keys::VirtualKey;
