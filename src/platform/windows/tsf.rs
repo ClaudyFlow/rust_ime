@@ -152,24 +152,25 @@ impl InputMethodHost for TsfHost {
                                     }
                                 }
 
-                                // 检查语言切换热键 (最简化逻辑以确保成功)
-                                let is_tab = key_code == 0x09;
+                                // 检查语言切换热键 (Tab 或 Ctrl+Space)
                                 let is_ctrl_space = key_code == 0x20 && ctrl;
+                                let is_toggle_key = (key_code == 0x09 && !ctrl && !alt && !shift) || 
+                                                   (is_ctrl_space && !alt && !shift);
                                 
-                                if is_tab || is_ctrl_space {
-                                    if msg_type == 1 { // 仅在真实按下时处理
+                                if is_toggle_key {
+                                    if msg_type == 1 {
                                         let mut p = processor.lock().unwrap();
                                         p.toggle();
                                         let enabled = p.chinese_enabled;
                                         let summary = p.get_current_profile_display();
                                         drop(p);
-                                        
                                         println!("[TSF Toggle] Key: 0x{:02X}, Enabled: {}", key_code, enabled);
+                                        
                                         let msg = if enabled { "中文模式" } else { "直通模式" };
                                         let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                                        
                                         update_gui_impl(&gui_tx, &processor);
                                     }
-                                    
                                     let mut response = vec![2u8]; // Consume
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
@@ -199,12 +200,8 @@ impl InputMethodHost for TsfHost {
                                     }
                                 }
 
-                                // 直通逻辑：如果 buffer 为空且不是切换键，允许常用控制键直通
-                                let is_control_key = key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || 
-                                                    (key_code >= 0x30 && key_code <= 0x39) ||
-                                                    (key_code >= 0x21 && key_code <= 0x28); // Arrows, PgUp/Dn
-                                                    
-                                if is_control_key {
+                                // 处理回车/退格/数字的特殊直通逻辑
+                                if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
                                     let p = processor.lock().unwrap();
                                     if p.buffer.is_empty() {
                                         let mut response = vec![0u8]; // PassThrough
@@ -223,31 +220,28 @@ impl InputMethodHost for TsfHost {
                                 }
 
                                 let key = match key_code {
-                                    0x41..=0x5A => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x41)),
-                                    0x30..=0x39 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x30 + 26)),
-                                    0x60..=0x69 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x60 + 26)), // Numpad
-                                    0x20 => Some(crate::evdev::Key::KEY_SPACE),
-                                    0x08 => Some(crate::evdev::Key::KEY_BACKSPACE),
-                                    0x0D => Some(crate::evdev::Key::KEY_ENTER),
-                                    0x1B => Some(crate::evdev::Key::KEY_ESC),
-                                    0x09 => Some(crate::evdev::Key::KEY_TAB),
-                                    0x21 => Some(crate::evdev::Key::KEY_PAGEUP),
-                                    0x22 => Some(crate::evdev::Key::KEY_PAGEDOWN),
-                                    0x25 => Some(crate::evdev::Key::KEY_LEFT),
-                                    0x26 => Some(crate::evdev::Key::KEY_UP),
-                                    0x27 => Some(crate::evdev::Key::KEY_RIGHT),
-                                    0x28 => Some(crate::evdev::Key::KEY_DOWN),
-                                    0xBB => Some(crate::evdev::Key::KEY_EQUAL),
-                                    0xBD => Some(crate::evdev::Key::KEY_MINUS),
-                                    0xBC => Some(crate::evdev::Key::KEY_COMMA),
-                                    0xBE => Some(crate::evdev::Key::KEY_DOT),
-                                    0xBF => Some(crate::evdev::Key::KEY_SLASH),
-                                    0xBA => Some(crate::evdev::Key::KEY_SEMICOLON),
-                                    0xDE => Some(crate::evdev::Key::KEY_APOSTROPHE),
-                                    0xDB => Some(crate::evdev::Key::KEY_LEFTBRACE),
-                                    0xDD => Some(crate::evdev::Key::KEY_RIGHTBRACE),
-                                    0xDC => Some(crate::evdev::Key::KEY_BACKSLASH),
-                                    0xC0 => Some(crate::evdev::Key::KEY_GRAVE),
+                                    0x41..=0x5A => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x41) as u8)),
+                                    0x30..=0x39 => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x30 + 26) as u8)),
+                                    0x20 => Some(crate::engine::keys::VirtualKey::Space),
+                                    0x08 => Some(crate::engine::keys::VirtualKey::Backspace),
+                                    0x0D => Some(crate::engine::keys::VirtualKey::Enter),
+                                    0x1B => Some(crate::engine::keys::VirtualKey::Esc),
+                                    0x09 => Some(crate::engine::keys::VirtualKey::Tab),
+                                    0x25 => Some(crate::engine::keys::VirtualKey::Left),
+                                    0x26 => Some(crate::engine::keys::VirtualKey::Up),
+                                    0x27 => Some(crate::engine::keys::VirtualKey::Right),
+                                    0x28 => Some(crate::engine::keys::VirtualKey::Down),
+                                    0xBB => Some(crate::engine::keys::VirtualKey::Equal),
+                                    0xBD => Some(crate::engine::keys::VirtualKey::Minus),
+                                    0xBC => Some(crate::engine::keys::VirtualKey::Comma),
+                                    0xBE => Some(crate::engine::keys::VirtualKey::Dot),
+                                    0xBF => Some(crate::engine::keys::VirtualKey::Slash),
+                                    0xBA => Some(crate::engine::keys::VirtualKey::Semicolon),
+                                    0xDE => Some(crate::engine::keys::VirtualKey::Apostrophe),
+                                    0xDB => Some(crate::engine::keys::VirtualKey::LeftBrace),
+                                    0xDD => Some(crate::engine::keys::VirtualKey::RightBrace),
+                                    0xDC => Some(crate::engine::keys::VirtualKey::Backslash),
+                                    0xC0 => Some(crate::engine::keys::VirtualKey::Grave),
                                     _ => None,
                                 };
 

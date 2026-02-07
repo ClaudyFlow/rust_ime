@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-#[cfg(target_os = "linux")]
-use evdev::Key;
-#[cfg(target_os = "windows")]
-use crate::evdev::Key;
 use crate::engine::trie::Trie;
+use crate::engine::keys::VirtualKey;
 use serde_json::Value;
 use std::time::{Instant, Duration};
 
@@ -99,14 +96,14 @@ pub struct Processor {
     pub enable_double_tap: bool,
     pub double_tap_timeout: Duration,
     pub double_taps: HashMap<String, String>,
-    pub last_tap_key: Option<Key>,
+    pub last_tap_key: Option<VirtualKey>,
     pub last_tap_time: Option<Instant>,
 
     // 长按相关
     pub enable_long_press: bool,
     pub long_press_timeout: Duration,
     pub long_press_mappings: HashMap<String, String>,
-    pub key_press_info: Option<(Key, Instant)>,
+    pub key_press_info: Option<(VirtualKey, Instant)>,
     pub long_press_triggered: bool,
 
     pub nav_mode: bool,
@@ -339,7 +336,7 @@ impl Processor {
         self.nav_mode = false;
     }
 
-    pub fn handle_key(&mut self, key: Key, val: i32, shift_pressed: bool) -> Action {
+    pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool) -> Action {
         if !self.chinese_enabled {
             return Action::PassThrough;
         }
@@ -380,11 +377,11 @@ impl Processor {
 
         if is_release {
             if self.buffer.is_empty() { return Action::PassThrough; }
-            if key == Key::KEY_GRAVE { return Action::Consume; }
+            if key == VirtualKey::Grave { return Action::Consume; }
             return Action::Consume;
         }
 
-        if key == Key::KEY_GRAVE {
+        if key == VirtualKey::Grave {
             if self.buffer.is_empty() {
                 self.switch_mode = !self.switch_mode;
                 return if self.switch_mode { Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) } else { Action::Notify("快捷切换".into(), "已退出".into()) };
@@ -396,12 +393,12 @@ impl Processor {
 
         if self.switch_mode {
             match key {
-                Key::KEY_ESC | Key::KEY_SPACE | Key::KEY_ENTER => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
-                Key::KEY_T => {
+                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
+                VirtualKey::T => {
                     self.switch_mode = false;
                     return Action::Notify("位置切换".into(), "窗口已移至顶部".into());
                 }
-                Key::KEY_B => {
+                VirtualKey::B => {
                     self.switch_mode = false;
                     return Action::Notify("位置切换".into(), "窗口已移至底部".into());
                 }
@@ -435,7 +432,7 @@ impl Processor {
         }
     }
 
-    fn handle_direct(&mut self, key: Key, shift_pressed: bool) -> Action {
+    fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
                 let old_buffer = self.buffer.clone();
@@ -455,20 +452,20 @@ impl Processor {
         Action::PassThrough
     }
 
-    fn handle_composing(&mut self, mut key: Key, shift_pressed: bool) -> Action {
+    fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
         let now = Instant::now();
 
         // 如果处于导航模式，映射 HJKL 为方向键
         if self.nav_mode {
             match key {
-                Key::KEY_H => key = Key::KEY_LEFT,
-                Key::KEY_L => key = Key::KEY_RIGHT,
-                Key::KEY_K => key = Key::KEY_UP,
-                Key::KEY_J => key = Key::KEY_DOWN,
-                Key::KEY_LEFT | Key::KEY_RIGHT | Key::KEY_UP | Key::KEY_DOWN 
-                | Key::KEY_PAGEUP | Key::KEY_PAGEDOWN | Key::KEY_HOME | Key::KEY_END 
-                | Key::KEY_SPACE | Key::KEY_ENTER | Key::KEY_GRAVE => { /* 保持模式 */ }
+                VirtualKey::H => key = VirtualKey::Left,
+                VirtualKey::L => key = VirtualKey::Right,
+                VirtualKey::K => key = VirtualKey::Up,
+                VirtualKey::J => key = VirtualKey::Down,
+                VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down 
+                | VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Home | VirtualKey::End 
+                | VirtualKey::Space | VirtualKey::Enter | VirtualKey::Grave => { /* 保持模式 */ }
                 _ => { self.nav_mode = false; } // 按其他键退出导航模式
             }
         }
@@ -526,7 +523,7 @@ impl Processor {
         let flip_arrow = styles.contains(&"arrow".to_string());
 
         match key {
-            Key::KEY_BACKSPACE => {
+            VirtualKey::Backspace => {
                 if self.filter_mode != FilterMode::None {
                     self.aux_filter.pop();
                     if self.aux_filter.is_empty() {
@@ -552,16 +549,16 @@ impl Processor {
                     if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
                 } else { if let Some(act) = self.lookup() { return act; } self.update_phantom_action() }
             }
-            Key::KEY_MINUS if flip_me && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            Key::KEY_EQUAL if flip_me && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            Key::KEY_COMMA if flip_cd && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            Key::KEY_DOT if flip_cd && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            VirtualKey::Minus if flip_me && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
+            VirtualKey::Equal if flip_me && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            VirtualKey::Comma if flip_cd && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
+            VirtualKey::Dot if flip_cd && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
 
-            Key::KEY_LEFT | Key::KEY_RIGHT | Key::KEY_UP | Key::KEY_DOWN => {
+            VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down => {
                 let (move_prev, move_next, page_prev, page_next) = if self.swap_arrow_keys {
-                    (Key::KEY_UP, Key::KEY_DOWN, Key::KEY_LEFT, Key::KEY_RIGHT)
+                    (VirtualKey::Up, VirtualKey::Down, VirtualKey::Left, VirtualKey::Right)
                 } else {
-                    (Key::KEY_LEFT, Key::KEY_RIGHT, Key::KEY_UP, Key::KEY_DOWN)
+                    (VirtualKey::Left, VirtualKey::Right, VirtualKey::Up, VirtualKey::Down)
                 };
 
                 if key == move_prev {
@@ -577,12 +574,12 @@ impl Processor {
                 }
             }
 
-            Key::KEY_PAGEUP => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            Key::KEY_PAGEDOWN => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            Key::KEY_HOME => { if shift_pressed { self.selected = 0; self.page = 0; } else { self.selected = self.page; } Action::Consume }
-            Key::KEY_END => { if has_cand { if shift_pressed { self.selected = self.candidates.len() - 1; self.page = (self.selected / self.page_size) * self.page_size; } else { self.selected = (self.page + self.page_size - 1).min(self.candidates.len() - 1); } } Action::Consume }
+            VirtualKey::PageUp => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
+            VirtualKey::PageDown => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            VirtualKey::Home => { if shift_pressed { self.selected = 0; self.page = 0; } else { self.selected = self.page; } Action::Consume }
+            VirtualKey::End => { if has_cand { if shift_pressed { self.selected = self.candidates.len() - 1; self.page = (self.selected / self.page_size) * self.page_size; } else { self.selected = (self.page + self.page_size - 1).min(self.candidates.len() - 1); } } Action::Consume }
 
-            Key::KEY_SPACE => {
+            VirtualKey::Space => {
                 if shift_pressed {
                     if let Some(hint) = self.candidate_hints.get(self.selected) {
                         if !hint.is_empty() {
@@ -594,19 +591,19 @@ impl Processor {
                 if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone()); }
                 self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
             }
-            Key::KEY_ENTER => {
+            VirtualKey::Enter => {
                 self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
                 self.last_lookup_pinyin.clear(); // 清空检索记录，确保不触发学习
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out); }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
             }
-            Key::KEY_ESC | Key::KEY_DELETE => { 
+            VirtualKey::Esc | VirtualKey::Delete => { 
                 self.commit_history.clear(); // 取消输入，清空历史
                 let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } 
             }
 
-            Key::KEY_SLASH if !self.buffer.is_empty() => {
+            VirtualKey::Slash if !self.buffer.is_empty() => {
                 let mut new_buffer = self.buffer.clone();
                 // 找到最后一个音节的起始位置（通常是空格后的部分，或者是整个 buffer）
                 let last_part_start = new_buffer.rfind(' ').map(|i| i + 1).unwrap_or(0);
@@ -659,7 +656,7 @@ impl Processor {
         }
     }
 
-    fn handle_punctuation(&mut self, key: Key, shift_pressed: bool) -> Action {
+    fn handle_punctuation(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
         let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
         let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
         let mut commit_text = if !self.joined_sentence.is_empty() { self.joined_sentence.clone() } else if !self.candidates.is_empty() { self.candidates[0].clone() } else { self.buffer.clone() };
@@ -957,26 +954,26 @@ impl Processor {
     }
 }
 
-pub fn is_letter(key: Key) -> bool {
+pub fn is_letter(key: VirtualKey) -> bool {
     matches!(key,
-        Key::KEY_Q | Key::KEY_W | Key::KEY_E | Key::KEY_R | Key::KEY_T | Key::KEY_Y | Key::KEY_U | Key::KEY_I | Key::KEY_O | Key::KEY_P |
-        Key::KEY_A | Key::KEY_S | Key::KEY_D | Key::KEY_F | Key::KEY_G | Key::KEY_H | Key::KEY_J | Key::KEY_K | Key::KEY_L |
-        Key::KEY_Z | Key::KEY_X | Key::KEY_C | Key::KEY_V | Key::KEY_B | Key::KEY_N | Key::KEY_M |
-        Key::KEY_APOSTROPHE
+        VirtualKey::Q | VirtualKey::W | VirtualKey::E | VirtualKey::R | VirtualKey::T | VirtualKey::Y | VirtualKey::U | VirtualKey::I | VirtualKey::O | VirtualKey::P |
+        VirtualKey::A | VirtualKey::S | VirtualKey::D | VirtualKey::F | VirtualKey::G | VirtualKey::H | VirtualKey::J | VirtualKey::K | VirtualKey::L |
+        VirtualKey::Z | VirtualKey::X | VirtualKey::C | VirtualKey::V | VirtualKey::B | VirtualKey::N | VirtualKey::M |
+        VirtualKey::Apostrophe
     )
 }
-pub fn is_digit(key: Key) -> bool { matches!(key, Key::KEY_1 | Key::KEY_2 | Key::KEY_3 | Key::KEY_4 | Key::KEY_5 | Key::KEY_6 | Key::KEY_7 | Key::KEY_8 | Key::KEY_9 | Key::KEY_0) }
-pub fn key_to_digit(key: Key) -> Option<usize> { match key { Key::KEY_1 => Some(1), Key::KEY_2 => Some(2), Key::KEY_3 => Some(3), Key::KEY_4 => Some(4), Key::KEY_5 => Some(5), Key::KEY_6 => Some(6), Key::KEY_7 => Some(7), Key::KEY_8 => Some(8), Key::KEY_9 => Some(9), Key::KEY_0 => Some(0), _ => None } }
-pub fn key_to_char(key: Key, shift: bool) -> Option<char> {
+pub fn is_digit(key: VirtualKey) -> bool { matches!(key, VirtualKey::Digit1 | VirtualKey::Digit2 | VirtualKey::Digit3 | VirtualKey::Digit4 | VirtualKey::Digit5 | VirtualKey::Digit6 | VirtualKey::Digit7 | VirtualKey::Digit8 | VirtualKey::Digit9 | VirtualKey::Digit0) }
+pub fn key_to_digit(key: VirtualKey) -> Option<usize> { match key { VirtualKey::Digit1 => Some(1), VirtualKey::Digit2 => Some(2), VirtualKey::Digit3 => Some(3), VirtualKey::Digit4 => Some(4), VirtualKey::Digit5 => Some(5), VirtualKey::Digit6 => Some(6), VirtualKey::Digit7 => Some(7), VirtualKey::Digit8 => Some(8), VirtualKey::Digit9 => Some(9), VirtualKey::Digit0 => Some(0), _ => None } }
+pub fn key_to_char(key: VirtualKey, shift: bool) -> Option<char> {
     let c = match key {
-        Key::KEY_Q => Some('q'), Key::KEY_W => Some('w'), Key::KEY_E => Some('e'), Key::KEY_R => Some('r'), Key::KEY_T => Some('t'), Key::KEY_Y => Some('y'), Key::KEY_U => Some('u'), Key::KEY_I => Some('i'), Key::KEY_O => Some('o'), Key::KEY_P => Some('p'), Key::KEY_A => Some('a'), Key::KEY_S => Some('s'), Key::KEY_D => Some('d'), Key::KEY_F => Some('f'), Key::KEY_G => Some('g'), Key::KEY_H => Some('h'), Key::KEY_J => Some('j'), Key::KEY_K => Some('k'), Key::KEY_L => Some('l'), Key::KEY_Z => Some('z'), Key::KEY_X => Some('x'), Key::KEY_C => Some('c'), Key::KEY_V => Some('v'), Key::KEY_B => Some('b'), Key::KEY_N => Some('n'), Key::KEY_M => Some('m'), Key::KEY_APOSTROPHE => Some('\''), Key::KEY_SLASH => Some('/'),
-        Key::KEY_MINUS => Some('-'), Key::KEY_EQUAL => Some('='), Key::KEY_COMMA => Some(','), Key::KEY_DOT => Some('.'),
+        VirtualKey::Q => Some('q'), VirtualKey::W => Some('w'), VirtualKey::E => Some('e'), VirtualKey::R => Some('r'), VirtualKey::T => Some('t'), VirtualKey::Y => Some('y'), VirtualKey::U => Some('u'), VirtualKey::I => Some('i'), VirtualKey::O => Some('o'), VirtualKey::P => Some('p'), VirtualKey::A => Some('a'), VirtualKey::S => Some('s'), VirtualKey::D => Some('d'), VirtualKey::F => Some('f'), VirtualKey::G => Some('g'), VirtualKey::H => Some('h'), VirtualKey::J => Some('j'), VirtualKey::K => Some('k'), VirtualKey::L => Some('l'), VirtualKey::Z => Some('z'), VirtualKey::X => Some('x'), VirtualKey::C => Some('c'), VirtualKey::V => Some('v'), VirtualKey::B => Some('b'), VirtualKey::N => Some('n'), VirtualKey::M => Some('m'), VirtualKey::Apostrophe => Some('\''), VirtualKey::Slash => Some('/'),
+        VirtualKey::Minus => Some('-'), VirtualKey::Equal => Some('='), VirtualKey::Comma => Some(','), VirtualKey::Dot => Some('.'),
         _ => None
     };
     if shift { c.map(|ch| ch.to_ascii_uppercase()) } else { c }
 }
-fn get_punctuation_key(key: Key, shift: bool) -> Option<&'static str> {
-    match (key, shift) { (Key::KEY_GRAVE, false) => Some("`"), (Key::KEY_GRAVE, true) => Some("~"), (Key::KEY_MINUS, false) => Some("-"), (Key::KEY_MINUS, true) => Some("_"), (Key::KEY_EQUAL, false) => Some("="), (Key::KEY_EQUAL, true) => Some("+"), (Key::KEY_LEFTBRACE, false) => Some("["), (Key::KEY_LEFTBRACE, true) => Some("{"), (Key::KEY_RIGHTBRACE, false) => Some("]"), (Key::KEY_RIGHTBRACE, true) => Some("}"), (Key::KEY_BACKSLASH, false) => Some("\\"), (Key::KEY_BACKSLASH, true) => Some("|"), (Key::KEY_SEMICOLON, false) => Some(";"), (Key::KEY_SEMICOLON, true) => Some(":"), (Key::KEY_APOSTROPHE, false) => Some("'"), (Key::KEY_APOSTROPHE, true) => Some("\""), (Key::KEY_COMMA, false) => Some(","), (Key::KEY_COMMA, true) => Some("<"), (Key::KEY_DOT, false) => Some("."), (Key::KEY_DOT, true) => Some(">"), (Key::KEY_SLASH, false) => Some("/"), (Key::KEY_SLASH, true) => Some("?"), (Key::KEY_1, true) => Some("!"), (Key::KEY_2, true) => Some("@"), (Key::KEY_3, true) => Some("#"), (Key::KEY_4, true) => Some("$"), (Key::KEY_5, true) => Some("%"), (Key::KEY_6, true) => Some("^"), (Key::KEY_7, true) => Some("&"), (Key::KEY_8, true) => Some("*"), (Key::KEY_9, true) => Some("("), (Key::KEY_0, true) => Some(")"), _ => None }
+fn get_punctuation_key(key: VirtualKey, shift: bool) -> Option<&'static str> {
+    match (key, shift) { (VirtualKey::Grave, false) => Some("`"), (VirtualKey::Grave, true) => Some("~"), (VirtualKey::Minus, false) => Some("-"), (VirtualKey::Minus, true) => Some("_"), (VirtualKey::Equal, false) => Some("="), (VirtualKey::Equal, true) => Some("+"), (VirtualKey::LeftBrace, false) => Some("["), (VirtualKey::LeftBrace, true) => Some("{"), (VirtualKey::RightBrace, false) => Some("]"), (VirtualKey::RightBrace, true) => Some("}"), (VirtualKey::Backslash, false) => Some("\\"), (VirtualKey::Backslash, true) => Some("|"), (VirtualKey::Semicolon, false) => Some(";"), (VirtualKey::Semicolon, true) => Some(":"), (VirtualKey::Apostrophe, false) => Some("'"), (VirtualKey::Apostrophe, true) => Some("\""), (VirtualKey::Comma, false) => Some(","), (VirtualKey::Comma, true) => Some("<"), (VirtualKey::Dot, false) => Some("."), (VirtualKey::Dot, true) => Some(">"), (VirtualKey::Slash, false) => Some("/"), (VirtualKey::Slash, true) => Some("?"), (VirtualKey::Digit1, true) => Some("!"), (VirtualKey::Digit2, true) => Some("@"), (VirtualKey::Digit3, true) => Some("#"), (VirtualKey::Digit4, true) => Some("$"), (VirtualKey::Digit5, true) => Some("%"), (VirtualKey::Digit6, true) => Some("^"), (VirtualKey::Digit7, true) => Some("&"), (VirtualKey::Digit8, true) => Some("*"), (VirtualKey::Digit9, true) => Some("("), (VirtualKey::Digit0, true) => Some(")"), _ => None }
 }
 pub fn strip_tones(s: &str) -> String {
     let mut res = String::new();
