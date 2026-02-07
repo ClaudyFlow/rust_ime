@@ -744,61 +744,61 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);
             
-            if let Some(state) = &raw const WINDOW_STATE {
-                if let Some(state) = &*state {
-                    // 设置背景
-                    let mut rect = RECT::default();
-                    let _ = GetClientRect(hwnd, &mut rect);
-                    let brush = CreateSolidBrush(COLORREF(0xFFFFFF));
-                    FillRect(hdc, &rect, brush);
-                    DeleteObject(brush);
+            let state_ptr = &raw const WINDOW_STATE;
+            if let Some(state) = &*state_ptr {
+                // 设置背景
+                let mut rect = RECT::default();
+                let _ = GetClientRect(hwnd, &mut rect);
+                let brush = CreateSolidBrush(COLORREF(0xFFFFFF));
+                FillRect(hdc, &rect, brush);
+                DeleteObject(brush);
 
-                    // 绘制边框
-                    let border_pen = CreatePen(PS_SOLID, 1, COLORREF(0xCCCCCC));
-                    SelectObject(hdc, border_pen);
-                    Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
-                    DeleteObject(border_pen);
+                // 绘制边框
+                let border_pen = CreatePen(PS_SOLID, 1, COLORREF(0xCCCCCC));
+                SelectObject(hdc, border_pen);
+                Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
+                DeleteObject(border_pen);
 
-                    SetBkMode(hdc, TRANSPARENT);
+                SetBkMode(hdc, TRANSPARENT);
 
-                    // 绘制拼音
-                    let py_font = CreateFontW(20, 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
-                    SelectObject(hdc, py_font);
-                    SetTextColor(hdc, COLORREF(0xFF000000));
-                    let py_w: Vec<u16> = state.pinyin.encode_utf16().collect();
-                    TextOutW(hdc, 10, 10, &py_w);
-                    DeleteObject(py_font);
+                // 绘制拼音
+                let py_font = CreateFontW(20, 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                SelectObject(hdc, py_font);
+                SetTextColor(hdc, COLORREF(0xFF000000));
+                let py_w: Vec<u16> = state.pinyin.encode_utf16().collect();
+                TextOutW(hdc, 10, 10, &py_w);
+                DeleteObject(py_font);
 
-                    // 绘制候选词与提示
-                    let cand_font = CreateFontW(18, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Microsoft YaHei\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
-                    let hint_font = CreateFontW(14, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                // 绘制候选词与提示
+                let cand_font = CreateFontW(18, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Microsoft YaHei\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                let hint_font = CreateFontW(14, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32, 0, 0, 0, 0, PCWSTR("Segoe UI\0".encode_utf16().collect::<Vec<u16>>().as_ptr()));
+                
+                let mut x = 10;
+                for (i, cand) in state.candidates.iter().take(5).enumerate() {
+                    let text = format!("{}.{}", i + 1, cand);
+                    let text_w: Vec<u16> = text.encode_utf16().collect();
                     
-                    let mut x = 10;
-                    for (i, cand) in state.candidates.iter().take(5).enumerate() {
-                        let text = format!("{}.{}", i + 1, cand);
-                        let text_w: Vec<u16> = text.encode_utf16().collect();
-                        
-                        SelectObject(hdc, cand_font);
-                        if i == state.selected {
-                            SetTextColor(hdc, COLORREF(0x00E37100)); // 蓝色
-                        } else {
-                            SetTextColor(hdc, COLORREF(0x00000000)); // 黑色
-                        }
-                        TextOutW(hdc, x, 40, &text_w);
-                        
-                        if let Some(hint) = state.hints.get(i) {
-                            if !hint.is_empty() {
-                                SelectObject(hdc, hint_font);
-                                SetTextColor(hdc, COLORREF(0x00888888)); // 灰色提示
-                                let hint_w: Vec<u16> = hint.encode_utf16().collect();
-                                TextOutW(hdc, x, 65, &hint_w);
-                            }
-                        }
-                        x += (text.chars().count() * 20 + 80) as i32;
+                    SelectObject(hdc, cand_font);
+                    if i == state.selected {
+                        SetTextColor(hdc, COLORREF(0x00E37100)); // 蓝色
+                    } else {
+                        SetTextColor(hdc, COLORREF(0x00000000)); // 黑色
                     }
-                    DeleteObject(cand_font);
-                    DeleteObject(hint_font);
+                    TextOutW(hdc, x, 40, &text_w);
+                    
+                    if let Some(hint) = state.hints.get(i) {
+                        let hint_str: &String = hint;
+                        if !hint_str.is_empty() {
+                            SelectObject(hdc, hint_font);
+                            SetTextColor(hdc, COLORREF(0x00888888)); // 灰色提示
+                            let hint_w: Vec<u16> = hint_str.encode_utf16().collect();
+                            TextOutW(hdc, x, 65, &hint_w);
+                        }
+                    }
+                    x += (text.chars().count() * 20 + 80) as i32;
                 }
+                DeleteObject(cand_font);
+                DeleteObject(hint_font);
             }
 
             EndPaint(hwnd, &ps);
