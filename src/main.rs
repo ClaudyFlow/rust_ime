@@ -223,7 +223,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             use windows::Win32::System::Console::GetConsoleWindow;
             use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
             let window = unsafe { GetConsoleWindow() };
-            if !window.is_invalid() {
+            if window.0 != 0 {
                 unsafe { ShowWindow(window, SW_HIDE); }
             }
             println!("✅ 已转入后台运行 (窗口已隐藏)。");
