@@ -642,10 +642,29 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 }
 
 #[cfg(target_os = "windows")]
-pub fn start_gui(_rx: Receiver<GuiEvent>, _initial_config: Config) {
-    println!("⚠️ Windows 暂不支持 GTK4 原生界面。");
-    // 保持线程运行
-    loop {
-        std::thread::sleep(std::time::Duration::from_secs(3600));
+
+pub fn start_gui(rx: Receiver<GuiEvent>, _initial_config: Config) {
+
+    println!("[GUI] Windows 模式启动 (仅日志输出)。");
+
+    while let Ok(event) = rx.recv() {
+
+        match event {
+
+            GuiEvent::Update { pinyin, candidates, selected, .. } => {
+
+                if !pinyin.is_empty() {
+
+                    println!("[GUI Update] Pinyin: {}, Candidates: {:?}, Selected: {}", pinyin, candidates, selected);
+
+                }
+
+            }
+
+            _ => {}
+
+        }
+
     }
+
 }

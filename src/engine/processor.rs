@@ -174,11 +174,13 @@ impl Processor {
             }
         }
 
+        let chinese_enabled = initial_profile != "english";
+
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
             punctuation, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
-            chinese_enabled: false, best_segmentation: vec![],
+            chinese_enabled, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
             phantom_mode: PhantomMode::Pinyin,

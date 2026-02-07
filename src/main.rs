@@ -104,7 +104,16 @@ pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let root = find_project_root();
+    let root = if let Ok(mut exe_path) = std::env::current_exe() {
+        exe_path.pop();
+        if exe_path.join("dicts").exists() {
+            exe_path
+        } else {
+            find_project_root()
+        }
+    } else {
+        find_project_root()
+    };
     env::set_current_dir(&root)?;
 
     let args: Vec<String> = env::args().collect();
@@ -119,12 +128,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             #[cfg(target_os = "windows")]
             "--register" => {
+                unsafe {
+                    windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?;
+                }
                 let mut dll_path = std::env::current_exe()?;
-                dll_path.set_file_name("rust_ime.dll");
+                dll_path.set_file_name("rust_ime_tsf.dll");
                 if !dll_path.exists() {
                     // 尝试在 target/debug 或 target/release 找
                     let mut p = std::env::current_exe()?;
-                    p.pop(); p.push("rust_ime.dll");
+                    p.pop(); p.push("rust_ime_tsf.dll");
                     dll_path = p;
                 }
                 
@@ -138,6 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             #[cfg(target_os = "windows")]
             "--unregister" => {
                 unsafe {
+                    windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?;
                     registry::unregister_server(&IME_ID)?;
                 }
                 println!("✅ 已注销 TSF 输入法。");

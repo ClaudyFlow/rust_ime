@@ -138,8 +138,10 @@ impl InputMethodHost for TsfHost {
                                     let ctrl = (modifiers & 2) != 0;
                                     let alt = (modifiers & 4) != 0;
                                     
-                                    // 检查语言切换热键 (默认为 Tab)
-                                    if key_code == 0x09 && !ctrl && !alt && !shift {
+                                    println!("[TSF Pipe] Key: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+
+                                    // 检查语言切换热键 (默认为 Tab 或 Shift)
+                                    if (key_code == 0x09 || key_code == 0x10) && !ctrl && !alt && !shift {
                                         let mut p = processor.lock().unwrap();
                                         p.toggle();
                                         let enabled = p.chinese_enabled;
@@ -177,12 +179,19 @@ impl InputMethodHost for TsfHost {
                                     }
 
                                     let key = match key_code {
-                                        0x41..=0x5A => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x41)),
+                                        0x41..=0x5A => {
+                                            // 直接转换回字母，Processor::handle_key 会根据 shift 处理大小写
+                                            let base = if shift { 0 } else { 0 }; // 这里其实没区别，transmute 需要确切的 index
+                                            // 参考 main.rs 中 Key 的定义: KEY_A = 0
+                                            Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x41))
+                                        }
                                         0x30..=0x39 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x30 + 26)),
+                                        0x60..=0x69 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x60 + 26)), // Numpad
                                         0x20 => Some(crate::evdev::Key::KEY_SPACE),
                                         0x08 => Some(crate::evdev::Key::KEY_BACKSPACE),
                                         0x0D => Some(crate::evdev::Key::KEY_ENTER),
                                         0x1B => Some(crate::evdev::Key::KEY_ESC),
+                                        0x09 => Some(crate::evdev::Key::KEY_TAB),
                                         0x21 => Some(crate::evdev::Key::KEY_PAGEUP),
                                         0x22 => Some(crate::evdev::Key::KEY_PAGEDOWN),
                                         0x25 => Some(crate::evdev::Key::KEY_LEFT),
@@ -191,6 +200,15 @@ impl InputMethodHost for TsfHost {
                                         0x28 => Some(crate::evdev::Key::KEY_DOWN),
                                         0xBB => Some(crate::evdev::Key::KEY_EQUAL),
                                         0xBD => Some(crate::evdev::Key::KEY_MINUS),
+                                        0xBC => Some(crate::evdev::Key::KEY_COMMA),
+                                        0xBE => Some(crate::evdev::Key::KEY_DOT),
+                                        0xBF => Some(crate::evdev::Key::KEY_SLASH),
+                                        0xBA => Some(crate::evdev::Key::KEY_SEMICOLON),
+                                        0xDE => Some(crate::evdev::Key::KEY_APOSTROPHE),
+                                        0xDB => Some(crate::evdev::Key::KEY_LEFTBRACE),
+                                        0xDD => Some(crate::evdev::Key::KEY_RIGHTBRACE),
+                                        0xDC => Some(crate::evdev::Key::KEY_BACKSLASH),
+                                        0xC0 => Some(crate::evdev::Key::KEY_GRAVE),
                                         _ => None,
                                     };
 
@@ -202,6 +220,7 @@ impl InputMethodHost for TsfHost {
                                         update_gui_impl(&gui_tx, &processor);
 
                                         let mut response = Vec::new();
+                                        println!("[TSF Action] {:?} -> {:?}", key, action);
                                         match action {
                                             crate::engine::processor::Action::Emit(txt) => {
                                                 response.push(1); 
