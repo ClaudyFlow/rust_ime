@@ -113,7 +113,6 @@ impl InputMethodHost for TsfHost {
                     );
                     
                     if h_pipe.is_invalid() {
-                        eprintln!("[TSF Server] CreateNamedPipeW 失败。");
                         continue;
                     }
 
@@ -130,97 +129,90 @@ impl InputMethodHost for TsfHost {
                                 if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 {
                                     break;
                                 }
+                                
+                                if bytes_read < 6 { continue; }
+                                
+                                let msg_type = buffer[0]; // 1=Actual, 2=Test
+                                let key_code = u32::from_le_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]);
+                                let modifiers = buffer[5];
+                                let shift = (modifiers & 1) != 0;
+                                let ctrl = (modifiers & 2) != 0;
+                                let alt = (modifiers & 4) != 0;
+                                
+                                if msg_type == 1 {
+                                    println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+                                }
 
-                                if bytes_read >= 6 {
-                                    let key_code = u32::from_le_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]);
-                                    let modifiers = buffer[5];
-                                    let shift = (modifiers & 1) != 0;
-                                    let ctrl = (modifiers & 2) != 0;
-                                    let alt = (modifiers & 4) != 0;
+                                // 检查语言切换热键 (默认为 Tab 或 Ctrl+Space)
+                                let is_toggle_key = (key_code == 0x09 && !ctrl && !alt && !shift) || 
+                                                   (key_code == 0x20 && ctrl && !alt && !shift);
+                                
+                                if is_toggle_key {
+                                    if msg_type == 1 { // 仅在真实按下时切换
+                                        let mut p = processor.lock().unwrap();
+                                        p.toggle();
+                                        let enabled = p.chinese_enabled;
+                                        let summary = p.get_current_profile_display();
+                                        drop(p);
+                                        println!("[TSF Toggle] 中文模式: {}", enabled);
+                                        
+                                        let msg = if enabled { "中文模式" } else { "直通模式" };
+                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                                        
+                                        update_gui_impl(&gui_tx, &processor);
+                                    }
                                     
-                                    println!("[TSF Pipe] Key: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+                                    let mut response = vec![2u8]; // Consume
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                    continue;
+                                }
 
-                                    // 检查语言切换热键 (默认为 Tab 或 Shift)
-                                    if (key_code == 0x09 || key_code == 0x10) && !ctrl && !alt && !shift {
-                                        let mut p = processor.lock().unwrap();
-                                        p.toggle();
-                                        let enabled = p.chinese_enabled;
-                                        let summary = p.get_current_profile_display();
-                                        drop(p);
-                                        
-                                        let msg = if enabled { "中文模式" } else { "直通模式" };
-                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                                        
-                                        update_gui_impl(&gui_tx, &processor);
-                                        
-                                        let mut response = vec![2u8]; // Consume
-                                        let mut bytes_written = 0;
-                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-                                        continue;
-                                    }
+                                // 如果是 Shift 键且不是组合键，直接放过 (PassThrough)
+                                if key_code == 0x10 && !ctrl && !alt {
+                                    let mut response = vec![0u8]; 
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                    continue;
+                                }
 
-                                    // 也可以支持 Ctrl+Space
-                                    if key_code == 0x20 && ctrl && !alt && !shift {
-                                        let mut p = processor.lock().unwrap();
-                                        p.toggle();
-                                        let enabled = p.chinese_enabled;
-                                        let summary = p.get_current_profile_display();
-                                        drop(p);
-                                        
-                                        let msg = if enabled { "中文模式" } else { "直通模式" };
-                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                                        
-                                        update_gui_impl(&gui_tx, &processor);
-                                        
-                                        let mut response = vec![2u8]; // Consume
-                                        let mut bytes_written = 0;
-                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-                                        continue;
-                                    }
+                                let key = match key_code {
+                                    0x41..=0x5A => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x41)),
+                                    0x30..=0x39 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x30 + 26)),
+                                    0x60..=0x69 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x60 + 26)), // Numpad
+                                    0x20 => Some(crate::evdev::Key::KEY_SPACE),
+                                    0x08 => Some(crate::evdev::Key::KEY_BACKSPACE),
+                                    0x0D => Some(crate::evdev::Key::KEY_ENTER),
+                                    0x1B => Some(crate::evdev::Key::KEY_ESC),
+                                    0x09 => Some(crate::evdev::Key::KEY_TAB),
+                                    0x21 => Some(crate::evdev::Key::KEY_PAGEUP),
+                                    0x22 => Some(crate::evdev::Key::KEY_PAGEDOWN),
+                                    0x25 => Some(crate::evdev::Key::KEY_LEFT),
+                                    0x26 => Some(crate::evdev::Key::KEY_UP),
+                                    0x27 => Some(crate::evdev::Key::KEY_RIGHT),
+                                    0x28 => Some(crate::evdev::Key::KEY_DOWN),
+                                    0xBB => Some(crate::evdev::Key::KEY_EQUAL),
+                                    0xBD => Some(crate::evdev::Key::KEY_MINUS),
+                                    0xBC => Some(crate::evdev::Key::KEY_COMMA),
+                                    0xBE => Some(crate::evdev::Key::KEY_DOT),
+                                    0xBF => Some(crate::evdev::Key::KEY_SLASH),
+                                    0xBA => Some(crate::evdev::Key::KEY_SEMICOLON),
+                                    0xDE => Some(crate::evdev::Key::KEY_APOSTROPHE),
+                                    0xDB => Some(crate::evdev::Key::KEY_LEFTBRACE),
+                                    0xDD => Some(crate::evdev::Key::KEY_RIGHTBRACE),
+                                    0xDC => Some(crate::evdev::Key::KEY_BACKSLASH),
+                                    0xC0 => Some(crate::evdev::Key::KEY_GRAVE),
+                                    _ => None,
+                                };
 
-                                    let key = match key_code {
-                                        0x41..=0x5A => {
-                                            // 直接转换回字母，Processor::handle_key 会根据 shift 处理大小写
-                                            let base = if shift { 0 } else { 0 }; // 这里其实没区别，transmute 需要确切的 index
-                                            // 参考 main.rs 中 Key 的定义: KEY_A = 0
-                                            Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x41))
-                                        }
-                                        0x30..=0x39 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x30 + 26)),
-                                        0x60..=0x69 => Some(std::mem::transmute::<u32, crate::evdev::Key>(key_code - 0x60 + 26)), // Numpad
-                                        0x20 => Some(crate::evdev::Key::KEY_SPACE),
-                                        0x08 => Some(crate::evdev::Key::KEY_BACKSPACE),
-                                        0x0D => Some(crate::evdev::Key::KEY_ENTER),
-                                        0x1B => Some(crate::evdev::Key::KEY_ESC),
-                                        0x09 => Some(crate::evdev::Key::KEY_TAB),
-                                        0x21 => Some(crate::evdev::Key::KEY_PAGEUP),
-                                        0x22 => Some(crate::evdev::Key::KEY_PAGEDOWN),
-                                        0x25 => Some(crate::evdev::Key::KEY_LEFT),
-                                        0x26 => Some(crate::evdev::Key::KEY_UP),
-                                        0x27 => Some(crate::evdev::Key::KEY_RIGHT),
-                                        0x28 => Some(crate::evdev::Key::KEY_DOWN),
-                                        0xBB => Some(crate::evdev::Key::KEY_EQUAL),
-                                        0xBD => Some(crate::evdev::Key::KEY_MINUS),
-                                        0xBC => Some(crate::evdev::Key::KEY_COMMA),
-                                        0xBE => Some(crate::evdev::Key::KEY_DOT),
-                                        0xBF => Some(crate::evdev::Key::KEY_SLASH),
-                                        0xBA => Some(crate::evdev::Key::KEY_SEMICOLON),
-                                        0xDE => Some(crate::evdev::Key::KEY_APOSTROPHE),
-                                        0xDB => Some(crate::evdev::Key::KEY_LEFTBRACE),
-                                        0xDD => Some(crate::evdev::Key::KEY_RIGHTBRACE),
-                                        0xDC => Some(crate::evdev::Key::KEY_BACKSLASH),
-                                        0xC0 => Some(crate::evdev::Key::KEY_GRAVE),
-                                        _ => None,
-                                    };
-
-                                    if let Some(key) = key {
+                                if let Some(key) = key {
+                                    let mut response = Vec::new();
+                                    if msg_type == 1 {
                                         let mut p = processor.lock().unwrap();
                                         let action = p.handle_key(key, 1, shift);
                                         drop(p);
-                                        
                                         update_gui_impl(&gui_tx, &processor);
 
-                                        let mut response = Vec::new();
-                                        println!("[TSF Action] {:?} -> {:?}", key, action);
                                         match action {
                                             crate::engine::processor::Action::Emit(txt) => {
                                                 response.push(1); 
@@ -241,14 +233,22 @@ impl InputMethodHost for TsfHost {
                                                 response.push(0);
                                             }
                                         }
-                                        
-                                        let mut bytes_written = 0;
-                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                     } else {
-                                        let mut response = vec![0u8]; // Action::None
-                                        let mut bytes_written = 0;
-                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                        // TestKeyDown: 如果是中文模式且是字母/符号，返回 Consume (2)
+                                        let p = processor.lock().unwrap();
+                                        if p.chinese_enabled {
+                                            response.push(2);
+                                        } else {
+                                            response.push(0);
+                                        }
                                     }
+                                    
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                } else {
+                                    let mut response = vec![0u8]; // Action::None
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                 }
                             }
                             let _ = CloseHandle(handle);

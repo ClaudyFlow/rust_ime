@@ -39,7 +39,7 @@ impl TextService {
         Ok(())
     }
 
-    fn send_key_to_server(&self, key_code: u32, modifiers: u8) -> (u8, String) {
+    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8) -> (u8, String) {
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
         unsafe {
             let h_pipe = CreateFileW(
@@ -53,12 +53,10 @@ impl TextService {
             );
 
             if let Ok(handle) = h_pipe {
-                if handle.is_invalid() {
-                    return (0, String::new());
-                }
+                if handle.is_invalid() { return (0, String::new()); }
 
                 let mut request = [0u8; 6];
-                request[0] = 1; // KeyDown
+                request[0] = msg_type; // 1=KeyDown, 2=Test
                 let code_bytes = key_code.to_le_bytes();
                 request[1..5].copy_from_slice(&code_bytes);
                 request[5] = modifiers;
@@ -70,13 +68,13 @@ impl TextService {
                 let mut bytes_read = 0;
                 if ReadFile(handle, Some(&mut response), Some(&mut bytes_read), None).is_ok() && bytes_read > 0 {
                     let action = response[0];
-                    let text = if action == 1 && bytes_read > 1 {
-                        String::from_utf8_lossy(&response[1..bytes_read as usize]).to_string()
-                    } else {
-                        String::new()
-                    };
+                    if action == 1 { // Commit
+                        let text = String::from_utf8_lossy(&response[1..bytes_read as usize]).to_string();
+                        let _ = CloseHandle(handle);
+                        return (action, text);
+                    }
                     let _ = CloseHandle(handle);
-                    return (action, text);
+                    return (action, String::new());
                 }
                 let _ = CloseHandle(handle);
             }
@@ -111,42 +109,11 @@ impl ITfKeyEventSink_Impl for TextService {
     
     fn OnTestKeyDown(&self, _context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
         let key_code = wparam.0 as u32;
-        // 允许大多数按键通过管道咨询服务器
-        // A-Z (0x41-0x5A), 0-9 (0x30-0x39), Numpad 0-9 (0x60-0x69)
-        // Space (0x20), Enter (0x0D), Backspace (0x08), ESC (0x1B), Tab (0x09)
-        // Arrows (0x25-0x28), PgUp/Dn (0x21-0x22), Home/End (0x23-0x24)
-        // Punctuation and others...
         if (key_code >= 0x30 && key_code <= 0x39) || (key_code >= 0x41 && key_code <= 0x5A) ||
            (key_code >= 0x60 && key_code <= 0x69) ||
            key_code == 0x20 || key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || key_code == 0x09 ||
            (key_code >= 0x21 && key_code <= 0x28) ||
-           key_code == 0x10 || key_code == 0x11 || key_code == 0x12 || // Shift, Ctrl, Alt
-           key_code == 0xBB || key_code == 0xBD || key_code == 0xBC || key_code == 0xBE || // = - , .
-           key_code == 0xBF || key_code == 0xBA || key_code == 0xDE || // / ; '
-           key_code == 0xDB || key_code == 0xDD || key_code == 0xDC || // [ ] \
-           key_code == 0xC0 // `
-        {
-            let mut modifiers = 0u8;
-            unsafe {
-                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 1; }
-                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
-                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
-            }
-            let (action, _) = self.send_key_to_server(key_code, modifiers);
-            if action != 0 {
-                return Ok(TRUE);
-            }
-        }
-        Ok(FALSE)
-    }
-
-    fn OnKeyDown(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
-        let key_code = wparam.0 as u32;
-        if (key_code >= 0x30 && key_code <= 0x39) || (key_code >= 0x41 && key_code <= 0x5A) ||
-           (key_code >= 0x60 && key_code <= 0x69) ||
-           key_code == 0x20 || key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || key_code == 0x09 ||
-           (key_code >= 0x21 && key_code <= 0x28) ||
-           key_code == 0x10 || key_code == 0x11 || key_code == 0x12 ||
+           key_code == 0x10 || key_code == 0x11 || key_code == 0x12 || key_code == 0x14 ||
            key_code == 0xBB || key_code == 0xBD || key_code == 0xBC || key_code == 0xBE ||
            key_code == 0xBF || key_code == 0xBA || key_code == 0xDE ||
            key_code == 0xDB || key_code == 0xDD || key_code == 0xDC ||
@@ -158,7 +125,31 @@ impl ITfKeyEventSink_Impl for TextService {
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
                 if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
             }
-            let (action, text) = self.send_key_to_server(key_code, modifiers);
+            let (action, _) = self.send_key_to_server(2, key_code, modifiers); // 2 = Test
+            if action != 0 { return Ok(TRUE); }
+        }
+        Ok(FALSE)
+    }
+
+    fn OnKeyDown(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        let key_code = wparam.0 as u32;
+        if (key_code >= 0x30 && key_code <= 0x39) || (key_code >= 0x41 && key_code <= 0x5A) ||
+           (key_code >= 0x60 && key_code <= 0x69) ||
+           key_code == 0x20 || key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || key_code == 0x09 ||
+           (key_code >= 0x21 && key_code <= 0x28) ||
+           key_code == 0x10 || key_code == 0x11 || key_code == 0x12 || key_code == 0x14 ||
+           key_code == 0xBB || key_code == 0xBD || key_code == 0xBC || key_code == 0xBE ||
+           key_code == 0xBF || key_code == 0xBA || key_code == 0xDE ||
+           key_code == 0xDB || key_code == 0xDD || key_code == 0xDC ||
+           key_code == 0xC0
+        {
+            let mut modifiers = 0u8;
+            unsafe {
+                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 1; }
+                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
+                if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
+            }
+            let (action, text) = self.send_key_to_server(1, key_code, modifiers); // 1 = Actual
             if action != 0 {
                 if action == 1 {
                     if let Some(ctx) = context {
@@ -190,25 +181,33 @@ impl EditSession {
 
 impl ITfEditSession_Impl for EditSession {
     fn DoEditSession(&self, ec: u32) -> Result<()> {
-        log("RustIME: DoEditSession start");
         unsafe {
-            // 重点 1: 手动转换接口，并检查是否为 null
-            let source_res: Result<ITfInsertAtSelection> = self.context.cast();
-            if let Ok(source) = source_res {
-                // 重点 2: 确保 Vec 存活到调用结束
-                let mut text_w: Vec<u16> = self.text.encode_utf16().collect();
-                text_w.push(0);
-                
-                log("RustIME: Invoking InsertTextAtSelection");
-                // 重点 3: 严格遵循 windows-rs 0.52.0 的 3 参数签名
-                let res = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
-                
-                match res {
-                    Ok(_) => log("RustIME: Insert Success"),
-                    Err(e) => log(&format!("RustIME: Insert Error: {:?}", e)),
+            let text_w: Vec<u16> = self.text.encode_utf16().collect();
+            if text_w.is_empty() { return Ok(()); }
+
+            // 方案：获取当前选区并直接设置文本
+            let mut selection = [TF_SELECTION { ..Default::default() }];
+            let mut fetched = 0;
+            
+            // 1. 获取当前插入点
+            if self.context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched).is_ok() && fetched > 0 {
+                if let Some(range) = &*selection[0].range {
+                    // 2. 将文本设置到该位置
+                    let _ = range.SetText(ec, 0, &text_w);
+                    
+                    // 3. 将光标移至文本末尾
+                    let _ = range.Collapse(ec, TF_ANCHOR_END);
+                    let _ = self.context.SetSelection(ec, &[TF_SELECTION {
+                        range: std::mem::ManuallyDrop::new(Some(range.clone())),
+                        style: selection[0].style,
+                    }]);
                 }
             } else {
-                log("RustIME: Failed to cast ITfInsertAtSelection");
+                // 备选方案：如果 GetSelection 失败，尝试原始插入接口
+                let source_res: Result<ITfInsertAtSelection> = self.context.cast();
+                if let Ok(source) = source_res {
+                    let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
+                }
             }
         }
         Ok(())

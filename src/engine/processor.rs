@@ -174,16 +174,16 @@ impl Processor {
             }
         }
 
-        let chinese_enabled = initial_profile != "english";
+        let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
 
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
             punctuation, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
-            chinese_enabled, best_segmentation: vec![],
+            chinese_enabled: false, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
-            phantom_mode: PhantomMode::Pinyin,
+            phantom_mode,
             phantom_text: String::new(),
             preview_selected_candidate: false,
             enable_anti_typo: true,
@@ -288,9 +288,13 @@ impl Processor {
             }
         }
 
-        self.phantom_mode = match conf.appearance.preview_mode.as_str() {
-            "pinyin" => PhantomMode::Pinyin,
-            _ => PhantomMode::None,
+        self.phantom_mode = if cfg!(target_os = "windows") {
+            PhantomMode::None
+        } else {
+            match conf.appearance.preview_mode.as_str() {
+                "pinyin" => PhantomMode::Pinyin,
+                _ => PhantomMode::None,
+            }
         };
 
         if self.buffer.is_empty() {
