@@ -3,6 +3,7 @@ use ksni::menu::{StandardItem, MenuItem};
 #[cfg(target_os = "linux")]
 use ksni::{Tray, ToolTip, TrayService, Handle};
 use std::sync::mpsc::Sender;
+#[cfg(target_os = "linux")]
 use tiny_skia::*;
 
 #[derive(Debug, Clone)]
