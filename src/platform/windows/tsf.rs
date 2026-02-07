@@ -167,18 +167,26 @@ impl InputMethodHost for TsfHost {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
                                 }
 
-                                // 1. 优先检查切换热键 (必须排在第一位)
-                                let is_toggle = (key_code == 0x09 && !ctrl && !alt) || (key_code == 0x20 && ctrl);
-                                if is_toggle {
+                                // 1. 优先检查切换热键 (必须排在最前面)
+                                let is_ctrl_space = (key_code == 0x20) && ctrl;
+                                let is_tab = (key_code == 0x09) && !ctrl && !alt;
+                                
+                                if is_tab || is_ctrl_space {
                                     if msg_type == 1 {
                                         let mut p = processor.lock().unwrap();
                                         p.toggle();
                                         let enabled = p.chinese_enabled;
-                                        let summary = p.get_current_profile_display();
+                                        let profile_name = p.get_current_profile_display();
                                         drop(p);
-                                        println!("[TSF Toggle] Key: 0x{:02X}, Enabled: {}", key_code, enabled);
-                                        let msg = if enabled { "中文模式" } else { "直通模式" };
-                                        let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
+                                        
+                                        let (title, msg) = if enabled {
+                                            ("中", format!("中文模式 ({})", profile_name))
+                                        } else {
+                                            ("英", "英文直通模式".to_string())
+                                        };
+                                        
+                                        println!("[TSF Toggle] Mode: {}", title);
+                                        let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
                                         update_gui_impl(&gui_tx, &processor);
                                     }
                                     let mut response = vec![2u8]; // Consume
