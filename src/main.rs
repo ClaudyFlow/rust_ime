@@ -374,7 +374,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::thread::spawn(move || {
         if let Ok(rt) = tokio::runtime::Runtime::new() {
             rt.block_on(async {
-                ui::web::WebServer::new(8765, config_web, tries_web, tray_tx_web).start().await;
+                let server = ui::web::WebServer::new(8765, config_web, tries_web, tray_tx_web);
+                server.start().await;
             });
         }
     });

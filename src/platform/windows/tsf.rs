@@ -143,12 +143,13 @@ impl InputMethodHost for TsfHost {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
                                 }
 
-                                // 检查语言切换热键 (默认为 Tab 或 Ctrl+Space)
+                                // 检查语言切换热键 (Tab 或 Ctrl+Space)
+                                let is_ctrl_space = key_code == 0x20 && ctrl;
                                 let is_toggle_key = (key_code == 0x09 && !ctrl && !alt && !shift) || 
-                                                   (key_code == 0x20 && ctrl && !alt && !shift);
+                                                   (is_ctrl_space && !alt && !shift);
                                 
                                 if is_toggle_key {
-                                    if msg_type == 1 { // 仅在真实按下时切换
+                                    if msg_type == 1 {
                                         let mut p = processor.lock().unwrap();
                                         p.toggle();
                                         let enabled = p.chinese_enabled;
@@ -161,11 +162,21 @@ impl InputMethodHost for TsfHost {
                                         
                                         update_gui_impl(&gui_tx, &processor);
                                     }
-                                    
                                     let mut response = vec![2u8]; // Consume
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                     continue;
+                                }
+
+                                // 处理回车/退格/数字的特殊直通逻辑
+                                if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
+                                    let p = processor.lock().unwrap();
+                                    if p.buffer.is_empty() {
+                                        let mut response = vec![0u8]; // PassThrough
+                                        let mut bytes_written = 0;
+                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                        continue;
+                                    }
                                 }
 
                                 // 如果是 Shift 键且不是组合键，直接放过 (PassThrough)
@@ -234,9 +245,12 @@ impl InputMethodHost for TsfHost {
                                             }
                                         }
                                     } else {
-                                        // TestKeyDown: 如果是中文模式且是字母/符号，返回 Consume (2)
+                                        // TestKeyDown: 只有在中文模式且 (buffer 不为空 或 按键是字母) 时才拦截
                                         let p = processor.lock().unwrap();
-                                        if p.chinese_enabled {
+                                        let is_letter = key_code >= 0x41 && key_code <= 0x5A;
+                                        let would_handle = p.chinese_enabled && (!p.buffer.is_empty() || is_letter);
+                                        
+                                        if would_handle {
                                             response.push(2);
                                         } else {
                                             response.push(0);
@@ -264,4 +278,3 @@ impl InputMethodHost for TsfHost {
         { Err("TsfHost 仅支持 Windows。".into()) }
     }
 }
-
