@@ -147,7 +147,7 @@ impl InputMethodHost for TsfHost {
                                     let y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
                                     if x != 0 || y != 0 {
                                         if let Some(ref tx) = gui_tx {
-                                            let _ = tx.send(GuiEvent::MoveTo { x, y });
+                                            let _ = tx.send(crate::ui::GuiEvent::MoveTo { x, y });
                                         }
                                     }
                                 }

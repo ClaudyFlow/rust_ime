@@ -48,6 +48,7 @@ use std::process::Command;
 use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
 pub use config::Config;
+use ui::GuiEvent;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -371,7 +372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         use rand::Rng;
                         let idx = rand::thread_rng().gen_range(0..entries.len());
                         let (h, t) = &entries[idx];
-                        let _ = gui_tx_learn.send(ui::gui::GuiEvent::ShowLearning(h.clone(), t.clone()));
+                        let _ = gui_tx_learn.send(GuiEvent::ShowLearning(h.clone(), t.clone()));
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_secs(interval.max(1)));
@@ -414,7 +415,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::Update { 
+                    let _ = gui_tx_tray.send(GuiEvent::Update { 
                         pinyin: "".into(), 
                         candidates: vec![], 
                         hints: vec![], 
@@ -442,7 +443,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(mut w) = config_tray.write() { 
                         w.appearance.show_candidates = enabled; 
                         let _ = save_config(&w); 
-                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                        let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
                     }
                 }
                 ui::tray::TrayEvent::ToggleModernGui => {
@@ -455,7 +456,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(mut w) = config_tray.write() { 
                         w.appearance.show_modern_candidates = enabled; 
                         let _ = save_config(&w); 
-                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                        let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
                     }
                 }
                 ui::tray::TrayEvent::ToggleNotify => {
@@ -478,7 +479,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     // 如果关闭按键显示，清除当前的按键显示
                     if !enabled {
-                        let _ = gui_tx_tray.send(ui::gui::GuiEvent::ClearKeystrokes);
+                        let _ = gui_tx_tray.send(GuiEvent::ClearKeystrokes);
                     }
                 }
                 ui::tray::TrayEvent::ToggleLearning => {
@@ -487,7 +488,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let enabled = w.appearance.learning_mode;
                     tray_handle.update(|t| t.learning_mode = enabled);
                     let _ = save_config(&w);
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(w.clone()));
+                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
                 }
                 ui::tray::TrayEvent::ToggleAntiTypo => {
                     let mut w = config_tray.write().unwrap();
@@ -522,7 +523,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();
                     processor_clone.lock().unwrap().apply_config(&new_conf);
-                    let _ = gui_tx_tray.send(ui::gui::GuiEvent::ApplyConfig(new_conf.clone()));
+                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf.clone()));
                     
                     // 同步更新托盘菜单状态
                     tray_handle.update(|t| {
