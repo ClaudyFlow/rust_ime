@@ -117,6 +117,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("✅ 已设置开机自启。");
                 return Ok(());
             }
+            #[cfg(target_os = "windows")]
+            "--register" => {
+                let mut dll_path = std::env::current_exe()?;
+                dll_path.set_file_name("rust_ime.dll");
+                if !dll_path.exists() {
+                    // 尝试在 target/debug 或 target/release 找
+                    let mut p = std::env::current_exe()?;
+                    p.pop(); p.push("rust_ime.dll");
+                    dll_path = p;
+                }
+                
+                println!("正在从 {:?} 注册...", dll_path);
+                unsafe {
+                    registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(dll_path.to_str().unwrap()))?;
+                }
+                println!("✅ 已注册 TSF 输入法。");
+                return Ok(());
+            }
+            #[cfg(target_os = "windows")]
+            "--unregister" => {
+                unsafe {
+                    registry::unregister_server(&IME_ID)?;
+                }
+                println!("✅ 已注销 TSF 输入法。");
+                return Ok(());
+            }
             "--foreground" => {
                 should_daemonize = false;
             }

@@ -15,14 +15,18 @@ pub fn to_pcwstr(s: &str) -> Vec<u16> {
     v
 }
 
-pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description: &str) -> Result<()> {
+pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description: &str, dll_path_override: Option<&str>) -> Result<()> {
     // 1. 获取 DLL 路径
-    let mut path = [0u16; 260];
-    let len = windows::Win32::System::LibraryLoader::GetModuleFileNameW(dll_instance, &mut path);
-    if len == 0 {
-        return Err(Error::from_win32());
-    }
-    let dll_path = String::from_utf16_lossy(&path[..len as usize]);
+    let dll_path = if let Some(path) = dll_path_override {
+        path.to_string()
+    } else {
+        let mut path = [0u16; 260];
+        let len = windows::Win32::System::LibraryLoader::GetModuleFileNameW(dll_instance, &mut path);
+        if len == 0 {
+            return Err(Error::from_win32());
+        }
+        String::from_utf16_lossy(&path[..len as usize])
+    };
     let clsid_str = format!("{{{:?}}}", clsid);
     
     // 2. 注册 COM CLSID

@@ -334,6 +334,9 @@ impl Processor {
     }
 
     pub fn handle_key(&mut self, key: Key, val: i32, shift_pressed: bool) -> Action {
+        if !self.chinese_enabled {
+            return Action::PassThrough;
+        }
         let _is_press = val != 0;
         let is_repeat = val == 2;
         let is_release = val == 0;

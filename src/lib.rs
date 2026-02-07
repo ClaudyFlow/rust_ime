@@ -70,7 +70,7 @@ pub unsafe extern "system" fn DllGetClassObject(
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn DllRegisterServer() -> HRESULT {
-    registry::register_server(DLL_INSTANCE, &IME_ID, "Rust IME")
+    registry::register_server(DLL_INSTANCE, &IME_ID, "Rust IME", None)
         .map_or_else(|e| e.code(), |_| S_OK)
 }
 
