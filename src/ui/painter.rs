@@ -3,14 +3,11 @@ use crate::config::Config;
 use fontdue::Font;
 
 pub struct CandidatePainter {
-    pub width: u32,
-    pub height: u32,
     font: Option<Font>,
 }
 
 impl CandidatePainter {
     pub fn new() -> Self {
-        // 在 Windows 上尝试加载微软雅黑
         let font_path = "C:\\Windows\\Fonts\\msyh.ttc"; // 微软雅黑
         let font = if let Ok(data) = std::fs::read(font_path) {
             Font::from_bytes(data, fontdue::FontSettings::default()).ok()
@@ -18,106 +15,120 @@ impl CandidatePainter {
             None
         };
 
-        Self { 
-            width: 600, 
-            height: 160, // 增加高度
-            font,
-        }
+        Self { font }
     }
 
-    pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> Vec<u8> {
-        // 1. 动态计算宽度：根据拼音长度和候选词大致预估
-        let min_width = 400;
-        let pinyin_width = (pinyin.chars().count() * 18) as u32 + 80;
-        let mut candidates_width = 0;
-        for (i, c) in candidates.iter().enumerate() {
-            candidates_width += (c.chars().count() * 28) as u32 + 50;
-            if let Some(h) = hints.get(i) {
-                candidates_width += (h.chars().count() * 14) as u32;
-            }
-        }
-        let dynamic_width = pinyin_width.max(candidates_width).max(min_width).min(1200); // 限制最大宽度
+    pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> (Vec<u8>, u32, u32) {
+        let padding = 16.0;
+        let corner_radius = 6.0;
+        let font_size_pinyin = 18.0;
+        let font_size_cand = 20.0;
+        let line_height_pinyin = font_size_pinyin * 1.4;
+        let line_height_cand = font_size_cand * 1.4;
+        let spacing_v = 12.0;
+        let item_spacing_h = 24.0;
 
-        let mut pixmap = Pixmap::new(dynamic_width, self.height).unwrap();
+        let mut cand_widths = Vec::new();
+        let mut total_width = 300.0;
+        let mut total_height = 100.0;
+        
+        if let Some(ref font) = self.font {
+            let pinyin_w = self.measure_text(font, pinyin, font_size_pinyin);
+            let mut row_width = 0.0;
+            for (i, cand) in candidates.iter().enumerate() {
+                let text = format!("{}.{}", i + 1, cand);
+                let w = self.measure_text(font, &text, font_size_cand);
+                let hint_w = if let Some(h) = hints.get(i) {
+                    if !h.is_empty() { self.measure_text(font, h, font_size_cand * 0.75) + 6.0 } else { 0.0 }
+                } else { 0.0 };
+                let total_item_w = w + hint_w;
+                cand_widths.push(total_item_w);
+                row_width += total_item_w + if i < candidates.len() - 1 { item_spacing_h } else { 0.0 };
+            }
+            total_width = (pinyin_w + padding * 2.0).max(row_width + padding * 2.0).max(300.0).min(1200.0);
+            total_height = padding * 2.0 + line_height_pinyin + spacing_v + line_height_cand;
+        }
+
+        let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
-        let margin = 10.0;
-        let radius = 12.0;
+        // 多层阴影
+        for i in 1..=3 {
+            let offset = i as f32 * 2.0;
+            let mut shadow_paint = Paint::default();
+            shadow_paint.set_color(Color::from_rgba8(0, 0, 0, (15 / i) as u8));
+            shadow_paint.anti_alias = true;
+            let shadow_rect = Rect::from_xywh(offset, offset, total_width - offset, total_height - offset).unwrap();
+            let shadow_path = self.create_rounded_rect_path(shadow_rect, corner_radius + offset);
+            pixmap.fill_path(&shadow_path, &shadow_paint, FillRule::Winding, Transform::identity(), None);
+        }
 
-        // 2. 绘制阴影
-        let mut shadow_paint = Paint::default();
-        shadow_paint.set_color(Color::from_rgba8(0, 0, 0, 40));
-        shadow_paint.anti_alias = true;
-        let shadow_rect = Rect::from_xywh(2.0, 2.0, dynamic_width as f32 - 4.0, self.height as f32 - 4.0).unwrap();
-        let shadow_path = self.create_rounded_rect_path(shadow_rect, radius + 2.0);
-        pixmap.fill_path(&shadow_path, &shadow_paint, FillRule::Winding, Transform::identity(), None);
-
-        // 3. 绘制主背景
+        // 背景
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&config.appearance.candidate_bg_color));
         bg_paint.anti_alias = true;
-        let rect = Rect::from_xywh(margin, margin, dynamic_width as f32 - margin * 2.0, self.height as f32 - margin * 2.0).unwrap();
-        let path = self.create_rounded_rect_path(rect, radius);
-        pixmap.fill_path(&path, &bg_paint, FillRule::Winding, Transform::identity(), None);
+        let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
+        let main_path = self.create_rounded_rect_path(main_rect, corner_radius);
+        pixmap.fill_path(&main_path, &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 4. 绘制文字 (高清晰度渲染)
         if let Some(ref font) = self.font {
-            // A. 绘制拼音 (下移位置)
-            self.draw_text(&mut pixmap, font, pinyin, 30.0, 50.0, 30.0, Color::from_rgba8(0, 113, 227, 255));
+            let pinyin_y = padding + line_height_pinyin * 0.8;
+            self.draw_text(&mut pixmap, font, pinyin, padding, pinyin_y, font_size_pinyin, Color::from_rgba8(100, 100, 100, 255));
 
-            // B. 绘制候选词与提示 (下移位置)
-            let mut x_offset = 30.0;
+            let cand_y_base = padding + line_height_pinyin + spacing_v;
+            let mut x_cursor = padding;
             for (i, cand) in candidates.iter().enumerate() {
+                let is_selected = i == selected;
+                if is_selected {
+                    let mut hp = Paint::default();
+                    hp.set_color(Color::from_rgba8(0, 120, 215, 40));
+                    let hr = Rect::from_xywh(x_cursor - 4.0, cand_y_base, cand_widths[i] + 8.0, line_height_cand).unwrap();
+                    pixmap.fill_path(&self.create_rounded_rect_path(hr, 4.0), &hp, FillRule::Winding, Transform::identity(), None);
+                }
                 let text = format!("{}.{}", i + 1, cand);
-                let color = if i == selected {
-                    Color::from_rgba8(0, 113, 227, 255)
-                } else {
-                    Color::BLACK
-                };
-                
-                let adv = self.draw_text(&mut pixmap, font, &text, x_offset, 110.0, 32.0, color);
-                x_offset += adv;
-                
+                let adv = self.draw_text(&mut pixmap, font, &text, x_cursor, cand_y_base + line_height_cand * 0.75, font_size_cand, if is_selected { Color::from_rgba8(0, 102, 204, 255) } else { Color::BLACK });
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
-                        let hint_adv = self.draw_text(&mut pixmap, font, hint, x_offset + 6.0, 110.0, 18.0, Color::from_rgba8(150, 150, 150, 255));
-                        x_offset += hint_adv + 6.0;
+                        self.draw_text(&mut pixmap, font, hint, x_cursor + adv + 4.0, cand_y_base + line_height_cand * 0.75, font_size_cand * 0.75, Color::from_rgba8(150, 150, 150, 255));
                     }
                 }
-                x_offset += 45.0;
+                x_cursor += cand_widths[i] + item_spacing_h;
             }
         }
 
-        pixmap.data().to_vec()
+        (pixmap.data().to_vec(), total_width as u32, total_height as u32)
+    }
+
+    fn measure_text(&self, font: &Font, text: &str, size: f32) -> f32 {
+        let mut width = 0.0;
+        for c in text.chars() {
+            let metrics = font.metrics(c, size);
+            width += metrics.advance_width;
+        }
+        width
     }
 
     fn draw_text(&self, pixmap: &mut Pixmap, font: &Font, text: &str, x: f32, y: f32, size: f32, color: Color) -> f32 {
-        let mut current_x = x;
-        let mut total_advance = 0.0;
-        
+        let mut cx = x;
         for c in text.chars() {
             let (metrics, bitmap) = font.rasterize(c, size);
             for row in 0..metrics.height {
                 for col in 0..metrics.width {
                     let alpha = bitmap[row * metrics.width + col];
                     if alpha > 0 {
-                        let px = current_x + col as f32 + metrics.xmin as f32;
-                        let py = y + row as f32 - metrics.ymin as f32 - metrics.height as f32; // 调整 Y 轴对齐
-                        
+                        let px = cx + col as f32 + metrics.xmin as f32;
+                        let py = y + row as f32 - metrics.ymin as f32 - metrics.height as f32;
                         if px >= 0.0 && px < pixmap.width() as f32 && py >= 0.0 && py < pixmap.height() as f32 {
-                            let mut paint = Paint::default();
-                            let mut c_with_alpha = color;
-                            c_with_alpha.set_alpha(color.alpha() * (alpha as f32 / 255.0));
-                            paint.set_color(c_with_alpha);
-                            pixmap.fill_rect(Rect::from_xywh(px, py, 1.0, 1.0).unwrap(), &paint, Transform::identity(), None);
+                            let mut p = Paint::default();
+                            p.set_color(Color::from_rgba(color.red(), color.green(), color.blue(), color.alpha() * (alpha as f32 / 255.0)).unwrap());
+                            pixmap.fill_rect(Rect::from_xywh(px, py, 1.0, 1.0).unwrap(), &p, Transform::identity(), None);
                         }
                     }
                 }
             }
-            current_x += metrics.advance_width;
-            total_advance += metrics.advance_width;
+            cx += metrics.advance_width;
         }
-        total_advance
+        cx - x
     }
 
     fn create_rounded_rect_path(&self, rect: Rect, radius: f32) -> Path {

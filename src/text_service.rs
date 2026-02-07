@@ -22,7 +22,7 @@ pub struct TextService {
 
 impl TextService {
     pub fn new() -> Self {
-        log("RustIME: TextService::new");
+        log("RustIME: TextService::new - BUILD 2045");
         Self {
             client_id: AtomicU32::new(0),
         }

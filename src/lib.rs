@@ -1,3 +1,4 @@
+// Version: 2026-02-07 20:45 - UI Update Sync
 #[cfg(windows)]
 use windows::{
     core::*,

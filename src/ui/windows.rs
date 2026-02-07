@@ -73,7 +73,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                     vec![String::new(); current_candidates.len()]
                                 };
 
-                                let pixels = painter.draw(
+                                // 使用 Painter 绘图，获取准确的 w 和 h
+                                let (pixels, w, h) = painter.draw(
                                     &state.pinyin, 
                                     &current_candidates, 
                                     &current_hints, 
@@ -81,10 +82,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                     &current_config
                                 );
                                 
-                                let dynamic_width = (pixels.len() / (painter.height as usize * 4)) as u32;
-                                
-                                update_window_pixels(hwnd, &pixels, dynamic_width, painter.height);
-                                let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, dynamic_width as i32, painter.height as i32, SWP_NOMOVE | SWP_NOACTIVATE);
+                                update_window_pixels(hwnd, &pixels, w, h);
+                                let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, w as i32, h as i32, SWP_NOMOVE | SWP_NOACTIVATE);
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                             }
                         }
