@@ -20,7 +20,7 @@ impl CandidatePainter {
 
         Self { 
             width: 600, 
-            height: 120,
+            height: 160, // 增加高度
             font,
         }
     }
@@ -28,12 +28,12 @@ impl CandidatePainter {
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> Vec<u8> {
         // 1. 动态计算宽度：根据拼音长度和候选词大致预估
         let min_width = 400;
-        let pinyin_width = (pinyin.chars().count() * 15) as u32 + 60;
+        let pinyin_width = (pinyin.chars().count() * 18) as u32 + 80;
         let mut candidates_width = 0;
         for (i, c) in candidates.iter().enumerate() {
-            candidates_width += (c.chars().count() * 25) as u32 + 40;
+            candidates_width += (c.chars().count() * 28) as u32 + 50;
             if let Some(h) = hints.get(i) {
-                candidates_width += (h.chars().count() * 12) as u32;
+                candidates_width += (h.chars().count() * 14) as u32;
             }
         }
         let dynamic_width = pinyin_width.max(candidates_width).max(min_width).min(1200); // 限制最大宽度
@@ -62,11 +62,11 @@ impl CandidatePainter {
 
         // 4. 绘制文字 (高清晰度渲染)
         if let Some(ref font) = self.font {
-            // A. 绘制拼音
-            self.draw_text(&mut pixmap, font, pinyin, 25.0, 20.0, 24.0, Color::from_rgba8(0, 113, 227, 255));
+            // A. 绘制拼音 (下移位置)
+            self.draw_text(&mut pixmap, font, pinyin, 30.0, 50.0, 30.0, Color::from_rgba8(0, 113, 227, 255));
 
-            // B. 绘制候选词与提示
-            let mut x_offset = 25.0;
+            // B. 绘制候选词与提示 (下移位置)
+            let mut x_offset = 30.0;
             for (i, cand) in candidates.iter().enumerate() {
                 let text = format!("{}.{}", i + 1, cand);
                 let color = if i == selected {
@@ -75,16 +75,16 @@ impl CandidatePainter {
                     Color::BLACK
                 };
                 
-                let adv = self.draw_text(&mut pixmap, font, &text, x_offset, 65.0, 26.0, color);
+                let adv = self.draw_text(&mut pixmap, font, &text, x_offset, 110.0, 32.0, color);
                 x_offset += adv;
                 
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
-                        let hint_adv = self.draw_text(&mut pixmap, font, hint, x_offset + 4.0, 65.0, 16.0, Color::from_rgba8(150, 150, 150, 255));
-                        x_offset += hint_adv + 4.0;
+                        let hint_adv = self.draw_text(&mut pixmap, font, hint, x_offset + 6.0, 110.0, 18.0, Color::from_rgba8(150, 150, 150, 255));
+                        x_offset += hint_adv + 6.0;
                     }
                 }
-                x_offset += 35.0;
+                x_offset += 45.0;
             }
         }
 
