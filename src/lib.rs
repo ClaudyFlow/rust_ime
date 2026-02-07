@@ -2,7 +2,6 @@
 use windows::{
     core::*,
     Win32::Foundation::*,
-    Win32::System::Com::*,
     Win32::System::SystemServices::DLL_PROCESS_ATTACH,
 };
 
