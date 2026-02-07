@@ -166,15 +166,16 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::*;
         let mut info = GUITHREADINFO::default();
         info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
-        if GetGUIThreadInfo(0, &mut info).as_bool() {
+        if GetGUIThreadInfo(0, &mut info).is_ok() {
             let mut pt = POINT {
                 x: info.rcCaret.left,
                 y: info.rcCaret.bottom,
             };
-            ClientToScreen(info.hwndCaret, &mut pt);
+            let _ = ClientToScreen(info.hwndCaret, &mut pt);
             if pt.x != 0 || pt.y != 0 {
                 return Some((pt.x, pt.y));
             }
