@@ -143,33 +143,36 @@ impl InputMethodHost for TsfHost {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
                                 }
 
-                                // 检查语言切换热键 (Tab 或 Ctrl+Space)
+                                // 检查语言切换热键 (最简化逻辑以确保成功)
+                                let is_tab = key_code == 0x09;
                                 let is_ctrl_space = key_code == 0x20 && ctrl;
-                                let is_toggle_key = (key_code == 0x09 && !ctrl && !alt && !shift) || 
-                                                   (is_ctrl_space && !alt && !shift);
                                 
-                                if is_toggle_key {
-                                    if msg_type == 1 {
+                                if is_tab || is_ctrl_space {
+                                    if msg_type == 1 { // 仅在真实按下时处理
                                         let mut p = processor.lock().unwrap();
                                         p.toggle();
                                         let enabled = p.chinese_enabled;
                                         let summary = p.get_current_profile_display();
                                         drop(p);
-                                        println!("[TSF Toggle] 中文模式: {}", enabled);
                                         
+                                        println!("[TSF Toggle] Key: 0x{:02X}, Enabled: {}", key_code, enabled);
                                         let msg = if enabled { "中文模式" } else { "直通模式" };
                                         let _ = notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                                        
                                         update_gui_impl(&gui_tx, &processor);
                                     }
+                                    
                                     let mut response = vec![2u8]; // Consume
                                     let mut bytes_written = 0;
                                     let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                     continue;
                                 }
 
-                                // 处理回车/退格/数字的特殊直通逻辑
-                                if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
+                                // 直通逻辑：如果 buffer 为空且不是切换键，允许常用控制键直通
+                                let is_control_key = key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || 
+                                                    (key_code >= 0x30 && key_code <= 0x39) ||
+                                                    (key_code >= 0x21 && key_code <= 0x28); // Arrows, PgUp/Dn
+                                                    
+                                if is_control_key {
                                     let p = processor.lock().unwrap();
                                     if p.buffer.is_empty() {
                                         let mut response = vec![0u8]; // PassThrough
