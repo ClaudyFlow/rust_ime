@@ -39,30 +39,9 @@ impl TextService {
         Ok(())
     }
 
-    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, context: Option<&ITfContext>) -> (u8, String) {
-        let mut x = 0i32;
-        let mut y = 0i32;
-
-        if let Some(ctx) = context {
-            unsafe {
-                if let Ok(view) = ctx.GetActiveView() {
-                    let mut rect = RECT::default();
-                    let mut selection = [TF_SELECTION { ..Default::default() }];
-                    let mut fetched = 0;
-                    
-                    // 获取当前选区 (光标位置)
-                    if ctx.GetSelection(0, TF_DEFAULT_SELECTION, &mut selection, &mut fetched).is_ok() && fetched > 0 {
-                        if let Some(range) = &*selection[0].range {
-                            let mut clipped = BOOL(0);
-                            if view.GetTextExt(range, &mut rect, &mut clipped).is_ok() {
-                                x = rect.left;
-                                y = rect.bottom;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, _context: Option<&ITfContext>) -> (u8, String) {
+        let x = 0i32;
+        let y = 0i32;
 
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
         unsafe {
@@ -79,7 +58,7 @@ impl TextService {
             if let Ok(handle) = h_pipe {
                 if handle.is_invalid() { return (0, String::new()); }
 
-                let mut request = [0u8; 14]; // 增加长度存放 x, y (各 4 字节)
+                let mut request = [0u8; 14];
                 request[0] = msg_type;
                 let code_bytes = key_code.to_le_bytes();
                 request[1..5].copy_from_slice(&code_bytes);
@@ -133,7 +112,7 @@ impl ITfTextInputProcessor_Impl for TextService {
 impl ITfKeyEventSink_Impl for TextService {
     fn OnSetFocus(&self, _fforeground: BOOL) -> Result<()> { Ok(()) }
     
-    fn OnTestKeyDown(&self, _context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+    fn OnTestKeyDown(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
         let key_code = wparam.0 as u32;
         if (key_code >= 0x30 && key_code <= 0x39) || (key_code >= 0x41 && key_code <= 0x5A) ||
            (key_code >= 0x60 && key_code <= 0x69) ||
