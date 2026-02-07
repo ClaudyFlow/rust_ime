@@ -1,5 +1,10 @@
 use serde::{Serialize, Deserialize};
 
+#[cfg(target_os = "linux")]
+use evdev;
+#[cfg(target_os = "windows")]
+use crate::evdev;
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Config {
     pub files: Files,

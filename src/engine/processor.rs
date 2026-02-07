@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+#[cfg(target_os = "linux")]
 use evdev::Key;
+#[cfg(target_os = "windows")]
+use crate::evdev::Key;
 use crate::engine::trie::Trie;
 use serde_json::Value;
 use std::time::{Instant, Duration};

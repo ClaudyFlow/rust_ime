@@ -1,9 +1,13 @@
+#[cfg(target_os = "linux")]
 use gtk4::prelude::*;
+#[cfg(target_os = "linux")]
 use gtk4::{Window, Label, Box, Orientation, CssProvider};
+#[cfg(target_os = "linux")]
 use gdk4::Display;
 #[cfg(target_os = "linux")]
 use gtk4_layer_shell::{LayerShell, Layer, Edge, KeyboardMode};
 use std::sync::mpsc::Receiver;
+#[cfg(target_os = "linux")]
 use glib::MainContext;
 use crate::config::Config;
 
@@ -30,16 +34,21 @@ pub enum GuiEvent {
     Exit,
 }
 
+#[cfg(target_os = "linux")]
 use std::rc::Rc;
+#[cfg(target_os = "linux")]
 use std::cell::RefCell;
+#[cfg(target_os = "linux")]
 use glib::SourceId;
 
+#[cfg(target_os = "linux")]
 #[derive(Debug)]
 struct DisplayedKey {
     label: Label,
     last_active: std::time::Instant,
 }
 
+#[cfg(target_os = "linux")]
 struct KeystrokeController {
     box_: Box,
     window: Window,
@@ -48,6 +57,7 @@ struct KeystrokeController {
     max_keys: usize,
 }
 
+#[cfg(target_os = "linux")]
 impl KeystrokeController {
     fn new(box_: Box, window: Window, initial_timeout: u64) -> Rc<Self> {
         let controller = Rc::new(Self {
@@ -154,6 +164,7 @@ impl KeystrokeController {
     }
 }
 
+#[cfg(target_os = "linux")]
 struct LearningController {
     window: Window,
     word_label: Label,
@@ -161,6 +172,7 @@ struct LearningController {
     timeout: RefCell<Option<SourceId>>,
 }
 
+#[cfg(target_os = "linux")]
 impl LearningController {
     fn new(window: Window, word_label: Label, hint_label: Label, _interval_sec: u64) -> Rc<Self> {
         Rc::new(Self {
@@ -206,6 +218,7 @@ impl LearningController {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     if gtk4::init().is_err() {
         eprintln!("[GUI] Failed to initialize GTK4.");
@@ -626,4 +639,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     window.present(); modern_window.present(); ks_controller.window.present(); learn_controller.window.present();
     window.set_opacity(0.0); modern_window.set_opacity(0.0); ks_controller.window.set_opacity(0.0); learn_controller.window.set_opacity(0.0);
     glib::MainLoop::new(None, false).run();
+}
+
+#[cfg(target_os = "windows")]
+pub fn start_gui(_rx: Receiver<GuiEvent>, _initial_config: Config) {
+    println!("⚠️ Windows 暂不支持 GTK4 原生界面。");
+    // 保持线程运行
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(3600));
+    }
 }

@@ -9,7 +9,7 @@ use std::ffi::OsString;
 use std::os::windows::ffi::OsStrExt;
 
 // 辅助函数：将 Rust 字符串转为 PCWSTR (UTF-16, null-terminated)
-fn to_pcwstr(s: &str) -> Vec<u16> {
+pub fn to_pcwstr(s: &str) -> Vec<u16> {
     let mut v: Vec<u16> = OsString::from(s).encode_wide().collect();
     v.push(0);
     v
@@ -27,11 +27,11 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
     
     // 2. 注册 COM CLSID
     // HKCR\CLSID\{GUID}
-    let key_path = format!("CLSID\{}", clsid_str);
+    let key_path = format!(r"CLSID\{}", clsid_str);
     set_reg_key(HKEY_CLASSES_ROOT, &key_path, None, description)?;
     
     // HKCR\CLSID\{GUID}\InProcServer32
-    let inproc_key = format!("{}\InProcServer32", key_path);
+    let inproc_key = format!(r"{}\InProcServer32", key_path);
     set_reg_key(HKEY_CLASSES_ROOT, &inproc_key, None, &dll_path)?;
     set_reg_key(HKEY_CLASSES_ROOT, &inproc_key, Some("ThreadingModel"), "Apartment")?;
 
@@ -41,23 +41,25 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
     
     // 注册中文 (简体) 配置文件
     // 0x0804 是 zh-CN 的 LCID
-    profiles.Register(&clsid)?;
+    profiles.Register(clsid)?;
+    
+    let desc_w = to_pcwstr(description);
+    let icon_w = to_pcwstr("Rust IME Icon");
     profiles.AddLanguageProfile(
-        &clsid, 
+        clsid, 
         0x0804, 
         &crate::LANG_PROFILE_ID, 
-        &HSTRING::from(description), 
-        &HSTRING::from(description).len() as u32,
-        &HSTRING::from("Rust IME Icon").len() as u32 // 这里应该传图标文件路径，暂时简略
+        &desc_w, 
+        &icon_w,
+        0
     )?;
 
     // 4. (可选) 注册到 Category 
-    // HKLM\SOFTWARE\Microsoft\CTF\TIP\{GUID}\LanguageProfile\0x0804\{ProfileGUID}
-    // Windows 8+ 可能需要这个才能在列表中显示
     let category_mgr: ITfCategoryMgr = CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)?;
-    category_mgr.RegisterCategory(&clsid, &GUID_TFCAT_TIP_KEYBOARD, &clsid)?;
-    category_mgr.RegisterCategory(&clsid, &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, &clsid)?;
-    category_mgr.RegisterCategory(&clsid, &GUID_TFCAT_TIPCAP_UIELEMENTENABLED, &clsid)?;
+    category_mgr.RegisterCategory(clsid, &GUID_TFCAT_TIP_KEYBOARD, clsid)?;
+    category_mgr.RegisterCategory(clsid, &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, clsid)?;
+    category_mgr.RegisterCategory(clsid, &GUID_TFCAT_TIPCAP_UIELEMENTENABLED, clsid)?;
+    category_mgr.RegisterCategory(clsid, &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, clsid)?;
 
     Ok(())
 }
@@ -67,18 +69,19 @@ pub unsafe fn unregister_server(clsid: &GUID) -> Result<()> {
     
     // 1. 注销 TSF 配置文件
     if let Ok(profiles) = CoCreateInstance::<_, ITfInputProcessorProfiles>(&CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER) {
-        let _ = profiles.Unregister(&clsid);
+        let _ = profiles.Unregister(clsid);
     }
     
     // 2. 注销 Category
     if let Ok(category_mgr) = CoCreateInstance::<_, ITfCategoryMgr>(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER) {
-        let _ = category_mgr.UnregisterCategory(&clsid, &GUID_TFCAT_TIP_KEYBOARD, &clsid);
-        let _ = category_mgr.UnregisterCategory(&clsid, &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, &clsid);
-        let _ = category_mgr.UnregisterCategory(&clsid, &GUID_TFCAT_TIPCAP_UIELEMENTENABLED, &clsid);
+        let _ = category_mgr.UnregisterCategory(clsid, &GUID_TFCAT_TIP_KEYBOARD, clsid);
+        let _ = category_mgr.UnregisterCategory(clsid, &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, clsid);
+        let _ = category_mgr.UnregisterCategory(clsid, &GUID_TFCAT_TIPCAP_UIELEMENTENABLED, clsid);
+        let _ = category_mgr.UnregisterCategory(clsid, &GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, clsid);
     }
 
     // 3. 删除注册表键值
-    let key_path = format!("CLSID\{}", clsid_str);
+    let key_path = format!(r"CLSID\{}", clsid_str);
     // 递归删除比较麻烦，这里简单处理，假设用户会用 regsvr32 /u
     // 实际生产环境应该写一个递归删除的 helper
     let _ = RegDeleteTreeW(HKEY_CLASSES_ROOT, PCWSTR(to_pcwstr(&key_path).as_ptr()));
@@ -90,21 +93,16 @@ unsafe fn set_reg_key(root: HKEY, path: &str, name: Option<&str>, value: &str) -
     let mut key: HKEY = HKEY(0);
     let path_w = to_pcwstr(path);
     
-    RegCreateKeyExW(
+    RegCreateKeyW(
         root, 
         PCWSTR(path_w.as_ptr()), 
-        0, 
-        None, 
-        REG_OPTION_NON_VOLATILE, 
-        KEY_WRITE, 
-        None, 
-        &mut key, 
-        None
+        &mut key
     )?;
 
     let val_w = to_pcwstr(value);
-    let name_ptr = match name {
-        Some(n) => to_pcwstr(n).as_ptr(),
+    let name_w = name.map(|n| to_pcwstr(n));
+    let name_ptr = match &name_w {
+        Some(nw) => nw.as_ptr(),
         None => std::ptr::null(),
     };
 
@@ -113,9 +111,9 @@ unsafe fn set_reg_key(root: HKEY, path: &str, name: Option<&str>, value: &str) -
         PCWSTR(name_ptr),
         0,
         REG_SZ,
-        Some(std::slice::from_raw_parts(val_w.as_ptr() as *const u8, val_w.len() * 2)),
+        Some(std::slice::from_raw_parts(val_w.as_ptr() as *const u8, val_w.len() * 2)), 
     );
 
     let _ = RegCloseKey(key);
-    res.ok()
+    res
 }

@@ -1,4 +1,6 @@
+#[cfg(target_os = "linux")]
 use ksni::menu::{StandardItem, MenuItem};
+#[cfg(target_os = "linux")]
 use ksni::{Tray, ToolTip, TrayService, Handle};
 use std::sync::mpsc::Sender;
 use tiny_skia::*;
@@ -21,6 +23,7 @@ pub enum TrayEvent {
     CyclePreview,
 }
 
+#[cfg(target_os = "linux")]
 pub struct ImeTray {
     pub chinese_enabled: bool,
     pub active_profile: String,
@@ -35,6 +38,7 @@ pub struct ImeTray {
     pub tx: Sender<TrayEvent>,
 }
 
+#[cfg(target_os = "linux")]
 impl Tray for ImeTray {
     fn icon_name(&self) -> String {
         // 动态变更名称，强制部分桌面环境（如 GNOME）刷新像素缓存
@@ -208,6 +212,7 @@ impl Tray for ImeTray {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
     show_modern_candidates: bool,
@@ -222,4 +227,82 @@ pub fn start_tray(
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });
     handle
+}
+
+#[cfg(target_os = "windows")]
+
+pub struct WindowsTrayHandle;
+
+
+
+#[cfg(target_os = "windows")]
+
+impl WindowsTrayHandle {
+
+    pub fn update<F>(&self, _f: F)
+
+    where
+
+        F: FnOnce(&mut ImeTrayStub),
+
+    {
+
+        // Windows 下暂不执行更新逻辑
+
+    }
+
+}
+
+
+
+#[cfg(target_os = "windows")]
+
+pub struct ImeTrayStub {
+
+    pub chinese_enabled: bool,
+
+    pub active_profile: String,
+
+    pub show_candidates: bool,
+
+    pub show_modern_candidates: bool,
+
+    pub show_notifications: bool,
+
+    pub show_keystrokes: bool,
+
+    pub learning_mode: bool,
+
+    pub anti_typo: bool,
+
+    pub commit_mode: String,
+
+    pub preview_mode: String,
+
+}
+
+
+
+#[cfg(target_os = "windows")]
+
+pub fn start_tray(
+
+    _chinese_enabled: bool, _active_profile: String, _show_candidates: bool,
+
+    _show_modern_candidates: bool,
+
+    _show_notifications: bool, _show_keystrokes: bool, _learning_mode: bool,
+
+    _anti_typo: bool,
+
+    _commit_mode: String,
+
+    _preview_mode: String,
+
+    _event_tx: Sender<TrayEvent>
+
+) -> WindowsTrayHandle {
+
+    WindowsTrayHandle
+
 }

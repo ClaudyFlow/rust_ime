@@ -3,10 +3,7 @@ use windows::{
     core::*,
     Win32::Foundation::*,
     Win32::System::Com::*,
-    Win32::System::LibraryLoader::*,
-    Win32::System::Registry::*,
-    Win32::System::SystemServices::*,
-    Win32::UI::TextServices::*,
+    Win32::System::SystemServices::DLL_PROCESS_ATTACH,
 };
 
 #[cfg(windows)]
@@ -66,7 +63,7 @@ pub unsafe extern "system" fn DllGetClassObject(
     let unknown: IUnknown = factory.into();
     
     // 查询接口 (通常是 IClassFactory)
-    unknown.query(&*riid, ppv).map_err(|e| e.code()).unwrap_or(S_OK)
+    unknown.query(&*riid, ppv)
 }
 
 #[cfg(windows)]
@@ -74,8 +71,7 @@ pub unsafe extern "system" fn DllGetClassObject(
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn DllRegisterServer() -> HRESULT {
     registry::register_server(DLL_INSTANCE, &IME_ID, "Rust IME")
-        .map_err(|e| e.code())
-        .unwrap_or(S_OK)
+        .map_or_else(|e| e.code(), |_| S_OK)
 }
 
 #[cfg(windows)]
@@ -83,8 +79,7 @@ pub unsafe extern "system" fn DllRegisterServer() -> HRESULT {
 #[allow(non_snake_case)]
 pub unsafe extern "system" fn DllUnregisterServer() -> HRESULT {
     registry::unregister_server(&IME_ID)
-        .map_err(|e| e.code())
-        .unwrap_or(S_OK)
+        .map_or_else(|e| e.code(), |_| S_OK)
 }
 
 // 空壳实现，防止编译错误
