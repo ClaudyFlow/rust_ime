@@ -176,6 +176,29 @@ impl InputMethodHost for TsfHost {
                                     continue;
                                 }
 
+                                // 灵魂功能：CapsLock / Shift 触发筛选
+                                if (key_code == 0x14 || key_code == 0x10) && !ctrl && !alt {
+                                    let mut p = processor.lock().unwrap();
+                                    if p.chinese_enabled && !p.buffer.is_empty() {
+                                        if msg_type == 1 {
+                                            if key_code == 0x14 {
+                                                println!("[TSF Filter] Trigger Page Filter");
+                                                p.start_page_filter();
+                                            } else {
+                                                println!("[TSF Filter] Trigger Global Filter");
+                                                p.start_global_filter();
+                                            }
+                                            drop(p);
+                                            update_gui_impl(&gui_tx, &processor);
+                                        }
+                                        
+                                        let mut response = vec![2u8]; // Consume
+                                        let mut bytes_written = 0;
+                                        let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                        continue;
+                                    }
+                                }
+
                                 // 直通逻辑：如果 buffer 为空且不是切换键，允许常用控制键直通
                                 let is_control_key = key_code == 0x0D || key_code == 0x08 || key_code == 0x1B || 
                                                     (key_code >= 0x30 && key_code <= 0x39) ||

@@ -477,7 +477,7 @@ impl Processor {
         if is_letter(key) {
             // A. 如果已经处于筛选模式，直接追加筛选码 (忽略双击)
             if self.filter_mode != FilterMode::None {
-                if let Some(c) = key_to_char(key, false) {
+                if let Some(c) = key_to_char(key, shift_pressed) {
                     self.aux_filter.push(c);
                     self.selected = 0;
                     if self.filter_mode == FilterMode::Global { self.page = 0; }
