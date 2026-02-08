@@ -825,7 +825,8 @@ impl Processor {
                     } else {
                         // 如果系统词库没有，但是用户词库有（新词），也加入候选
                         self.candidates.insert(insert_pos, word.clone());
-                        self.candidate_hints.insert(insert_pos, "✨ 用户词".to_string());
+                        // 使用更兼容的符号 ★ 替代 Emoji，并改为更简洁的标注
+                        self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
                     }
                 }
             }
