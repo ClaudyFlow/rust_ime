@@ -14,6 +14,7 @@ pub use windows as gui;
 
 use crate::config::Config;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum GuiEvent {
     Update {

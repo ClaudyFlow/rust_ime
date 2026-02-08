@@ -284,6 +284,7 @@ impl Config {
     }
 }
 
+#[allow(dead_code)]
 pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
     let mut combinations = Vec::new();
     for combo_str in s.split('|') {
@@ -305,6 +306,7 @@ pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
     combinations
 }
 
+#[allow(dead_code)]
 fn string_to_key(s: &str) -> Option<evdev::Key> {
     match s {
         "ctrl" | "lctrl" | "rctrl" => Some(evdev::Key::KEY_LEFTCTRL),

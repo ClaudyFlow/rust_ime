@@ -267,7 +267,7 @@ static mut TRAY_STATE: Option<Arc<Mutex<ImeTrayStub>>> = None;
 static mut TRAY_TX: Option<Sender<TrayEvent>> = None;
 
 #[cfg(target_os = "windows")]
-pub struct WindowsTrayHandle(Arc<Mutex<ImeTrayStub>>, HWND);
+pub struct WindowsTrayHandle(Arc<Mutex<ImeTrayStub>>);
 
 #[cfg(target_os = "windows")]
 impl WindowsTrayHandle {
@@ -375,13 +375,13 @@ pub fn start_tray(
             }
             
             Shell_NotifyIconW(NIM_DELETE, &nid);
-            DestroyIcon(h_icon);
+            let _ = DestroyIcon(h_icon);
         }
     });
 
     // 等待窗口句柄返回，如果超时或失败则返回空句柄
-    let hwnd = rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or(HWND(0));
-    WindowsTrayHandle(state_clone, hwnd)
+    let _hwnd = rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or(HWND(0));
+    WindowsTrayHandle(state_clone)
 }
 
 #[cfg(target_os = "windows")]

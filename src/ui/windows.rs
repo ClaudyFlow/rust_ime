@@ -25,75 +25,81 @@ struct WindowState {
 }
 
 pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
-    unsafe {
-        let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
-        let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+    let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
+    let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
-        let wc = WNDCLASSW {
-            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-            hInstance: instance.into(),
-            lpszClassName: window_class,
-            lpfnWndProc: Some(wnd_proc),
-            ..Default::default()
-        };
-        RegisterClassW(&wc);
+    let wc = WNDCLASSW {
+        hCursor: unsafe { LoadCursorW(None, IDC_ARROW).unwrap() },
+        hInstance: instance.into(),
+        lpszClassName: window_class,
+        lpfnWndProc: Some(wnd_proc),
+        ..Default::default()
+    };
+    unsafe { RegisterClassW(&wc); }
 
-        let hwnd = CreateWindowExW(
+    let hwnd = unsafe {
+        CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
             window_class, PCWSTR(std::ptr::null()), WS_POPUP,
             100, 100, 600, 160, None, None, instance, None,
-        );
+        )
+    };
 
-        let key_class = PCWSTR("RustImeKey\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-        let wc_key = WNDCLASSW {
-            hInstance: instance.into(),
-            lpszClassName: key_class,
-            lpfnWndProc: Some(wnd_proc),
-            ..Default::default()
-        };
-        RegisterClassW(&wc_key);
+    let key_class = PCWSTR("RustImeKey\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+    let wc_key = WNDCLASSW {
+        hInstance: instance.into(),
+        lpszClassName: key_class,
+        lpfnWndProc: Some(wnd_proc),
+        ..Default::default()
+    };
+    unsafe { RegisterClassW(&wc_key); }
+    unsafe {
         KEY_WINDOW = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
             key_class, PCWSTR(std::ptr::null()), WS_POPUP,
             0, 0, 0, 0, None, None, instance, None,
         );
+    }
 
-        let learn_class = PCWSTR("RustImeLearn\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-        let wc_learn = WNDCLASSW {
-            hInstance: instance.into(),
-            lpszClassName: learn_class,
-            lpfnWndProc: Some(wnd_proc),
-            ..Default::default()
-        };
-        RegisterClassW(&wc_learn);
+    let learn_class = PCWSTR("RustImeLearn\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+    let wc_learn = WNDCLASSW {
+        hInstance: instance.into(),
+        lpszClassName: learn_class,
+        lpfnWndProc: Some(wnd_proc),
+        ..Default::default()
+    };
+    unsafe { RegisterClassW(&wc_learn); }
+    unsafe {
         LEARN_WINDOW = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
             learn_class, PCWSTR(std::ptr::null()), WS_POPUP,
             0, 0, 0, 0, None, None, instance, None,
         );
+    }
 
-        let painter = CandidatePainter::new();
-        let current_config = Arc::new(std::sync::RwLock::new(initial_config));
+    let painter = CandidatePainter::new();
+    let current_config = Arc::new(std::sync::RwLock::new(initial_config));
 
-        let current_config_main = current_config.clone();
-        std::thread::spawn(move || {
-            while let Ok(event) = rx.recv() {
-                match event {
-                    GuiEvent::ApplyConfig(conf) => { 
-                        if let Ok(mut w) = current_config_main.write() { *w = conf; }
-                    }
-                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-                        unsafe {
-                            if let Some(ref mut state) = WINDOW_STATE {
-                                state.pinyin = pinyin;
-                                state.candidates = candidates;
-                                state.hints = hints;
-                                state.selected = selected;
-                            } else {
-                                WINDOW_STATE = Some(WindowState { pinyin, candidates, hints, selected, x: 100, y: 100 });
-                            }
-                            
-                            let state = WINDOW_STATE.as_ref().unwrap();
+    let current_config_main = current_config.clone();
+    std::thread::spawn(move || {
+        while let Ok(event) = rx.recv() {
+            match event {
+                GuiEvent::ApplyConfig(conf) => { 
+                    if let Ok(mut w) = current_config_main.write() { *w = conf; }
+                }
+                GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
+                    unsafe {
+                        let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
+                        if let Some(ref mut state) = *state_ptr {
+                            state.pinyin = pinyin;
+                            state.candidates = candidates;
+                            state.hints = hints;
+                            state.selected = selected;
+                        } else {
+                            *state_ptr = Some(WindowState { pinyin, candidates, hints, selected, x: 100, y: 100 });
+                        }
+                        
+                        if let Some(ref state) = *state_ptr {
                             if state.pinyin.is_empty() {
                                 ShowWindow(hwnd, SW_HIDE);
                             } else {
@@ -127,82 +133,88 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             }
                         }
                     }
-                    GuiEvent::MoveTo { x, y } => {
-                        unsafe {
-                            if let Some(ref mut state) = WINDOW_STATE { state.x = x; state.y = y; }
-                            // 偏移 25 像素，确保显示在文字下方
-                            let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-                        }
-                    }
-                    GuiEvent::Keystroke(key) => {
-                        unsafe {
-                            let config_snapshot = current_config_main.read().unwrap().clone();
-                            if !config_snapshot.appearance.show_keystrokes { continue; }
-                            DISPLAYED_KEYS.push((key, std::time::Instant::now()));
-                            if DISPLAYED_KEYS.len() > 10 { DISPLAYED_KEYS.remove(0); }
-                            
-                            let keys: Vec<String> = DISPLAYED_KEYS.iter().map(|(k, _)| k.clone()).collect();
-                            let (pixels, w, h) = painter.draw_keystrokes(&keys, &config_snapshot);
-                            update_window_pixels(KEY_WINDOW, &pixels, w, h);
-                            
-                            let sw = GetSystemMetrics(SM_CXSCREEN);
-                            let sh = GetSystemMetrics(SM_CYSCREEN);
-                            let _ = SetWindowPos(KEY_WINDOW, HWND_TOPMOST, (sw - w as i32) / 2, sh - h as i32 - 100, w as i32, h as i32, SWP_NOACTIVATE);
-                            ShowWindow(KEY_WINDOW, SW_SHOWNOACTIVATE);
-                        }
-                    }
-                    GuiEvent::ClearKeystrokes => {
-                        unsafe {
-                            DISPLAYED_KEYS.clear();
-                            ShowWindow(KEY_WINDOW, SW_HIDE);
-                        }
-                    }
-                    GuiEvent::ShowLearning(word, hint) => {
-                        unsafe {
-                            let config_snapshot = current_config_main.read().unwrap().clone();
-                            if !config_snapshot.appearance.learning_mode { continue; }
-                            let (pixels, w, h) = painter.draw_learning(&word, &hint, &config_snapshot);
-                            update_window_pixels(LEARN_WINDOW, &pixels, w, h);
-                            
-                            let sw = GetSystemMetrics(SM_CXSCREEN);
-                            let _ = SetWindowPos(LEARN_WINDOW, HWND_TOPMOST, sw - w as i32 - 40, 40, w as i32, h as i32, SWP_NOACTIVATE);
-                            ShowWindow(LEARN_WINDOW, SW_SHOWNOACTIVATE);
-                        }
-                    }
-                    _ => {}
                 }
-            }
-        });
-
-        // 启动一个简单的清理定时器线程
-        let painter_timer = CandidatePainter::new(); // 计时器线程专用的 painter
-        let current_config_timer = current_config.clone();
-        std::thread::spawn(move || {
-            loop {
-                std::thread::sleep(std::time::Duration::from_millis(200));
-                unsafe {
-                    let now = std::time::Instant::now();
-                    // 清理过期按键
-                    let mut changed = false;
-                    DISPLAYED_KEYS.retain(|(_, time)| {
-                        if now.duration_since(*time).as_millis() < 2000 { true } else { changed = true; false }
-                    });
-                    if changed {
-                        if DISPLAYED_KEYS.is_empty() {
-                            ShowWindow(KEY_WINDOW, SW_HIDE);
-                        } else {
-                            // 重新绘制并更新以反映按键消失
-                            let keys: Vec<String> = DISPLAYED_KEYS.iter().map(|(k, _)| k.clone()).collect();
-                            let config_snapshot = current_config_timer.read().unwrap().clone();
-                            let (pixels, w, h) = painter_timer.draw_keystrokes(&keys, &config_snapshot);
-                            update_window_pixels(KEY_WINDOW, &pixels, w, h);
-                        }
+                GuiEvent::MoveTo { x, y } => {
+                    unsafe {
+                        let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
+                        if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
+                        // 偏移 25 像素，确保显示在文字下方
+                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     }
                 }
+                GuiEvent::Keystroke(key) => {
+                    unsafe {
+                        let config_snapshot = current_config_main.read().unwrap().clone();
+                        if !config_snapshot.appearance.show_keystrokes { continue; }
+                        let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
+                        (*keys_ptr).push((key, std::time::Instant::now()));
+                        if (*keys_ptr).len() > 10 { (*keys_ptr).remove(0); }
+                        
+                        let keys: Vec<String> = (*keys_ptr).iter().map(|(k, _)| k.clone()).collect();
+                        let (pixels, w, h) = painter.draw_keystrokes(&keys, &config_snapshot);
+                        update_window_pixels(KEY_WINDOW, &pixels, w, h);
+                        
+                        let sw = GetSystemMetrics(SM_CXSCREEN);
+                        let sh = GetSystemMetrics(SM_CYSCREEN);
+                        let _ = SetWindowPos(KEY_WINDOW, HWND_TOPMOST, (sw - w as i32) / 2, sh - h as i32 - 100, w as i32, h as i32, SWP_NOACTIVATE);
+                        ShowWindow(KEY_WINDOW, SW_SHOWNOACTIVATE);
+                    }
+                }
+                GuiEvent::ClearKeystrokes => {
+                    unsafe {
+                        let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
+                        (*keys_ptr).clear();
+                        ShowWindow(KEY_WINDOW, SW_HIDE);
+                    }
+                }
+                GuiEvent::ShowLearning(word, hint) => {
+                    unsafe {
+                        let config_snapshot = current_config_main.read().unwrap().clone();
+                        if !config_snapshot.appearance.learning_mode { continue; }
+                        let (pixels, w, h) = painter.draw_learning(&word, &hint, &config_snapshot);
+                        update_window_pixels(LEARN_WINDOW, &pixels, w, h);
+                        
+                        let sw = GetSystemMetrics(SM_CXSCREEN);
+                        let _ = SetWindowPos(LEARN_WINDOW, HWND_TOPMOST, sw - w as i32 - 40, 40, w as i32, h as i32, SWP_NOACTIVATE);
+                        ShowWindow(LEARN_WINDOW, SW_SHOWNOACTIVATE);
+                    }
+                }
+                _ => {}
             }
-        });
+        }
+    });
 
-        let mut msg = MSG::default();
+    // 启动一个简单的清理定时器线程
+    let painter_timer = CandidatePainter::new(); // 计时器线程专用的 painter
+    let current_config_timer = current_config.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            unsafe {
+                let now = std::time::Instant::now();
+                // 清理过期按键
+                let mut changed = false;
+                let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
+                (*keys_ptr).retain(|(_, time)| {
+                    if now.duration_since(*time).as_millis() < 2000 { true } else { changed = true; false }
+                });
+                if changed {
+                    if (*keys_ptr).is_empty() {
+                        ShowWindow(KEY_WINDOW, SW_HIDE);
+                    } else {
+                        // 重新绘制并更新以反映按键消失
+                        let keys: Vec<String> = (*keys_ptr).iter().map(|(k, _)| k.clone()).collect();
+                        let config_snapshot = current_config_timer.read().unwrap().clone();
+                        let (pixels, w, h) = painter_timer.draw_keystrokes(&keys, &config_snapshot);
+                        update_window_pixels(KEY_WINDOW, &pixels, w, h);
+                    }
+                }
+            }
+        }
+    });
+
+    let mut msg = MSG::default();
+    unsafe {
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
