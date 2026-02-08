@@ -161,9 +161,11 @@ impl CandidatePainter {
         let mut total_width = padding * 2.0;
         let mut widths = Vec::new();
 
-        if let Some(f_en) = &self.font_en {
+        let f_main = self.font_en.as_ref().or(self.font_zh.as_ref());
+        
+        if let Some(font) = f_main {
             for key in keys {
-                let w = self.measure_text(f_en, key, font_size);
+                let w = self.measure_text(font, key, font_size);
                 widths.push(w);
                 total_width += w + padding * 2.0 + item_spacing;
             }
@@ -175,7 +177,7 @@ impl CandidatePainter {
         pixmap.fill(Color::TRANSPARENT);
 
         let mut x_cursor = padding;
-        if let Some(f_en) = &self.font_en {
+        if let Some(font) = f_main {
             for (i, key) in keys.iter().enumerate() {
                 let item_w = widths[i] + padding * 2.0;
                 let item_h = font_size * 1.5;
@@ -194,7 +196,7 @@ impl CandidatePainter {
                 pixmap.stroke_path(&self.create_rounded_rect_path(rect, corner_radius), &border_paint, &stroke, Transform::identity(), None);
 
                 // 文字
-                self.draw_text(&mut pixmap, f_en, key, x_cursor + padding, padding + item_h * 0.75, font_size, Color::WHITE);
+                self.draw_text(&mut pixmap, font, key, x_cursor + padding, padding + item_h * 0.75, font_size, Color::WHITE);
                 
                 x_cursor += item_w + item_spacing;
             }

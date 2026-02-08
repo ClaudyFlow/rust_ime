@@ -340,23 +340,18 @@ impl Processor {
     }
 
     pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool) -> Action {
-        if !self.chinese_enabled {
-            return Action::PassThrough;
-        }
-        let is_press = val == 1;
-        let is_repeat = val == 2;
-        let is_release = val == 0;
         let now = Instant::now();
+        let is_press = val == 1;
 
-        // 统一按键回显处理 (仅在按下时触发)
+        // 统一按键回显处理 (放在最前面，确保中英文模式都生效)
         if is_press {
             if let Some(ref tx) = self.gui_tx {
                 let display_name = match key {
-                    VirtualKey::Backspace => Some("⌫".to_string()),
-                    VirtualKey::Enter => Some("⏎".to_string()),
-                    VirtualKey::Space => Some("␣".to_string()),
-                    VirtualKey::Esc => Some("⎋".to_string()),
-                    VirtualKey::Tab => Some("⇥".to_string()),
+                    VirtualKey::Backspace => Some("Back".to_string()),
+                    VirtualKey::Enter => Some("Enter".to_string()),
+                    VirtualKey::Space => Some("Space".to_string()),
+                    VirtualKey::Esc => Some("Esc".to_string()),
+                    VirtualKey::Tab => Some("Tab".to_string()),
                     _ => key_to_char(key, shift_pressed).map(|c| c.to_string()),
                 };
                 if let Some(name) = display_name {
@@ -364,6 +359,12 @@ impl Processor {
                 }
             }
         }
+
+        if !self.chinese_enabled {
+            return Action::PassThrough;
+        }
+        let is_repeat = val == 2;
+        let is_release = val == 0;
 
         // 处理长按逻辑
         if self.enable_long_press && is_letter(key) && !shift_pressed {
