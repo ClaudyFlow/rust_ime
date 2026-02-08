@@ -117,6 +117,7 @@ pub struct Processor {
     // 连续选词记忆
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
+    pub gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
 }
 
 impl Processor {
@@ -162,6 +163,7 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
         punctuation_raw: HashMap<String, Value>, 
+        gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
     ) -> Self {
         let mut punctuation = HashMap::new();
         for (k, v) in punctuation_raw {
@@ -227,6 +229,7 @@ impl Processor {
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
+            gui_tx,
         }
     }
 
@@ -472,6 +475,11 @@ impl Processor {
 
         // 1. 字母键优先处理 (筛选 或 双击)
         if is_letter(key) {
+            if let Some(c) = key_to_char(key, shift_pressed) {
+                if let Some(ref tx) = self.gui_tx {
+                    let _ = tx.send(crate::ui::GuiEvent::Keystroke(c.to_string()));
+                }
+            }
             // A. 如果已经处于筛选模式，直接追加筛选码 (忽略双击)
             if self.filter_mode != FilterMode::None {
                 if let Some(c) = key_to_char(key, shift_pressed) {
@@ -998,6 +1006,7 @@ mod tests {
                         enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
                         nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
+                        gui_tx: None,
             
                         profile_keys: Vec::new(),
              auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,

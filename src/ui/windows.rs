@@ -72,12 +72,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         );
 
         let painter = CandidatePainter::new();
-        let mut current_config = initial_config;
+        let current_config = Arc::new(std::sync::RwLock::new(initial_config));
 
+        let current_config_main = current_config.clone();
         std::thread::spawn(move || {
             while let Ok(event) = rx.recv() {
                 match event {
-                    GuiEvent::ApplyConfig(conf) => { current_config = conf; }
+                    GuiEvent::ApplyConfig(conf) => { 
+                        if let Ok(mut w) = current_config_main.write() { *w = conf; }
+                    }
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         unsafe {
                             if let Some(ref mut state) = WINDOW_STATE {
@@ -93,7 +96,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             if state.pinyin.is_empty() {
                                 ShowWindow(hwnd, SW_HIDE);
                             } else {
-                                let page_size = current_config.appearance.page_size;
+                                let (page_size, config_snapshot) = {
+                                    let r = current_config_main.read().unwrap();
+                                    (r.appearance.page_size, r.clone())
+                                };
+                                
                                 let start = (state.selected / page_size) * page_size;
                                 let end = (start + page_size).min(state.candidates.len());
                                 
@@ -110,7 +117,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                     &current_candidates, 
                                     &current_hints, 
                                     state.selected % page_size, 
-                                    &current_config
+                                    &config_snapshot
                                 );
                                 
                                 update_window_pixels(hwnd, &pixels, w, h);
@@ -128,12 +135,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     }
                     GuiEvent::Keystroke(key) => {
                         unsafe {
-                            if !current_config.appearance.show_keystrokes { continue; }
+                            let config_snapshot = current_config_main.read().unwrap().clone();
+                            if !config_snapshot.appearance.show_keystrokes { continue; }
                             DISPLAYED_KEYS.push((key, std::time::Instant::now()));
                             if DISPLAYED_KEYS.len() > 10 { DISPLAYED_KEYS.remove(0); }
                             
                             let keys: Vec<String> = DISPLAYED_KEYS.iter().map(|(k, _)| k.clone()).collect();
-                            let (pixels, w, h) = painter.draw_keystrokes(&keys, &current_config);
+                            let (pixels, w, h) = painter.draw_keystrokes(&keys, &config_snapshot);
                             update_window_pixels(KEY_WINDOW, &pixels, w, h);
                             
                             let sw = GetSystemMetrics(SM_CXSCREEN);
@@ -150,8 +158,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     }
                     GuiEvent::ShowLearning(word, hint) => {
                         unsafe {
-                            if !current_config.appearance.learning_mode { continue; }
-                            let (pixels, w, h) = painter.draw_learning(&word, &hint, &current_config);
+                            let config_snapshot = current_config_main.read().unwrap().clone();
+                            if !config_snapshot.appearance.learning_mode { continue; }
+                            let (pixels, w, h) = painter.draw_learning(&word, &hint, &config_snapshot);
                             update_window_pixels(LEARN_WINDOW, &pixels, w, h);
                             
                             let sw = GetSystemMetrics(SM_CXSCREEN);
@@ -165,6 +174,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         });
 
         // 启动一个简单的清理定时器线程
+        let painter_timer = CandidatePainter::new(); // 计时器线程专用的 painter
+        let current_config_timer = current_config.clone();
         std::thread::spawn(move || {
             loop {
                 std::thread::sleep(std::time::Duration::from_millis(200));
@@ -179,7 +190,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         if DISPLAYED_KEYS.is_empty() {
                             ShowWindow(KEY_WINDOW, SW_HIDE);
                         } else {
-                            // 重新绘制并更新 (这里简化处理，实际可以通过 channel 通知主 GUI 线程)
+                            // 重新绘制并更新以反映按键消失
+                            let keys: Vec<String> = DISPLAYED_KEYS.iter().map(|(k, _)| k.clone()).collect();
+                            let config_snapshot = current_config_timer.read().unwrap().clone();
+                            let (pixels, w, h) = painter_timer.draw_keystrokes(&keys, &config_snapshot);
+                            update_window_pixels(KEY_WINDOW, &pixels, w, h);
                         }
                     }
                 }
