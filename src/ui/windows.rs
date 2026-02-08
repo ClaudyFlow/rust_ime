@@ -153,14 +153,21 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let mut final_x = x;
                         let mut final_y = y + 25;
 
-                        // 右侧溢出检测
-                        if final_x + w > sw {
-                            final_x = sw - w - 10;
-                        }
-                        // 底部溢出检测
-                        if final_y + h > sh {
-                            // 如果底部溢出，尝试放到光标上方
-                            final_y = y - h - 5; 
+                        // 居中处理：如果收到 0,0 坐标，说明定位失败，将窗口居中
+                        if x == 0 && y == 0 {
+                            final_x = (sw - w) / 2;
+                            final_y = (sh - h) / 2;
+                        } else {
+                            // 正常的防溢出逻辑
+                            // 右侧溢出检测
+                            if final_x + w > sw {
+                                final_x = sw - w - 10;
+                            }
+                            // 底部溢出检测
+                            if final_y + h > sh {
+                                // 如果底部溢出，尝试放到光标上方
+                                final_y = y - h - 5; 
+                            }
                         }
                         
                         // 确保不超出左/上边界

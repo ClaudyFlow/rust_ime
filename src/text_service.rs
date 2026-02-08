@@ -41,19 +41,8 @@ impl TextService {
     }
 
     fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, _context: Option<&ITfContext>) -> (u8, String) {
-        let mut x = 0i32;
-        let mut y = 0i32;
-
-        unsafe {
-            let hwnd = GetFocus();
-            if hwnd.0 != 0 {
-                let mut rect = RECT::default();
-                if GetWindowRect(hwnd, &mut rect).is_ok() {
-                    x = rect.left;
-                    y = rect.top;
-                }
-            }
-        }
+        let x = 0i32;
+        let y = 0i32;
 
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
         let pipe_pcwstr = PCWSTR(pipe_name.as_ptr());
