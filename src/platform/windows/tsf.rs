@@ -134,7 +134,8 @@ impl InputMethodHost for TsfHost {
             // 设置安全描述符，允许所有用户连接 (解决权限问题)
             let mut sd = SECURITY_DESCRIPTOR::default();
             unsafe {
-                let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), SECURITY_DESCRIPTOR_REVISION);
+                // SECURITY_DESCRIPTOR_REVISION 恒等于 1
+                let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), 1);
                 let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false);
             }
             let sa = SECURITY_ATTRIBUTES {
