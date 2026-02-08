@@ -10,7 +10,7 @@ pub struct CandidatePainter {
     font_zh: Option<Font>,
     font_en: Option<Font>,
     glyph_cache: Mutex<HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>>,
-    custom_fonts: Mutex<HashMap<String, Font>>,
+    custom_fonts: Mutex<HashMap<String, Option<Font>>>,
     font_map: HashMap<String, String>, // Name -> Path
 }
 
@@ -25,21 +25,17 @@ impl CandidatePainter {
             font_map.insert(f.name.to_lowercase(), f.path);
         }
 
-        // 1. 中文名流字体：优先 Windows 微软雅黑，其次 Linux Noto CJK，最后用本地自带
-        let font_zh = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc"))
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")))
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/google-noto-cjk-fonts/NotoSansCJK-Regular.ttc")))
-            .or_else(|| font_map.get("microsoft yahei").and_then(|p| Self::load_font(&PathBuf::from(p))))
-            .or_else(|| font_map.get("noto sans cjk sc").and_then(|p| Self::load_font(&PathBuf::from(p))))
-            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf")))
-            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttf")));
+        // 核心改动：优先使用本地高性能字体 NotoSansSC-Bold.ttf
+        let local_bold = root.join("fonts/NotoSansSC-Bold.ttf");
+        let local_reg = root.join("fonts/NotoSansCJKsc-Regular.otf");
 
-        // 2. 英文名流字体：优先 Windows Segoe UI，其次本地 Inter，最后是 Linux 系统字体
-        let font_en = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))
-            .or_else(|| font_map.get("segoe ui").and_then(|p| Self::load_font(&PathBuf::from(p))))
-            .or_else(|| Self::load_font(&root.join("fonts/Inter-Regular.ttf")))
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")))
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto/NotoSans-Regular.ttf")));
+        let font_zh = Self::load_font(&local_bold)
+            .or_else(|| Self::load_font(&local_reg))
+            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc")));
+
+        let font_en = Self::load_font(&local_bold)
+            .or_else(|| Self::load_font(&local_reg))
+            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf")));
 
         Self { 
             font_zh, 
@@ -59,21 +55,24 @@ impl CandidatePainter {
     }
 
     fn get_font_by_family(&self, family: &str) -> Option<Font> {
+        if family.is_empty() { return None; }
         let family_lower = family.to_lowercase();
-        let mut cache = self.custom_fonts.lock().unwrap();
-        if let Some(f) = cache.get(&family_lower) {
-            return Some(f.clone());
+        
+        {
+            let cache = self.custom_fonts.lock().unwrap();
+            if let Some(f) = cache.get(&family_lower) {
+                // 我们现在存的是 Option<Font>，避免重复查找找不到的字体
+                return f.clone();
+            }
         }
 
-        // 1. 检查已知别名映射
+        // 如果缓存没命中，执行查找
         let mut path = match family_lower.as_str() {
             "simhei" | "黑体" => Some("C:\\Windows\\Fonts\\simhei.ttf".to_string()),
             "microsoft yahei" | "微软雅黑" => Some("C:\\Windows\\Fonts\\msyh.ttc".to_string()),
-            "simsun" | "宋体" => Some("C:\\Windows\\Fonts\\simsun.ttc".to_string()),
             _ => None,
         };
 
-        // 2. 如果别名没命中，在系统扫描结果中查找
         if path.is_none() {
             path = self.font_map.get(&family_lower).cloned();
         }
@@ -84,9 +83,10 @@ impl CandidatePainter {
             None
         };
 
-        if let Some(ref font) = f {
-            cache.insert(family_lower, font.clone());
-            // 如果更换了字体，清空字形缓存
+        // 存入缓存（哪怕是 None 也要存，防止重复搜索）
+        let mut cache = self.custom_fonts.lock().unwrap();
+        cache.insert(family_lower, f.clone());
+        if f.is_some() {
             self.glyph_cache.lock().unwrap().clear();
         }
         f
@@ -335,7 +335,11 @@ impl CandidatePainter {
         let mut cx = x;
         let pixmap_width = pixmap.width() as i32;
         let pixmap_height = pixmap.height() as i32;
-        let pixels = pixmap.pixels_mut();
+        
+        let r_val = (color.red() * 255.0) as u32;
+        let g_val = (color.green() * 255.0) as u32;
+        let b_val = (color.blue() * 255.0) as u32;
+        let a_base = color.alpha();
 
         for c in text.chars() {
             let mut target_font = font;
@@ -348,33 +352,33 @@ impl CandidatePainter {
             }
 
             let (metrics, bitmap) = self.get_glyph(target_font, c, size);
-            let r = (color.red() * 255.0) as u32;
-            let g = (color.green() * 255.0) as u32;
-            let b = (color.blue() * 255.0) as u32;
-            let a_base = color.alpha();
+            
+            // 批量获取像素引用，减少 lock() 次数是不可能的，因为 get_glyph 已经处理了
+            // 但我们可以优化像素写入逻辑
+            let pixels = pixmap.pixels_mut();
 
             for row in 0..metrics.height {
+                let py = (y + row as f32 - metrics.ymin as f32 - metrics.height as f32) as i32;
+                if py < 0 || py >= pixmap_height { continue; }
+                
+                let row_offset = py * pixmap_width;
+                let bitmap_row_offset = row * metrics.width;
+
                 for col in 0..metrics.width {
-                    let alpha_val = bitmap[row * metrics.width + col];
+                    let alpha_val = bitmap[bitmap_row_offset + col];
                     if alpha_val > 0 {
                         let px = (cx + col as f32 + metrics.xmin as f32) as i32;
-                        let py = (y + row as f32 - metrics.ymin as f32 - metrics.height as f32) as i32;
-                        
-                        if px >= 0 && px < pixmap_width && py >= 0 && py < pixmap_height {
-                            let idx = (py * pixmap_width + px) as usize;
+                        if px >= 0 && px < pixmap_width {
+                            let idx = (row_offset + px) as usize;
                             let alpha = (a_base * (alpha_val as f32 / 255.0) * 255.0) as u32;
                             
-                            // 预乘 Alpha 混合
                             let old_pixel = pixels[idx];
-                            let old_r = old_pixel.red() as u32;
-                            let old_g = old_pixel.green() as u32;
-                            let old_b = old_pixel.blue() as u32;
-                            let old_a = old_pixel.alpha() as u32;
+                            let inv_alpha = 255 - alpha;
 
-                            let new_r = (r * alpha + old_r * (255 - alpha)) / 255;
-                            let new_g = (g * alpha + old_g * (255 - alpha)) / 255;
-                            let new_b = (b * alpha + old_b * (255 - alpha)) / 255;
-                            let new_a = (alpha * 255 + old_a * (255 - alpha)) / 255;
+                            let new_r = (r_val * alpha + old_pixel.red() as u32 * inv_alpha) / 255;
+                            let new_g = (g_val * alpha + old_pixel.green() as u32 * inv_alpha) / 255;
+                            let new_b = (b_val * alpha + old_pixel.blue() as u32 * inv_alpha) / 255;
+                            let new_a = (alpha * 255 + old_pixel.alpha() as u32 * inv_alpha) / 255;
 
                             pixels[idx] = PremultipliedColorU8::from_rgba(new_r as u8, new_g as u8, new_b as u8, new_a as u8).unwrap();
                         }

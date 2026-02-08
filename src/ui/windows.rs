@@ -82,7 +82,21 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
     let current_config_main = current_config.clone();
     std::thread::spawn(move || {
-        while let Ok(event) = rx.recv() {
+        while let Ok(mut event) = rx.recv() {
+            // 事件合并逻辑：如果频道里还有 Update 事件，直接跳过当前的，取最新的
+            if matches!(event, GuiEvent::Update { .. }) {
+                while let Ok(next_event) = rx.try_recv() {
+                    if matches!(next_event, GuiEvent::Update { .. }) {
+                        event = next_event;
+                    } else {
+                        // 如果是 MoveTo 等非 Update 事件，先处理当前的 Update，再把这个事件存起来下回处理
+                        // 或者更简单：如果是重要事件就不合并了。
+                        // 这里我们简单处理：只合并连续的 Update
+                        break; 
+                    }
+                }
+            }
+
             match event {
                 GuiEvent::ApplyConfig(conf) => { 
                     if let Ok(mut w) = current_config_main.write() { *w = conf; }
