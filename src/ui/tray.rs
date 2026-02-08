@@ -239,6 +239,8 @@ use windows::{
 };
 #[cfg(target_os = "windows")]
 use std::sync::{Arc, Mutex};
+#[cfg(target_os = "windows")]
+use image;
 
 #[cfg(target_os = "windows")]
 const WM_TRAYICON: u32 = WM_USER + 100;
@@ -328,13 +330,30 @@ pub fn start_tray(
                 return;
             }
 
+            // Load custom icon
+            let h_icon = if let Ok(img) = image::open("picture/rust-ime.png") {
+                let img = img.resize(32, 32, image::imageops::FilterType::Lanczos3);
+                let rgba = img.to_rgba8();
+                let mut bgra = Vec::with_capacity(rgba.len());
+                for pixel in rgba.pixels() {
+                    bgra.push(pixel[2]); // B
+                    bgra.push(pixel[1]); // G
+                    bgra.push(pixel[0]); // R
+                    bgra.push(pixel[3]); // A
+                }
+                let and_mask = vec![0u8; 32 * 32 / 8];
+                CreateIcon(None, 32, 32, 1, 32, and_mask.as_ptr(), bgra.as_ptr()).unwrap_or_else(|_| LoadIconW(None, IDI_APPLICATION).unwrap_or_default())
+            } else {
+                LoadIconW(None, IDI_APPLICATION).unwrap_or_default()
+            };
+
             let mut nid = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: hwnd,
                 uID: TRAY_ICON_ID,
                 uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
                 uCallbackMessage: WM_TRAYICON,
-                hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
+                hIcon: h_icon,
                 ..Default::default()
             };
             
@@ -356,6 +375,7 @@ pub fn start_tray(
             }
             
             Shell_NotifyIconW(NIM_DELETE, &nid);
+            DestroyIcon(h_icon);
         }
     });
 

@@ -152,9 +152,9 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
-    pub fn draw_keystrokes(&self, keys: &[String], _config: &Config) -> (Vec<u8>, u32, u32) {
-        let padding = 12.0;
-        let font_size = 20.0;
+    pub fn draw_keystrokes(&self, keys: &[String], config: &Config) -> (Vec<u8>, u32, u32) {
+        let padding = config.appearance.keystroke_margin_x as f32; // Reuse margin_x for internal padding
+        let font_size = config.appearance.keystroke_font_size as f32;
         let item_spacing = 8.0;
         let corner_radius = 6.0;
 
@@ -182,7 +182,7 @@ impl CandidatePainter {
                 
                 // 背景
                 let mut bg_paint = Paint::default();
-                bg_paint.set_color(Color::from_rgba8(30, 30, 30, 200));
+                bg_paint.set_color(self.parse_color(&config.appearance.keystroke_bg_color));
                 bg_paint.anti_alias = true;
                 let rect = Rect::from_xywh(x_cursor, padding, item_w, item_h).unwrap();
                 pixmap.fill_path(&self.create_rounded_rect_path(rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
@@ -203,10 +203,10 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
-    pub fn draw_learning(&self, word: &str, hint: &str, _config: &Config) -> (Vec<u8>, u32, u32) {
+    pub fn draw_learning(&self, word: &str, hint: &str, config: &Config) -> (Vec<u8>, u32, u32) {
         let padding = 16.0;
-        let font_size_word = 24.0;
-        let font_size_hint = 14.0;
+        let font_size_word = config.appearance.learning_font_size as f32;
+        let font_size_hint = font_size_word * 0.6;
         let corner_radius = 8.0;
 
         let mut total_width = 200.0;
@@ -224,7 +224,7 @@ impl CandidatePainter {
 
         // 背景
         let mut bg_paint = Paint::default();
-        bg_paint.set_color(Color::from_rgba8(40, 44, 52, 230));
+        bg_paint.set_color(self.parse_color(&config.appearance.learning_bg_color));
         bg_paint.anti_alias = true;
         let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
