@@ -247,8 +247,7 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let p = self.processor.lock().unwrap();
-                        if p.show_keystrokes { if let Some(ref tx) = self.gui_tx { let name = map_key_to_display_name(key); if !name.is_empty() { let _ = tx.send(GuiEvent::Keystroke(name)); } } }
+                        // 逻辑已移至 Processor::handle_key
                     }
                 }
             }
