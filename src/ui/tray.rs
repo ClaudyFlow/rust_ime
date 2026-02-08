@@ -305,30 +305,48 @@ pub fn start_tray(
     let state_clone = state.clone();
     std::thread::spawn(move || {
         unsafe {
-            let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
-            let window_class = PCWSTR("RustImeTray\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+            let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap_or_default();
+            let window_class = PCWSTR("RustImeTrayClass\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+            
             let wc = WNDCLASSW {
                 hInstance: instance.into(),
                 lpszClassName: window_class,
                 lpfnWndProc: Some(tray_wnd_proc),
+                hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
                 ..Default::default()
             };
             RegisterClassW(&wc);
-            let hwnd = CreateWindowExW(Default::default(), window_class, PCWSTR(std::ptr::null()), WS_OVERLAPPEDWINDOW, 0, 0, 0, 0, None, None, instance, None);
+
+            // 使用 WS_POPUP 创建一个完全不可见的后台窗口
+            let hwnd = CreateWindowExW(
+                Default::default(), window_class, PCWSTR(std::ptr::null()), 
+                WS_POPUP, 0, 0, 0, 0, None, None, instance, None
+            );
             
+            if hwnd.0 == 0 {
+                eprintln!("[Tray] 无法创建托盘隐藏窗口: {:?}", GetLastError());
+                return;
+            }
+
             let mut nid = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: hwnd,
                 uID: TRAY_ICON_ID,
                 uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
                 uCallbackMessage: WM_TRAYICON,
-                hIcon: LoadIconW(None, IDI_APPLICATION).unwrap(),
+                hIcon: LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
                 ..Default::default()
             };
-            let tip = "Rust IME".encode_utf16().collect::<Vec<u16>>();
-            nid.szTip[..tip.len()].copy_from_slice(&tip);
             
-            Shell_NotifyIconW(NIM_ADD, &nid);
+            let tip_str = "Rust IME (运行中)";
+            let tip_w: Vec<u16> = tip_str.encode_utf16().collect();
+            let len = tip_w.len().min(nid.szTip.len() - 1);
+            nid.szTip[..len].copy_from_slice(&tip_w[..len]);
+            
+            if !Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
+                eprintln!("[Tray] 注册托盘图标失败");
+            }
+
             let _ = tx.send(hwnd);
 
             let mut msg = MSG::default();
@@ -336,11 +354,14 @@ pub fn start_tray(
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+            
             Shell_NotifyIconW(NIM_DELETE, &nid);
         }
     });
 
-    WindowsTrayHandle(state_clone, rx.recv().unwrap())
+    // 等待窗口句柄返回，如果超时或失败则返回空句柄
+    let hwnd = rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or(HWND(0));
+    WindowsTrayHandle(state_clone, hwnd)
 }
 
 #[cfg(target_os = "windows")]
