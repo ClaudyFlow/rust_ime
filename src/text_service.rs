@@ -75,7 +75,7 @@ impl TextService {
                     if !h.is_invalid() { break Ok(h); }
                 }
 
-                if GetLastError() == ERROR_PIPE_BUSY && retry_count < 3 {
+                if GetLastError().is_err_and(|e| e.code() == ERROR_PIPE_BUSY.to_hresult()) && retry_count < 3 {
                     let _ = WaitNamedPipeW(pipe_pcwstr, 100);
                     retry_count += 1;
                     continue;
