@@ -327,6 +327,18 @@ impl InputMethodHost for TsfHost {
                                                 let _ = notify_tx.send(NotifyEvent::Message(s, b));
                                                 response.push(2);
                                             }
+                                            crate::engine::processor::Action::Alert => {
+                                                unsafe {
+                                                    use windows::Win32::Media::Audio::*;
+                                                    let root = crate::find_project_root();
+                                                    let sound_path = root.join("sounds/beep.wav");
+                                                    if sound_path.exists() {
+                                                        let path_w = windows::core::HSTRING::from(sound_path.to_string_lossy().as_ref());
+                                                        let _ = PlaySoundW(windows::core::PCWSTR(path_w.as_ptr()), None, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+                                                    }
+                                                }
+                                                response.push(2);
+                                            }
                                             _ => {
                                                 let response = vec![0u8]; // PassThrough
                                                 let mut bytes_written = 0;

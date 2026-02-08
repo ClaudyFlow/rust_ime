@@ -236,7 +236,22 @@ impl InputMethodHost for EvdevHost {
                                 }
                                 let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); 
                             }
-                            Action::Alert => { if self.config.read().unwrap().input.enable_error_sound { let _ = std::process::Command::new("canberra-gtk-play").arg("--id=dialog-error").spawn(); } }
+                            Action::Alert => { 
+                                if self.config.read().unwrap().input.enable_error_sound { 
+                                    let root = crate::find_project_root();
+                                    let sound_path = root.join("sounds/beep.wav");
+                                    if sound_path.exists() {
+                                        let _ = std::process::Command::new("canberra-gtk-play")
+                                            .arg("-f")
+                                            .arg(sound_path)
+                                            .spawn();
+                                    } else {
+                                        let _ = std::process::Command::new("canberra-gtk-play")
+                                            .arg("--id=dialog-error")
+                                            .spawn();
+                                    }
+                                } 
+                            }
                             Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
                             _ => {}
                         }
