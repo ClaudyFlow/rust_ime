@@ -139,11 +139,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?;
                 }
                 let mut dll_path = std::env::current_exe()?;
-                dll_path.set_file_name("rust_ime_tsf.dll");
+                dll_path.set_file_name("rust_ime_tsf_v2.dll");
                 if !dll_path.exists() {
                     // 尝试在 target/debug 或 target/release 找
                     let mut p = std::env::current_exe()?;
-                    p.pop(); p.push("rust_ime_tsf.dll");
+                    p.pop(); p.push("rust_ime_tsf_v2.dll");
                     dll_path = p;
                 }
                 

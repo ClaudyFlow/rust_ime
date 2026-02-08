@@ -56,12 +56,15 @@ impl TextService {
         let mut x = 0i32;
         let mut y = 0i32;
 
-        // 尝试使用 GetTextExt 获取精确坐标 (针对 Chrome/Edge 等 TSF 兼容程序)
-        if let Some(ctx) = context {
-            let (tx, ty) = self.get_text_ext(ctx);
-            if tx != 0 || ty != 0 {
-                x = tx;
-                y = ty;
+        // 性能优化：只有在实际按键（msg_type=1）且可能是输入字符或已在输入时，才尝试获取坐标
+        // 这样可以避免在每个按键测试阶段都进行耗时的 GetTextExt 调用
+        if msg_type == 1 && (key_code >= 0x41 && key_code <= 0x5A || key_code == 0x08) {
+            if let Some(ctx) = context {
+                let (tx, ty) = self.get_text_ext(ctx);
+                if tx != 0 || ty != 0 {
+                    x = tx;
+                    y = ty;
+                }
             }
         }
 
