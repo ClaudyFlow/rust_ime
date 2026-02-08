@@ -18,6 +18,7 @@ impl CandidatePainter {
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf"))); // Linux 回退
 
         let font_zh = Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))
+            .or_else(|| Self::load_font(&root.join("fonts/NotoSansSC-Regular.ttf")))
             .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc"))) // Windows 回退
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"))); // Linux 回退
 
