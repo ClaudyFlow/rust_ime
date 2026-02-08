@@ -4,16 +4,13 @@ use windows::{
     Win32::Graphics::Gdi::*,
     core::*,
 };
-use crate::ui::painter::CandidatePainter;
 use crate::ui::GuiEvent;
 use crate::config::Config;
-use std::sync::Arc;
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, RwLock};
 
 static mut WINDOW_STATE: Option<WindowState> = None;
-static mut KEY_WINDOW: HWND = HWND(0);
-static mut LEARN_WINDOW: HWND = HWND(0);
-static mut DISPLAYED_KEYS: Vec<(String, std::time::Instant)> = Vec::new();
+static mut CURRENT_CONFIG: Option<Arc<RwLock<Config>>> = None;
 
 struct WindowState {
     pinyin: String,
@@ -28,84 +25,43 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
     let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
-    let wc = WNDCLASSW {
-        hCursor: unsafe { LoadCursorW(None, IDC_ARROW).unwrap() },
-        hInstance: instance.into(),
-        lpszClassName: window_class,
-        lpfnWndProc: Some(wnd_proc),
-        ..Default::default()
-    };
-    unsafe { RegisterClassW(&wc); }
-
-    let hwnd = unsafe {
-        CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-            window_class, PCWSTR(std::ptr::null()), WS_POPUP,
-            100, 100, 600, 160, None, None, instance, None,
-        )
-    };
-
-    let key_class = PCWSTR("RustImeKey\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-    let wc_key = WNDCLASSW {
-        hInstance: instance.into(),
-        lpszClassName: key_class,
-        lpfnWndProc: Some(wnd_proc),
-        ..Default::default()
-    };
-    unsafe { RegisterClassW(&wc_key); }
     unsafe {
-        KEY_WINDOW = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-            key_class, PCWSTR(std::ptr::null()), WS_POPUP,
-            0, 0, 0, 0, None, None, instance, None,
+        // 加载本地字体，让 GDI 可以识别到 Noto Sans SC
+        let root = crate::find_project_root();
+        let font_path = root.join("fonts/NotoSansSC-Bold.ttf");
+        if font_path.exists() {
+            let path_u16: Vec<u16> = font_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
+            let _ = AddFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE, None);
+        }
+
+        let wc = WNDCLASSW {
+            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
+            hInstance: instance.into(),
+            lpszClassName: window_class,
+            lpfnWndProc: Some(wnd_proc),
+            hbrBackground: CreateSolidBrush(COLORREF(0xFFFFFF)), 
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        CURRENT_CONFIG = Some(Arc::new(RwLock::new(initial_config)));
+
+        let hwnd = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            window_class, PCWSTR(std::ptr::null()), WS_POPUP | WS_BORDER,
+            100, 100, 400, 120, None, None, instance, None,
         );
-    }
 
-    let learn_class = PCWSTR("RustImeLearn\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-    let wc_learn = WNDCLASSW {
-        hInstance: instance.into(),
-        lpszClassName: learn_class,
-        lpfnWndProc: Some(wnd_proc),
-        ..Default::default()
-    };
-    unsafe { RegisterClassW(&wc_learn); }
-    unsafe {
-        LEARN_WINDOW = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
-            learn_class, PCWSTR(std::ptr::null()), WS_POPUP,
-            0, 0, 0, 0, None, None, instance, None,
-        );
-    }
-
-    let painter = CandidatePainter::new();
-    let current_config = Arc::new(std::sync::RwLock::new(initial_config));
-
-    let current_config_main = current_config.clone();
-    std::thread::spawn(move || {
-        while let Ok(mut event) = rx.recv() {
-            // 合并过载的 Update 事件，防止长按时堆积
-            if matches!(event, GuiEvent::Update { .. }) {
-                let mut count = 0;
-                while let Ok(next) = rx.try_recv() {
-                    if matches!(next, GuiEvent::Update { .. }) {
-                        event = next;
-                        count += 1;
-                        if count > 10 { break; } // 防止饿死
-                    } else {
-                        // 如果是 MoveTo 等事件，先处理当前的 Update，再把非 Update 事件留到下一轮
-                        // 由于 rx 是 channel，我们无法把拿出来的东西塞回去，所以只能在这里中断合并逻辑
-                        // 幸好大部分时候 Update 后紧跟 MoveTo，我们处理完 Update 后下一轮循环就会拿到 MoveTo
-                        break; 
+        std::thread::spawn(move || {
+            while let Ok(mut event) = rx.recv() {
+                if matches!(event, GuiEvent::Update { .. }) {
+                    while let Ok(next) = rx.try_recv() {
+                        if matches!(next, GuiEvent::Update { .. }) { event = next; } else { break; }
                     }
                 }
-            }
 
-            match event {
-                GuiEvent::ApplyConfig(conf) => { 
-                    if let Ok(mut w) = current_config_main.write() { *w = conf; }
-                }
-                GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-                    unsafe {
+                match event {
+                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr {
                             state.pinyin = pinyin;
@@ -120,150 +76,29 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             if state.pinyin.is_empty() {
                                 ShowWindow(hwnd, SW_HIDE);
                             } else {
-                                let (page_size, config_snapshot) = {
-                                    let r = current_config_main.read().unwrap();
-                                    (r.appearance.page_size as usize, r.clone())
-                                };
-                                
-                                let start = (state.selected / page_size) * page_size;
-                                let end = (start + page_size).min(state.candidates.len());
-                                
-                                let current_candidates = state.candidates[start..end].to_vec();
-                                let current_hints = if state.hints.len() >= end {
-                                    state.hints[start..end].to_vec()
-                                } else {
-                                    vec![String::new(); current_candidates.len()]
-                                };
-
-                                let (pixels, w, h) = painter.draw(
-                                    &state.pinyin, 
-                                    &current_candidates, 
-                                    &current_hints, 
-                                    state.selected % page_size, 
-                                    &config_snapshot
-                                );
-                                
-                                let (fx, fy) = (state.x, state.y);
-                                update_window_pixels(hwnd, &pixels, w, h);
-                                
-                                let sw = GetSystemMetrics(SM_CXSCREEN);
-                                let sh = GetSystemMetrics(SM_CYSCREEN);
-                                let mut final_x = fx;
-                                let mut final_y = fy + 25;
-                                
-                                if fx == 0 && fy == 0 {
-                                    final_x = (sw - w as i32) / 2;
-                                    final_y = (sh - h as i32) / 2;
-                                } else {
-                                    if final_x + w as i32 > sw { final_x = sw - w as i32 - 10; }
-                                    if final_y + h as i32 > sh { final_y = fy - h as i32 - 5; }
-                                }
-                                
-                                let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, w as i32, h as i32, SWP_NOACTIVATE);
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                                InvalidateRect(hwnd, None, BOOL(1));
+                                UpdateWindow(hwnd); 
                             }
                         }
                     }
-                }
-                GuiEvent::MoveTo { x, y } => {
-                    unsafe {
+                    GuiEvent::MoveTo { x, y } => {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
-                        
-                        let mut rect = RECT::default();
-                        let _ = GetWindowRect(hwnd, &mut rect);
-                        let w = rect.right - rect.left;
-                        let h = rect.bottom - rect.top;
-
-                        let sw = GetSystemMetrics(SM_CXSCREEN);
-                        let sh = GetSystemMetrics(SM_CYSCREEN);
-                        let mut final_x = x;
-                        let mut final_y = y + 25;
-
-                        if x == 0 && y == 0 {
-                            final_x = (sw - w) / 2;
-                            final_y = (sh - h) / 2;
-                        } else {
-                            if final_x + w > sw { final_x = sw - w - 10; }
-                            if final_y + h > sh { final_y = y - h - 5; }
+                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                    GuiEvent::ApplyConfig(conf) => {
+                        if let Some(ref arc) = CURRENT_CONFIG {
+                            if let Ok(mut w) = arc.write() { *w = conf; }
                         }
-                        
-                        final_x = final_x.max(0);
-                        final_y = final_y.max(0);
-
-                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        InvalidateRect(hwnd, None, BOOL(1));
                     }
-                }
-                GuiEvent::Keystroke(key) => {
-                    unsafe {
-                        let config_snapshot = current_config_main.read().unwrap().clone();
-                        if !config_snapshot.appearance.show_keystrokes { continue; }
-                        let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
-                        (*keys_ptr).push((key, std::time::Instant::now()));
-                        if (*keys_ptr).len() > 10 { (*keys_ptr).remove(0); }
-                        
-                        let keys: Vec<String> = (*keys_ptr).iter().map(|(k, _)| k.clone()).collect();
-                        let (pixels, w, h) = painter.draw_keystrokes(&keys, &config_snapshot);
-                        update_window_pixels(KEY_WINDOW, &pixels, w, h);
-                        
-                        let sw = GetSystemMetrics(SM_CXSCREEN);
-                        let sh = GetSystemMetrics(SM_CYSCREEN);
-                        let _ = SetWindowPos(KEY_WINDOW, HWND_TOPMOST, (sw - w as i32) / 2, sh - h as i32 - 100, w as i32, h as i32, SWP_NOACTIVATE);
-                        ShowWindow(KEY_WINDOW, SW_SHOWNOACTIVATE);
-                    }
-                }
-                GuiEvent::ClearKeystrokes => {
-                    unsafe {
-                        let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
-                        (*keys_ptr).clear();
-                        ShowWindow(KEY_WINDOW, SW_HIDE);
-                    }
-                }
-                GuiEvent::ShowLearning(word, hint) => {
-                    unsafe {
-                        let config_snapshot = current_config_main.read().unwrap().clone();
-                        if !config_snapshot.appearance.learning_mode { continue; }
-                        let (pixels, w, h) = painter.draw_learning(&word, &hint, &config_snapshot);
-                        update_window_pixels(LEARN_WINDOW, &pixels, w, h);
-                        
-                        let sw = GetSystemMetrics(SM_CXSCREEN);
-                        let _ = SetWindowPos(LEARN_WINDOW, HWND_TOPMOST, sw - w as i32 - 40, 40, w as i32, h as i32, SWP_NOACTIVATE);
-                        ShowWindow(LEARN_WINDOW, SW_SHOWNOACTIVATE);
-                    }
-                }
-                _ => {}
-            }
-        }
-    });
-
-    let painter_timer = CandidatePainter::new();
-    let current_config_timer = current_config.clone();
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(std::time::Duration::from_millis(200));
-            unsafe {
-                let now = std::time::Instant::now();
-                let mut changed = false;
-                let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
-                (*keys_ptr).retain(|(_, time)| {
-                    if now.duration_since(*time).as_millis() < 2000 { true } else { changed = true; false }
-                });
-                if changed {
-                    if (*keys_ptr).is_empty() {
-                        ShowWindow(KEY_WINDOW, SW_HIDE);
-                    } else {
-                        let keys: Vec<String> = (*keys_ptr).iter().map(|(k, _)| k.clone()).collect();
-                        let config_snapshot = current_config_timer.read().unwrap().clone();
-                        let (pixels, w, h) = painter_timer.draw_keystrokes(&keys, &config_snapshot);
-                        update_window_pixels(KEY_WINDOW, &pixels, w, h);
-                    }
+                    _ => {}
                 }
             }
-        }
-    });
+        });
 
-    let mut msg = MSG::default();
-    unsafe {
+        let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
@@ -271,66 +106,180 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     }
 }
 
-// 优化的像素更新函数
-unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u32) {
-    if width == 0 || height == 0 { return; }
-    
-    let hdc_screen = GetDC(None);
-    let hdc_mem = CreateCompatibleDC(hdc_screen);
-    
-    let bmi = BITMAPINFO {
-        bmiHeader: BITMAPINFOHEADER {
-            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: width as i32,
-            biHeight: -(height as i32),
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let mut bits = std::ptr::null_mut();
-    let h_bitmap = CreateDIBSection(hdc_screen, &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
-    
-    if !bits.is_null() {
-        let bits_slice = std::slice::from_raw_parts_mut(bits as *mut u8, (width * height * 4) as usize);
-        // tiny-skia (RGBA) to Windows (BGRA)
-        for i in 0..(width * height) as usize {
-            let offset = i * 4;
-            bits_slice[offset]     = pixels[offset + 2]; // B
-            bits_slice[offset + 1] = pixels[offset + 1]; // G
-            bits_slice[offset + 2] = pixels[offset];     // R
-            bits_slice[offset + 3] = pixels[offset + 3]; // A
-        }
-    }
-
-    let old_bitmap = SelectObject(hdc_mem, h_bitmap);
-    let size = SIZE { cx: width as i32, cy: height as i32 };
-    let pt_src = POINT { x: 0, y: 0 };
-    let blend = BLENDFUNCTION {
-        BlendOp: AC_SRC_OVER as u8,
-        SourceConstantAlpha: 255,
-        AlphaFormat: AC_SRC_ALPHA as u8,
-        ..Default::default()
-    };
-
-    let _ = UpdateLayeredWindow(
-        hwnd, hdc_screen, None, Some(&size), 
-        hdc_mem, Some(&pt_src), COLORREF(0), 
-        Some(&blend), ULW_ALPHA
-    );
-
-    SelectObject(hdc_mem, old_bitmap);
-    DeleteObject(h_bitmap);
-    DeleteDC(hdc_mem);
-    ReleaseDC(None, hdc_screen);
-}
-
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
+        WM_PAINT => {
+            let mut ps = PAINTSTRUCT::default();
+            let hdc = BeginPaint(hwnd, &mut ps);
+            
+            let mut rect = RECT::default();
+            let _ = GetClientRect(hwnd, &mut rect);
+            let mem_dc = CreateCompatibleDC(hdc);
+            let mem_bm = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+            let old_bm = SelectObject(mem_dc, mem_bm);
+            
+            let brush = CreateSolidBrush(COLORREF(0xFFFFFF));
+            let _ = FillRect(mem_dc, &rect, brush);
+            let _ = DeleteObject(brush);
+
+            if let Some(ref state) = WINDOW_STATE {
+                if let Some(ref arc) = CURRENT_CONFIG {
+                    if let Ok(conf) = arc.read() {
+                        draw_content(mem_dc, hwnd, state, &conf);
+                    }
+                }
+            }
+            
+            let _ = BitBlt(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, SRCCOPY);
+            
+            SelectObject(mem_dc, old_bm);
+            let _ = DeleteObject(mem_bm);
+            let _ = DeleteDC(mem_dc);
+            
+            EndPaint(hwnd, &ps);
+            LRESULT(0)
+        }
+        WM_ERASEBKGND => LRESULT(1),
         WM_DESTROY => { PostQuitMessage(0); LRESULT(0) }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config) {
+    SetBkMode(hdc, TRANSPARENT);
+    
+    let pad_x = conf.appearance.window_padding_x;
+    let pad_y = conf.appearance.window_padding_y;
+    let row_space = conf.appearance.row_spacing as i32;
+
+    // 尝试加载本地粗体字，如果名字匹配不上，系统会自动回退到类似字体的 Bold 版本
+    let py_font_name = HSTRING::from(&conf.appearance.pinyin_text.font_family);
+    let h_font_py = CreateFontW(
+        -(conf.appearance.pinyin_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 700, // 700 = Bold
+        0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(py_font_name.as_ptr())
+    );
+
+    let cand_font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
+    let h_font_cand = CreateFontW(
+        -(conf.appearance.candidate_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 700, // 700 = Bold
+        0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(cand_font_name.as_ptr())
+    );
+
+    let hint_font_name = HSTRING::from(&conf.appearance.hint_text.font_family);
+    let h_font_hint = CreateFontW(
+        -(conf.appearance.hint_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(hint_font_name.as_ptr())
+    );
+
+    // --- 开始绘制拼音行 ---
+    SelectObject(hdc, h_font_py);
+    let py_color = parse_color_win(&conf.appearance.pinyin_text.color);
+    SetTextColor(hdc, py_color);
+    let py_u16: Vec<u16> = state.pinyin.encode_utf16().collect();
+    TextOutW(hdc, pad_x, pad_y, &py_u16);
+
+    let mut py_size = SIZE::default();
+    GetTextExtentPoint32W(hdc, &py_u16, &mut py_size);
+
+    // --- 开始绘制候选词行 ---
+    let cand_y = pad_y + py_size.cy + row_space;
+    let mut x_cursor = pad_x;
+    
+    let cand_color = parse_color_win(&conf.appearance.candidate_text.color);
+    let hint_color = parse_color_win(&conf.appearance.hint_text.color);
+    let highlight_color = parse_color_win(&conf.appearance.window_highlight_color);
+    
+    let page_size = conf.appearance.page_size;
+    let start = (state.selected / page_size) * page_size;
+    let end = (start + page_size).min(state.candidates.len());
+
+    let mut max_row_height = 0;
+
+    for i in start..end {
+        let is_selected = i == state.selected;
+        
+        // A. 绘制序号
+        SelectObject(hdc, h_font_cand);
+        let idx_text = format!("{}.", i - start + 1);
+        let idx_u16: Vec<u16> = idx_text.encode_utf16().collect();
+        let mut idx_size = SIZE::default();
+        GetTextExtentPoint32W(hdc, &idx_u16, &mut idx_size);
+        
+        SetTextColor(hdc, if is_selected { highlight_color } else { cand_color });
+        TextOutW(hdc, x_cursor, cand_y, &idx_u16);
+        x_cursor += idx_size.cx + 4;
+
+        // B. 绘制词语
+        let cand_text = &state.candidates[i];
+        let cand_u16: Vec<u16> = cand_text.encode_utf16().collect();
+        let mut text_size = SIZE::default();
+        GetTextExtentPoint32W(hdc, &cand_u16, &mut text_size);
+        
+        if is_selected {
+            // 选中项背景色
+            let h_brush = CreateSolidBrush(COLORREF(0xF0F0F0)); // 浅灰色高亮
+            let r = RECT { left: x_cursor - 2, top: cand_y, right: x_cursor + text_size.cx + 2, bottom: cand_y + text_size.cy };
+            let _ = FillRect(hdc, &r, h_brush);
+            let _ = DeleteObject(h_brush);
+        }
+        
+        TextOutW(hdc, x_cursor, cand_y, &cand_u16);
+        x_cursor += text_size.cx;
+
+        // C. 绘制提示 (辅助码)
+        if let Some(hint) = state.hints.get(i) {
+            if !hint.is_empty() {
+                SelectObject(hdc, h_font_hint);
+                let hint_u16: Vec<u16> = hint.encode_utf16().collect();
+                let mut hint_size = SIZE::default();
+                GetTextExtentPoint32W(hdc, &hint_u16, &mut hint_size);
+                
+                SetTextColor(hdc, if is_selected { highlight_color } else { hint_color });
+                TextOutW(hdc, x_cursor + 4, cand_y + (text_size.cy - hint_size.cy), &hint_u16);
+                x_cursor += hint_size.cx + 8;
+            }
+        }
+        
+        x_cursor += conf.appearance.item_spacing as i32;
+        max_row_height = max_row_height.max(text_size.cy);
+    }
+
+    // 清理
+    let _ = DeleteObject(h_font_py);
+    let _ = DeleteObject(h_font_cand);
+    let _ = DeleteObject(h_font_hint);
+    
+    // 动态调整窗口尺寸
+    let final_w = (x_cursor + pad_x).max(300);
+    let final_h = cand_y + max_row_height + pad_y;
+    
+    let mut current_rect = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut current_rect);
+    let cur_w = current_rect.right - current_rect.left;
+    let cur_h = current_rect.bottom - current_rect.top;
+    
+    if final_w != cur_w || final_h != cur_h {
+        let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, final_w, final_h, SWP_NOMOVE | SWP_NOACTIVATE);
+    }
+}
+
+fn parse_color_win(s: &str) -> COLORREF {
+    if s.starts_with('#') && s.len() == 7 {
+        let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(0);
+        return COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16));
+    }
+    COLORREF(0)
 }
