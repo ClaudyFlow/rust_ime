@@ -307,13 +307,42 @@ impl CandidatePainter {
         pb.finish().unwrap()
     }
 
-    fn parse_color(&self, hex: &str) -> Color {
-        if hex.starts_with('#') && hex.len() == 7 {
-            let r = u8::from_str_radix(&hex[1..3], 16).unwrap_or(255);
-            let g = u8::from_str_radix(&hex[3..5], 16).unwrap_or(255);
-            let b = u8::from_str_radix(&hex[5..7], 16).unwrap_or(255);
+    fn parse_color(&self, color_str: &str) -> Color {
+        let s = color_str.trim().to_lowercase();
+        
+        // 1. 处理 #RRGGBB
+        if s.starts_with('#') && s.len() == 7 {
+            let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
+            let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
+            let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
             return Color::from_rgba8(r, g, b, 255);
         }
+        
+        // 2. 处理 rgba(r, g, b, a)
+        if s.starts_with("rgba") {
+            let content = s.trim_start_matches("rgba(").trim_end_matches(')');
+            let parts: Vec<&str> = content.split(',').map(|p| p.trim()).collect();
+            if parts.len() >= 4 {
+                let r = parts[0].parse::<u8>().unwrap_or(255);
+                let g = parts[1].parse::<u8>().unwrap_or(255);
+                let b = parts[2].parse::<u8>().unwrap_or(255);
+                let a = (parts[3].parse::<f32>().unwrap_or(1.0) * 255.0) as u8;
+                return Color::from_rgba8(r, g, b, a);
+            }
+        }
+
+        // 3. 处理 rgb(r, g, b)
+        if s.starts_with("rgb") {
+            let content = s.trim_start_matches("rgb(").trim_end_matches(')');
+            let parts: Vec<&str> = content.split(',').map(|p| p.trim()).collect();
+            if parts.len() >= 3 {
+                let r = parts[0].parse::<u8>().unwrap_or(255);
+                let g = parts[1].parse::<u8>().unwrap_or(255);
+                let b = parts[2].parse::<u8>().unwrap_or(255);
+                return Color::from_rgba8(r, g, b, 255);
+            }
+        }
+
         Color::WHITE
     }
 }

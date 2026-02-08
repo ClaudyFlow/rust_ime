@@ -271,7 +271,15 @@ unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u3
     let h_bitmap = CreateDIBSection(hdc_screen, &bmi, DIB_RGB_COLORS, &mut bits, None, 0).unwrap();
     
     if !bits.is_null() {
-        std::ptr::copy_nonoverlapping(pixels.as_ptr(), bits as *mut u8, (width * height * 4) as usize);
+        // tiny-skia 输出的是 RGBA，Windows 位图需要 BGRA
+        let mut bgra_pixels = Vec::with_capacity(pixels.len());
+        for chunk in pixels.chunks_exact(4) {
+            bgra_pixels.push(chunk[2]); // B
+            bgra_pixels.push(chunk[1]); // G
+            bgra_pixels.push(chunk[0]); // R
+            bgra_pixels.push(chunk[3]); // A
+        }
+        std::ptr::copy_nonoverlapping(bgra_pixels.as_ptr(), bits as *mut u8, (width * height * 4) as usize);
     }
 
     let old_bitmap = SelectObject(hdc_mem, h_bitmap);
