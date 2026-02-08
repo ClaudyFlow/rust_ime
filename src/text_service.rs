@@ -2,8 +2,7 @@ use windows::{
     core::*,
     Win32::Foundation::*,
     Win32::UI::TextServices::*,
-    Win32::UI::WindowsAndMessaging::GetWindowRect,
-    Win32::UI::Input::KeyboardAndMouse::{GetFocus, VK_SHIFT, VK_CONTROL, VK_MENU},
+    Win32::UI::Input::KeyboardAndMouse::{VK_SHIFT, VK_CONTROL, VK_MENU},
     Win32::System::Diagnostics::Debug::OutputDebugStringW,
     Win32::Storage::FileSystem::*,
     Win32::System::Pipes::WaitNamedPipeW,
@@ -40,9 +39,31 @@ impl TextService {
         Ok(())
     }
 
-    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, _context: Option<&ITfContext>) -> (u8, String) {
-        let x = 0i32;
-        let y = 0i32;
+    fn get_text_ext(&self, context: &ITfContext) -> (i32, i32) {
+        let client_id = self.client_id.load(Ordering::SeqCst);
+        let mut x = 0;
+        let mut y = 0;
+        unsafe {
+            let session = GetTextExtSession::new(context.clone(), &mut x, &mut y);
+            let session_ptr: ITfEditSession = session.into();
+            // 同步请求会话以获取坐标
+            let _ = context.RequestEditSession(client_id, &session_ptr, TF_ES_READ | TF_ES_SYNC);
+        }
+        (x, y)
+    }
+
+    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, context: Option<&ITfContext>) -> (u8, String) {
+        let mut x = 0i32;
+        let mut y = 0i32;
+
+        // 尝试使用 GetTextExt 获取精确坐标 (针对 Chrome/Edge 等 TSF 兼容程序)
+        if let Some(ctx) = context {
+            let (tx, ty) = self.get_text_ext(ctx);
+            if tx != 0 || ty != 0 {
+                x = tx;
+                y = ty;
+            }
+        }
 
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
         let pipe_pcwstr = PCWSTR(pipe_name.as_ptr());
@@ -198,6 +219,43 @@ impl ITfEditSession_Impl for EditSession {
                 let source_res: Result<ITfInsertAtSelection> = self.context.cast();
                 if let Ok(source) = source_res {
                     let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[implement(ITfEditSession)]
+struct GetTextExtSession {
+    context: ITfContext,
+    out_x: *mut i32,
+    out_y: *mut i32,
+}
+
+impl GetTextExtSession {
+    fn new(context: ITfContext, out_x: *mut i32, out_y: *mut i32) -> Self {
+        Self { context, out_x, out_y }
+    }
+}
+
+impl ITfEditSession_Impl for GetTextExtSession {
+    fn DoEditSession(&self, ec: u32) -> Result<()> {
+        unsafe {
+            let view_res: Result<ITfContextView> = self.context.GetActiveView();
+            if let Ok(view) = view_res {
+                let mut selection = [TF_SELECTION { ..Default::default() }];
+                let mut fetched = 0;
+                if self.context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched).is_ok() && fetched > 0 {
+                    if let Some(range) = &*selection[0].range {
+                        let mut rect = RECT::default();
+                        let mut clipped = FALSE;
+                        if view.GetTextExt(ec, range, &mut rect, &mut clipped).is_ok() {
+                            // 优先使用 bottom/left 作为候选框锚点
+                            *self.out_x = rect.left;
+                            *self.out_y = rect.bottom;
+                        }
+                    }
                 }
             }
         }
