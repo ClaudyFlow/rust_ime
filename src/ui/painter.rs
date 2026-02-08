@@ -37,14 +37,15 @@ impl CandidatePainter {
     }
 
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> (Vec<u8>, u32, u32) {
-        let padding = 16.0;
-        let corner_radius = config.appearance.corner_radius;
+        let padding_x = 18.0;
+        let padding_y = 14.0;
+        let corner_radius = config.appearance.corner_radius.max(8.0); // Ensure at least 8px for modern look
         let font_size_pinyin = config.appearance.pinyin_font_size as f32;
         let font_size_cand = config.appearance.candidate_font_size as f32;
         let line_height_pinyin = font_size_pinyin * 1.4;
-        let line_height_cand = font_size_cand * 1.4;
-        let spacing_v = 12.0;
-        let item_spacing_h = 24.0;
+        let line_height_cand = font_size_cand * 1.5;
+        let spacing_v = 8.0;
+        let item_spacing_h = 16.0;
 
         let mut cand_widths = Vec::new();
         let mut total_width = 300.0;
@@ -65,39 +66,43 @@ impl CandidatePainter {
                     if !h.is_empty() { self.measure_text(f_en, h, font_size_cand * 0.75) + 8.0 } else { 0.0 }
                 } else { 0.0 };
                 
-                let total_item_w = w_prefix + w_cand + hint_w;
+                let total_item_w = w_prefix + w_cand + hint_w + 12.0; // Extra padding for selection pill
                 cand_widths.push(total_item_w);
                 row_width += total_item_w + if i < candidates.len() - 1 { item_spacing_h } else { 0.0 };
             }
-            total_width = (pinyin_w + padding * 2.0).max(row_width + padding * 2.0).max(300.0).min(1200.0);
-            total_height = padding * 2.0 + line_height_pinyin + spacing_v + line_height_cand;
+            total_width = (pinyin_w + padding_x * 2.0).max(row_width + padding_x * 2.0).max(320.0).min(1200.0);
+            total_height = padding_y * 2.0 + line_height_pinyin + spacing_v + line_height_cand;
         }
 
         let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
-        // 绘制阴影 (高级感：更淡、分布更自然的柔和阴影)
-        for i in 1..=8 {
-            let offset = i as f32 * 1.0;
+        // 绘制阴影 (GTK4 风格：大而柔和)
+        // 模拟高斯模糊阴影：多层低透明度叠加
+        let shadow_color = Color::from_rgba8(0, 0, 0, 15); // 非常淡的黑色
+        for i in 1..=12 {
+            let spread = i as f32 * 1.5;
             let mut sp = Paint::default();
-            // 阴影颜色更加深邃且透明度递减
-            let alpha = (10 - i) as u8;
-            sp.set_color(Color::from_rgba8(0, 0, 0, alpha));
+            sp.set_color(shadow_color);
             sp.anti_alias = true;
-            let sr = Rect::from_xywh(offset, offset, total_width - offset, total_height - offset).unwrap();
-            pixmap.fill_path(&self.create_rounded_rect_path(sr, corner_radius + offset), &sp, FillRule::Winding, Transform::identity(), None);
+            let sr = Rect::from_xywh(4.0, 4.0 + i as f32 * 0.5, total_width - 20.0, total_height - 20.0).unwrap();
+            // 使用路径填充来模拟模糊边缘
+             let shadow_path = self.create_rounded_rect_path(sr, corner_radius + spread * 0.5);
+             pixmap.fill_path(&shadow_path, &sp, FillRule::Winding, Transform::identity(), None);
         }
 
-        // 主背景
+        // 主背景 (略微缩小以留出阴影空间)
+        let content_w = total_width - 20.0;
+        let content_h = total_height - 20.0;
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&config.appearance.candidate_bg_color));
         bg_paint.anti_alias = true;
-        let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
+        let main_rect = Rect::from_xywh(10.0, 5.0, content_w, content_h).unwrap();
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 边框 (1px 深黑色，增强视觉边界感)
+        // 边框 (极细微的轮廓)
         let mut border_paint = Paint::default();
-        border_paint.set_color(Color::from_rgba8(30, 30, 30, 255)); // 优雅的深黑
+        border_paint.set_color(Color::from_rgba8(0, 0, 0, 20)); // 10% 黑
         border_paint.anti_alias = true;
         let border_stroke = Stroke {
             width: 1.0,
@@ -106,46 +111,62 @@ impl CandidatePainter {
         pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &border_stroke, Transform::identity(), None);
 
         if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
-            // 1. 绘制拼音 (强制英文字体)
+            let offset_x = 10.0;
+            let offset_y = 5.0;
+
+            // 1. 绘制拼音
             let py_color = self.parse_color(&config.appearance.pinyin_color);
-            let pinyin_y = padding + line_height_pinyin * 0.8;
-            self.draw_mixed_text(&mut pixmap, f_zh, f_en, pinyin, padding, pinyin_y, font_size_pinyin, py_color, true);
+            let pinyin_y = offset_y + padding_y + line_height_pinyin * 0.7;
+            self.draw_mixed_text(&mut pixmap, f_zh, f_en, pinyin, offset_x + padding_x, pinyin_y, font_size_pinyin, py_color, true);
+
+            // 分割线 (可选，视风格而定，GTK4 通常很干净，这里留白即可)
 
             // 2. 绘制候选词
-            let cand_y_base = padding + line_height_pinyin + spacing_v;
-            let mut x_cursor = padding;
+            let cand_y_base = offset_y + padding_y + line_height_pinyin + spacing_v;
+            let mut x_cursor = offset_x + padding_x;
             let text_color = self.parse_color(&config.appearance.candidate_text_color);
             let highlight_color = self.parse_color(&config.appearance.candidate_highlight_color);
 
             for (i, cand) in candidates.iter().enumerate() {
                 let is_selected = i == selected;
+                let item_w = cand_widths[i];
+                
+                // 选中项背景 (圆角胶囊)
                 if is_selected {
                     let mut hp = Paint::default();
+                    // GTK4 选中通常是蓝色背景白字，或者浅蓝背景深蓝字
+                    // 这里采用浅色背景风格
                     let mut hc = highlight_color;
-                    hc.set_alpha(0.12);
+                    hc.set_alpha(0.15); // 15% 透明度的主色调
                     hp.set_color(hc);
-                    let hr = Rect::from_xywh(x_cursor - 6.0, cand_y_base, cand_widths[i] + 12.0, line_height_cand).unwrap();
-                    pixmap.fill_path(&self.create_rounded_rect_path(hr, 4.0), &hp, FillRule::Winding, Transform::identity(), None);
+                    let hr = Rect::from_xywh(x_cursor - 6.0, cand_y_base, item_w, line_height_cand).unwrap();
+                    pixmap.fill_path(&self.create_rounded_rect_path(hr, 6.0), &hp, FillRule::Winding, Transform::identity(), None);
                 }
                 
                 let prefix = format!("{}.", i + 1);
                 let current_color = if is_selected { highlight_color } else { text_color };
-                let text_y = cand_y_base + line_height_cand * 0.75;
+                // 选中项字体加粗效果通过稍微偏移重绘模拟 (简单粗暴)
+                // 或者保持颜色区分即可
                 
-                // 序号 (英文)
-                let adv1 = self.draw_text(&mut pixmap, f_en, &prefix, x_cursor, text_y, font_size_cand, current_color);
-                // 汉字 (中文)
+                let text_y = cand_y_base + line_height_cand * 0.7;
+                
+                // 序号 (半透明)
+                let mut prefix_color = current_color;
+                if !is_selected { prefix_color.set_alpha(0.6); }
+                let adv1 = self.draw_text(&mut pixmap, f_en, &prefix, x_cursor, text_y, font_size_cand, prefix_color);
+                
+                // 汉字
                 let adv2 = self.draw_text(&mut pixmap, f_zh, cand, x_cursor + adv1, text_y, font_size_cand, current_color);
                 
-                // 提示词 (英文)
+                // 提示词
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
-                        let mut hc = text_color;
-                        hc.set_alpha(0.4);
+                        let mut hc = current_color;
+                        hc.set_alpha(0.5);
                         self.draw_text(&mut pixmap, f_en, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_cand * 0.75, hc);
                     }
                 }
-                x_cursor += cand_widths[i] + item_spacing_h;
+                x_cursor += item_w + item_spacing_h;
             }
         }
 

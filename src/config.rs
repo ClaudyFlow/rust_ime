@@ -166,18 +166,18 @@ impl Config {
                 candidate_margin_x: 0,
                 candidate_margin_y: 50,
                 candidate_bg_color: "#ffffff".to_string(),
-                candidate_text_color: "#000000".to_string(),
-                candidate_highlight_color: "#0071e3".to_string(),
-                pinyin_color: "#646464".to_string(),
+                candidate_text_color: "#24292e".to_string(), // Dark grey
+                candidate_highlight_color: "#0969da".to_string(), // GitHub Blue
+                pinyin_color: "#586069".to_string(), // Light grey
                 pinyin_font_size: 18,
-                corner_radius: 6.0,
+                corner_radius: 10.0, // Smoother corners
                 modern_cand_anchor: "bottom_left".to_string(),
                 modern_cand_font_size: 16,
                 modern_cand_hint_font_size: 10,
                 modern_cand_margin_x: 40,
                 modern_cand_margin_y: 200,
-                modern_cand_text_color: "#0071e3".to_string(),
-                modern_cand_highlight_color: "#0071e3".to_string(),
+                modern_cand_text_color: "#0969da".to_string(),
+                modern_cand_highlight_color: "#0969da".to_string(),
                 modern_cand_bg_color: "rgba(255, 255, 255, 0.95)".to_string(),
                 keystroke_anchor: "bottom_right".to_string(),
                 keystroke_font_size: 24,
