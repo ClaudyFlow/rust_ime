@@ -81,6 +81,6 @@ name = "compile_dict"
 path = "src/bin/compile_dict.rs"
 
 [lib]
-name = "rust_ime_tsf_v2"
+name = "rust_ime_tsf_v3"
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
