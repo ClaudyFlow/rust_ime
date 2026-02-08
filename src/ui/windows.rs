@@ -7,7 +7,8 @@ use windows::{
 use crate::ui::painter::CandidatePainter;
 use crate::ui::GuiEvent;
 use crate::config::Config;
-use std::sync::{Arc, Receiver};
+use std::sync::Arc;
+use std::sync::mpsc::Receiver;
 
 static mut WINDOW_STATE: Option<WindowState> = None;
 static mut KEY_WINDOW: HWND = HWND(0);
