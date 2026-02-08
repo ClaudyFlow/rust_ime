@@ -165,6 +165,24 @@ impl InputMethodHost for TsfHost {
                                 
                                 if msg_type == 1 {
                                     println!("[TSF Pipe] KeyDown: 0x{:02X}, Shift: {}, Ctrl: {}, Alt: {}", key_code, shift, ctrl, alt);
+                                    
+                                    // 发送按键事件到 GUI (用于按键显示功能)
+                                    if let Some(ref tx) = gui_tx {
+                                        let key_char = match key_code {
+                                            0x41..=0x5A => Some(((key_code - 0x41) as u8 + b'A') as char),
+                                            0x30..=0x39 => Some(((key_code - 0x30) as u8 + b'0') as char),
+                                            0x20 => Some(' '),
+                                            0x0D => Some('⏎'),
+                                            0x08 => Some('⌫'),
+                                            0x1B => Some('⎋'),
+                                            _ => None,
+                                        };
+                                        if let Some(c) = key_char {
+                                            let mut s = c.to_string();
+                                            if shift && c.is_ascii_lowercase() { s = s.to_uppercase(); }
+                                            let _ = tx.send(GuiEvent::Keystroke(s));
+                                        }
+                                    }
                                 }
 
                                 // 1. 优先检查切换热键 (必须排在最前面)

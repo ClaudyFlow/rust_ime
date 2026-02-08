@@ -152,6 +152,94 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
+    pub fn draw_keystrokes(&self, keys: &[String], config: &Config) -> (Vec<u8>, u32, u32) {
+        let padding = 12.0;
+        let font_size = 20.0;
+        let item_spacing = 8.0;
+        let corner_radius = 6.0;
+
+        let mut total_width = padding * 2.0;
+        let mut heights = Vec::new();
+        let mut widths = Vec::new();
+
+        if let Some(f_en) = &self.font_en {
+            for key in keys {
+                let w = self.measure_text(f_en, key, font_size);
+                widths.push(w);
+                total_width += w + padding * 2.0 + item_spacing;
+            }
+        }
+        total_width = total_width.max(10.0);
+        let total_height = font_size * 1.5 + padding * 2.0 + 10.0;
+
+        let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
+        pixmap.fill(Color::TRANSPARENT);
+
+        let mut x_cursor = padding;
+        if let Some(f_en) = &self.font_en {
+            for (i, key) in keys.iter().enumerate() {
+                let item_w = widths[i] + padding * 2.0;
+                let item_h = font_size * 1.5;
+                
+                // 背景
+                let mut bg_paint = Paint::default();
+                bg_paint.set_color(Color::from_rgba8(30, 30, 30, 200));
+                bg_paint.anti_alias = true;
+                let rect = Rect::from_xywh(x_cursor, padding, item_w, item_h).unwrap();
+                pixmap.fill_path(&self.create_rounded_rect_path(rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
+                
+                // 边框
+                let mut border_paint = Paint::default();
+                border_paint.set_color(Color::from_rgba8(200, 200, 200, 100));
+                let stroke = Stroke { width: 1.0, ..Default::default() };
+                pixmap.stroke_path(&self.create_rounded_rect_path(rect, corner_radius), &border_paint, &stroke, Transform::identity(), None);
+
+                // 文字
+                self.draw_text(&mut pixmap, f_en, key, x_cursor + padding, padding + item_h * 0.75, font_size, Color::WHITE);
+                
+                x_cursor += item_w + item_spacing;
+            }
+        }
+
+        (pixmap.data().to_vec(), total_width as u32, total_height as u32)
+    }
+
+    pub fn draw_learning(&self, word: &str, hint: &str, config: &Config) -> (Vec<u8>, u32, u32) {
+        let padding = 16.0;
+        let font_size_word = 24.0;
+        let font_size_hint = 14.0;
+        let corner_radius = 8.0;
+
+        let mut total_width = 200.0;
+        let mut total_height = 80.0;
+
+        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
+            let w_word = self.measure_text(f_zh, word, font_size_word);
+            let w_hint = self.measure_text(f_en, hint, font_size_hint);
+            total_width = (w_word.max(w_hint) + padding * 2.0).max(150.0);
+            total_height = font_size_word + font_size_hint + padding * 2.0 + 10.0 + 10.0;
+        }
+
+        let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
+        pixmap.fill(Color::TRANSPARENT);
+
+        // 背景
+        let mut bg_paint = Paint::default();
+        bg_paint.set_color(Color::from_rgba8(40, 44, 52, 230));
+        bg_paint.anti_alias = true;
+        let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
+        pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
+
+        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
+            // 汉字
+            self.draw_text(&mut pixmap, f_zh, word, padding, padding + font_size_word * 0.8, font_size_word, Color::WHITE);
+            // 提示
+            self.draw_text(&mut pixmap, f_en, hint, padding, padding + font_size_word + font_size_hint * 1.0, font_size_hint, Color::from_rgba8(171, 178, 191, 255));
+        }
+
+        (pixmap.data().to_vec(), total_width as u32, total_height as u32)
+    }
+
     fn measure_text(&self, font: &Font, text: &str, size: f32) -> f32 {
         let mut width = 0.0;
         for c in text.chars() {

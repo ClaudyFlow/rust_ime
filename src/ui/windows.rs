@@ -10,6 +10,9 @@ use crate::config::Config;
 use std::sync::mpsc::Receiver;
 
 static mut WINDOW_STATE: Option<WindowState> = None;
+static mut KEY_WINDOW: HWND = HWND(0);
+static mut LEARN_WINDOW: HWND = HWND(0);
+static mut DISPLAYED_KEYS: Vec<(String, std::time::Instant)> = Vec::new();
 
 struct WindowState {
     pinyin: String,
@@ -40,10 +43,40 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             100, 100, 600, 160, None, None, instance, None,
         );
 
+        let key_class = PCWSTR("RustImeKey\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+        let wc_key = WNDCLASSW {
+            hInstance: instance.into(),
+            lpszClassName: key_class,
+            lpfnWndProc: Some(wnd_proc),
+            ..Default::default()
+        };
+        RegisterClassW(&wc_key);
+        KEY_WINDOW = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+            key_class, PCWSTR(std::ptr::null()), WS_POPUP,
+            0, 0, 0, 0, None, None, instance, None,
+        );
+
+        let learn_class = PCWSTR("RustImeLearn\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+        let wc_learn = WNDCLASSW {
+            hInstance: instance.into(),
+            lpszClassName: learn_class,
+            lpfnWndProc: Some(wnd_proc),
+            ..Default::default()
+        };
+        RegisterClassW(&wc_learn);
+        LEARN_WINDOW = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE,
+            learn_class, PCWSTR(std::ptr::null()), WS_POPUP,
+            0, 0, 0, 0, None, None, instance, None,
+        );
+
         let painter = CandidatePainter::new();
         let mut current_config = initial_config;
 
         std::thread::spawn(move || {
+            let mut last_learn_clear = std::time::Instant::now();
+            
             while let Ok(event) = rx.recv() {
                 match event {
                     GuiEvent::ApplyConfig(conf) => { current_config = conf; }
@@ -95,7 +128,63 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                         }
                     }
+                    GuiEvent::Keystroke(key) => {
+                        unsafe {
+                            if !current_config.appearance.show_keystrokes { continue; }
+                            DISPLAYED_KEYS.push((key, std::time::Instant::now()));
+                            if DISPLAYED_KEYS.len() > 10 { DISPLAYED_KEYS.remove(0); }
+                            
+                            let keys: Vec<String> = DISPLAYED_KEYS.iter().map(|(k, _)| k.clone()).collect();
+                            let (pixels, w, h) = painter.draw_keystrokes(&keys, &current_config);
+                            update_window_pixels(KEY_WINDOW, &pixels, w, h);
+                            
+                            let sw = GetSystemMetrics(SM_CXSCREEN);
+                            let sh = GetSystemMetrics(SM_CYSCREEN);
+                            let _ = SetWindowPos(KEY_WINDOW, HWND_TOPMOST, (sw - w as i32) / 2, sh - h as i32 - 100, w as i32, h as i32, SWP_NOACTIVATE);
+                            ShowWindow(KEY_WINDOW, SW_SHOWNOACTIVATE);
+                        }
+                    }
+                    GuiEvent::ClearKeystrokes => {
+                        unsafe {
+                            DISPLAYED_KEYS.clear();
+                            ShowWindow(KEY_WINDOW, SW_HIDE);
+                        }
+                    }
+                    GuiEvent::ShowLearning(word, hint) => {
+                        unsafe {
+                            if !current_config.appearance.learning_mode { continue; }
+                            let (pixels, w, h) = painter.draw_learning(&word, &hint, &current_config);
+                            update_window_pixels(LEARN_WINDOW, &pixels, w, h);
+                            
+                            let sw = GetSystemMetrics(SM_CXSCREEN);
+                            let _ = SetWindowPos(LEARN_WINDOW, HWND_TOPMOST, sw - w as i32 - 40, 40, w as i32, h as i32, SWP_NOACTIVATE);
+                            ShowWindow(LEARN_WINDOW, SW_SHOWNOACTIVATE);
+                            last_learn_clear = std::time::Instant::now();
+                        }
+                    }
                     _ => {}
+                }
+            }
+        });
+
+        // 启动一个简单的清理定时器线程
+        std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(200));
+                unsafe {
+                    let now = std::time::Instant::now();
+                    // 清理过期按键
+                    let mut changed = false;
+                    DISPLAYED_KEYS.retain(|(_, time)| {
+                        if now.duration_since(*time).as_millis() < 2000 { true } else { changed = true; false }
+                    });
+                    if changed {
+                        if DISPLAYED_KEYS.is_empty() {
+                            ShowWindow(KEY_WINDOW, SW_HIDE);
+                        } else {
+                            // 重新绘制并更新 (这里简化处理，实际可以通过 channel 通知主 GUI 线程)
+                        }
+                    }
                 }
             }
         });
