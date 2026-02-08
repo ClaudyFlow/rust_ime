@@ -11,21 +11,32 @@ pub struct CandidatePainter {
     font_en: Option<Font>,
     glyph_cache: Mutex<HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>>,
     custom_fonts: Mutex<HashMap<String, Font>>,
+    font_map: HashMap<String, String>, // Name -> Path
 }
 
 impl CandidatePainter {
     pub fn new() -> Self {
         let root = crate::find_project_root();
         
+        // 预先扫描系统字体
+        let system_fonts = crate::platform::fonts::list_system_fonts();
+        let mut font_map = HashMap::new();
+        for f in system_fonts {
+            font_map.insert(f.name.to_lowercase(), f.path);
+        }
+
         // 1. 中文名流字体：优先 Windows 微软雅黑，其次 Linux Noto CJK，最后用本地自带
         let font_zh = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc"))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/google-noto-cjk-fonts/NotoSansCJK-Regular.ttc")))
+            .or_else(|| font_map.get("microsoft yahei").and_then(|p| Self::load_font(&PathBuf::from(p))))
+            .or_else(|| font_map.get("noto sans cjk sc").and_then(|p| Self::load_font(&PathBuf::from(p))))
             .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf")))
             .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttf")));
 
         // 2. 英文名流字体：优先 Windows Segoe UI，其次本地 Inter，最后是 Linux 系统字体
         let font_en = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))
+            .or_else(|| font_map.get("segoe ui").and_then(|p| Self::load_font(&PathBuf::from(p))))
             .or_else(|| Self::load_font(&root.join("fonts/Inter-Regular.ttf")))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto/NotoSans-Regular.ttf")));
@@ -35,6 +46,7 @@ impl CandidatePainter {
             font_en, 
             glyph_cache: Mutex::new(HashMap::new()),
             custom_fonts: Mutex::new(HashMap::new()),
+            font_map,
         }
     }
 
@@ -47,32 +59,33 @@ impl CandidatePainter {
     }
 
     fn get_font_by_family(&self, family: &str) -> Option<Font> {
+        let family_lower = family.to_lowercase();
         let mut cache = self.custom_fonts.lock().unwrap();
-        if let Some(f) = cache.get(family) {
+        if let Some(f) = cache.get(&family_lower) {
             return Some(f.clone());
         }
 
-        let f = {
-            #[cfg(target_os = "windows")]
-            {
-                let paths = match family.to_lowercase().as_str() {
-                    "simhei" | "黑体" => vec!["C:\\Windows\\Fonts\\simhei.ttf"],
-                    "microsoft yahei" | "微软雅黑" => vec!["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\msyh.ttf"],
-                    "simsun" | "宋体" => vec!["C:\\Windows\\Fonts\\simsun.ttc"],
-                    _ => vec![],
-                };
-                let mut found = None;
-                for p in paths {
-                    if let Some(f) = Self::load_font(&std::path::PathBuf::from(p)) { found = Some(f); break; }
-                }
-                found
-            }
-            #[cfg(not(target_os = "windows"))]
-            { None }
+        // 1. 检查已知别名映射
+        let mut path = match family_lower.as_str() {
+            "simhei" | "黑体" => Some("C:\\Windows\\Fonts\\simhei.ttf".to_string()),
+            "microsoft yahei" | "微软雅黑" => Some("C:\\Windows\\Fonts\\msyh.ttc".to_string()),
+            "simsun" | "宋体" => Some("C:\\Windows\\Fonts\\simsun.ttc".to_string()),
+            _ => None,
+        };
+
+        // 2. 如果别名没命中，在系统扫描结果中查找
+        if path.is_none() {
+            path = self.font_map.get(&family_lower).cloned();
+        }
+
+        let f = if let Some(p) = path {
+            Self::load_font(&PathBuf::from(p))
+        } else {
+            None
         };
 
         if let Some(ref font) = f {
-            cache.insert(family.to_string(), font.clone());
+            cache.insert(family_lower, font.clone());
             // 如果更换了字体，清空字形缓存
             self.glyph_cache.lock().unwrap().clear();
         }
@@ -80,29 +93,35 @@ impl CandidatePainter {
     }
 
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> (Vec<u8>, u32, u32) {
-        let padding_x = 18.0;
-        let padding_y = 14.0;
-        let corner_radius = config.appearance.corner_radius;
-        let font_size_pinyin = config.appearance.pinyin_font_size as f32;
-        let font_size_cand = config.appearance.candidate_font_size as f32;
+        let appearance = &config.appearance;
+        let padding_x = appearance.window_padding_x as f32;
+        let padding_y = appearance.window_padding_y as f32;
+        let corner_radius = appearance.corner_radius;
+        let item_spacing = appearance.item_spacing;
+        let row_spacing = appearance.row_spacing;
+
+        let font_size_pinyin = appearance.pinyin_text.font_size as f32;
+        let font_size_cand = appearance.candidate_text.font_size as f32;
+        let font_size_hint = appearance.hint_text.font_size as f32;
+        
         let line_height_pinyin = font_size_pinyin * 1.4;
         let line_height_cand = font_size_cand * 1.5;
-        let spacing_v = 8.0;
-        let item_spacing_h = 16.0;
 
         // 动态加载字体
-        let f_pinyin_custom = self.get_font_by_family(&config.appearance.pinyin_font_family);
-        let f_cand_custom = self.get_font_by_family(&config.appearance.candidate_font_family);
+        let f_pinyin_custom = self.get_font_by_family(&appearance.pinyin_text.font_family);
+        let f_cand_custom = self.get_font_by_family(&appearance.candidate_text.font_family);
+        let f_hint_custom = self.get_font_by_family(&appearance.hint_text.font_family);
         
         let f_pinyin = f_pinyin_custom.as_ref().or(self.font_en.as_ref()).or(self.font_zh.as_ref());
         let f_cand = f_cand_custom.as_ref().or(self.font_zh.as_ref()).or(self.font_en.as_ref());
+        let f_hint = f_hint_custom.as_ref().or(self.font_en.as_ref()).or(self.font_zh.as_ref());
 
         let mut cand_widths = Vec::new();
         let mut total_width = 300.0;
         let mut total_height = 100.0;
         
         // 预计算布局
-        if let (Some(f_py), Some(f_zh)) = (f_pinyin, f_cand) {
+        if let (Some(f_py), Some(f_zh), Some(f_ht)) = (f_pinyin, f_cand, f_hint) {
             let pinyin_w = self.measure_text(f_py, pinyin, font_size_pinyin);
             
             let mut row_width = 0.0;
@@ -111,15 +130,15 @@ impl CandidatePainter {
                 let w_prefix = self.measure_text(f_py, &prefix, font_size_cand);
                 let w_cand = self.measure_text(f_zh, cand, font_size_cand);
                 let hint_w = if let Some(h) = hints.get(i) {
-                    if !h.is_empty() { self.measure_text(f_py, h, font_size_cand * 0.75) + 8.0 } else { 0.0 }
+                    if !h.is_empty() { self.measure_text(f_ht, h, font_size_hint) + 8.0 } else { 0.0 }
                 } else { 0.0 };
                 
                 let total_item_w = w_prefix + w_cand + hint_w + 12.0;
                 cand_widths.push(total_item_w);
-                row_width += total_item_w + if i < candidates.len() - 1 { item_spacing_h } else { 0.0 };
+                row_width += total_item_w + if i < candidates.len() - 1 { item_spacing } else { 0.0 };
             }
             total_width = (pinyin_w + padding_x * 2.0).max(row_width + padding_x * 2.0).max(320.0).min(1200.0);
-            total_height = padding_y * 2.0 + line_height_pinyin + spacing_v + line_height_cand;
+            total_height = padding_y * 2.0 + line_height_pinyin + row_spacing + line_height_cand;
         }
 
         let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
@@ -128,27 +147,35 @@ impl CandidatePainter {
         // 移除所有阴影逻辑，直接绘制主背景
         let main_rect = Rect::from_xywh(0.0, 0.0, total_width, total_height).unwrap();
         let mut bg_paint = Paint::default();
-        bg_paint.set_color(self.parse_color(&config.appearance.candidate_bg_color));
+        bg_paint.set_color(self.parse_color(&appearance.window_bg_color));
         bg_paint.anti_alias = true;
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
 
         // 边框
         let mut border_paint = Paint::default();
-        border_paint.set_color(Color::from_rgba8(0, 0, 0, 40));
+        border_paint.set_color(self.parse_color(&appearance.window_border_color));
         border_paint.anti_alias = true;
         pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &Stroke { width: 1.0, ..Default::default() }, Transform::identity(), None);
 
-        if let (Some(f_py), Some(f_zh)) = (f_pinyin, f_cand) {
+        if let (Some(f_py), Some(f_zh), Some(f_ht)) = (f_pinyin, f_cand, f_hint) {
             // 1. 绘制拼音
-            let py_color = self.parse_color(&config.appearance.pinyin_color);
+            let mut py_color = self.parse_color(&appearance.pinyin_text.color);
+            py_color.set_alpha(appearance.pinyin_text.alpha);
+            
             let pinyin_y = padding_y + line_height_pinyin * 0.7;
             self.draw_mixed_text(&mut pixmap, f_zh, f_py, pinyin, padding_x, pinyin_y, font_size_pinyin, py_color, false);
 
             // 2. 绘制候选词
-            let cand_y_base = padding_y + line_height_pinyin + spacing_v;
+            let cand_y_base = padding_y + line_height_pinyin + row_spacing;
             let mut x_cursor = padding_x;
-            let text_color = self.parse_color(&config.appearance.candidate_text_color);
-            let highlight_color = self.parse_color(&config.appearance.candidate_highlight_color);
+            
+            let mut text_color = self.parse_color(&appearance.candidate_text.color);
+            text_color.set_alpha(appearance.candidate_text.alpha);
+            
+            let mut highlight_color = self.parse_color(&appearance.window_highlight_color);
+            
+            let mut hint_color = self.parse_color(&appearance.hint_text.color);
+            hint_color.set_alpha(appearance.hint_text.alpha);
 
             for (i, cand) in candidates.iter().enumerate() {
                 let is_selected = i == selected;
@@ -157,7 +184,7 @@ impl CandidatePainter {
                 if is_selected {
                     let mut hp = Paint::default();
                     let mut hc = highlight_color;
-                    hc.set_alpha(0.15);
+                    hc.set_alpha(0.15); // Highlight background alpha
                     hp.set_color(hc);
                     let hr = Rect::from_xywh(x_cursor - 6.0, cand_y_base, item_w, line_height_cand).unwrap();
                     pixmap.fill_path(&self.create_rounded_rect_path(hr, 6.0), &hp, FillRule::Winding, Transform::identity(), None);
@@ -169,17 +196,20 @@ impl CandidatePainter {
                 
                 let mut prefix_color = current_color;
                 if !is_selected { prefix_color.set_alpha(0.6); }
+                
+                // 绘制序号 (使用拼音字体或候选词字体? 一般候选词字体更统一，但这里保留用 f_py 处理数字)
                 let adv1 = self.draw_text(&mut pixmap, f_py, &prefix, x_cursor, text_y, font_size_cand, prefix_color);
+                // 绘制候选词
                 let adv2 = self.draw_text(&mut pixmap, f_zh, cand, x_cursor + adv1, text_y, font_size_cand, current_color);
                 
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
-                        let mut hc = current_color;
-                        hc.set_alpha(0.5);
-                        self.draw_text(&mut pixmap, f_py, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_cand * 0.75, hc);
+                        let mut hc = if is_selected { highlight_color } else { hint_color };
+                        if is_selected { hc.set_alpha(0.6); }
+                        self.draw_text(&mut pixmap, f_ht, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_hint, hc);
                     }
                 }
-                x_cursor += item_w + item_spacing_h;
+                x_cursor += item_w + item_spacing;
             }
         }
 

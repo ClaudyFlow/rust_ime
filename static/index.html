@@ -179,32 +179,57 @@
                 </div>
             </div>
 
-            <h2>传统窗口样式</h2>
+            <h2>候选框容器 (Window)</h2>
             <div class="card">
                 <div class="setting-item"><div class="info"><div class="title">窗口位置</div></div><select id="candidate_anchor"><option value="bottom">屏幕底部</option><option value="top">屏幕顶部</option></select></div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
-                    <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="candidate_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">内边距 (X/Y)</div></div><div style="display:flex; gap:5px;"><input type="number" id="window_padding_x" style="width:60px;"> <input type="number" id="window_padding_y" style="width:60px;"></div></div>
+                    <div class="setting-item"><div class="info"><div class="title">圆角半径</div></div><input type="number" id="corner_radius"></div>
                 </div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="window_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_bg_color_picker"></div></div></div>
+                    <div class="setting-item"><div class="info"><div class="title">边框颜色</div></div><div class="color-picker-group"><input type="text" id="window_border_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_border_color_picker"></div></div></div>
+                </div>
+                <div class="setting-item"><div class="info"><div class="title">强调色 (选中项背景)</div></div><div class="color-picker-group"><input type="text" id="window_highlight_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_highlight_color_picker"></div></div></div>
+            </div>
+
+            <h2>1. 拼音样式 (Pinyin)</h2>
+            <div class="card">
                 <div class="setting-item">
-                    <div class="info"><div class="title">候选词字体</div><div class="desc">例如: SimHei, Microsoft YaHei</div></div>
-                    <input type="text" id="candidate_font_family" style="width: 200px;">
+                    <div class="info"><div class="title">字体家族</div></div>
+                    <select id="pinyin_text_font_family" class="font-select" style="width: 250px;"></select>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">拼音字号</div></div><input type="number" id="pinyin_font_size"></div>
-                    <div class="setting-item">
-                        <div class="info"><div class="title">拼音字体</div><div class="desc">例如: SimHei, Microsoft YaHei</div></div>
-                        <input type="text" id="pinyin_font_family" style="width: 200px;">
-                    </div>
+                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="pinyin_text_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="pinyin_text_alpha"></div>
+                </div>
+                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="pinyin_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="pinyin_text_color_picker"></div></div></div>
+            </div>
+
+            <h2>2. 候选词样式 (Candidate)</h2>
+            <div class="card">
+                <div class="setting-item">
+                    <div class="info"><div class="title">字体家族</div></div>
+                    <select id="candidate_text_font_family" class="font-select" style="width: 250px;"></select>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_text_color_picker"></div></div></div>
-                    <div class="setting-item"><div class="info"><div class="title">高亮颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_highlight_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_highlight_color_picker"></div></div></div>
+                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="candidate_text_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="candidate_text_alpha"></div>
+                </div>
+                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_text_color_picker"></div></div></div>
+            </div>
+
+            <h2>3. 提示/辅助码样式 (Hint)</h2>
+            <div class="card">
+                <div class="setting-item">
+                    <div class="info"><div class="title">字体家族</div></div>
+                    <select id="hint_text_font_family" class="font-select" style="width: 250px;"></select>
                 </div>
                 <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">拼音颜色</div></div><div class="color-picker-group"><input type="text" id="pinyin_color" style="width:80px;"><div class="color-preview"><input type="color" id="pinyin_color_picker"></div></div></div>
-                    <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_bg_color_picker"></div></div></div>
+                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="hint_text_font_size"></div>
+                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="hint_text_alpha"></div>
                 </div>
+                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="hint_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="hint_text_color_picker"></div></div></div>
             </div>
 
             <h2>卡片窗口样式</h2>
@@ -351,6 +376,14 @@
         async function load() {
             const r = await fetch('/api/config'); config = await r.json();
             
+            // 加载字体列表
+            const font_r = await fetch('/api/fonts');
+            const system_fonts = await font_r.json();
+            const font_options = system_fonts.map(f => `<option value="${f.name}">${f.name}</option>`).join('');
+            document.querySelectorAll('.font-select').forEach(select => {
+                select.innerHTML = `<option value="">默认系统字体</option>` + font_options;
+            });
+
             // 方案选择
             const pc = document.getElementById('active_profiles_container');
             pc.innerHTML = config.files.profiles.map(p => `
@@ -385,8 +418,34 @@
                 if (defaultIdx !== -1) ats.selectedIndex = defaultIdx;
             }
 
-            const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'candidate_font_family', 'pinyin_font_size', 'pinyin_font_family', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
-            allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] || config.input[id] || ""; });
+            // 绑定普通输入框 (支持嵌套属性路径，用 _ 分隔)
+            const allIds = [
+                'commit_mode', 'page_size', 'candidate_anchor', 'corner_radius', 
+                'window_bg_color', 'window_border_color', 'window_highlight_color',
+                'window_padding_x', 'window_padding_y', 'item_spacing', 'row_spacing',
+                'pinyin_text_font_family', 'pinyin_text_font_size', 'pinyin_text_alpha', 'pinyin_text_color',
+                'candidate_text_font_family', 'candidate_text_font_size', 'candidate_text_alpha', 'candidate_text_color',
+                'hint_text_font_family', 'hint_text_font_size', 'hint_text_alpha', 'hint_text_color',
+                'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec',
+                'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color'
+            ];
+            
+            allIds.forEach(id => { 
+                const el = document.getElementById(id); 
+                if(!el) return;
+                
+                // 解析路径，例如 pinyin_text_font_size -> config.appearance.pinyin_text.font_size
+                let val = null;
+                if (id.includes('_text_')) {
+                    const parts = id.split('_text_'); // [pinyin, font_family]
+                    const section = parts[0] + '_text';
+                    const prop = parts[1];
+                    val = config.appearance[section][prop];
+                } else {
+                    val = config.appearance[id] !== undefined ? config.appearance[id] : config.input[id];
+                }
+                el.value = val !== undefined ? val : "";
+            });
 
             const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'enable_user_dict', 'enable_fixed_first_candidate'];
             checkIds.forEach(id => { 
@@ -405,10 +464,15 @@
             renderKeyboard('kb-doubletap', 'double_taps');
             renderKeyboard('kb-profilekeys', 'profile_keys');
 
-            const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'pinyin_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
+            // 绑定颜色选择器
+            const colorIds = [
+                'window_bg_color', 'window_border_color', 'window_highlight_color',
+                'pinyin_text_color', 'candidate_text_color', 'hint_text_color',
+                'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'
+            ];
             colorIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
-                el.value = config.appearance[id]; linkColor(id);
+                linkColor(id);
                 const picker = document.getElementById(id + '_picker'); if(el.value && el.value.startsWith('#')) picker.value = el.value;
             });
 
@@ -421,7 +485,7 @@
             
             ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'long_press_timeout_ms', 'enable_user_dict', 'enable_fixed_first_candidate'].forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
-                config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseInt(el.value) : el.value);
+                config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseFloat(el.value) : el.value);
             });
 
             // 特殊处理同步的双击开关和时长
@@ -430,10 +494,29 @@
             const altDtTimeout = document.getElementById('double_tap_timeout_ms_alt');
             if(altDtTimeout) config.input.double_tap_timeout_ms = parseInt(altDtTimeout.value);
 
-            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_font_family', 'pinyin_font_size', 'pinyin_font_family', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'pinyin_color', 'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color', 'learning_dict_path'];
-            appIds.forEach(id => {
+            const appearanceIds = [
+                'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint',
+                'candidate_anchor', 'corner_radius', 'window_bg_color', 'window_border_color', 'window_highlight_color',
+                'window_padding_x', 'window_padding_y', 'item_spacing', 'row_spacing',
+                'pinyin_text_font_family', 'pinyin_text_font_size', 'pinyin_text_alpha', 'pinyin_text_color',
+                'candidate_text_font_family', 'candidate_text_font_size', 'candidate_text_alpha', 'candidate_text_color',
+                'hint_text_font_family', 'hint_text_font_size', 'hint_text_alpha', 'hint_text_color',
+                'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec',
+                'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'learning_dict_path'
+            ];
+
+            appearanceIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
-                config.appearance[id] = el.type === 'number' ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
+                const val = el.type === 'number' ? parseFloat(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
+                
+                if (id.includes('_text_')) {
+                    const parts = id.split('_text_');
+                    const section = parts[0] + '_text';
+                    const prop = parts[1];
+                    config.appearance[section][prop] = (prop === 'font_size' || prop === 'alpha') ? parseFloat(val) : val;
+                } else {
+                    config.appearance[id] = val;
+                }
             });
 
             await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });

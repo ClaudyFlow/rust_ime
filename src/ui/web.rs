@@ -46,6 +46,7 @@ impl WebServer {
             .route("/", get(index_handler))
             .route("/api/config", get(get_config).post(update_config))
             .route("/api/config/reset", post(reset_config))
+            .route("/api/fonts", get(list_fonts))
             .route("/api/dicts", get(list_dicts))
             .route("/api/dicts/compile", post(compile_dicts_handler))
             .route("/api/dicts/reload", post(reload_dicts))
@@ -372,4 +373,8 @@ async fn add_dict_entry(Json(req): Json<AddEntryRequest>) -> StatusCode {
     }
 
     StatusCode::INTERNAL_SERVER_ERROR
+}
+
+async fn list_fonts() -> Json<Vec<crate::platform::fonts::FontInfo>> {
+    Json(crate::platform::fonts::list_system_fonts())
 }

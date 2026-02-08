@@ -256,9 +256,9 @@ impl Processor {
         self.prefix_matching_limit = conf.input.prefix_matching_limit;
         self.enable_abbreviation_matching = conf.input.enable_abbreviation_matching;
         self.filter_proper_nouns_by_case = conf.input.filter_proper_nouns_by_case;
-        self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
+        self.profile_keys = conf.input.profile_keys.iter().map(|pk: &crate::config::ProfileKey| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         
-        self.page_flipping_styles = conf.input.page_flipping_keys.iter().map(|s| s.to_lowercase()).collect();
+        self.page_flipping_styles = conf.input.page_flipping_keys.iter().map(|s: &String| s.to_lowercase()).collect();
         self.swap_arrow_keys = conf.input.swap_arrow_keys;
         
         self.enable_english_filter = conf.input.enable_english_filter;
@@ -280,7 +280,7 @@ impl Processor {
         }
 
         if !conf.input.active_profiles.is_empty() {
-            self.active_profiles = conf.input.active_profiles.iter().map(|p| p.to_lowercase()).collect();
+            self.active_profiles = conf.input.active_profiles.iter().map(|p: &String| p.to_lowercase()).collect();
         } else {
             let new_profile = conf.input.default_profile.to_lowercase();
             if !new_profile.is_empty() && self.tries.contains_key(&new_profile) {

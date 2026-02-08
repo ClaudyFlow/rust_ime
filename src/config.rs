@@ -35,18 +35,24 @@ pub struct Appearance {
     pub show_tone_hint: bool,
     pub show_en_hint: bool,
     pub candidate_anchor: String,
-    pub candidate_font_size: u32,
-    pub candidate_hint_font_size: u32,
-    pub candidate_margin_x: i32,
-    pub candidate_margin_y: i32,
-    pub candidate_bg_color: String,
-    pub candidate_text_color: String,
-    pub candidate_highlight_color: String,
-    pub pinyin_color: String,
-    pub pinyin_font_size: u32,
-    pub pinyin_font_family: String,
-    pub candidate_font_family: String,
+    
+    // Window Style
     pub corner_radius: f32,
+    pub window_bg_color: String,
+    pub window_highlight_color: String,
+    pub window_border_color: String,
+    pub window_padding_x: i32,
+    pub window_padding_y: i32,
+    pub item_spacing: f32,
+    pub row_spacing: f32,
+
+    // Text Styles
+    pub pinyin_text: TextStyle,
+    pub candidate_text: TextStyle,
+    pub hint_text: TextStyle,
+    pub comment_text: TextStyle, // For extra info like "User", "Emoji"
+
+    // Modern GUI specific
     pub modern_cand_anchor: String,
     pub modern_cand_font_size: u32,
     pub modern_cand_hint_font_size: u32,
@@ -55,12 +61,16 @@ pub struct Appearance {
     pub modern_cand_text_color: String,
     pub modern_cand_highlight_color: String,
     pub modern_cand_bg_color: String,
+    
+    // Keystroke specific
     pub keystroke_anchor: String,
     pub keystroke_font_size: u32,
     pub keystroke_timeout_ms: u64,
     pub keystroke_bg_color: String,
     pub keystroke_margin_x: i32,
     pub keystroke_margin_y: i32,
+    
+    // Learning mode
     pub learning_mode: bool,
     pub learning_anchor: String,
     pub learning_interval_sec: u64,
@@ -69,8 +79,17 @@ pub struct Appearance {
     pub learning_margin_y: i32,
     pub learning_bg_color: String,
     pub learning_dict_path: String,
+    
     pub preview_mode: String,
     pub learning_interval: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct TextStyle {
+    pub font_family: String,
+    pub font_size: u32,
+    pub color: String,
+    pub alpha: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -163,18 +182,41 @@ impl Config {
                 show_tone_hint: false,
                 show_en_hint: true,
                 candidate_anchor: "bottom".to_string(),
-                candidate_font_size: 18,
-                candidate_hint_font_size: 10,
-                candidate_margin_x: 0,
-                candidate_margin_y: 50,
-                candidate_bg_color: "#ffffff".to_string(),
-                candidate_text_color: "#24292e".to_string(), // Dark grey
-                candidate_highlight_color: "#0969da".to_string(), // GitHub Blue
-                pinyin_color: "#586069".to_string(), // Light grey
-                pinyin_font_size: 18,
-                pinyin_font_family: "SimHei".to_string(),
-                candidate_font_family: "SimHei".to_string(),
-                corner_radius: 10.0, // Smoother corners
+                
+                corner_radius: 10.0,
+                window_bg_color: "#ffffff".to_string(),
+                window_highlight_color: "#0969da".to_string(),
+                window_border_color: "rgba(0, 0, 0, 0.2)".to_string(),
+                window_padding_x: 18,
+                window_padding_y: 14,
+                item_spacing: 16.0,
+                row_spacing: 8.0,
+
+                pinyin_text: TextStyle {
+                    font_family: "Microsoft YaHei".to_string(),
+                    font_size: 18,
+                    color: "#586069".to_string(),
+                    alpha: 1.0,
+                },
+                candidate_text: TextStyle {
+                    font_family: "Microsoft YaHei".to_string(),
+                    font_size: 18,
+                    color: "#24292e".to_string(),
+                    alpha: 1.0,
+                },
+                hint_text: TextStyle {
+                    font_family: "Arial".to_string(),
+                    font_size: 14,
+                    color: "#6e7781".to_string(),
+                    alpha: 0.8,
+                },
+                comment_text: TextStyle {
+                    font_family: "Segoe UI Emoji".to_string(),
+                    font_size: 12,
+                    color: "#0969da".to_string(),
+                    alpha: 0.7,
+                },
+
                 modern_cand_anchor: "bottom_left".to_string(),
                 modern_cand_font_size: 16,
                 modern_cand_hint_font_size: 10,
@@ -183,12 +225,14 @@ impl Config {
                 modern_cand_text_color: "#0969da".to_string(),
                 modern_cand_highlight_color: "#0969da".to_string(),
                 modern_cand_bg_color: "rgba(255, 255, 255, 0.95)".to_string(),
+                
                 keystroke_anchor: "bottom_right".to_string(),
                 keystroke_font_size: 24,
                 keystroke_timeout_ms: 1500,
                 keystroke_bg_color: "rgba(0, 0, 0, 0.7)".to_string(),
                 keystroke_margin_x: 20,
                 keystroke_margin_y: 20,
+                
                 learning_mode: false,
                 learning_anchor: "top_right".to_string(),
                 learning_interval_sec: 10,
@@ -197,6 +241,7 @@ impl Config {
                 learning_margin_y: 40,
                 learning_bg_color: "rgba(20, 20, 20, 0.85)".to_string(),
                 learning_dict_path: "dicts/chinese/words/words.json".to_string(),
+                
                 preview_mode: "pinyin".to_string(),
                 learning_interval: 10,
             },
@@ -208,7 +253,7 @@ impl Config {
                 clipboard_delay_ms: 10,
                 enable_anti_typo: true,
                 enable_double_tap: true,
-                double_tap_timeout_ms: 250, // 默认 250ms
+                double_tap_timeout_ms: 250,
                 double_taps: vec![
                     DoubleTap { trigger_key: "i".to_string(), insert_text: "ing".to_string() },
                     DoubleTap { trigger_key: "u".to_string(), insert_text: "sh".to_string() },
