@@ -6,6 +6,8 @@ use windows::{
     Win32::UI::Input::KeyboardAndMouse::{GetFocus, VK_SHIFT, VK_CONTROL, VK_MENU},
     Win32::System::Diagnostics::Debug::OutputDebugStringW,
     Win32::Storage::FileSystem::*,
+    Win32::System::Pipes::WaitNamedPipeW,
+    Win32::Foundation::{ERROR_PIPE_BUSY, GetLastError},
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -73,8 +75,7 @@ impl TextService {
                     if !h.is_invalid() { break Ok(h); }
                 }
 
-                let err = GetLastError();
-                if err == ERROR_PIPE_BUSY && retry_count < 3 {
+                if GetLastError() == ERROR_PIPE_BUSY && retry_count < 3 {
                     let _ = WaitNamedPipeW(pipe_pcwstr, 100);
                     retry_count += 1;
                     continue;
