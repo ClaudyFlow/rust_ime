@@ -148,8 +148,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 
                 println!("正在从 {:?} 注册...", dll_path);
+                let path_str = dll_path.to_str().ok_or("Path contains invalid UTF-8")?;
                 unsafe {
-                    registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(dll_path.to_str().unwrap()))?;
+                    registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(path_str))?;
                 }
                 println!("✅ 已注册 TSF 输入法。");
                 return Ok(());
@@ -336,8 +337,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "windows")]
     std::thread::spawn(move || {
-        while let Ok(_event) = notify_rx.recv() {
-            // Windows 下暂不处理通知
+        while let Ok(event) = notify_rx.recv() {
+            match event {
+                NotifyEvent::Message(summary, body) => { 
+                    let _ = notify_rust::Notification::new()
+                        .summary(&summary)
+                        .body(&body)
+                        .appname("Rust IME")
+                        .timeout(notify_rust::Timeout::Milliseconds(3000))
+                        .show(); 
+                },
+                NotifyEvent::Update(s, b) => { 
+                    let _ = notify_rust::Notification::new()
+                        .summary(&s)
+                        .body(&b)
+                        .appname("Rust IME")
+                        .timeout(notify_rust::Timeout::Milliseconds(1000))
+                        .show(); 
+                },
+                NotifyEvent::Close => {}
+            }
         }
     });
 
@@ -644,11 +663,67 @@ X-GNOME-Autostart-enabled=true
 
 #[cfg(target_os = "windows")]
 
+
+
 pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
 
-    println!("⚠️ Windows 暂不支持自动设置开机自启。");
 
-    Ok(())
+
+    let exe = std::env::current_exe()?;
+
+
+
+    let exe_path = exe.to_str().ok_or("Invalid path encoding")?;
+
+
+
+    let status = std::process::Command::new("reg")
+
+
+
+        .arg("add")
+
+
+
+        .arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+
+
+
+        .arg("/v")
+
+
+
+        .arg("RustIME")
+
+
+
+        .arg("/t")
+
+
+
+        .arg("REG_SZ")
+
+
+
+        .arg("/d")
+
+
+
+        .arg(exe_path)
+
+
+
+        .arg("/f")
+
+
+
+        .status()?;
+
+
+
+    if status.success() { Ok(()) } else { Err("Failed to add registry key".into()) }
+
+
 
 }
 
@@ -678,8 +753,42 @@ pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
 
 #[cfg(target_os = "windows")]
 
+
+
 pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
 
-    Ok(())
+
+
+    let status = std::process::Command::new("reg")
+
+
+
+        .arg("delete")
+
+
+
+        .arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+
+
+
+        .arg("/v")
+
+
+
+        .arg("RustIME")
+
+
+
+        .arg("/f")
+
+
+
+        .status()?;
+
+
+
+    if status.success() { Ok(()) } else { Err("Failed to remove registry key".into()) }
+
+
 
 }

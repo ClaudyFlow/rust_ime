@@ -22,6 +22,7 @@
 
 ### 潜在 Panic 点 (Unwrap Usage)
 1. **主键设备寻找 (`main.rs`)**: `find_keyboard().unwrap_or_default()` 后直接 `Device::open(&device_path)?`。如果路径非法或权限不足，虽然有 `?` 但前面的逻辑依赖较重。
+   - [x] (Windows) `dll_path.to_str().unwrap()` 已修复为 safe handling。
 2. **字符处理 (`ime.rs`, `config.rs`)**: `current_str.chars().next().unwrap()` 在 `segment_pinyin` 中使用。虽然逻辑上此时字符串不应为空，但在极端非法编码或逻辑边缘情况下可能崩溃。
 3. **Web 端数据获取 (`web.rs`)**: 存在多处 `.unwrap()`，如 `num_str.insert(0, clean_word.pop().unwrap())`。如果 `clean_word` 为空，Web 配置服务器将直接崩溃。
 
