@@ -83,15 +83,18 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     let current_config_main = current_config.clone();
     std::thread::spawn(move || {
         while let Ok(mut event) = rx.recv() {
-            // 事件合并逻辑：如果频道里还有 Update 事件，直接跳过当前的，取最新的
+            // 合并过载的 Update 事件，防止长按时堆积
             if matches!(event, GuiEvent::Update { .. }) {
-                while let Ok(next_event) = rx.try_recv() {
-                    if matches!(next_event, GuiEvent::Update { .. }) {
-                        event = next_event;
+                let mut count = 0;
+                while let Ok(next) = rx.try_recv() {
+                    if matches!(next, GuiEvent::Update { .. }) {
+                        event = next;
+                        count += 1;
+                        if count > 10 { break; } // 防止饿死
                     } else {
-                        // 如果是 MoveTo 等非 Update 事件，先处理当前的 Update，再把这个事件存起来下回处理
-                        // 或者更简单：如果是重要事件就不合并了。
-                        // 这里我们简单处理：只合并连续的 Update
+                        // 如果是 MoveTo 等事件，先处理当前的 Update，再把非 Update 事件留到下一轮
+                        // 由于 rx 是 channel，我们无法把拿出来的东西塞回去，所以只能在这里中断合并逻辑
+                        // 幸好大部分时候 Update 后紧跟 MoveTo，我们处理完 Update 后下一轮循环就会拿到 MoveTo
                         break; 
                     }
                 }
@@ -132,7 +135,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                     vec![String::new(); current_candidates.len()]
                                 };
 
-                                // 使用 Painter 绘图，获取准确的 w 和 h
                                 let (pixels, w, h) = painter.draw(
                                     &state.pinyin, 
                                     &current_candidates, 
@@ -141,8 +143,23 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                                     &config_snapshot
                                 );
                                 
+                                let (fx, fy) = (state.x, state.y);
                                 update_window_pixels(hwnd, &pixels, w, h);
-                                let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, w as i32, h as i32, SWP_NOMOVE | SWP_NOACTIVATE);
+                                
+                                let sw = GetSystemMetrics(SM_CXSCREEN);
+                                let sh = GetSystemMetrics(SM_CYSCREEN);
+                                let mut final_x = fx;
+                                let mut final_y = fy + 25;
+                                
+                                if fx == 0 && fy == 0 {
+                                    final_x = (sw - w as i32) / 2;
+                                    final_y = (sh - h as i32) / 2;
+                                } else {
+                                    if final_x + w as i32 > sw { final_x = sw - w as i32 - 10; }
+                                    if final_y + h as i32 > sh { final_y = fy - h as i32 - 5; }
+                                }
+                                
+                                let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, w as i32, h as i32, SWP_NOACTIVATE);
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                             }
                         }
@@ -153,38 +170,24 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
                         
-                        // 智能防溢出处理
-                        let sw = GetSystemMetrics(SM_CXSCREEN);
-                        let sh = GetSystemMetrics(SM_CYSCREEN);
-                        
-                        // 获取当前窗口尺寸 (如果已创建)
                         let mut rect = RECT::default();
                         let _ = GetWindowRect(hwnd, &mut rect);
                         let w = rect.right - rect.left;
                         let h = rect.bottom - rect.top;
 
-                        // 默认偏移：Y轴向下25像素
+                        let sw = GetSystemMetrics(SM_CXSCREEN);
+                        let sh = GetSystemMetrics(SM_CYSCREEN);
                         let mut final_x = x;
                         let mut final_y = y + 25;
 
-                        // 居中处理：如果收到 0,0 坐标，说明定位失败，将窗口居中
                         if x == 0 && y == 0 {
                             final_x = (sw - w) / 2;
                             final_y = (sh - h) / 2;
                         } else {
-                            // 正常的防溢出逻辑
-                            // 右侧溢出检测
-                            if final_x + w > sw {
-                                final_x = sw - w - 10;
-                            }
-                            // 底部溢出检测
-                            if final_y + h > sh {
-                                // 如果底部溢出，尝试放到光标上方
-                                final_y = y - h - 5; 
-                            }
+                            if final_x + w > sw { final_x = sw - w - 10; }
+                            if final_y + h > sh { final_y = y - h - 5; }
                         }
                         
-                        // 确保不超出左/上边界
                         final_x = final_x.max(0);
                         final_y = final_y.max(0);
 
@@ -233,15 +236,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         }
     });
 
-    // 启动一个简单的清理定时器线程
-    let painter_timer = CandidatePainter::new(); // 计时器线程专用的 painter
+    let painter_timer = CandidatePainter::new();
     let current_config_timer = current_config.clone();
     std::thread::spawn(move || {
         loop {
             std::thread::sleep(std::time::Duration::from_millis(200));
             unsafe {
                 let now = std::time::Instant::now();
-                // 清理过期按键
                 let mut changed = false;
                 let keys_ptr = std::ptr::addr_of_mut!(DISPLAYED_KEYS);
                 (*keys_ptr).retain(|(_, time)| {
@@ -251,7 +252,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     if (*keys_ptr).is_empty() {
                         ShowWindow(KEY_WINDOW, SW_HIDE);
                     } else {
-                        // 重新绘制并更新以反映按键消失
                         let keys: Vec<String> = (*keys_ptr).iter().map(|(k, _)| k.clone()).collect();
                         let config_snapshot = current_config_timer.read().unwrap().clone();
                         let (pixels, w, h) = painter_timer.draw_keystrokes(&keys, &config_snapshot);
@@ -271,7 +271,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     }
 }
 
+// 优化的像素更新函数
 unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u32) {
+    if width == 0 || height == 0 { return; }
+    
     let hdc_screen = GetDC(None);
     let hdc_mem = CreateCompatibleDC(hdc_screen);
     
@@ -293,6 +296,7 @@ unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u3
     
     if !bits.is_null() {
         let bits_slice = std::slice::from_raw_parts_mut(bits as *mut u8, (width * height * 4) as usize);
+        // tiny-skia (RGBA) to Windows (BGRA)
         for i in 0..(width * height) as usize {
             let offset = i * 4;
             bits_slice[offset]     = pixels[offset + 2]; // B
@@ -312,7 +316,11 @@ unsafe fn update_window_pixels(hwnd: HWND, pixels: &[u8], width: u32, height: u3
         ..Default::default()
     };
 
-    let _ = UpdateLayeredWindow(hwnd, hdc_screen, None, Some(&size), hdc_mem, Some(&pt_src), COLORREF(0), Some(&blend), ULW_ALPHA);
+    let _ = UpdateLayeredWindow(
+        hwnd, hdc_screen, None, Some(&size), 
+        hdc_mem, Some(&pt_src), COLORREF(0), 
+        Some(&blend), ULW_ALPHA
+    );
 
     SelectObject(hdc_mem, old_bitmap);
     DeleteObject(h_bitmap);

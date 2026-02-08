@@ -169,10 +169,11 @@ impl CandidatePainter {
             let cand_y_base = padding_y + line_height_pinyin + row_spacing;
             let mut x_cursor = padding_x;
             
-            let mut text_color = self.parse_color(&appearance.candidate_text.color);
+            let text_color = self.parse_color(&appearance.candidate_text.color);
+            let mut text_color = text_color;
             text_color.set_alpha(appearance.candidate_text.alpha);
             
-            let mut highlight_color = self.parse_color(&appearance.window_highlight_color);
+            let highlight_color = self.parse_color(&appearance.window_highlight_color);
             
             let mut hint_color = self.parse_color(&appearance.hint_text.color);
             hint_color.set_alpha(appearance.hint_text.alpha);
