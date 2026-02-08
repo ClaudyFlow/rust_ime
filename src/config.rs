@@ -44,6 +44,8 @@ pub struct Appearance {
     pub candidate_highlight_color: String,
     pub pinyin_color: String,
     pub pinyin_font_size: u32,
+    pub pinyin_font_family: String,
+    pub candidate_font_family: String,
     pub corner_radius: f32,
     pub modern_cand_anchor: String,
     pub modern_cand_font_size: u32,
@@ -170,6 +172,8 @@ impl Config {
                 candidate_highlight_color: "#0969da".to_string(), // GitHub Blue
                 pinyin_color: "#586069".to_string(), // Light grey
                 pinyin_font_size: 18,
+                pinyin_font_family: "SimHei".to_string(),
+                candidate_font_family: "SimHei".to_string(),
                 corner_radius: 10.0, // Smoother corners
                 modern_cand_anchor: "bottom_left".to_string(),
                 modern_cand_font_size: 16,

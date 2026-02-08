@@ -186,11 +186,25 @@
                     <div class="setting-item"><div class="info"><div class="title">垂直偏移 (Y)</div></div><input type="number" id="candidate_margin_y"></div>
                     <div class="setting-item"><div class="info"><div class="title">主字号</div></div><input type="number" id="candidate_font_size"></div>
                 </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">候选词字体</div><div class="desc">例如: SimHei, Microsoft YaHei</div></div>
+                    <input type="text" id="candidate_font_family" style="width: 200px;">
+                </div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">拼音字号</div></div><input type="number" id="pinyin_font_size"></div>
+                    <div class="setting-item">
+                        <div class="info"><div class="title">拼音字体</div><div class="desc">例如: SimHei, Microsoft YaHei</div></div>
+                        <input type="text" id="pinyin_font_family" style="width: 200px;">
+                    </div>
+                </div>
                 <div class="grid-2">
                     <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_text_color_picker"></div></div></div>
                     <div class="setting-item"><div class="info"><div class="title">高亮颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_highlight_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_highlight_color_picker"></div></div></div>
                 </div>
-                <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_bg_color_picker"></div></div></div>
+                <div class="grid-2">
+                    <div class="setting-item"><div class="info"><div class="title">拼音颜色</div></div><div class="color-picker-group"><input type="text" id="pinyin_color" style="width:80px;"><div class="color-preview"><input type="color" id="pinyin_color_picker"></div></div></div>
+                    <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_bg_color_picker"></div></div></div>
+                </div>
             </div>
 
             <h2>卡片窗口样式</h2>
@@ -371,7 +385,7 @@
                 if (defaultIdx !== -1) ats.selectedIndex = defaultIdx;
             }
 
-            const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
+            const allIds = ['commit_mode', 'page_size', 'candidate_anchor', 'candidate_margin_y', 'candidate_font_size', 'candidate_font_family', 'pinyin_font_size', 'pinyin_font_family', 'modern_cand_anchor', 'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec'];
             allIds.forEach(id => { const el = document.getElementById(id); if(el) el.value = config.appearance[id] || config.input[id] || ""; });
 
             const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'enable_user_dict', 'enable_fixed_first_candidate'];
@@ -391,7 +405,7 @@
             renderKeyboard('kb-doubletap', 'double_taps');
             renderKeyboard('kb-profilekeys', 'profile_keys');
 
-            const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
+            const colorIds = ['candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'pinyin_color', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'];
             colorIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 el.value = config.appearance[id]; linkColor(id);
@@ -416,7 +430,7 @@
             const altDtTimeout = document.getElementById('double_tap_timeout_ms_alt');
             if(altDtTimeout) config.input.double_tap_timeout_ms = parseInt(altDtTimeout.value);
 
-            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color', 'learning_dict_path'];
+            const appIds = ['page_size', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'candidate_margin_y', 'candidate_font_size', 'candidate_font_family', 'pinyin_font_size', 'pinyin_font_family', 'candidate_text_color', 'candidate_highlight_color', 'candidate_bg_color', 'pinyin_color', 'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color', 'learning_dict_path'];
             appIds.forEach(id => {
                 const el = document.getElementById(id); if(!el) return;
                 config.appearance[id] = el.type === 'number' ? parseInt(el.value) : (el.type === 'checkbox' ? el.checked : el.value);

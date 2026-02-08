@@ -36,10 +36,26 @@ impl CandidatePainter {
         }
     }
 
+    fn get_font_by_family(&self, family: &str) -> Option<Font> {
+        #[cfg(target_os = "windows")]
+        {
+            let paths = match family.to_lowercase().as_str() {
+                "simhei" | "黑体" => vec!["C:\\Windows\\Fonts\\simhei.ttf"],
+                "microsoft yahei" | "微软雅黑" => vec!["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\msyh.ttf"],
+                "simsun" | "宋体" => vec!["C:\\Windows\\Fonts\\simsun.ttc"],
+                _ => vec![],
+            };
+            for p in paths {
+                if let Some(f) = Self::load_font(&std::path::PathBuf::from(p)) { return Some(f); }
+            }
+        }
+        None
+    }
+
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> (Vec<u8>, u32, u32) {
         let padding_x = 18.0;
         let padding_y = 14.0;
-        let corner_radius = config.appearance.corner_radius.max(8.0); // Ensure at least 8px for modern look
+        let corner_radius = config.appearance.corner_radius;
         let font_size_pinyin = config.appearance.pinyin_font_size as f32;
         let font_size_cand = config.appearance.candidate_font_size as f32;
         let line_height_pinyin = font_size_pinyin * 1.4;
@@ -47,26 +63,31 @@ impl CandidatePainter {
         let spacing_v = 8.0;
         let item_spacing_h = 16.0;
 
+        // 动态加载字体
+        let f_pinyin_custom = self.get_font_by_family(&config.appearance.pinyin_font_family);
+        let f_cand_custom = self.get_font_by_family(&config.appearance.candidate_font_family);
+        
+        let f_pinyin = f_pinyin_custom.as_ref().or(self.font_en.as_ref()).or(self.font_zh.as_ref());
+        let f_cand = f_cand_custom.as_ref().or(self.font_zh.as_ref()).or(self.font_en.as_ref());
+
         let mut cand_widths = Vec::new();
         let mut total_width = 300.0;
         let mut total_height = 100.0;
         
         // 预计算布局
-        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
-            // 拼音用英文字体测量
-            let pinyin_w = self.measure_text(f_en, pinyin, font_size_pinyin);
+        if let (Some(f_py), Some(f_zh)) = (f_pinyin, f_cand) {
+            let pinyin_w = self.measure_text(f_py, pinyin, font_size_pinyin);
             
             let mut row_width = 0.0;
             for (i, cand) in candidates.iter().enumerate() {
                 let prefix = format!("{}.", i + 1);
-                let w_prefix = self.measure_text(f_en, &prefix, font_size_cand);
+                let w_prefix = self.measure_text(f_py, &prefix, font_size_cand);
                 let w_cand = self.measure_text(f_zh, cand, font_size_cand);
-                
                 let hint_w = if let Some(h) = hints.get(i) {
-                    if !h.is_empty() { self.measure_text(f_en, h, font_size_cand * 0.75) + 8.0 } else { 0.0 }
+                    if !h.is_empty() { self.measure_text(f_py, h, font_size_cand * 0.75) + 8.0 } else { 0.0 }
                 } else { 0.0 };
                 
-                let total_item_w = w_prefix + w_cand + hint_w + 12.0; // Extra padding for selection pill
+                let total_item_w = w_prefix + w_cand + hint_w + 12.0;
                 cand_widths.push(total_item_w);
                 row_width += total_item_w + if i < candidates.len() - 1 { item_spacing_h } else { 0.0 };
             }
@@ -77,53 +98,28 @@ impl CandidatePainter {
         let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
-        // 绘制阴影 (GTK4 风格：大而柔和)
-        // 模拟高斯模糊阴影：多层低透明度叠加
-        let shadow_color = Color::from_rgba8(0, 0, 0, 15); // 非常淡的黑色
-        for i in 1..=12 {
-            let spread = i as f32 * 1.5;
-            let mut sp = Paint::default();
-            sp.set_color(shadow_color);
-            sp.anti_alias = true;
-            let sr = Rect::from_xywh(4.0, 4.0 + i as f32 * 0.5, total_width - 20.0, total_height - 20.0).unwrap();
-            // 使用路径填充来模拟模糊边缘
-             let shadow_path = self.create_rounded_rect_path(sr, corner_radius + spread * 0.5);
-             pixmap.fill_path(&shadow_path, &sp, FillRule::Winding, Transform::identity(), None);
-        }
-
-        // 主背景 (略微缩小以留出阴影空间)
-        let content_w = total_width - 20.0;
-        let content_h = total_height - 20.0;
+        // 移除所有阴影逻辑，直接绘制主背景
+        let main_rect = Rect::from_xywh(0.0, 0.0, total_width, total_height).unwrap();
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&config.appearance.candidate_bg_color));
         bg_paint.anti_alias = true;
-        let main_rect = Rect::from_xywh(10.0, 5.0, content_w, content_h).unwrap();
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 边框 (极细微的轮廓)
+        // 边框
         let mut border_paint = Paint::default();
-        border_paint.set_color(Color::from_rgba8(0, 0, 0, 20)); // 10% 黑
+        border_paint.set_color(Color::from_rgba8(0, 0, 0, 40));
         border_paint.anti_alias = true;
-        let border_stroke = Stroke {
-            width: 1.0,
-            ..Default::default()
-        };
-        pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &border_stroke, Transform::identity(), None);
+        pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &Stroke { width: 1.0, ..Default::default() }, Transform::identity(), None);
 
-        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
-            let offset_x = 10.0;
-            let offset_y = 5.0;
-
+        if let (Some(f_py), Some(f_zh)) = (f_pinyin, f_cand) {
             // 1. 绘制拼音
             let py_color = self.parse_color(&config.appearance.pinyin_color);
-            let pinyin_y = offset_y + padding_y + line_height_pinyin * 0.7;
-            self.draw_mixed_text(&mut pixmap, f_zh, f_en, pinyin, offset_x + padding_x, pinyin_y, font_size_pinyin, py_color, true);
-
-            // 分割线 (可选，视风格而定，GTK4 通常很干净，这里留白即可)
+            let pinyin_y = padding_y + line_height_pinyin * 0.7;
+            self.draw_mixed_text(&mut pixmap, f_zh, f_py, pinyin, padding_x, pinyin_y, font_size_pinyin, py_color, false);
 
             // 2. 绘制候选词
-            let cand_y_base = offset_y + padding_y + line_height_pinyin + spacing_v;
-            let mut x_cursor = offset_x + padding_x;
+            let cand_y_base = padding_y + line_height_pinyin + spacing_v;
+            let mut x_cursor = padding_x;
             let text_color = self.parse_color(&config.appearance.candidate_text_color);
             let highlight_color = self.parse_color(&config.appearance.candidate_highlight_color);
 
@@ -131,13 +127,10 @@ impl CandidatePainter {
                 let is_selected = i == selected;
                 let item_w = cand_widths[i];
                 
-                // 选中项背景 (圆角胶囊)
                 if is_selected {
                     let mut hp = Paint::default();
-                    // GTK4 选中通常是蓝色背景白字，或者浅蓝背景深蓝字
-                    // 这里采用浅色背景风格
                     let mut hc = highlight_color;
-                    hc.set_alpha(0.15); // 15% 透明度的主色调
+                    hc.set_alpha(0.15);
                     hp.set_color(hc);
                     let hr = Rect::from_xywh(x_cursor - 6.0, cand_y_base, item_w, line_height_cand).unwrap();
                     pixmap.fill_path(&self.create_rounded_rect_path(hr, 6.0), &hp, FillRule::Winding, Transform::identity(), None);
@@ -145,25 +138,18 @@ impl CandidatePainter {
                 
                 let prefix = format!("{}.", i + 1);
                 let current_color = if is_selected { highlight_color } else { text_color };
-                // 选中项字体加粗效果通过稍微偏移重绘模拟 (简单粗暴)
-                // 或者保持颜色区分即可
-                
                 let text_y = cand_y_base + line_height_cand * 0.7;
                 
-                // 序号 (半透明)
                 let mut prefix_color = current_color;
                 if !is_selected { prefix_color.set_alpha(0.6); }
-                let adv1 = self.draw_text(&mut pixmap, f_en, &prefix, x_cursor, text_y, font_size_cand, prefix_color);
-                
-                // 汉字
+                let adv1 = self.draw_text(&mut pixmap, f_py, &prefix, x_cursor, text_y, font_size_cand, prefix_color);
                 let adv2 = self.draw_text(&mut pixmap, f_zh, cand, x_cursor + adv1, text_y, font_size_cand, current_color);
                 
-                // 提示词
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
                         let mut hc = current_color;
                         hc.set_alpha(0.5);
-                        self.draw_text(&mut pixmap, f_en, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_cand * 0.75, hc);
+                        self.draw_text(&mut pixmap, f_py, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_cand * 0.75, hc);
                     }
                 }
                 x_cursor += item_w + item_spacing_h;
