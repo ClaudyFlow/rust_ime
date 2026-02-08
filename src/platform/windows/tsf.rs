@@ -199,19 +199,21 @@ impl InputMethodHost for TsfHost {
                                 if is_tab || is_ctrl_space {
                                     if msg_type == 1 {
                                         let mut p = processor.lock().unwrap();
-                                        p.toggle();
+                                        let action = p.toggle();
                                         let enabled = p.chinese_enabled;
                                         let profile_name = p.get_current_profile_display();
                                         drop(p);
                                         
-                                        let (title, msg) = if enabled {
-                                            ("中", format!("中文模式 ({})", profile_name))
+                                        if let Action::Notify(title, msg) = action {
+                                            let _ = notify_tx.send(NotifyEvent::Message(title, msg));
                                         } else {
-                                            ("英", "英文直通模式".to_string())
-                                        };
-                                        
-                                        println!("[TSF Toggle] Mode: {}", title);
-                                        let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
+                                            let (title, msg) = if enabled {
+                                                ("中", format!("中文模式 ({})", profile_name))
+                                            } else {
+                                                ("英", "英文直通模式".to_string())
+                                            };
+                                            let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
+                                        }
                                         update_gui_impl(&gui_tx, &processor);
                                     }
                                     let response = vec![2u8]; // Consume
