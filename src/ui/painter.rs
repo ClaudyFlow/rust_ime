@@ -10,6 +10,7 @@ pub struct CandidatePainter {
     font_zh: Option<Font>,
     font_en: Option<Font>,
     glyph_cache: Mutex<HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>>,
+    custom_fonts: Mutex<HashMap<String, Font>>,
 }
 
 impl CandidatePainter {
@@ -29,7 +30,12 @@ impl CandidatePainter {
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto/NotoSans-Regular.ttf")));
 
-        Self { font_zh, font_en, glyph_cache: Mutex::new(HashMap::new()) }
+        Self { 
+            font_zh, 
+            font_en, 
+            glyph_cache: Mutex::new(HashMap::new()),
+            custom_fonts: Mutex::new(HashMap::new()),
+        }
     }
 
     fn load_font(path: &std::path::Path) -> Option<Font> {
@@ -41,19 +47,36 @@ impl CandidatePainter {
     }
 
     fn get_font_by_family(&self, family: &str) -> Option<Font> {
-        #[cfg(target_os = "windows")]
-        {
-            let paths = match family.to_lowercase().as_str() {
-                "simhei" | "黑体" => vec!["C:\\Windows\\Fonts\\simhei.ttf"],
-                "microsoft yahei" | "微软雅黑" => vec!["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\msyh.ttf"],
-                "simsun" | "宋体" => vec!["C:\\Windows\\Fonts\\simsun.ttc"],
-                _ => vec![],
-            };
-            for p in paths {
-                if let Some(f) = Self::load_font(&std::path::PathBuf::from(p)) { return Some(f); }
-            }
+        let mut cache = self.custom_fonts.lock().unwrap();
+        if let Some(f) = cache.get(family) {
+            return Some(f.clone());
         }
-        None
+
+        let f = {
+            #[cfg(target_os = "windows")]
+            {
+                let paths = match family.to_lowercase().as_str() {
+                    "simhei" | "黑体" => vec!["C:\\Windows\\Fonts\\simhei.ttf"],
+                    "microsoft yahei" | "微软雅黑" => vec!["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\msyh.ttf"],
+                    "simsun" | "宋体" => vec!["C:\\Windows\\Fonts\\simsun.ttc"],
+                    _ => vec![],
+                };
+                let mut found = None;
+                for p in paths {
+                    if let Some(f) = Self::load_font(&std::path::PathBuf::from(p)) { found = Some(f); break; }
+                }
+                found
+            }
+            #[cfg(not(target_os = "windows"))]
+            { None }
+        };
+
+        if let Some(ref font) = f {
+            cache.insert(family.to_string(), font.clone());
+            // 如果更换了字体，清空字形缓存
+            self.glyph_cache.lock().unwrap().clear();
+        }
+        f
     }
 
     pub fn draw(&self, pinyin: &str, candidates: &[String], hints: &[String], selected: usize, config: &Config) -> (Vec<u8>, u32, u32) {
@@ -333,13 +356,27 @@ impl CandidatePainter {
         cx - x
     }
 
-    fn draw_mixed_text(&self, pixmap: &mut Pixmap, f_zh: &Font, f_en: &Font, text: &str, x: f32, y: f32, size: f32, color: Color, force_en: bool) {
+    fn draw_mixed_text(&self, pixmap: &mut Pixmap, f_zh: &Font, f_en: &Font, text: &str, x: f32, y: f32, size: f32, color: Color, _force_en: bool) {
         let mut cx = x;
-        for c in text.chars() {
-            let is_latin = c.is_ascii() || force_en;
-            let font = if is_latin { f_en } else { f_zh };
-            let adv = self.draw_text(pixmap, font, &c.to_string(), cx, y, size, color);
-            cx += adv;
+        let mut current_batch = String::new();
+        let mut last_was_latin = true;
+
+        for (i, c) in text.chars().enumerate() {
+            let is_latin = c.is_ascii();
+            if i == 0 { last_was_latin = is_latin; }
+
+            if is_latin != last_was_latin {
+                let font = if last_was_latin { f_en } else { f_zh };
+                cx += self.draw_text(pixmap, font, &current_batch, cx, y, size, color);
+                current_batch.clear();
+                last_was_latin = is_latin;
+            }
+            current_batch.push(c);
+        }
+
+        if !current_batch.is_empty() {
+            let font = if last_was_latin { f_en } else { f_zh };
+            self.draw_text(pixmap, font, &current_batch, cx, y, size, color);
         }
     }
 
