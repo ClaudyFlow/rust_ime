@@ -3,9 +3,13 @@ use crate::config::Config;
 use fontdue::Font;
 use std::path::PathBuf;
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 pub struct CandidatePainter {
     font_zh: Option<Font>,
     font_en: Option<Font>,
+    glyph_cache: Mutex<HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>>,
 }
 
 impl CandidatePainter {
@@ -25,7 +29,7 @@ impl CandidatePainter {
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")))
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto/NotoSans-Regular.ttf")));
 
-        Self { font_zh, font_en }
+        Self { font_zh, font_en, glyph_cache: Mutex::new(HashMap::new()) }
     }
 
     fn load_font(path: &std::path::Path) -> Option<Font> {
@@ -257,10 +261,30 @@ impl CandidatePainter {
         width
     }
 
+    fn get_glyph(&self, font: &Font, c: char, size: f32) -> (fontdue::Metrics, Vec<u8>) {
+        let size_key = (size * 10.0) as u32; // 保留一位小数的精度
+        let key = (c, size_key);
+        
+        {
+            let cache = self.glyph_cache.lock().unwrap();
+            if let Some(cached) = cache.get(&key) {
+                return cached.clone();
+            }
+        }
+        
+        let (metrics, bitmap) = font.rasterize(c, size);
+        let mut cache = self.glyph_cache.lock().unwrap();
+        cache.insert(key, (metrics, bitmap.clone()));
+        (metrics, bitmap)
+    }
+
     fn draw_text(&self, pixmap: &mut Pixmap, font: &Font, text: &str, x: f32, y: f32, size: f32, color: Color) -> f32 {
         let mut cx = x;
+        let pixmap_width = pixmap.width() as i32;
+        let pixmap_height = pixmap.height() as i32;
+        let pixels = pixmap.pixels_mut();
+
         for c in text.chars() {
-            // 检查当前字体是否包含该字符，如果不包含且有备选字体，则尝试备选
             let mut target_font = font;
             if font.lookup_glyph_index(c) == 0 {
                 if let Some(ref fallback) = self.font_zh {
@@ -270,17 +294,36 @@ impl CandidatePainter {
                 }
             }
 
-            let (metrics, bitmap) = target_font.rasterize(c, size);
+            let (metrics, bitmap) = self.get_glyph(target_font, c, size);
+            let r = (color.red() * 255.0) as u32;
+            let g = (color.green() * 255.0) as u32;
+            let b = (color.blue() * 255.0) as u32;
+            let a_base = color.alpha();
+
             for row in 0..metrics.height {
                 for col in 0..metrics.width {
-                    let alpha = bitmap[row * metrics.width + col];
-                    if alpha > 0 {
-                        let px = cx + col as f32 + metrics.xmin as f32;
-                        let py = y + row as f32 - metrics.ymin as f32 - metrics.height as f32;
-                        if px >= 0.0 && px < pixmap.width() as f32 && py >= 0.0 && py < pixmap.height() as f32 {
-                            let mut p = Paint::default();
-                            p.set_color(Color::from_rgba(color.red(), color.green(), color.blue(), color.alpha() * (alpha as f32 / 255.0)).unwrap());
-                            pixmap.fill_rect(Rect::from_xywh(px, py, 1.0, 1.0).unwrap(), &p, Transform::identity(), None);
+                    let alpha_val = bitmap[row * metrics.width + col];
+                    if alpha_val > 0 {
+                        let px = (cx + col as f32 + metrics.xmin as f32) as i32;
+                        let py = (y + row as f32 - metrics.ymin as f32 - metrics.height as f32) as i32;
+                        
+                        if px >= 0 && px < pixmap_width && py >= 0 && py < pixmap_height {
+                            let idx = (py * pixmap_width + px) as usize;
+                            let alpha = (a_base * (alpha_val as f32 / 255.0) * 255.0) as u32;
+                            
+                            // 预乘 Alpha 混合
+                            let old_pixel = pixels[idx];
+                            let old_r = old_pixel.red() as u32;
+                            let old_g = old_pixel.green() as u32;
+                            let old_b = old_pixel.blue() as u32;
+                            let old_a = old_pixel.alpha() as u32;
+
+                            let new_r = (r * alpha + old_r * (255 - alpha)) / 255;
+                            let new_g = (g * alpha + old_g * (255 - alpha)) / 255;
+                            let new_b = (b * alpha + old_b * (255 - alpha)) / 255;
+                            let new_a = (alpha * 255 + old_a * (255 - alpha)) / 255;
+
+                            pixels[idx] = PremultipliedColorU8::from_rgba(new_r as u8, new_g as u8, new_b as u8, new_a as u8).unwrap();
                         }
                     }
                 }

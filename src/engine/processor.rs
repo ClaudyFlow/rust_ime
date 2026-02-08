@@ -963,10 +963,13 @@ impl Processor {
     }
 
     fn save_user_dict(&self) {
-        let path = std::path::Path::new("data/user_dict.json");
-        if let Ok(file) = std::fs::File::create(path) {
-            let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &self.user_dict);
-        }
+        let path = std::path::PathBuf::from("data/user_dict.json");
+        let dict_clone = self.user_dict.clone();
+        std::thread::spawn(move || {
+            if let Ok(file) = std::fs::File::create(path) {
+                let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &dict_clone);
+            }
+        });
     }
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
