@@ -73,11 +73,13 @@ impl CandidatePainter {
         let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
-        // 绘制阴影 (高级感：更淡、更广的阴影)
-        for i in 1..=5 {
-            let offset = i as f32 * 1.5;
+        // 绘制阴影 (高级感：更淡、分布更自然的柔和阴影)
+        for i in 1..=8 {
+            let offset = i as f32 * 1.0;
             let mut sp = Paint::default();
-            sp.set_color(Color::from_rgba8(0, 0, 0, (12 / i) as u8));
+            // 阴影颜色更加深邃且透明度递减
+            let alpha = (10 - i) as u8;
+            sp.set_color(Color::from_rgba8(0, 0, 0, alpha));
             sp.anti_alias = true;
             let sr = Rect::from_xywh(offset, offset, total_width - offset, total_height - offset).unwrap();
             pixmap.fill_path(&self.create_rounded_rect_path(sr, corner_radius + offset), &sp, FillRule::Winding, Transform::identity(), None);
@@ -89,6 +91,16 @@ impl CandidatePainter {
         bg_paint.anti_alias = true;
         let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
+
+        // 边框 (1px 深黑色，增强视觉边界感)
+        let mut border_paint = Paint::default();
+        border_paint.set_color(Color::from_rgba8(30, 30, 30, 255)); // 优雅的深黑
+        border_paint.anti_alias = true;
+        let border_stroke = Stroke {
+            width: 1.0,
+            ..Default::default()
+        };
+        pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &border_stroke, Transform::identity(), None);
 
         if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
             // 1. 绘制拼音 (强制英文字体)
