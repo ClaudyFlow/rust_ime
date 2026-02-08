@@ -12,8 +12,9 @@ impl CandidatePainter {
     pub fn new() -> Self {
         let root = crate::find_project_root();
         
-        // 1. 尝试加载自带字体 (高级感来源)
+        // 1. 尝试加载英文字体 (如果没了 Inter，优先用你留下的思源黑体，它覆盖最全)
         let font_en = Self::load_font(&root.join("fonts/Inter-Regular.ttf"))
+            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))) 
             .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))) // Windows 回退
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf"))); // Linux 回退
 
@@ -161,7 +162,17 @@ impl CandidatePainter {
     fn draw_text(&self, pixmap: &mut Pixmap, font: &Font, text: &str, x: f32, y: f32, size: f32, color: Color) -> f32 {
         let mut cx = x;
         for c in text.chars() {
-            let (metrics, bitmap) = font.rasterize(c, size);
+            // 检查当前字体是否包含该字符，如果不包含且有备选字体，则尝试备选
+            let mut target_font = font;
+            if font.lookup_glyph_index(c) == 0 {
+                if let Some(ref fallback) = self.font_zh {
+                    if fallback.lookup_glyph_index(c) != 0 {
+                        target_font = fallback;
+                    }
+                }
+            }
+
+            let (metrics, bitmap) = target_font.rasterize(c, size);
             for row in 0..metrics.height {
                 for col in 0..metrics.width {
                     let alpha = bitmap[row * metrics.width + col];
