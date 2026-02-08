@@ -346,7 +346,9 @@ impl InputMethodHost for TsfHost {
                                                 response.push(2);
                                             }
                                             _ => {
-                                                response.push(0);
+                                                let response = vec![0u8]; // PassThrough
+                                                let mut bytes_written = 0;
+                                                let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
                                             }
                                         }
                                     } else {

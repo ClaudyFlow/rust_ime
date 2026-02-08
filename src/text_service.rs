@@ -54,16 +54,33 @@ impl TextService {
         }
 
         let pipe_name = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
+        let pipe_pcwstr = PCWSTR(pipe_name.as_ptr());
         unsafe {
-            let h_pipe = CreateFileW(
-                PCWSTR(pipe_name.as_ptr()),
-                GENERIC_READ.0 | GENERIC_WRITE.0,
-                FILE_SHARE_NONE,
-                None,
-                OPEN_EXISTING,
-                FILE_FLAGS_AND_ATTRIBUTES(0),
-                None,
-            );
+            // 增加重试逻辑，如果管道忙碌则等待
+            let mut retry_count = 0;
+            let h_pipe = loop {
+                let handle = CreateFileW(
+                    pipe_pcwstr,
+                    GENERIC_READ.0 | GENERIC_WRITE.0,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE, // 允许共享
+                    None,
+                    OPEN_EXISTING,
+                    FILE_FLAGS_AND_ATTRIBUTES(0),
+                    None,
+                );
+
+                if let Ok(h) = handle {
+                    if !h.is_invalid() { break Ok(h); }
+                }
+
+                let err = GetLastError();
+                if err == ERROR_PIPE_BUSY && retry_count < 3 {
+                    let _ = WaitNamedPipeW(pipe_pcwstr, 100);
+                    retry_count += 1;
+                    continue;
+                }
+                break handle;
+            };
 
             if let Ok(handle) = h_pipe {
                 if handle.is_invalid() { return (0, String::new()); }
@@ -87,9 +104,13 @@ impl TextService {
                         let text = String::from_utf8_lossy(&response[1..bytes_read as usize]).to_string();
                         let _ = CloseHandle(handle);
                         return (action, text);
+                    } else if action == 2 { // Consume (拦截且不提交文本)
+                        let _ = CloseHandle(handle);
+                        return (2, String::new());
                     }
+                    // action == 0 (PassThrough)
                     let _ = CloseHandle(handle);
-                    return (action, String::new());
+                    return (0, String::new());
                 }
                 let _ = CloseHandle(handle);
             }
