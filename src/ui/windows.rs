@@ -75,8 +75,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         let mut current_config = initial_config;
 
         std::thread::spawn(move || {
-            let mut last_learn_clear = std::time::Instant::now();
-            
             while let Ok(event) = rx.recv() {
                 match event {
                     GuiEvent::ApplyConfig(conf) => { current_config = conf; }
@@ -159,7 +157,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             let sw = GetSystemMetrics(SM_CXSCREEN);
                             let _ = SetWindowPos(LEARN_WINDOW, HWND_TOPMOST, sw - w as i32 - 40, 40, w as i32, h as i32, SWP_NOACTIVATE);
                             ShowWindow(LEARN_WINDOW, SW_SHOWNOACTIVATE);
-                            last_learn_clear = std::time::Instant::now();
                         }
                     }
                     _ => {}

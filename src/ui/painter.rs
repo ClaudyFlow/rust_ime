@@ -152,14 +152,13 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
-    pub fn draw_keystrokes(&self, keys: &[String], config: &Config) -> (Vec<u8>, u32, u32) {
+    pub fn draw_keystrokes(&self, keys: &[String], _config: &Config) -> (Vec<u8>, u32, u32) {
         let padding = 12.0;
         let font_size = 20.0;
         let item_spacing = 8.0;
         let corner_radius = 6.0;
 
         let mut total_width = padding * 2.0;
-        let mut heights = Vec::new();
         let mut widths = Vec::new();
 
         if let Some(f_en) = &self.font_en {
@@ -204,7 +203,7 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
-    pub fn draw_learning(&self, word: &str, hint: &str, config: &Config) -> (Vec<u8>, u32, u32) {
+    pub fn draw_learning(&self, word: &str, hint: &str, _config: &Config) -> (Vec<u8>, u32, u32) {
         let padding = 16.0;
         let font_size_word = 24.0;
         let font_size_hint = 14.0;
