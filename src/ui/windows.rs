@@ -7,7 +7,7 @@ use windows::{
 use crate::ui::painter::CandidatePainter;
 use crate::ui::GuiEvent;
 use crate::config::Config;
-use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Receiver};
 
 static mut WINDOW_STATE: Option<WindowState> = None;
 static mut KEY_WINDOW: HWND = HWND(0);
@@ -98,7 +98,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             } else {
                                 let (page_size, config_snapshot) = {
                                     let r = current_config_main.read().unwrap();
-                                    (r.appearance.page_size, r.clone())
+                                    (r.appearance.page_size as usize, r.clone())
                                 };
                                 
                                 let start = (state.selected / page_size) * page_size;
