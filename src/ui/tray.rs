@@ -231,79 +231,195 @@ pub fn start_tray(
 }
 
 #[cfg(target_os = "windows")]
-
-pub struct WindowsTrayHandle;
-
-
+use windows::{
+    Win32::UI::Shell::*,
+    Win32::UI::WindowsAndMessaging::*,
+    Win32::Foundation::*,
+    core::*,
+};
+#[cfg(target_os = "windows")]
+use std::sync::{Arc, Mutex};
 
 #[cfg(target_os = "windows")]
+const WM_TRAYICON: u32 = WM_USER + 100;
+#[cfg(target_os = "windows")]
+const TRAY_ICON_ID: u32 = 1;
 
+#[cfg(target_os = "windows")]
+pub struct ImeTrayStub {
+    pub chinese_enabled: bool,
+    pub active_profile: String,
+    pub show_candidates: bool,
+    pub show_modern_candidates: bool,
+    pub show_notifications: bool,
+    pub show_keystrokes: bool,
+    pub learning_mode: bool,
+    pub anti_typo: bool,
+    pub commit_mode: String,
+    pub preview_mode: String,
+}
+
+#[cfg(target_os = "windows")]
+static mut TRAY_STATE: Option<Arc<Mutex<ImeTrayStub>>> = None;
+#[cfg(target_os = "windows")]
+static mut TRAY_TX: Option<Sender<TrayEvent>> = None;
+
+#[cfg(target_os = "windows")]
+pub struct WindowsTrayHandle(Arc<Mutex<ImeTrayStub>>, HWND);
+
+#[cfg(target_os = "windows")]
 impl WindowsTrayHandle {
-
-    pub fn update<F>(&self, _f: F)
-
+    pub fn update<F>(&self, f: F)
     where
-
         F: FnOnce(&mut ImeTrayStub),
-
     {
+        if let Ok(mut state) = self.0.lock() {
+            f(&mut *state);
+            // 这里可以触发 Shell_NotifyIconW 更新图标或提示，但目前简化处理
+        }
+    }
+}
 
-        // Windows 下暂不执行更新逻辑
-
+#[cfg(target_os = "windows")]
+pub fn start_tray(
+    chinese_enabled: bool, active_profile: String, show_candidates: bool,
+    show_modern_candidates: bool,
+    show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
+    anti_typo: bool,
+    commit_mode: String,
+    preview_mode: String,
+    event_tx: Sender<TrayEvent>
+) -> WindowsTrayHandle {
+    let state = Arc::new(Mutex::new(ImeTrayStub {
+        chinese_enabled, active_profile, show_candidates, show_modern_candidates,
+        show_notifications, show_keystrokes, learning_mode, anti_typo,
+        commit_mode, preview_mode,
+    }));
+    
+    unsafe {
+        TRAY_STATE = Some(state.clone());
+        TRAY_TX = Some(event_tx);
     }
 
+    let (tx, rx) = std::sync::mpsc::channel();
+    let state_clone = state.clone();
+    std::thread::spawn(move || {
+        unsafe {
+            let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap();
+            let window_class = PCWSTR("RustImeTray\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+            let wc = WNDCLASSW {
+                hInstance: instance.into(),
+                lpszClassName: window_class,
+                lpfnWndProc: Some(tray_wnd_proc),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+            let hwnd = CreateWindowExW(Default::default(), window_class, PCWSTR(std::ptr::null()), WS_OVERLAPPEDWINDOW, 0, 0, 0, 0, None, None, instance, None);
+            
+            let mut nid = NOTIFYICONDATAW {
+                cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+                hWnd: hwnd,
+                uID: TRAY_ICON_ID,
+                uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
+                uCallbackMessage: WM_TRAYICON,
+                hIcon: LoadIconW(None, IDI_APPLICATION).unwrap(),
+                ..Default::default()
+            };
+            let tip = "Rust IME".encode_utf16().collect::<Vec<u16>>();
+            nid.szTip[..tip.len()].copy_from_slice(&tip);
+            
+            Shell_NotifyIconW(NIM_ADD, &nid);
+            let _ = tx.send(hwnd);
+
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            Shell_NotifyIconW(NIM_DELETE, &nid);
+        }
+    });
+
+    WindowsTrayHandle(state_clone, rx.recv().unwrap())
 }
 
-
-
 #[cfg(target_os = "windows")]
-
-pub struct ImeTrayStub {
-
-    pub chinese_enabled: bool,
-
-    pub active_profile: String,
-
-    pub show_candidates: bool,
-
-    pub show_modern_candidates: bool,
-
-    pub show_notifications: bool,
-
-    pub show_keystrokes: bool,
-
-    pub learning_mode: bool,
-
-    pub anti_typo: bool,
-
-    pub commit_mode: String,
-
-    pub preview_mode: String,
-
+unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match msg {
+        WM_TRAYICON => {
+            if lparam.0 as u32 == WM_RBUTTONUP {
+                let mut pt = POINT::default();
+                let _ = GetCursorPos(&mut pt);
+                show_context_menu(hwnd, pt.x, pt.y);
+            }
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 as u32;
+            if let Some(ref tx) = TRAY_TX {
+                match id {
+                    1001 => { let _ = tx.send(TrayEvent::ToggleIme); }
+                    1002 => { let _ = tx.send(TrayEvent::NextProfile); }
+                    1003 => { let _ = tx.send(TrayEvent::ToggleGui); }
+                    1004 => { let _ = tx.send(TrayEvent::ToggleModernGui); }
+                    1005 => { let _ = tx.send(TrayEvent::CyclePreview); }
+                    1006 => { let _ = tx.send(TrayEvent::ToggleNotify); }
+                    1007 => { let _ = tx.send(TrayEvent::ToggleKeystroke); }
+                    1008 => { let _ = tx.send(TrayEvent::ToggleLearning); }
+                    1009 => { let _ = tx.send(TrayEvent::ToggleAntiTypo); }
+                    1010 => { let _ = tx.send(TrayEvent::SwitchCommitMode); }
+                    1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
+                    1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
+                    1013 => { let _ = tx.send(TrayEvent::Restart); }
+                    1014 => { let _ = tx.send(TrayEvent::Exit); }
+                    _ => {}
+                }
+            }
+            LRESULT(0)
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
 }
 
-
-
 #[cfg(target_os = "windows")]
-
-pub fn start_tray(
-
-    _chinese_enabled: bool, _active_profile: String, _show_candidates: bool,
-
-    _show_modern_candidates: bool,
-
-    _show_notifications: bool, _show_keystrokes: bool, _learning_mode: bool,
-
-    _anti_typo: bool,
-
-    _commit_mode: String,
-
-    _preview_mode: String,
-
-    _event_tx: Sender<TrayEvent>
-
-) -> WindowsTrayHandle {
-
-    WindowsTrayHandle
-
+unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
+    let h_menu = CreatePopupMenu().unwrap();
+    if let Some(ref state_arc) = TRAY_STATE {
+        if let Ok(state) = state_arc.lock() {
+            let mode_label = format!("模式: {}", if state.chinese_enabled { "中文" } else { "直通" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(HSTRING::from(&mode_label).as_ptr()));
+            let profile_label = format!("词库: {}", state.active_profile);
+            let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(HSTRING::from(&profile_label).as_ptr()));
+            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
+            
+            let gui_label = format!("传统候选窗: {}", if state.show_candidates { "显示" } else { "隐藏" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1003, PCWSTR(HSTRING::from(&gui_label).as_ptr()));
+            let modern_label = format!("卡片式候选窗: {}", if state.show_modern_candidates { "显示" } else { "隐藏" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1004, PCWSTR(HSTRING::from(&modern_label).as_ptr()));
+            let preview_label = format!("拼音预览: {}", if state.preview_mode == "pinyin" { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1005, PCWSTR(HSTRING::from(&preview_label).as_ptr()));
+            let notify_label = format!("系统通知候选词: {}", if state.show_notifications { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1006, PCWSTR(HSTRING::from(&notify_label).as_ptr()));
+            let key_label = format!("按键显示: {}", if state.show_keystrokes { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1007, PCWSTR(HSTRING::from(&key_label).as_ptr()));
+            let learn_label = format!("学习模式: {}", if state.learning_mode { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1008, PCWSTR(HSTRING::from(&learn_label).as_ptr()));
+            let anti_label = format!("防呆模式: {}", if state.anti_typo { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1009, PCWSTR(HSTRING::from(&anti_label).as_ptr()));
+            let commit_label = format!("上屏模式: {}", if state.commit_mode == "single" { "词模式" } else { "长句模式" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1010, PCWSTR(HSTRING::from(&commit_label).as_ptr()));
+            
+            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
+            let _ = AppendMenuW(h_menu, MF_STRING, 1011, PCWSTR(HSTRING::from("配置中心 (Web)").as_ptr()));
+            let _ = AppendMenuW(h_menu, MF_STRING, 1012, PCWSTR(HSTRING::from("重新加载配置").as_ptr()));
+            let _ = AppendMenuW(h_menu, MF_STRING, 1013, PCWSTR(HSTRING::from("重启服务").as_ptr()));
+            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
+            let _ = AppendMenuW(h_menu, MF_STRING, 1014, PCWSTR(HSTRING::from("退出程序").as_ptr()));
+        }
+    }
+    
+    let _ = SetForegroundWindow(hwnd);
+    let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
+    let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+    let _ = DestroyMenu(h_menu);
 }
