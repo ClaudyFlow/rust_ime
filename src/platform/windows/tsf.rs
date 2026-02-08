@@ -83,6 +83,8 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
         use windows::Win32::UI::WindowsAndMessaging::*;
         use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::*;
+        
+        // 1. 尝试 GetGUIThreadInfo (适用于大部分标准 Win32 控件)
         let mut info = GUITHREADINFO::default();
         info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
         if GetGUIThreadInfo(0, &mut info).is_ok() {
@@ -93,6 +95,19 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
             let _ = ClientToScreen(info.hwndCaret, &mut pt);
             if pt.x != 0 || pt.y != 0 {
                 return Some((pt.x, pt.y));
+            }
+        }
+
+        // 2. 尝试 GetCaretPos (作为备选，适用于某些老旧程序)
+        let mut pt = POINT::default();
+        if GetCaretPos(&mut pt).is_ok() {
+            let hwnd = GetForegroundWindow();
+            if hwnd.0 != 0 {
+                let _ = ClientToScreen(hwnd, &mut pt);
+                // 默认光标高度为 20，向下偏移
+                if pt.x != 0 || pt.y != 0 {
+                    return Some((pt.x, pt.y + 20));
+                }
             }
         }
     }
@@ -111,9 +126,22 @@ impl InputMethodHost for TsfHost {
             use windows::Win32::Storage::FileSystem::*;
             use windows::Win32::Foundation::*;
             use windows::core::PCWSTR;
+            use windows::Win32::Security::*;
 
             let pipe_name_w = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
             let pipe_pcwstr = PCWSTR(pipe_name_w.as_ptr());
+
+            // 设置安全描述符，允许所有用户连接 (解决权限问题)
+            let mut sd = SECURITY_DESCRIPTOR::default();
+            unsafe {
+                let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), SECURITY_DESCRIPTOR_REVISION);
+                let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false);
+            }
+            let sa = SECURITY_ATTRIBUTES {
+                nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+                lpSecurityDescriptor: &mut sd as *mut _ as *mut _,
+                bInheritHandle: false.into(),
+            };
 
             println!("[TSF Server] 正在启动命名管道: \\\\.\\pipe\\rust_ime_pipe");
 
@@ -127,10 +155,12 @@ impl InputMethodHost for TsfHost {
                         1024,
                         1024,
                         0,
-                        None,
+                        Some(&sa),
                     );
                     
                     if h_pipe.is_invalid() {
+                        eprintln!("[TSF Server] CreateNamedPipe failed: {:?}", GetLastError());
+                        std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
                     }
 

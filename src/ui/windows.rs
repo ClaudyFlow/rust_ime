@@ -138,8 +138,36 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     unsafe {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
-                        // 偏移 25 像素，确保显示在文字下方
-                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        
+                        // 智能防溢出处理
+                        let sw = GetSystemMetrics(SM_CXSCREEN);
+                        let sh = GetSystemMetrics(SM_CYSCREEN);
+                        
+                        // 获取当前窗口尺寸 (如果已创建)
+                        let mut rect = RECT::default();
+                        let _ = GetWindowRect(hwnd, &mut rect);
+                        let w = rect.right - rect.left;
+                        let h = rect.bottom - rect.top;
+
+                        // 默认偏移：Y轴向下25像素
+                        let mut final_x = x;
+                        let mut final_y = y + 25;
+
+                        // 右侧溢出检测
+                        if final_x + w > sw {
+                            final_x = sw - w - 10;
+                        }
+                        // 底部溢出检测
+                        if final_y + h > sh {
+                            // 如果底部溢出，尝试放到光标上方
+                            final_y = y - h - 5; 
+                        }
+                        
+                        // 确保不超出左/上边界
+                        final_x = final_x.max(0);
+                        final_y = final_y.max(0);
+
+                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     }
                 }
                 GuiEvent::Keystroke(key) => {
