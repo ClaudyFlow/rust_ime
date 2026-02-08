@@ -12,16 +12,18 @@ impl CandidatePainter {
     pub fn new() -> Self {
         let root = crate::find_project_root();
         
-        // 1. 优先使用系统字体 (微软雅黑)，以获得最佳的字符覆盖率和 Emoji 支持
-        let font_zh = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc")) // Windows 首选
-            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttf"))) // 兼容写法
-            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))) // 如果系统字体都没了，才用本地回退
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"))); // Linux 回退
+        // 1. 中文名流字体：优先 Windows 微软雅黑，其次 Linux Noto CJK，最后用本地自带
+        let font_zh = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc"))
+            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc")))
+            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/google-noto-cjk-fonts/NotoSansCJK-Regular.ttc")))
+            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf")))
+            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttf")));
 
-        // 英文字体也跟随系统风格，使用 Segoe UI
+        // 2. 英文名流字体：优先 Windows Segoe UI，其次本地 Inter，最后是 Linux 系统字体
         let font_en = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))
             .or_else(|| Self::load_font(&root.join("fonts/Inter-Regular.ttf")))
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")));
+            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")))
+            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto/NotoSans-Regular.ttf")));
 
         Self { font_zh, font_en }
     }
