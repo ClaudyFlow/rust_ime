@@ -12,16 +12,16 @@ impl CandidatePainter {
     pub fn new() -> Self {
         let root = crate::find_project_root();
         
-        // 1. 尝试加载英文字体 (如果没了 Inter，优先用你留下的思源黑体，它覆盖最全)
-        let font_en = Self::load_font(&root.join("fonts/Inter-Regular.ttf"))
-            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))) 
-            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))) // Windows 回退
-            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf"))); // Linux 回退
-
-        let font_zh = Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))
-            .or_else(|| Self::load_font(&root.join("fonts/NotoSansSC-Regular.ttf")))
-            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc"))) // Windows 回退
+        // 1. 优先使用系统字体 (微软雅黑)，以获得最佳的字符覆盖率和 Emoji 支持
+        let font_zh = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttc")) // Windows 首选
+            .or_else(|| Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\msyh.ttf"))) // 兼容写法
+            .or_else(|| Self::load_font(&root.join("fonts/NotoSansCJKsc-Regular.otf"))) // 如果系统字体都没了，才用本地回退
             .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"))); // Linux 回退
+
+        // 英文字体也跟随系统风格，使用 Segoe UI
+        let font_en = Self::load_font(&PathBuf::from("C:\\Windows\\Fonts\\segoeui.ttf"))
+            .or_else(|| Self::load_font(&root.join("fonts/Inter-Regular.ttf")))
+            .or_else(|| Self::load_font(&PathBuf::from("/usr/share/fonts/TTF/Inter-Regular.ttf")));
 
         Self { font_zh, font_en }
     }
