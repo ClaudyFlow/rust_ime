@@ -45,11 +45,17 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         // 加载本地字体，让 GDI 可以识别到 Noto Sans SC
         let root = crate::find_project_root();
         let font_path = root.join("fonts/NotoSansSC-Bold.ttf");
+        let mut font_loaded = false;
+        let mut path_u16: Vec<u16> = Vec::new();
+
         println!("[GUI] Loading font from: {:?}", font_path);
         if font_path.exists() {
-            let path_u16: Vec<u16> = font_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
+            path_u16 = font_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
             let res = AddFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE, None);
             println!("[GUI] AddFontResourceExW result: {}", res);
+            if res > 0 {
+                font_loaded = true;
+            }
         } else {
             println!("[GUI] Warning: Font file not found!");
         }
@@ -225,6 +231,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
+        }
+
+        if font_loaded {
+            let res = RemoveFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE.0, None);
+            println!("[GUI] RemoveFontResourceExW result: {}", res.as_bool());
         }
     }
 }
