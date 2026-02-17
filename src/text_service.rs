@@ -56,9 +56,16 @@ impl TextService {
         let mut x = 0i32;
         let mut y = 0i32;
 
-        // 性能优化：只有在实际按键（msg_type=1）且可能是输入字符或已在输入时，才尝试获取坐标
-        // 这样可以避免在每个按键测试阶段都进行耗时的 GetTextExt 调用
-        if msg_type == 1 && (key_code >= 0x41 && key_code <= 0x5A || key_code == 0x08) {
+        // 性能优化：在按键按下时尝试获取坐标
+        // 范围：A-Z, Backspace, Shift, CapsLock, 以及常见的标点符号键（如反引号 0xC0）
+        if msg_type == 1 && (
+            (key_code >= 0x41 && key_code <= 0x5A) || // A-Z
+            key_code == 0x08 || // Backspace
+            key_code == 0x10 || // Shift
+            key_code == 0x14 || // CapsLock
+            (key_code >= 0xBA && key_code <= 0xC0) || // 标点符号 (;, =, ,, -, ., /, `)
+            (key_code >= 0xDB && key_code <= 0xDE)    // 标点符号 ([, \, ], ')
+        ) {
             if let Some(ctx) = context {
                 let (tx, ty) = self.get_text_ext(ctx);
                 if tx != 0 || ty != 0 {
