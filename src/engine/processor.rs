@@ -642,6 +642,13 @@ impl Processor {
                 let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } 
             }
 
+            VirtualKey::Apostrophe if !shift_pressed => {
+                self.buffer.push('\'');
+                self.preview_selected_candidate = false;
+                if let Some(act) = self.lookup() { return act; }
+                self.update_phantom_action()
+            }
+
             VirtualKey::Slash if !self.buffer.is_empty() => {
                 let mut new_buffer = self.buffer.clone();
                 // 找到最后一个音节的起始位置（通常是空格后的部分，或者是整个 buffer）
@@ -684,12 +691,12 @@ impl Processor {
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
             }
             _ => {
-                if let Some(c) = key_to_char(key, shift_pressed) {
+                if get_punctuation_key(key, shift_pressed).is_some() {
+                    self.handle_punctuation(key, shift_pressed)
+                } else if let Some(c) = key_to_char(key, shift_pressed) {
                     let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
                     if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
                     if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
-                } else if get_punctuation_key(key, shift_pressed).is_some() {
-                    self.handle_punctuation(key, shift_pressed)
                 } else { Action::PassThrough }
             }
         }
