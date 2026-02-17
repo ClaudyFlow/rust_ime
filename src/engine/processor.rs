@@ -319,6 +319,19 @@ impl Processor {
         self.syllables = syllables;
     }
 
+    fn get_initial_len(&self, s: &str) -> usize {
+        let s_low = s.to_lowercase();
+        if s_low.starts_with("zh") || s_low.starts_with("ch") || s_low.starts_with("sh") {
+            return 2;
+        }
+        if let Some(c) = s_low.chars().next() {
+            if "bpmfdtnlgkhjqxzcsryw".contains(c) {
+                return 1;
+            }
+        }
+        0
+    }
+
     /// 将输入的连续字母切分为音节或简拼
     fn segment_buffer(&self, input: &str) -> Vec<String> {
         let mut segments = Vec::new();
@@ -648,7 +661,23 @@ impl Processor {
                     return Action::PassThrough;
                 }
 
-                self.buffer.pop();
+                // 智能删除逻辑：以音节为单位，先删韵母，再删声母
+                let segments = self.segment_buffer(&self.buffer);
+                if let Some(last) = segments.last() {
+                    let init_len = self.get_initial_len(last);
+                    let remove_count = if last.len() > init_len && init_len > 0 {
+                        last.len() - init_len
+                    } else {
+                        last.chars().count()
+                    };
+                    
+                    for _ in 0..remove_count {
+                        self.buffer.pop();
+                    }
+                } else {
+                    self.buffer.pop();
+                }
+
                 if self.buffer.is_empty() {
                     let del = self.phantom_text.chars().count(); self.reset();
                     if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
