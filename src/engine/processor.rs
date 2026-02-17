@@ -118,6 +118,10 @@ pub struct Processor {
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
     pub gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
+
+    // 标点状态相关
+    pub quote_open: bool,
+    pub single_quote_open: bool,
 }
 
 impl Processor {
@@ -230,6 +234,8 @@ impl Processor {
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
             gui_tx,
+            quote_open: false,
+            single_quote_open: false,
         }
     }
 
@@ -327,7 +333,7 @@ impl Processor {
         self.update_phantom_action()
     }
 
-    pub fn reset(&mut self) {
+    pub fn clear_composing(&mut self) {
         self.buffer.clear();
         self.candidates.clear();
         self.candidate_hints.clear();
@@ -338,12 +344,18 @@ impl Processor {
         self.state = ImeState::Direct;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
-        self.switch_mode = false;
         self.cursor_pos = 0;
         self.aux_filter.clear();
         self.filter_mode = FilterMode::None;
         self.page_snapshot.clear();
         self.nav_mode = false;
+    }
+
+    pub fn reset(&mut self) {
+        self.clear_composing();
+        self.switch_mode = false;
+        self.quote_open = false;
+        self.single_quote_open = false;
     }
 
     pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool) -> Action {
@@ -472,9 +484,8 @@ impl Processor {
             }
         }
 
-        if let Some(punc_key) = get_punctuation_key(key, shift_pressed) {
-            if let Some(zh_puncs) = self.punctuation.get(punc_key) { if let Some(first) = zh_puncs.first() { return Action::Emit(first.clone()); } }
-            return Action::Emit(punc_key.to_string());
+        if get_punctuation_key(key, shift_pressed).is_some() {
+            return self.handle_punctuation(key, shift_pressed);
         }
 
         Action::PassThrough
@@ -686,11 +697,28 @@ impl Processor {
 
     fn handle_punctuation(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
         let punc_key = get_punctuation_key(key, shift_pressed).unwrap();
-        let zh_punc = self.punctuation.get(punc_key).and_then(|v| v.first()).cloned().unwrap_or_else(|| punc_key.to_string());
+        let zh_puncs = self.punctuation.get(punc_key);
+        
+        let zh_punc = if let Some(puncs) = zh_puncs {
+            if punc_key == "\"" {
+                let p = if self.quote_open { puncs.get(1).or(puncs.get(0)) } else { puncs.get(0) };
+                self.quote_open = !self.quote_open;
+                p.cloned().unwrap_or_else(|| punc_key.to_string())
+            } else if punc_key == "'" {
+                let p = if self.single_quote_open { puncs.get(1).or(puncs.get(0)) } else { puncs.get(0) };
+                self.single_quote_open = !self.single_quote_open;
+                p.cloned().unwrap_or_else(|| punc_key.to_string())
+            } else {
+                puncs.first().cloned().unwrap_or_else(|| punc_key.to_string())
+            }
+        } else {
+            punc_key.to_string()
+        };
+
         let mut commit_text = if !self.joined_sentence.is_empty() { self.joined_sentence.clone() } else if !self.candidates.is_empty() { self.candidates[0].clone() } else { self.buffer.clone() };
         commit_text.push_str(&zh_punc);
         let del_len = self.phantom_text.chars().count();
-        self.reset();
+        self.clear_composing();
         self.commit_history.clear(); // 标点断句，清空历史
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
@@ -742,7 +770,7 @@ impl Processor {
         }
 
         if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { cand.push(' '); }
-        let del = self.phantom_text.chars().count(); self.reset(); Action::DeleteAndEmit { delete: del, insert: cand }
+        let del = self.phantom_text.chars().count(); self.clear_composing(); Action::DeleteAndEmit { delete: del, insert: cand }
     }
 
     fn update_phantom_action(&mut self) -> Action {
@@ -1018,7 +1046,10 @@ pub fn key_to_char(key: VirtualKey, shift: bool) -> Option<char> {
     } else { c }
 }
 fn get_punctuation_key(key: VirtualKey, shift: bool) -> Option<&'static str> {
-    match (key, shift) { (VirtualKey::Grave, false) => Some("`"), (VirtualKey::Grave, true) => Some("~"), (VirtualKey::Minus, false) => Some("-"), (VirtualKey::Minus, true) => Some("_"), (VirtualKey::Equal, false) => Some("="), (VirtualKey::Equal, true) => Some("+"), (VirtualKey::LeftBrace, false) => Some("["), (VirtualKey::LeftBrace, true) => Some("{"), (VirtualKey::RightBrace, false) => Some("]"), (VirtualKey::RightBrace, true) => Some("}"), (VirtualKey::Backslash, false) => Some("\\"), (VirtualKey::Backslash, true) => Some("|"), (VirtualKey::Semicolon, false) => Some(";"), (VirtualKey::Semicolon, true) => Some(":"), (VirtualKey::Apostrophe, false) => Some("'"), (VirtualKey::Apostrophe, true) => Some("\""), (VirtualKey::Comma, false) => Some(","), (VirtualKey::Comma, true) => Some("<"), (VirtualKey::Dot, false) => Some("."), (VirtualKey::Dot, true) => Some(">"), (VirtualKey::Slash, false) => Some("/"), (VirtualKey::Slash, true) => Some("?"), (VirtualKey::Digit1, true) => Some("!"), (VirtualKey::Digit2, true) => Some("@"), (VirtualKey::Digit3, true) => Some("#"), (VirtualKey::Digit4, true) => Some("$"), (VirtualKey::Digit5, true) => Some("%"), (VirtualKey::Digit6, true) => Some("^"), (VirtualKey::Digit7, true) => Some("&"), (VirtualKey::Digit8, true) => Some("*"), (VirtualKey::Digit9, true) => Some("("), (VirtualKey::Digit0, true) => Some(")"), _ => None }
+    match (key, shift) { 
+        (VirtualKey::Space, _) => Some(" "),
+        (VirtualKey::Grave, false) => Some("`"), 
+        (VirtualKey::Grave, true) => Some("~"),  (VirtualKey::Minus, false) => Some("-"), (VirtualKey::Minus, true) => Some("_"), (VirtualKey::Equal, false) => Some("="), (VirtualKey::Equal, true) => Some("+"), (VirtualKey::LeftBrace, false) => Some("["), (VirtualKey::LeftBrace, true) => Some("{"), (VirtualKey::RightBrace, false) => Some("]"), (VirtualKey::RightBrace, true) => Some("}"), (VirtualKey::Backslash, false) => Some("\\"), (VirtualKey::Backslash, true) => Some("|"), (VirtualKey::Semicolon, false) => Some(";"), (VirtualKey::Semicolon, true) => Some(":"), (VirtualKey::Apostrophe, false) => Some("'"), (VirtualKey::Apostrophe, true) => Some("\""), (VirtualKey::Comma, false) => Some(","), (VirtualKey::Comma, true) => Some("<"), (VirtualKey::Dot, false) => Some("."), (VirtualKey::Dot, true) => Some(">"), (VirtualKey::Slash, false) => Some("/"), (VirtualKey::Slash, true) => Some("?"), (VirtualKey::Digit1, true) => Some("!"), (VirtualKey::Digit2, true) => Some("@"), (VirtualKey::Digit3, true) => Some("#"), (VirtualKey::Digit4, true) => Some("$"), (VirtualKey::Digit5, true) => Some("%"), (VirtualKey::Digit6, true) => Some("^"), (VirtualKey::Digit7, true) => Some("&"), (VirtualKey::Digit8, true) => Some("*"), (VirtualKey::Digit9, true) => Some("("), (VirtualKey::Digit0, true) => Some(")"), _ => None }
 }
 pub fn strip_tones(s: &str) -> String {
     let mut res = String::new();
