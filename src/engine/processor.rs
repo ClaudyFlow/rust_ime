@@ -735,7 +735,13 @@ impl Processor {
             punc_key.to_string()
         };
 
-        let mut commit_text = if !self.joined_sentence.is_empty() { self.joined_sentence.clone() } else if !self.candidates.is_empty() { self.candidates[0].clone() } else { self.buffer.clone() };
+        let mut commit_text = if !self.joined_sentence.is_empty() { 
+            self.joined_sentence.trim_end().to_string() 
+        } else if !self.candidates.is_empty() { 
+            self.candidates[0].trim_end().to_string() 
+        } else { 
+            self.buffer.trim_end().to_string() 
+        };
         commit_text.push_str(&zh_punc);
         let del_len = self.phantom_text.chars().count();
         self.clear_composing();
