@@ -237,8 +237,8 @@ impl InputMethodHost for TsfHost {
                                         }
                                     }
 
-                                    if let Some(ref tx) = gui_tx {
-                                        let _ = tx.send(GuiEvent::MoveTo { x, y });
+                                    if (x != 0 || y != 0) && gui_tx.is_some() {
+                                        let _ = gui_tx.as_ref().unwrap().send(GuiEvent::MoveTo { x, y });
                                     }
                                 }
 
