@@ -113,6 +113,7 @@ pub struct Processor {
     pub enable_user_dict: bool,
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
+    pub enable_double_pinyin: bool,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -235,6 +236,7 @@ impl Processor {
             enable_user_dict: true,
             enable_fixed_first_candidate: false,
             enable_smart_backspace: true,
+            enable_double_pinyin: false,
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -250,6 +252,7 @@ impl Processor {
         self.enable_user_dict = conf.input.enable_user_dict;
         self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
         self.enable_smart_backspace = conf.input.enable_smart_backspace;
+        self.enable_double_pinyin = conf.input.enable_double_pinyin;
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -320,6 +323,57 @@ impl Processor {
 
     pub fn set_syllables(&mut self, syllables: std::collections::HashSet<String>) {
         self.syllables = syllables;
+    }
+
+    /// 双拼转换逻辑 (小鹤方案)
+    fn transform_double_pinyin(&self, last_char: char) -> Option<String> {
+        // 1. 确定当前处于什么位置 (声母还是韵母)
+        let segments = self.segment_buffer(&self.buffer);
+        let last_segment = segments.last()?;
+        let init_len = self.get_initial_len(last_segment);
+        
+        // 如果最后一个片段的长度等于声母长度，说明刚输入完声母，现在输入的是韵母
+        if last_segment.len() == init_len && init_len > 0 {
+            let initial = last_segment.as_str();
+            let rime = match last_char {
+                'q' => "iu", 'w' => "ei", 'r' => "uan", 't' => "ue", 'y' => "un",
+                'u' => "uai", 'i' => "i", 'o' => "uo", 'p' => "ie", 'a' => "a",
+                's' => if initial == "j" || initial == "q" || initial == "x" { "iong" } else { "ong" },
+                'd' => "ai", 'f' => "en", 'g' => "eng", 'h' => "ang", 'j' => "an",
+                'k' => "ao", 
+                'l' => if "gkhzhchsh".contains(initial) { "uang" } else { "iang" },
+                'z' => "ou", 'x' => if "gkhzhchsh".contains(initial) { "ua" } else { "ia" },
+                'c' => "ao", 'v' => "ui", 'b' => "in", 'n' => "iao", 'm' => "ian",
+                _ => return None,
+            };
+            
+            // 特殊修正：小鹤双拼中 r 也可以是 er (针对零声母 e)
+            if initial == "e" && last_char == 'r' { return Some("er".to_string()); }
+            
+            // 构造完整拼音
+            let mut full = initial.to_string();
+            full.push_str(rime);
+            
+            // 特殊修正：j/q/x 后面跟 ue 实际是 jue/que/xue (全拼里是 ju/qu/xu + e)
+            if (initial == "j" || initial == "q" || initial == "x") && rime == "ue" {
+                return Some(format!("{}ue", initial));
+            }
+            
+            return Some(full);
+        }
+        
+        // 如果当前是新音节的开始，处理声母映射
+        if self.buffer.is_empty() || self.buffer.ends_with(' ') || (last_segment.len() > init_len) {
+            let mapped_initial = match last_char {
+                'v' => "zh", 'u' => "sh", 'i' => "ch",
+                'a' | 'o' | 'e' => return Some(last_char.to_string()), // 零声母起始
+                c if "bpmfdtnlgkhjqxzcsryw".contains(c) => return Some(c.to_string()),
+                _ => return None,
+            };
+            return Some(mapped_initial.to_string());
+        }
+
+        None
     }
 
     fn get_initial_len(&self, s: &str) -> usize {
@@ -558,7 +612,19 @@ impl Processor {
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
                 let old_buffer = self.buffer.clone();
-                self.buffer.push(c);
+                
+                let mut used_double = false;
+                if self.enable_double_pinyin && c.is_ascii_lowercase() && !shift_pressed {
+                    if let Some(transformed) = self.transform_double_pinyin(c) {
+                        self.buffer.push_str(&transformed);
+                        used_double = true;
+                    }
+                }
+
+                if !used_double {
+                    self.buffer.push(c);
+                }
+
                 self.state = ImeState::Composing;
                 if let Some(act) = self.lookup() { return act; }
                 if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
@@ -797,7 +863,31 @@ impl Processor {
                 if get_punctuation_key(key, shift_pressed).is_some() {
                     self.handle_punctuation(key, shift_pressed)
                 } else if let Some(c) = key_to_char(key, shift_pressed) {
-                    let old_buffer = self.buffer.clone(); self.buffer.push(c); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
+                    let old_buffer = self.buffer.clone();
+                    
+                    // 双拼转换逻辑介入
+                    let mut used_double = false;
+                    if self.enable_double_pinyin && c.is_ascii_lowercase() && !shift_pressed {
+                        if let Some(transformed) = self.transform_double_pinyin(c) {
+                            // 替换掉最后可能存在的声母部分，或者直接推入
+                            let segments = self.segment_buffer(&self.buffer);
+                            if let Some(last) = segments.last() {
+                                let init_len = self.get_initial_len(last);
+                                if last.len() == init_len && init_len > 0 {
+                                    // 是在补全韵母，先删掉之前的声母
+                                    for _ in 0..last.len() { self.buffer.pop(); }
+                                }
+                            }
+                            self.buffer.push_str(&transformed);
+                            used_double = true;
+                        }
+                    }
+
+                    if !used_double {
+                        self.buffer.push(c);
+                    }
+
+                    self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
                     if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
                     if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
                 } else { Action::PassThrough }
@@ -1232,6 +1322,7 @@ mod tests {
                         enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
                         nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, 
                         enable_smart_backspace: true,
+                        enable_double_pinyin: false,
                         user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
                         gui_tx: None,

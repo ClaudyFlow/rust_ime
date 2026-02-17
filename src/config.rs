@@ -128,6 +128,7 @@ pub struct Input {
     pub enable_user_dict: bool,
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
+    pub enable_double_pinyin: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -328,6 +329,7 @@ impl Config {
                 enable_user_dict: true,
                 enable_fixed_first_candidate: false,
                 enable_smart_backspace: true,
+                enable_double_pinyin: false,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
