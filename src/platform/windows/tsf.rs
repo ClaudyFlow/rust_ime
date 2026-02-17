@@ -166,20 +166,25 @@ impl InputMethodHost for TsfHost {
                     }
 
                     println!("[TSF Server] Waiting for client connection...");
-                    if ConnectNamedPipe(h_pipe, None).is_ok() {
-                        println!("[TSF Server] Client connected!");
+                    let connect_res = ConnectNamedPipe(h_pipe, None);
+                    let already_connected = connect_res.is_err() && connect_res.as_ref().err().unwrap().code() == ERROR_PIPE_CONNECTED.to_hresult();
+                    
+                    if connect_res.is_ok() || already_connected {
+                        if already_connected {
+                            println!("[TSF Server] Client already connected before ConnectNamedPipe.");
+                        } else {
+                            println!("[TSF Server] Client connected!");
+                        }
                         let processor = self.processor.clone();
                         let gui_tx = self.gui_tx.clone();
                         let notify_tx = self.notify_tx.clone();
                         
                         std::thread::spawn(move || {
-                            println!("[TSF Pipe Thread] Thread started for connection.");
                             let handle = h_pipe;
                             let mut buffer = [0u8; 1024];
                             loop {
                                 let mut bytes_read = 0;
                                 if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 {
-                                    println!("[TSF Pipe Thread] Connection closed or error reading.");
                                     break;
                                 }
                                 
@@ -298,8 +303,8 @@ impl InputMethodHost for TsfHost {
                                 }
 
                                 let key = match key_code {
-                                    0x41..=0x5A => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x41) as u8)),
-                                    0x30..=0x39 => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x30 + 26) as u8)),
+                                    0x41..=0x5A => Some(std::mem::transmute::<u32, crate::engine::keys::VirtualKey>(key_code - 0x41)),
+                                    0x30..=0x39 => Some(std::mem::transmute::<u32, crate::engine::keys::VirtualKey>(key_code - 0x30 + 26)),
                                     0x20 => Some(crate::engine::keys::VirtualKey::Space),
                                     0x08 => Some(crate::engine::keys::VirtualKey::Backspace),
                                     0x0D => Some(crate::engine::keys::VirtualKey::Enter),
