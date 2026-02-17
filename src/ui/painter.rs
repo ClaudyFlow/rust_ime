@@ -226,7 +226,8 @@ impl CandidatePainter {
         let mut total_width = padding * 2.0;
         let mut widths = Vec::new();
 
-        let f_main = self.font_en.as_ref().or(self.font_zh.as_ref());
+        let f_custom = self.get_font_by_family(&config.appearance.keystroke_font_family);
+        let f_main = f_custom.as_ref().or(self.font_en.as_ref()).or(self.font_zh.as_ref());
         
         if let Some(font) = f_main {
             for key in keys {
@@ -243,6 +244,7 @@ impl CandidatePainter {
 
         let mut x_cursor = padding;
         if let Some(font) = f_main {
+            let text_color = self.parse_color(&config.appearance.keystroke_color);
             for (i, key) in keys.iter().enumerate() {
                 let item_w = widths[i] + padding * 2.0;
                 let item_h = font_size * 1.5;
@@ -261,7 +263,7 @@ impl CandidatePainter {
                 pixmap.stroke_path(&self.create_rounded_rect_path(rect, corner_radius), &border_paint, &stroke, Transform::identity(), None);
 
                 // 文字
-                self.draw_text(&mut pixmap, font, key, x_cursor + padding, padding + item_h * 0.75, font_size, Color::WHITE);
+                self.draw_text(&mut pixmap, font, key, x_cursor + padding, padding + item_h * 0.75, font_size, text_color);
                 
                 x_cursor += item_w + item_spacing;
             }
@@ -279,7 +281,11 @@ impl CandidatePainter {
         let mut total_width = 200.0;
         let mut total_height = 80.0;
 
-        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
+        let f_custom = self.get_font_by_family(&config.appearance.learning_font_family);
+        let f_zh_best = f_custom.as_ref().or(self.font_zh.as_ref());
+        let f_en_best = f_custom.as_ref().or(self.font_en.as_ref());
+
+        if let (Some(f_zh), Some(f_en)) = (f_zh_best, f_en_best) {
             let w_word = self.measure_text(f_zh, word, font_size_word);
             let w_hint = self.measure_text(f_en, hint, font_size_hint);
             total_width = (w_word.max(w_hint) + padding * 2.0).max(150.0);
@@ -296,11 +302,13 @@ impl CandidatePainter {
         let main_rect = Rect::from_xywh(0.0, 0.0, total_width - 10.0, total_height - 10.0).unwrap();
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        if let (Some(f_zh), Some(f_en)) = (&self.font_zh, &self.font_en) {
+        if let (Some(f_zh), Some(f_en)) = (f_zh_best, f_en_best) {
+            let color = self.parse_color(&config.appearance.learning_color);
+            let hint_color = self.parse_color(&config.appearance.learning_hint_color);
             // 汉字
-            self.draw_text(&mut pixmap, f_zh, word, padding, padding + font_size_word * 0.8, font_size_word, Color::WHITE);
+            self.draw_text(&mut pixmap, f_zh, word, padding, padding + font_size_word * 0.8, font_size_word, color);
             // 提示
-            self.draw_text(&mut pixmap, f_en, hint, padding, padding + font_size_word + font_size_hint * 1.0, font_size_hint, Color::from_rgba8(171, 178, 191, 255));
+            self.draw_text(&mut pixmap, f_en, hint, padding, padding + font_size_word + font_size_hint * 1.0, font_size_hint, hint_color);
         }
 
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)

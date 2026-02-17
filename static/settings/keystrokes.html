@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>按键回显设置 - rust-ime</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/static/index.html" class="back-link">← 返回主页</a>
+            <h1>按键回显设置</h1>
+        </header>
+
+        <div class="card">
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">启用按键回显</div>
+                    <div class="desc">在屏幕上实时显示你按下的按键。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label>
+            </div>
+        </div>
+
+        <h2>显示配置</h2>
+        <div class="card">
+            <div class="setting-item">
+                <div class="info"><div class="title">锚定位置</div></div>
+                <select id="keystroke_anchor">
+                    <option value="top_right">右上角</option>
+                    <option value="top_left">左上角</option>
+                    <option value="bottom_right">右下角</option>
+                    <option value="bottom_left">左下角</option>
+                    <option value="center">屏幕中央</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="keystroke_font_size"></div>
+                <div class="setting-item"><div class="info"><div class="title">消失延迟 (ms)</div></div><input type="number" id="keystroke_timeout_ms"></div>
+            </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">字体家族</div></div>
+                <select id="keystroke_font_family" class="font-select" style="width:250px;"></select>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item">
+                    <div class="info"><div class="title">背景颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="keystroke_bg_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="keystroke_bg_color_picker"></div>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">文字颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="keystroke_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="keystroke_color_picker"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item"><div class="info"><div class="title">水平边距 (X)</div></div><input type="number" id="keystroke_margin_x"></div>
+                <div class="setting-item"><div class="info"><div class="title">垂直边距 (Y)</div></div><input type="number" id="keystroke_margin_y"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <button class="btn" onclick="save()">保存更改</button>
+        <button class="btn btn-danger" onclick="resetConfig()">重置默认</button>
+    </div>
+
+    <div id="toast" class="status-toast">已保存并应用</div>
+
+    <script src="/static/js/settings.js"></script>
+    <script>
+        async function init() {
+            await loadConfig();
+            
+            bindInput('show_keystrokes', 'appearance');
+            bindInput('keystroke_anchor', 'appearance');
+            bindInput('keystroke_font_size', 'appearance');
+            bindInput('keystroke_timeout_ms', 'appearance');
+            bindInput('keystroke_bg_color', 'appearance');
+            bindInput('keystroke_color', 'appearance');
+            bindInput('keystroke_margin_x', 'appearance');
+            bindInput('keystroke_margin_y', 'appearance');
+            
+            document.getElementById('keystroke_font_family').setAttribute('data-value', config.appearance.keystroke_font_family);
+
+            linkColor('keystroke_bg_color', 'appearance');
+            linkColor('keystroke_color', 'appearance');
+
+            await loadFonts(['keystroke_font_family']);
+        }
+
+        async function save() {
+            config.appearance.keystroke_font_family = document.getElementById('keystroke_font_family').value;
+            await saveConfig();
+        }
+
+        init();
+    </script>
+</body>
+</html>

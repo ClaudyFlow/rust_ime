@@ -94,20 +94,6 @@
                 </div>
             </div>
         </div>
-
-        <h2>其他显示</h2>
-        <div class="card">
-            <div class="grid-2">
-                <div class="setting-item">
-                    <div class="info"><div class="title">按键回显</div><div class="desc">在屏幕角显示按下的键</div></div>
-                    <label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">学习模式</div><div class="desc">在屏幕角显示词条学习提示</div></div>
-                    <label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="sticky-footer">
@@ -129,8 +115,6 @@
             bindInput('window_bg_color', 'appearance');
             bindInput('window_border_color', 'appearance');
             bindInput('window_highlight_color', 'appearance');
-            bindInput('show_keystrokes', 'appearance');
-            bindInput('learning_mode', 'appearance');
 
             // 绑定 Pinyin 样式
             const p = config.appearance.pinyin_text;

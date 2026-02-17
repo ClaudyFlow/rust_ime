@@ -67,6 +67,8 @@ pub struct Appearance {
     pub keystroke_font_size: u32,
     pub keystroke_timeout_ms: u64,
     pub keystroke_bg_color: String,
+    pub keystroke_color: String,
+    pub keystroke_font_family: String,
     pub keystroke_margin_x: i32,
     pub keystroke_margin_y: i32,
     
@@ -78,6 +80,9 @@ pub struct Appearance {
     pub learning_margin_x: i32,
     pub learning_margin_y: i32,
     pub learning_bg_color: String,
+    pub learning_color: String,
+    pub learning_hint_color: String,
+    pub learning_font_family: String,
     pub learning_dict_path: String,
     
     pub preview_mode: String,
@@ -230,6 +235,8 @@ impl Config {
                 keystroke_font_size: 24,
                 keystroke_timeout_ms: 1500,
                 keystroke_bg_color: "rgba(0, 0, 0, 0.7)".to_string(),
+                keystroke_color: "#ffffff".to_string(),
+                keystroke_font_family: "Microsoft YaHei".to_string(),
                 keystroke_margin_x: 20,
                 keystroke_margin_y: 20,
                 
@@ -240,6 +247,9 @@ impl Config {
                 learning_margin_x: 20,
                 learning_margin_y: 40,
                 learning_bg_color: "rgba(20, 20, 20, 0.85)".to_string(),
+                learning_color: "#ffffff".to_string(),
+                learning_hint_color: "#abb2bf".to_string(),
+                learning_font_family: "Microsoft YaHei".to_string(),
                 learning_dict_path: "dicts/chinese/words/words.json".to_string(),
                 
                 preview_mode: "pinyin".to_string(),
