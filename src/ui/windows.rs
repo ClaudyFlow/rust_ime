@@ -134,7 +134,28 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     GuiEvent::MoveTo { x, y } => {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
-                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 20, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        
+                        let mut rect = RECT::default();
+                        let _ = GetWindowRect(hwnd, &mut rect);
+                        let w = rect.right - rect.left;
+                        let h = rect.bottom - rect.top;
+
+                        let screen_w = GetSystemMetrics(SM_CXSCREEN);
+                        let screen_h = GetSystemMetrics(SM_CYSCREEN);
+
+                        let mut final_x = x;
+                        let mut final_y = y + 20;
+
+                        if final_x + w > screen_w {
+                            final_x = screen_w - w;
+                        }
+                        if final_y + h > screen_h {
+                            final_y = y - h - 5; // 如果下方放不下，放到光标上方
+                        }
+                        if final_x < 0 { final_x = 0; }
+                        if final_y < 0 { final_y = 0; }
+
+                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     }
                     GuiEvent::Keystroke(key) => {
                         let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.show_keystrokes } else { false };
@@ -516,7 +537,28 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let cur_h = current_rect.bottom - current_rect.top;
     
     if final_w != cur_w || final_h != cur_h {
-        let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, final_w, final_h, SWP_NOMOVE | SWP_NOACTIVATE);
+        let mut final_x = current_rect.left;
+        let mut final_y = current_rect.top;
+
+        // 获取当前窗口所在的显示器信息 (考虑多显示器)
+        let h_monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut monitor_info = MONITORINFO::default();
+        monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        if GetMonitorInfoW(h_monitor, &mut monitor_info).as_bool() {
+            let rc_work = monitor_info.rcWork;
+            if final_x + final_w > rc_work.right {
+                final_x = rc_work.right - final_w;
+            }
+            if final_y + final_h > rc_work.bottom {
+                // 如果在 draw_content 里发现下方出界，通常已经在 MoveTo 修正过 y 偏移了，
+                // 这里的 final_y 通常已经是在光标上方。我们只需确保不超出工作区底部。
+                final_y = rc_work.bottom - final_h;
+            }
+            if final_x < rc_work.left { final_x = rc_work.left; }
+            if final_y < rc_work.top { final_y = rc_work.top; }
+        }
+
+        let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, final_w, final_h, SWP_NOACTIVATE);
     }
 }
 
