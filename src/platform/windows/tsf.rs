@@ -369,7 +369,12 @@ impl InputMethodHost for TsfHost {
                                     } else {
                                         let p = processor.lock().unwrap();
                                         let is_letter = key_code >= 0x41 && key_code <= 0x5A;
-                                        let would_handle = p.chinese_enabled && (!p.buffer.is_empty() || is_letter);
+                                        let is_punctuation = match key_code {
+                                            0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true,
+                                            0x30..=0x39 if shift => true, // 数字键加 Shift (如 !, @, # 等)
+                                            _ => false,
+                                        };
+                                        let would_handle = p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punctuation);
                                         if would_handle {
                                             response.push(2);
                                         } else {
