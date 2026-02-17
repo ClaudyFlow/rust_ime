@@ -97,14 +97,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             ks_class, PCWSTR(std::ptr::null()), WS_POPUP,
             0, 0, 800, 100, None, None, instance, None,
         );
-        SetLayeredWindowAttributes(hwnd_ks, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
+        let _ = SetLayeredWindowAttributes(hwnd_ks, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
 
         let hwnd_learn = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
             learn_class, PCWSTR(std::ptr::null()), WS_POPUP,
             0, 0, 400, 80, None, None, instance, None,
         );
-        SetLayeredWindowAttributes(hwnd_learn, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
+        let _ = SetLayeredWindowAttributes(hwnd_learn, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
 
         std::thread::spawn(move || {
             println!("[GUI Thread] Event receiver thread started.");
