@@ -19,6 +19,7 @@ pub enum TrayEvent {
     ToggleKeystroke,
     ToggleLearning,
     ToggleAntiTypo,
+    ToggleDoublePinyin,
     SwitchCommitMode,
     ReloadConfig,
     CyclePreview,
@@ -257,6 +258,7 @@ pub struct ImeTrayStub {
     pub show_keystrokes: bool,
     pub learning_mode: bool,
     pub anti_typo: bool,
+    pub double_pinyin: bool,
     pub commit_mode: String,
     pub preview_mode: String,
 }
@@ -288,6 +290,7 @@ pub fn start_tray(
     show_modern_candidates: bool,
     show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
     anti_typo: bool,
+    double_pinyin: bool,
     commit_mode: String,
     preview_mode: String,
     event_tx: Sender<TrayEvent>
@@ -295,6 +298,7 @@ pub fn start_tray(
     let state = Arc::new(Mutex::new(ImeTrayStub {
         chinese_enabled, active_profile, show_candidates, show_modern_candidates,
         show_notifications, show_keystrokes, learning_mode, anti_typo,
+        double_pinyin,
         commit_mode, preview_mode,
     }));
     
@@ -408,6 +412,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1007 => { let _ = tx.send(TrayEvent::ToggleKeystroke); }
                     1008 => { let _ = tx.send(TrayEvent::ToggleLearning); }
                     1009 => { let _ = tx.send(TrayEvent::ToggleAntiTypo); }
+                    1015 => { let _ = tx.send(TrayEvent::ToggleDoublePinyin); }
                     1010 => { let _ = tx.send(TrayEvent::SwitchCommitMode); }
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
@@ -447,6 +452,8 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_STRING, 1008, PCWSTR(HSTRING::from(&learn_label).as_ptr()));
             let anti_label = format!("防呆模式: {}", if state.anti_typo { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1009, PCWSTR(HSTRING::from(&anti_label).as_ptr()));
+            let dp_label = format!("小鹤双拼模式: {}", if state.double_pinyin { "开启" } else { "关闭" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1015, PCWSTR(HSTRING::from(&dp_label).as_ptr()));
             let commit_label = format!("上屏模式: {}", if state.commit_mode == "single" { "词模式" } else { "长句模式" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1010, PCWSTR(HSTRING::from(&commit_label).as_ptr()));
             
