@@ -74,7 +74,8 @@ $InstallBat | Out-File -FilePath "$ReleaseDir\install.bat" -Encoding ascii
 $UninstallBat | Out-File -FilePath "$ReleaseDir\uninstall.bat" -Encoding ascii
 
 # 6. Compress to ZIP
-$ZipFile = "$ReleaseDir.zip"
+if (!(Test-Path "release")) { New-Item -ItemType Directory "release" }
+$ZipFile = "release\$ReleaseDir.zip"
 if (Test-Path $ZipFile) { Remove-Item $ZipFile }
 Write-Host "Compressing..." -ForegroundColor Cyan
 Compress-Archive -Path "$ReleaseDir\*" -DestinationPath $ZipFile
