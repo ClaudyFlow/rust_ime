@@ -433,7 +433,7 @@ impl Processor {
                             self.page += self.page_size;
                             self.selected = self.page;
                         }
-                        return Action::Notify("导航模式".into(), "已开启 (HJKL) - 已跳至下页".into());
+                        return Action::Notify("导航模式".into(), "已开启 (H:左 J:下 K:上 L:右) - 已跳至下页".into());
                     } else {
                         return Action::Notify("导航模式".into(), "已退出".into());
                     }
