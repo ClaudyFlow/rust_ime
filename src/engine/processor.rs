@@ -427,7 +427,16 @@ impl Processor {
                     return if self.switch_mode { Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) } else { Action::Notify("快捷切换".into(), "已退出".into()) };
                 } else {
                     self.nav_mode = !self.nav_mode;
-                    return if self.nav_mode { Action::Notify("导航模式".into(), "已开启 (HJKL)".into()) } else { Action::Notify("导航模式".into(), "已退出".into()) };
+                    if self.nav_mode {
+                        // 进入导航模式时，自动跳到下一页
+                        if self.page + self.page_size < self.candidates.len() {
+                            self.page += self.page_size;
+                            self.selected = self.page;
+                        }
+                        return Action::Notify("导航模式".into(), "已开启 (HJKL) - 已跳至下页".into());
+                    } else {
+                        return Action::Notify("导航模式".into(), "已退出".into());
+                    }
                 }
             }
             return Action::Consume;
