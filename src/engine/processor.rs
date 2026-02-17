@@ -118,6 +118,7 @@ pub struct Processor {
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
     pub gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
+    pub user_dict_tx: Option<std::sync::mpsc::Sender<HashMap<String, Vec<(String, u32)>>>>,
 
     // 标点状态相关
     pub quote_open: bool,
@@ -234,6 +235,7 @@ impl Processor {
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
             gui_tx,
+            user_dict_tx: None,
             quote_open: false,
             single_quote_open: false,
         }
@@ -1010,16 +1012,31 @@ impl Processor {
         } else {
             println!("[Processor] No user dictionary found.");
         }
+
+        // 启动后台保存线程
+        if self.user_dict_tx.is_none() {
+            let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, Vec<(String, u32)>>>();
+            self.user_dict_tx = Some(tx);
+            std::thread::spawn(move || {
+                let path = std::path::PathBuf::from("data/user_dict.json");
+                while let Ok(dict_clone) = rx.recv() {
+                    // 简单的去重/节流：如果队列里还有更多，先清空，只存最后一次
+                    let mut latest = dict_clone;
+                    while let Ok(next) = rx.try_recv() {
+                        latest = next;
+                    }
+                    if let Ok(file) = std::fs::File::create(&path) {
+                        let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &latest);
+                    }
+                }
+            });
+        }
     }
 
     fn save_user_dict(&self) {
-        let path = std::path::PathBuf::from("data/user_dict.json");
-        let dict_clone = self.user_dict.clone();
-        std::thread::spawn(move || {
-            if let Ok(file) = std::fs::File::create(path) {
-                let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &dict_clone);
-            }
-        });
+        if let Some(ref tx) = self.user_dict_tx {
+            let _ = tx.send(self.user_dict.clone());
+        }
     }
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
@@ -1092,6 +1109,7 @@ mod tests {
                         nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
                         gui_tx: None,
+                        user_dict_tx: None,
             
                         profile_keys: Vec::new(),
              auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
