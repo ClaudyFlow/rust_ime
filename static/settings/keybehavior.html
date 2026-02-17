@@ -46,6 +46,10 @@
                 <div class="info"><div class="title">数字键选词</div><div class="desc">关闭后数字键将作为普通字符输入</div></div>
                 <label class="switch"><input type="checkbox" id="enable_number_selection"><span class="slider"></span></label>
             </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">智能退格 (Smart Deletion)</div><div class="desc">退格时优先删除韵母，保留声母</div></div>
+                <label class="switch"><input type="checkbox" id="enable_smart_backspace"><span class="slider"></span></label>
+            </div>
         </div>
 
         <h2>特殊行为 (Long Press & Double Tap)</h2>
@@ -115,6 +119,7 @@
             bindInput('enable_user_dict', 'input');
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');
+            bindInput('enable_smart_backspace', 'input');
             bindInput('enable_double_tap', 'input');
             bindInput('double_tap_timeout_ms', 'input');
             bindInput('enable_long_press', 'input');

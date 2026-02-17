@@ -112,6 +112,7 @@ pub struct Processor {
     // 用户个人词库相关
     pub enable_user_dict: bool,
     pub enable_fixed_first_candidate: bool,
+    pub enable_smart_backspace: bool,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -233,6 +234,7 @@ impl Processor {
             nav_mode: false,
             enable_user_dict: true,
             enable_fixed_first_candidate: false,
+            enable_smart_backspace: true,
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -247,6 +249,7 @@ impl Processor {
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
         self.enable_user_dict = conf.input.enable_user_dict;
         self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
+        self.enable_smart_backspace = conf.input.enable_smart_backspace;
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -661,20 +664,25 @@ impl Processor {
                     return Action::PassThrough;
                 }
 
-                // 智能删除逻辑：以音节为单位，先删韵母，再删声母
-                let segments = self.segment_buffer(&self.buffer);
-                if let Some(last) = segments.last() {
-                    let init_len = self.get_initial_len(last);
-                    let remove_count = if last.len() > init_len && init_len > 0 {
-                        last.len() - init_len
+                if self.enable_smart_backspace {
+                    // 智能删除逻辑：以音节为单位，先删韵母，再删声母
+                    let segments = self.segment_buffer(&self.buffer);
+                    if let Some(last) = segments.last() {
+                        let init_len = self.get_initial_len(last);
+                        let remove_count = if last.len() > init_len && init_len > 0 {
+                            last.len() - init_len
+                        } else {
+                            last.chars().count()
+                        };
+                        
+                        for _ in 0..remove_count {
+                            self.buffer.pop();
+                        }
                     } else {
-                        last.chars().count()
-                    };
-                    
-                    for _ in 0..remove_count {
                         self.buffer.pop();
                     }
                 } else {
+                    // 传统逐字符删除
                     self.buffer.pop();
                 }
 
@@ -1222,7 +1230,9 @@ mod tests {
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
                         enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
-                        nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
+                        nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, 
+                        enable_smart_backspace: true,
+                        user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
                         gui_tx: None,
                         user_dict_tx: None,
