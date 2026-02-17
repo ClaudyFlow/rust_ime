@@ -48,9 +48,15 @@ fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
     if !target_file.exists() { return true; } 
     let target_mtime = target_file.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
     
-    // 检查目录本身的修改时间 (删除或新增文件会改变目录 mtime)
-    let src_dir_mtime = src_dir.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
-    if src_dir_mtime > target_mtime { return true; }
+    // 检查目录本身的修改时间 (只有当目录比目标文件新时才考虑进一步检查)
+    if let Ok(m) = src_dir.metadata().and_then(|m| m.modified()) {
+        if m > target_mtime {
+            // 目录变了不一定代表内容变了，继续深挖
+        } else {
+            // 目录都没变，肯定没加减文件
+            return false;
+        }
+    }
 
     let mut max_src_mtime = SystemTime::UNIX_EPOCH;
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
@@ -63,7 +69,13 @@ fn should_compile(src_dir: &Path, target_file: &Path) -> bool {
             }
         }
     }
-    max_src_mtime > target_mtime
+    
+    // 只有源文件明确比编译产物新时（允许 1 秒以内的误差，解决某些打包工具的时间戳舍入问题）
+    if let Ok(duration) = max_src_mtime.duration_since(target_mtime) {
+        duration.as_secs() >= 1
+    } else {
+        false // 源文件比产物旧或时间一致
+    }
 }
 
 fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Result<(), Box<dyn std::error::Error>> {
