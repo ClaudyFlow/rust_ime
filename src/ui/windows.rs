@@ -149,15 +149,26 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let screen_w = GetSystemMetrics(SM_CXSCREEN);
                         let screen_h = GetSystemMetrics(SM_CYSCREEN);
 
+                        let anchor = if let Some(ref arc) = CURRENT_CONFIG { 
+                            arc.read().unwrap().appearance.candidate_anchor.clone() 
+                        } else { 
+                            "bottom".to_string() 
+                        };
+
                         let mut final_x = x;
-                        let mut final_y = y + 20;
+                        let mut final_y = if anchor == "top" { y - h - 5 } else { y + 20 };
 
                         if final_x + w > screen_w {
                             final_x = screen_w - w;
                         }
-                        if final_y + h > screen_h {
-                            final_y = y - h - 5; // 如果下方放不下，放到光标上方
+                        
+                        // 智能翻转逻辑
+                        if anchor == "top" {
+                            if final_y < 0 { final_y = y + 20; } // 上方放不下，翻转到下方
+                        } else {
+                            if final_y + h > screen_h { final_y = y - h - 5; } // 下方放不下，翻转到上方
                         }
+
                         if final_x < 0 { final_x = 0; }
                         if final_y < 0 { final_y = 0; }
 
@@ -429,13 +440,34 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let pad_x = conf.appearance.window_padding_x;
     let pad_y = conf.appearance.window_padding_y;
     let row_space = conf.appearance.row_spacing as i32;
+    let item_space = conf.appearance.item_spacing as i32;
+    let radius = conf.appearance.corner_radius as i32;
 
-    // 尝试加载本地粗体字，如果名字匹配不上，系统会自动回退到类似字体的 Bold 版本
+    let bg_color = parse_color_win(&conf.appearance.window_bg_color);
+    let border_color = parse_color_win(&conf.appearance.window_border_color);
+    let highlight_color = parse_color_win(&conf.appearance.window_highlight_color);
+
+    // 绘制背景和圆角边框
+    let mut rect = RECT::default();
+    let _ = GetClientRect(hwnd, &mut rect);
+    
+    let bg_brush = CreateSolidBrush(bg_color);
+    let border_pen = CreatePen(PS_SOLID, 1, border_color);
+    let old_brush = SelectObject(hdc, bg_brush);
+    let old_pen = SelectObject(hdc, border_pen);
+    
+    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius * 2, radius * 2);
+    
+    SelectObject(hdc, old_brush);
+    SelectObject(hdc, old_pen);
+    let _ = DeleteObject(bg_brush);
+    let _ = DeleteObject(border_pen);
+
+    // 字体准备
     let py_font_name = HSTRING::from(&conf.appearance.pinyin_text.font_family);
     let h_font_py = CreateFontW(
         -(conf.appearance.pinyin_text.font_size as i32 * 96 / 72),
-        0, 0, 0, 700, // 700 = Bold
-        0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
         OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
         CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
         PCWSTR(py_font_name.as_ptr())
@@ -444,8 +476,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let cand_font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
     let h_font_cand = CreateFontW(
         -(conf.appearance.candidate_text.font_size as i32 * 96 / 72),
-        0, 0, 0, 700, // 700 = Bold
-        0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
         OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
         CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
         PCWSTR(cand_font_name.as_ptr())
@@ -460,23 +491,21 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         PCWSTR(hint_font_name.as_ptr())
     );
 
-    // --- 开始绘制拼音行 ---
+    // --- 绘制拼音行 ---
     SelectObject(hdc, h_font_py);
-    let py_color = parse_color_win(&conf.appearance.pinyin_text.color);
-    SetTextColor(hdc, py_color);
+    SetTextColor(hdc, parse_color_win(&conf.appearance.pinyin_text.color));
     let py_u16: Vec<u16> = state.pinyin.encode_utf16().collect();
     TextOutW(hdc, pad_x, pad_y, &py_u16);
 
     let mut py_size = SIZE::default();
     GetTextExtentPoint32W(hdc, &py_u16, &mut py_size);
 
-    // --- 开始绘制候选词行 ---
+    // --- 绘制候选词行 ---
     let cand_y = pad_y + py_size.cy + row_space;
     let mut x_cursor = pad_x;
     
     let cand_color = parse_color_win(&conf.appearance.candidate_text.color);
     let hint_color = parse_color_win(&conf.appearance.hint_text.color);
-    let highlight_color = parse_color_win(&conf.appearance.window_highlight_color);
     
     let page_size = conf.appearance.page_size;
     let start = (state.selected / page_size) * page_size;
@@ -487,59 +516,80 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     for i in start..end {
         let is_selected = i == state.selected;
         
-        // A. 绘制序号
+        // 计算当前项的总宽度（序号+词语+提示）
         SelectObject(hdc, h_font_cand);
         let idx_text = format!("{}.", i - start + 1);
         let idx_u16: Vec<u16> = idx_text.encode_utf16().collect();
         let mut idx_size = SIZE::default();
         GetTextExtentPoint32W(hdc, &idx_u16, &mut idx_size);
+
+        let cand_text = &state.candidates[i];
+        let cand_u16: Vec<u16> = cand_text.encode_utf16().collect();
+        let mut text_size = SIZE::default();
+        GetTextExtentPoint32W(hdc, &cand_u16, &mut text_size);
+
+        let mut hint_w = 0;
+        let mut h_size = SIZE::default();
+        if let Some(hint) = state.hints.get(i) {
+            if !hint.is_empty() {
+                SelectObject(hdc, h_font_hint);
+                let hint_u16: Vec<u16> = hint.encode_utf16().collect();
+                GetTextExtentPoint32W(hdc, &hint_u16, &mut h_size);
+                hint_w = h_size.cx + 8;
+            }
+        }
+
+        let item_total_w = idx_size.cx + 4 + text_size.cx + hint_w;
         
+        if is_selected {
+            // 使用配置的高亮背景色，并带微小圆角
+            let h_brush = CreateSolidBrush(COLORREF(0xE0E0E0)); // 这里可改为支持 alpha 的高亮色逻辑
+            let r = RECT { 
+                left: x_cursor - 6, 
+                top: cand_y - 2, 
+                right: x_cursor + item_total_w + 6, 
+                bottom: cand_y + text_size.cy + 2 
+            };
+            let h_pen = CreatePen(PS_NULL, 0, COLORREF(0));
+            let old_b = SelectObject(hdc, h_brush);
+            let old_p = SelectObject(hdc, h_pen);
+            RoundRect(hdc, r.left, r.top, r.right, r.bottom, 8, 8);
+            SelectObject(hdc, old_b);
+            SelectObject(hdc, old_p);
+            let _ = DeleteObject(h_brush);
+            let _ = DeleteObject(h_pen);
+        }
+        
+        // A. 绘制序号
+        SelectObject(hdc, h_font_cand);
         SetTextColor(hdc, if is_selected { highlight_color } else { cand_color });
         TextOutW(hdc, x_cursor, cand_y, &idx_u16);
         x_cursor += idx_size.cx + 4;
 
         // B. 绘制词语
-        let cand_text = &state.candidates[i];
-        let cand_u16: Vec<u16> = cand_text.encode_utf16().collect();
-        let mut text_size = SIZE::default();
-        GetTextExtentPoint32W(hdc, &cand_u16, &mut text_size);
-        
-        if is_selected {
-            // 选中项背景色
-            let h_brush = CreateSolidBrush(COLORREF(0xF0F0F0)); // 浅灰色高亮
-            let r = RECT { left: x_cursor - 2, top: cand_y, right: x_cursor + text_size.cx + 2, bottom: cand_y + text_size.cy };
-            let _ = FillRect(hdc, &r, h_brush);
-            let _ = DeleteObject(h_brush);
-        }
-        
         TextOutW(hdc, x_cursor, cand_y, &cand_u16);
         x_cursor += text_size.cx;
 
-        // C. 绘制提示 (辅助码)
-        if let Some(hint) = state.hints.get(i) {
-            if !hint.is_empty() {
-                SelectObject(hdc, h_font_hint);
-                let hint_u16: Vec<u16> = hint.encode_utf16().collect();
-                let mut hint_size = SIZE::default();
-                GetTextExtentPoint32W(hdc, &hint_u16, &mut hint_size);
-                
-                SetTextColor(hdc, if is_selected { highlight_color } else { hint_color });
-                TextOutW(hdc, x_cursor + 4, cand_y + (text_size.cy - hint_size.cy), &hint_u16);
-                x_cursor += hint_size.cx + 8;
-            }
+        // C. 绘制提示
+        if hint_w > 0 {
+            SelectObject(hdc, h_font_hint);
+            SetTextColor(hdc, if is_selected { highlight_color } else { hint_color });
+            let hint_u16: Vec<u16> = state.hints[i].encode_utf16().collect();
+            TextOutW(hdc, x_cursor + 4, cand_y + (text_size.cy - h_size.cy), &hint_u16);
+            x_cursor += hint_w;
         }
         
-        x_cursor += conf.appearance.item_spacing as i32;
+        x_cursor += item_space;
         max_row_height = max_row_height.max(text_size.cy);
     }
 
-    // 清理
+    // 清理字体
     let _ = DeleteObject(h_font_py);
     let _ = DeleteObject(h_font_cand);
     let _ = DeleteObject(h_font_hint);
     
-    // 动态调整窗口尺寸
-    let final_w = (x_cursor + pad_x).max(300);
+    // 动态调整窗口尺寸和位置
+    let final_w = (x_cursor + pad_x - item_space).max(200);
     let final_h = cand_y + max_row_height + pad_y;
     
     let mut current_rect = RECT::default();
@@ -551,24 +601,16 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         let mut final_x = current_rect.left;
         let mut final_y = current_rect.top;
 
-        // 获取当前窗口所在的显示器信息 (考虑多显示器)
         let h_monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         let mut monitor_info = MONITORINFO::default();
         monitor_info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
         if GetMonitorInfoW(h_monitor, &mut monitor_info).as_bool() {
             let rc_work = monitor_info.rcWork;
-            if final_x + final_w > rc_work.right {
-                final_x = rc_work.right - final_w;
-            }
-            if final_y + final_h > rc_work.bottom {
-                // 如果在 draw_content 里发现下方出界，通常已经在 MoveTo 修正过 y 偏移了，
-                // 这里的 final_y 通常已经是在光标上方。我们只需确保不超出工作区底部。
-                final_y = rc_work.bottom - final_h;
-            }
+            if final_x + final_w > rc_work.right { final_x = rc_work.right - final_w; }
+            if final_y + final_h > rc_work.bottom { final_y = rc_work.bottom - final_h; }
             if final_x < rc_work.left { final_x = rc_work.left; }
             if final_y < rc_work.top { final_y = rc_work.top; }
         }
-
         let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, final_w, final_h, SWP_NOACTIVATE);
     }
 }
