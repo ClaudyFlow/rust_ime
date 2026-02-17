@@ -87,11 +87,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         CURRENT_CONFIG = Some(Arc::new(RwLock::new(initial_config)));
 
         let hwnd = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED,
-            window_class, PCWSTR(std::ptr::null()), WS_POPUP,
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            window_class, PCWSTR(std::ptr::null()), WS_POPUP | WS_BORDER,
             100, 100, 400, 120, None, None, instance, None,
         );
-        SetLayeredWindowAttributes(hwnd, COLORREF(0xFFFFFF), 255, LWA_COLORKEY);
 
         let hwnd_ks = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
@@ -135,7 +134,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     GuiEvent::MoveTo { x, y } => {
                         let state_ptr = std::ptr::addr_of_mut!(WINDOW_STATE);
                         if let Some(ref mut state) = *state_ptr { state.x = x; state.y = y; }
-                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 25, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        let _ = SetWindowPos(hwnd, HWND_TOPMOST, x, y + 20, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
                     }
                     GuiEvent::Keystroke(key) => {
                         let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.show_keystrokes } else { false };
