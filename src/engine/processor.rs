@@ -952,13 +952,17 @@ impl Processor {
     }
 
     fn load_user_dict(&mut self) {
+        println!("[Processor] Loading user dictionary...");
         let path = std::path::Path::new("data/user_dict.json");
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
                     self.user_dict = dict;
+                    println!("[Processor] User dictionary loaded ({} entries).", self.user_dict.len());
                 }
             }
+        } else {
+            println!("[Processor] No user dictionary found.");
         }
     }
 

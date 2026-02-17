@@ -18,6 +18,7 @@ pub struct Trie {
 
 impl Trie {
     pub fn load<P: AsRef<Path>>(index_path: P, data_path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        println!("[Trie] Loading index: {:?}, data: {:?}", index_path.as_ref(), data_path.as_ref());
         let index_file = File::open(&index_path)?;
         let data_file = File::open(&data_path)?;
         let index_data = MmapData(Arc::new(unsafe { Mmap::map(&index_file)? }));

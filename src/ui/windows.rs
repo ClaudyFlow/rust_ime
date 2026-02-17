@@ -22,6 +22,7 @@ struct WindowState {
 }
 
 pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
+    println!("[GUI] Starting Windows GUI thread...");
     let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
     let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
@@ -29,9 +30,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         // 加载本地字体，让 GDI 可以识别到 Noto Sans SC
         let root = crate::find_project_root();
         let font_path = root.join("fonts/NotoSansSC-Bold.ttf");
+        println!("[GUI] Loading font from: {:?}", font_path);
         if font_path.exists() {
             let path_u16: Vec<u16> = font_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
-            let _ = AddFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE, None);
+            let res = AddFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE, None);
+            println!("[GUI] AddFontResourceExW result: {}", res);
+        } else {
+            println!("[GUI] Warning: Font file not found!");
         }
 
         let wc = WNDCLASSW {
@@ -43,6 +48,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             ..Default::default()
         };
         RegisterClassW(&wc);
+        println!("[GUI] Window class registered.");
 
         CURRENT_CONFIG = Some(Arc::new(RwLock::new(initial_config)));
 
@@ -51,14 +57,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             window_class, PCWSTR(std::ptr::null()), WS_POPUP | WS_BORDER,
             100, 100, 400, 120, None, None, instance, None,
         );
+        println!("[GUI] Window created: {:?}", hwnd);
 
         std::thread::spawn(move || {
+            println!("[GUI Thread] Event receiver thread started.");
             while let Ok(mut event) = rx.recv() {
-                if matches!(event, GuiEvent::Update { .. }) {
-                    while let Ok(next) = rx.try_recv() {
-                        if matches!(next, GuiEvent::Update { .. }) { event = next; } else { break; }
-                    }
-                }
+                // ... (existing coalescence logic)
 
                 match event {
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {

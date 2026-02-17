@@ -3,70 +3,70 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-echo "=== Rust-IME 自动安装脚本 ==="
+echo "=== Rust-IME Auto Installer ==="
 
 # 0. Check Rust environment
 if ! command -v cargo &> /dev/null;
 then
-    echo "❌ 错误: 未检测到 Rust/Cargo 环境"
-    echo "请先安装 Rust: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    echo "❌ Error: Rust/Cargo environment not found"
+    echo "Please install Rust first: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
     exit 1
 fi
 
 # 1. Install Dependencies
-echo -e "\n[1/4] 安装系统依赖..."
+echo -e "\n[1/4] Installing system dependencies..."
 if [ -f /etc/debian_version ]; then
     # Detect Debian/Ubuntu/Pop!_OS
-    echo "检测到 Debian 系系统，正在使用 apt 安装依赖..."
+    echo "Debian-based system detected, installing via apt..."
     sudo apt-get update
     sudo apt-get install -y libxcb-composite0-dev libx11-dev libdbus-1-dev build-essential pkg-config clang gtk4-layer-shell
 elif [ -f /etc/arch-release ]; then
     # Detect Arch Linux/Manjaro
-    echo "检测到 Arch 系系统，正在使用 pacman 安装依赖..."
+    echo "Arch-based system detected, installing via pacman..."
     sudo pacman -S --noconfirm --needed base-devel pkgconf clang gtk4-layer-shell libxcb libx11 dbus
 else
-    echo "⚠️  未检测到已知包管理器 (apt/pacman)"
-    echo "请确保已手动安装以下开发库："
+    echo "⚠️  Unknown package manager (not apt or pacman)"
+    echo "Please ensure the following development libraries are installed:"
     echo "  - xcb, x11, dbus development files"
     echo "  - pkg-config, clang"
     echo "  - gtk4-layer-shell"
-    read -p "按回车键继续..."
+    read -p "Press Enter to continue..."
 fi
 
 # 2. Configure Permissions
-echo -e "\n[2/4] 配置用户权限..."
+echo -e "\n[2/4] Configuring user permissions..."
 CURRENT_USER=$(whoami)
 
 # Add to input group
 if groups | grep -q "\binput\b"; then
-    echo "✅ 用户 '$CURRENT_USER' 已经在 input 组中"
+    echo "✅ User '$CURRENT_USER' is already in the 'input' group"
 else
-    echo "正在将用户 '$CURRENT_USER' 加入 input 组..."
+    echo "Adding user '$CURRENT_USER' to 'input' group..."
     sudo usermod -aG input "$CURRENT_USER"
-    echo "✅ 已添加 (需要注销后生效)"
+    echo "✅ Added (Logout/login required to take effect)"
 fi
 
 # Udev rules for uinput
-echo "正在配置 uinput 设备规则..."
+echo "Configuring uinput device rules..."
 if [ ! -f /etc/udev/rules.d/99-rust-ime-uinput.rules ]; then
     echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/99-rust-ime-uinput.rules > /dev/null
-    echo "✅ 规则文件已创建"
+    echo "✅ Rule file created"
     sudo udevadm control --reload-rules
     sudo udevadm trigger
 else
-    echo "✅ 规则文件已存在"
+    echo "✅ Rule file already exists"
 fi
 
 # 3. Build Project / Prepare Binary
-echo -e "\n[3/4] 准备程序文件..."
+echo -e "\n[3/4] Preparing program files..."
 if [ -f "./rust-ime" ]; then
-    echo "✅ 检测到预编译二进制文件，跳过编译步骤。"
+    echo "✅ Precompiled binary detected, skipping build step."
     chmod +x ./rust-ime
 else
-    echo "未检测到预编译文件，尝试从源码编译..."
+    echo "Precompiled binary not found, attempting to build from source..."
     if ! command -v cargo &> /dev/null; then
-        echo "❌ 错误: 未检测到 Rust 环境，且当前目录没有预编译的二进制文件。"
-        echo "请先安装 Rust 或使用发布的二进制安装包。"
+        echo "❌ Error: Rust environment not found and no precompiled binary available."
+        echo "Please install Rust or use a release package."
         exit 1
     fi
     cargo build --release
@@ -74,52 +74,52 @@ else
 fi
 
 # 3.5 Compile Dictionaries
-echo -e "\n[3.5/4] 准备词库..."
+echo -e "\n[3.5/4] Preparing dictionaries..."
 if [ -d "./data" ] && [ "$(ls -A ./data 2>/dev/null)" ]; then
-    echo "✅ 检测到已有词库数据。"
+    echo "✅ Dictionaries already exist."
 else
-    echo "正在编译原始词库 (需要几秒钟)..."
+    echo "Compiling raw dictionaries (this may take a few seconds)..."
     if command -v cargo &> /dev/null; then
         cargo run --release --bin compile_dict
     else
-        # 如果是二进制包，我们需要确保包里已经带了编译好的 data，或者通过二进制运行编译
-        ./rust-ime --compile-dict || echo "⚠️ 警告: 无法自动编译词库，请确保 data 目录完整。"
+        # If it's a binary package, we should ensure it has compiled data or run compilation via binary
+        ./rust-ime --compile-dict || echo "⚠️ Warning: Failed to automatically compile dictionaries. Ensure 'data' directory is complete."
     fi
 fi
 
 # 4. Install
-echo -e "\n[4/4] 执行安装..."
-# 获取当前绝对路径
+echo -e "\n[4/4] Executing installation..."
+# Get absolute path
 INSTALL_PATH=$(pwd)
 
-# 4.1 安装二进制文件
+# 4.1 Install binary
 sudo cp -f "$INSTALL_PATH/rust-ime" /usr/local/bin/rust-ime
 sudo chmod +x /usr/local/bin/rust-ime
-echo "✅ 已安装二进制文件到: /usr/local/bin/rust-ime"
+echo "✅ Installed binary to: /usr/local/bin/rust-ime"
 
-# 4.2 安装图标
+# 4.2 Install icon
 ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 sudo mkdir -p "$ICON_DIR"
 if [ -f "$INSTALL_PATH/picture/rust-ime.png" ]; then
     sudo cp -f "$INSTALL_PATH/picture/rust-ime.png" "$ICON_DIR/rust-ime.png"
-    echo "✅ 已安装图标到: $ICON_DIR/rust-ime.png"
+    echo "✅ Installed icon to: $ICON_DIR/rust-ime.png"
 fi
 
-# 4.3 安装桌面入口文件
+# 4.3 Install desktop entry
 APP_DIR="/usr/share/applications"
 if [ -f "$INSTALL_PATH/rust-ime.desktop" ]; then
     sudo cp -f "$INSTALL_PATH/rust-ime.desktop" "$APP_DIR/rust-ime.desktop"
     sudo update-desktop-database "$APP_DIR" || true
-    echo "✅ 已安装桌面快捷方式，现在你可以在应用菜单找到 Rust-IME"
+    echo "✅ Installed desktop shortcut. You can now find Rust-IME in your application menu."
 fi
 
-# 4.4 开启默认配置中的自启 (如果是第一次安装)
-# 修正: 使用已经安装到系统的路径执行
+# 4.4 Trigger first-time installation tasks
+# Use the installed path
 /usr/local/bin/rust-ime --install || true
 
 echo -e "\n=========================================="
-echo "🎉 安装完成！"
-echo "你可以直接在终端输入 'rust-ime' 启动"
-echo "⚠️  注意: 如果是第一次运行脚本并被添加到了 input 组，"
-echo "    你必须【注销并重新登录】(或重启电脑) 才能正常使用！"
+echo "🎉 Installation Complete!"
+echo "You can start it by typing 'rust-ime' in the terminal."
+echo "⚠️  Note: If this is your first time running this script and you were added to the 'input' group,"
+echo "    you MUST 【logout and log back in】 (or restart) for it to work properly!"
 echo "=========================================="

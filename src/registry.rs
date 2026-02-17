@@ -15,6 +15,15 @@ pub fn to_pcwstr(s: &str) -> Vec<u16> {
     v
 }
 
+// 辅助函数：格式化 GUID 为注册表需要的 {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} 格式
+pub fn format_guid(guid: &GUID) -> String {
+    format!("{{{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}}}",
+        guid.data1, guid.data2, guid.data3,
+        guid.data4[0], guid.data4[1], guid.data4[2], guid.data4[3],
+        guid.data4[4], guid.data4[5], guid.data4[6], guid.data4[7]
+    ).to_uppercase()
+}
+
 pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description: &str, dll_path_override: Option<&str>) -> Result<()> {
     // 1. 获取 DLL 路径
     let dll_path = if let Some(path) = dll_path_override {
@@ -27,7 +36,7 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
         }
         String::from_utf16_lossy(&path[..len as usize])
     };
-    let clsid_str = format!("{{{:?}}}", clsid);
+    let clsid_str = format_guid(clsid);
     
     // 2. 注册 COM CLSID
     // HKCR\CLSID\{GUID}
@@ -58,6 +67,9 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
         0
     )?;
 
+    // 启用语言配置文件
+    profiles.EnableLanguageProfile(clsid, 0x0804, &crate::LANG_PROFILE_ID, true)?;
+
     // 4. (可选) 注册到 Category 
     let category_mgr: ITfCategoryMgr = CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)?;
     category_mgr.RegisterCategory(clsid, &GUID_TFCAT_TIP_KEYBOARD, clsid)?;
@@ -69,7 +81,7 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
 }
 
 pub unsafe fn unregister_server(clsid: &GUID) -> Result<()> {
-    let clsid_str = format!("{{{:?}}}", clsid);
+    let clsid_str = format_guid(clsid);
     
     // 1. 注销 TSF 配置文件
     if let Ok(profiles) = CoCreateInstance::<_, ITfInputProcessorProfiles>(&CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER) {

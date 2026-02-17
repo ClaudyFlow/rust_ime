@@ -144,10 +144,11 @@ impl InputMethodHost for TsfHost {
                 bInheritHandle: false.into(),
             };
 
-            println!("[TSF Server] 正在启动命名管道: \\\\.\\pipe\\rust_ime_pipe");
+            println!("[TSF Server] Starting naming pipe: \\\\.\\pipe\\rust_ime_pipe");
 
             loop {
                 unsafe {
+                    println!("[TSF Server] Creating named pipe instance...");
                     let h_pipe = CreateNamedPipeW(
                         pipe_pcwstr,
                         PIPE_ACCESS_DUPLEX,
@@ -165,17 +166,21 @@ impl InputMethodHost for TsfHost {
                         continue;
                     }
 
+                    println!("[TSF Server] Waiting for client connection...");
                     if ConnectNamedPipe(h_pipe, None).is_ok() {
+                        println!("[TSF Server] Client connected!");
                         let processor = self.processor.clone();
                         let gui_tx = self.gui_tx.clone();
                         let notify_tx = self.notify_tx.clone();
                         
                         std::thread::spawn(move || {
+                            println!("[TSF Pipe Thread] Thread started for connection.");
                             let handle = h_pipe;
                             let mut buffer = [0u8; 1024];
                             loop {
                                 let mut bytes_read = 0;
                                 if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 {
+                                    println!("[TSF Pipe Thread] Connection closed or error reading.");
                                     break;
                                 }
                                 

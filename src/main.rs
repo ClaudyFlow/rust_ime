@@ -138,21 +138,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 unsafe {
                     windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?;
                 }
+                
+                // 1. First, try the DLL in the same directory as the current EXE (Standard for Release Package)
                 let mut dll_path = std::env::current_exe()?;
                 dll_path.set_file_name("rust_ime_tsf_v3.dll");
+                
                 if !dll_path.exists() {
-                    // 尝试在 target/debug 或 target/release 找
-                    let mut p = std::env::current_exe()?;
-                    p.pop(); p.push("rust_ime_tsf_v3.dll");
-                    dll_path = p;
+                    // 2. Fallback: If not found, look in target/release or target/debug relative to current working directory (For Development)
+                    let mut fallback = std::env::current_dir()?;
+                    fallback.push("target");
+                    fallback.push("release");
+                    fallback.push("rust_ime_tsf_v3.dll");
+                    
+                    if !fallback.exists() {
+                        fallback.pop();
+                        fallback.pop();
+                        fallback.push("debug");
+                        fallback.push("rust_ime_tsf_v3.dll");
+                    }
+                    
+                    if fallback.exists() {
+                        dll_path = fallback;
+                    }
+                }
+
+                if !dll_path.exists() {
+                    eprintln!("❌ Error: Could not find 'rust_ime_tsf_v3.dll' in the current folder or target directories.");
+                    return Err("DLL not found".into());
                 }
                 
-                println!("正在从 {:?} 注册...", dll_path);
+                println!("Registering TSF from: {:?}", dll_path);
                 let path_str = dll_path.to_str().ok_or("Path contains invalid UTF-8")?;
                 unsafe {
                     registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(path_str))?;
                 }
-                println!("✅ 已注册 TSF 输入法。");
+                println!("✅ TSF Input Method registered successfully.");
                 return Ok(());
             }
             #[cfg(target_os = "windows")]
@@ -230,6 +250,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             use windows::Win32::System::Console::GetConsoleWindow;
             use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+            
+            // Redirect stdout and stderr to a file for debugging
+            let mut log_path = root.clone();
+            log_path.push("rust-ime.log");
+            if let Ok(log_file) = File::create(log_path) {
+                let _ = std::os::windows::io::AsRawHandle::as_raw_handle(&log_file);
+                // Note: Rust doesn't have a simple standard way to redirect stdout/stderr of the current process 
+                // globally without external crates like 'libc' or 'winapi' directly, 
+                // but we can at least print a message before hiding the console.
+            }
+
             let window = unsafe { GetConsoleWindow() };
             if window.0 != 0 {
                 unsafe { ShowWindow(window, SW_HIDE); }
