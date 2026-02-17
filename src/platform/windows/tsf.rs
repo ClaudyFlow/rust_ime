@@ -282,6 +282,22 @@ impl InputMethodHost for TsfHost {
                                     continue;
                                 }
 
+                                // 处理 Ctrl / Alt 组合键直通 (确保 Ctrl+C, Ctrl+V 等正常工作)
+                                if ctrl || alt {
+                                    if msg_type == 1 {
+                                        let mut p = processor.lock().unwrap();
+                                        if !p.buffer.is_empty() {
+                                            p.reset();
+                                            drop(p);
+                                            update_gui_impl(&gui_tx, &processor);
+                                        }
+                                    }
+                                    let response = vec![0u8]; // PassThrough
+                                    let mut bytes_written = 0;
+                                    let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+                                    continue;
+                                }
+
                                 let key = match key_code {
                                     0x41..=0x5A => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x41) as u8)),
                                     0x30..=0x39 => Some(std::mem::transmute::<u8, crate::engine::keys::VirtualKey>((key_code - 0x30 + 26) as u8)),
