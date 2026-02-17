@@ -155,22 +155,18 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let timeout = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(timeout));
-                            unsafe {
-                                let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
-                                if let Some(ref state) = *ks_ptr {
-                                    if state.last_update.elapsed().as_millis() >= timeout as u128 {
-                                        ShowWindow(hwnd_ks, SW_HIDE);
-                                    }
+                            let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
+                            if let Some(ref state) = *ks_ptr {
+                                if state.last_update.elapsed().as_millis() >= timeout as u128 {
+                                    ShowWindow(hwnd_ks, SW_HIDE);
                                 }
                             }
                         });
                     }
                     GuiEvent::ClearKeystrokes => {
-                        unsafe {
-                            let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
-                            *ks_ptr = None;
-                            ShowWindow(hwnd_ks, SW_HIDE);
-                        }
+                        let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
+                        *ks_ptr = None;
+                        ShowWindow(hwnd_ks, SW_HIDE);
                     }
                     GuiEvent::ShowLearning(word, hint) => {
                         let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.learning_mode } else { false };
@@ -183,12 +179,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_secs(3));
-                            unsafe {
-                                let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
-                                if let Some(ref state) = *ln_ptr {
-                                    if state.last_update.elapsed().as_secs() >= 3 {
-                                        ShowWindow(hwnd_learn, SW_HIDE);
-                                    }
+                            let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
+                            if let Some(ref state) = *ln_ptr {
+                                if state.last_update.elapsed().as_secs() >= 3 {
+                                    ShowWindow(hwnd_learn, SW_HIDE);
                                 }
                             }
                         });
