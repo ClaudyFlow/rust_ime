@@ -9,6 +9,7 @@ use windows::{
     Win32::Foundation::{ERROR_PIPE_BUSY, GetLastError},
 };
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::RwLock;
 
 fn log(msg: &str) {
     let mut v: Vec<u16> = msg.encode_utf16().collect();
@@ -19,6 +20,7 @@ fn log(msg: &str) {
 #[implement(ITfTextInputProcessor, ITfKeyEventSink)]
 pub struct TextService {
     client_id: AtomicU32,
+    thread_mgr: RwLock<Option<ITfThreadMgr>>,
 }
 
 impl TextService {
@@ -26,6 +28,7 @@ impl TextService {
         log("RustIME: TextService::new - BUILD 2045");
         Self {
             client_id: AtomicU32::new(0),
+            thread_mgr: RwLock::new(None),
         }
     }
 
@@ -144,6 +147,8 @@ impl ITfTextInputProcessor_Impl for TextService {
     fn Activate(&self, thread_mgr: Option<&ITfThreadMgr>, client_id: u32) -> Result<()> {
         self.client_id.store(client_id, Ordering::SeqCst);
         if let Some(mgr) = thread_mgr {
+            let mut lock = self.thread_mgr.write().unwrap();
+            *lock = Some(mgr.clone());
             unsafe {
                 let keystroke_mgr: ITfKeystrokeMgr = mgr.cast()?;
                 let sink: ITfKeyEventSink = self.cast()?;
@@ -153,7 +158,24 @@ impl ITfTextInputProcessor_Impl for TextService {
         Ok(())
     }
 
-    fn Deactivate(&self) -> Result<()> { Ok(()) }
+    fn Deactivate(&self) -> Result<()> {
+        log("RustIME: TextService::Deactivate");
+        // 应用程序退出或切换时，通知服务器重置状态并隐藏窗口
+        let _ = self.send_key_to_server(1, 0x1B, 0, None);
+        
+        let mgr_opt = {
+            let mut lock = self.thread_mgr.write().unwrap();
+            lock.take()
+        };
+
+        if let Some(mgr) = mgr_opt {
+            if let Ok(keystroke_mgr) = mgr.cast::<ITfKeystrokeMgr>() {
+                let client_id = self.client_id.load(Ordering::SeqCst);
+                let _ = unsafe { keystroke_mgr.UnadviseKeyEventSink(client_id) };
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ITfKeyEventSink_Impl for TextService {
