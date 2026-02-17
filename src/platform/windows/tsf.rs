@@ -303,8 +303,8 @@ impl InputMethodHost for TsfHost {
                                 }
 
                                 let key = match key_code {
-                                    0x41..=0x5A => Some(std::mem::transmute::<u32, crate::engine::keys::VirtualKey>(key_code - 0x41)),
-                                    0x30..=0x39 => Some(std::mem::transmute::<u32, crate::engine::keys::VirtualKey>(key_code - 0x30 + 26)),
+                                    0x41..=0x5A => crate::engine::keys::VirtualKey::from_u32(key_code - 0x41),
+                                    0x30..=0x39 => crate::engine::keys::VirtualKey::from_u32(key_code - 0x30 + 26),
                                     0x20 => Some(crate::engine::keys::VirtualKey::Space),
                                     0x08 => Some(crate::engine::keys::VirtualKey::Backspace),
                                     0x0D => Some(crate::engine::keys::VirtualKey::Enter),
