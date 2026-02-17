@@ -129,6 +129,14 @@ pub struct Input {
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
+    pub double_pinyin_scheme: DoublePinyinScheme,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct DoublePinyinScheme {
+    pub name: String,
+    pub initials: std::collections::HashMap<String, String>, // v -> zh
+    pub rimes: std::collections::HashMap<String, String>,    // q -> iu
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -330,6 +338,19 @@ impl Config {
                 enable_fixed_first_candidate: false,
                 enable_smart_backspace: true,
                 enable_double_pinyin: false,
+                double_pinyin_scheme: DoublePinyinScheme {
+                    name: "小鹤双拼".to_string(),
+                    initials: [
+                        ("v", "zh"), ("u", "sh"), ("i", "ch")
+                    ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                    rimes: [
+                        ("q", "iu"), ("w", "ei"), ("r", "uan"), ("t", "ue"), ("y", "un"),
+                        ("u", "uai"), ("i", "i"), ("o", "uo"), ("p", "ie"), ("a", "a"),
+                        ("s", "ong"), ("d", "ai"), ("f", "en"), ("g", "eng"), ("h", "ang"),
+                        ("j", "an"), ("k", "ao"), ("l", "iang"), ("z", "ou"), ("x", "ia"),
+                        ("c", "ao"), ("v", "ui"), ("b", "in"), ("n", "iao"), ("m", "ian")
+                    ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                },
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>双拼方案设置 - rust-ime</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .mapping-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .mapping-item {
+            background: var(--apple-card);
+            border: 1px solid var(--apple-border);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mapping-item:hover {
+            border-color: var(--apple-accent);
+            transform: scale(1.05);
+        }
+        .mapping-key {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--apple-accent);
+        }
+        .mapping-val {
+            font-size: 14px;
+            color: var(--apple-secondary);
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/static/index.html" class="back-link">← 返回主页</a>
+            <h1>双拼方案设置</h1>
+        </header>
+
+        <div class="card">
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">启用双拼模式</div>
+                    <div class="desc">直接按双拼键位输入，系统自动展开为全拼</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_double_pinyin"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">当前方案名称</div></div>
+                <input type="text" id="scheme_name" style="width: 200px;">
+            </div>
+        </div>
+
+        <div class="section-header">
+            <h2>声母映射 (Initials)</h2>
+        </div>
+        <div class="mapping-grid" id="initials-grid"></div>
+
+        <div class="section-header">
+            <h2>韵母映射 (Rimes)</h2>
+        </div>
+        <div class="mapping-grid" id="rimes-grid"></div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div class="card" style="width:300px; margin:auto; margin-top:20vh;">
+            <h3 id="modal-title">编辑映射</h3>
+            <div class="setting-item">
+                <input type="text" id="modal-input" style="width:100%; font-size:18px; padding:10px;">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="closeModal(true)" style="flex:1;">确定</button>
+                <button class="btn btn-danger" onclick="closeModal(false)" style="flex:1;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <button class="btn" onclick="save()">保存方案</button>
+        <button class="btn btn-danger" onclick="resetToXiaohe()">恢复小鹤默认</button>
+    </div>
+
+    <div id="toast" class="status-toast">方案已保存并应用</div>
+
+    <script src="/static/js/settings.js"></script>
+    <script>
+        let currentEdit = { type: '', key: '' };
+        const KEYS = "abcdefghijklmnopqrstuvwxyz".split("");
+
+        async function init() {
+            await loadConfig();
+            document.getElementById('enable_double_pinyin').checked = config.input.enable_double_pinyin;
+            document.getElementById('scheme_name').value = config.input.double_pinyin_scheme.name;
+            
+            document.getElementById('enable_double_pinyin').onchange = (e) => {
+                config.input.enable_double_pinyin = e.target.checked;
+            };
+            document.getElementById('scheme_name').oninput = (e) => {
+                config.input.double_pinyin_scheme.name = e.target.value;
+            };
+
+            renderGrids();
+        }
+
+        function renderGrids() {
+            const initialsGrid = document.getElementById('initials-grid');
+            const rimesGrid = document.getElementById('rimes-grid');
+            const scheme = config.input.double_pinyin_scheme;
+
+            initialsGrid.innerHTML = KEYS.map(k => {
+                const val = scheme.initials[k] || "";
+                return `<div class="mapping-item" onclick="openModal('initials', '${k}')">
+                    <div class="mapping-key">${k.toUpperCase()}</div>
+                    <div class="mapping-val">${val || '-'}</div>
+                </div>`;
+            }).join('');
+
+            rimesGrid.innerHTML = KEYS.map(k => {
+                const val = scheme.rimes[k] || "";
+                return `<div class="mapping-item" onclick="openModal('rimes', '${k}')">
+                    <div class="mapping-key">${k.toUpperCase()}</div>
+                    <div class="mapping-val">${val || '-'}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function openModal(type, key) {
+            currentEdit = { type, key };
+            const modal = document.getElementById('edit-modal');
+            const input = document.getElementById('modal-input');
+            const title = document.getElementById('modal-title');
+            
+            title.innerText = `编辑 ${type === 'initials' ? '声母' : '韵母'}: ${key.toUpperCase()}`;
+            input.value = config.input.double_pinyin_scheme[type][key] || "";
+            modal.style.display = 'flex';
+            input.focus();
+        }
+
+        function closeModal(save) {
+            if (save) {
+                const val = document.getElementById('modal-input').value.trim().toLowerCase();
+                const scheme = config.input.double_pinyin_scheme;
+                if (val === "") {
+                    delete scheme[currentEdit.type][currentEdit.key];
+                } else {
+                    scheme[currentEdit.type][currentEdit.key] = val;
+                }
+                renderGrids();
+            }
+            document.getElementById('edit-modal').style.display = 'none';
+        }
+
+        async function save() {
+            await saveConfig();
+        }
+
+        function resetToXiaohe() {
+            config.input.double_pinyin_scheme = {
+                name: "小鹤双拼",
+                initials: {"v":"zh", "u":"sh", "i":"ch"},
+                rimes: {
+                    "q":"iu", "w":"ei", "r":"uan", "t":"ue", "y":"un", "u":"uai", "i":"i", "o":"uo", "p":"ie", "a":"a",
+                    "s":"ong", "d":"ai", "f":"en", "g":"eng", "h":"ang", "j":"an", "k":"ao", "l":"iang", "z":"ou",
+                    "x":"ia", "c":"ao", "v":"ui", "b":"in", "n":"iao", "m":"ian"
+                }
+            };
+            document.getElementById('scheme_name').value = config.input.double_pinyin_scheme.name;
+            renderGrids();
+        }
+
+        init();
+    </script>
+</body>
+</html>

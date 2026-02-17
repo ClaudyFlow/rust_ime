@@ -114,6 +114,7 @@ pub struct Processor {
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
+    pub double_pinyin_scheme: crate::config::DoublePinyinScheme,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -237,6 +238,11 @@ impl Processor {
             enable_fixed_first_candidate: false,
             enable_smart_backspace: true,
             enable_double_pinyin: false,
+            double_pinyin_scheme: crate::config::DoublePinyinScheme {
+                name: "小鹤双拼".into(),
+                initials: [("v","zh"), ("u","sh"), ("i","ch")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(),
+                rimes: [("q","iu"), ("w","ei"), ("r","uan")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(), // 简略初始化，实际会被 apply_config 覆盖
+            },
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -253,6 +259,7 @@ impl Processor {
         self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
         self.enable_smart_backspace = conf.input.enable_smart_backspace;
         self.enable_double_pinyin = conf.input.enable_double_pinyin;
+        self.double_pinyin_scheme = conf.input.double_pinyin_scheme.clone();
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -325,52 +332,61 @@ impl Processor {
         self.syllables = syllables;
     }
 
-    /// 双拼转换逻辑 (小鹤方案)
+    /// 双拼转换逻辑 (基于配置方案)
     fn transform_double_pinyin(&self, last_char: char) -> Option<String> {
-        // 1. 确定当前处于什么位置 (声母还是韵母)
         let segments = self.segment_buffer(&self.buffer);
         let last_segment = segments.last()?;
         let init_len = self.get_initial_len(last_segment);
         
-        // 如果最后一个片段的长度等于声母长度，说明刚输入完声母，现在输入的是韵母
+        let c_str = last_char.to_string();
+
+        // 1. 如果最后一个片段是声母，现在输入的是韵母
         if last_segment.len() == init_len && init_len > 0 {
             let initial = last_segment.as_str();
-            let rime = match last_char {
-                'q' => "iu", 'w' => "ei", 'r' => "uan", 't' => "ue", 'y' => "un",
-                'u' => "uai", 'i' => "i", 'o' => "uo", 'p' => "ie", 'a' => "a",
-                's' => if initial == "j" || initial == "q" || initial == "x" { "iong" } else { "ong" },
-                'd' => "ai", 'f' => "en", 'g' => "eng", 'h' => "ang", 'j' => "an",
-                'k' => "ao", 
-                'l' => if "gkhzhchsh".contains(initial) { "uang" } else { "iang" },
-                'z' => "ou", 'x' => if "gkhzhchsh".contains(initial) { "ua" } else { "ia" },
-                'c' => "ao", 'v' => "ui", 'b' => "in", 'n' => "iao", 'm' => "ian",
-                _ => return None,
-            };
             
-            // 特殊修正：小鹤双拼中 r 也可以是 er (针对零声母 e)
+            // 从配置中查找韵母映射
+            let rime = self.double_pinyin_scheme.rimes.get(&c_str)?;
+            
+            // 特殊规则逻辑：
+            // 小鹤中 s 和 l 有双重含义，取决于声母
+            let final_rime = if c_str == "s" {
+                if initial == "j" || initial == "q" || initial == "x" { "iong" } else { "ong" }
+            } else if c_str == "l" {
+                if "gkhzhchsh".contains(initial) { "uang" } else { "iang" }
+            } else if c_str == "x" {
+                if "gkhzhchsh".contains(initial) { "ua" } else { "ia" }
+            } else {
+                rime.as_str()
+            };
+
+            // 特殊修正：er (针对零声母 e)
             if initial == "e" && last_char == 'r' { return Some("er".to_string()); }
             
-            // 构造完整拼音
             let mut full = initial.to_string();
-            full.push_str(rime);
+            full.push_str(final_rime);
             
-            // 特殊修正：j/q/x 后面跟 ue 实际是 jue/que/xue (全拼里是 ju/qu/xu + e)
-            if (initial == "j" || initial == "q" || initial == "x") && rime == "ue" {
+            // 拼写修正：j/q/x + ue -> jue/que/xue
+            if (initial == "j" || initial == "q" || initial == "x") && final_rime == "ue" {
                 return Some(format!("{}ue", initial));
             }
             
             return Some(full);
         }
         
-        // 如果当前是新音节的开始，处理声母映射
+        // 2. 处理新音节的声母
         if self.buffer.is_empty() || self.buffer.ends_with(' ') || (last_segment.len() > init_len) {
-            let mapped_initial = match last_char {
-                'v' => "zh", 'u' => "sh", 'i' => "ch",
-                'a' | 'o' | 'e' => return Some(last_char.to_string()), // 零声母起始
-                c if "bpmfdtnlgkhjqxzcsryw".contains(c) => return Some(c.to_string()),
-                _ => return None,
-            };
-            return Some(mapped_initial.to_string());
+            // 先看有没有专门的声母映射 (如 v -> zh)
+            if let Some(mapped) = self.double_pinyin_scheme.initials.get(&c_str) {
+                return Some(mapped.clone());
+            }
+            // 零声母 a, o, e 保持原样
+            if "aoe".contains(last_char) {
+                return Some(c_str);
+            }
+            // 普通声母
+            if "bpmfdtnlgkhjqxzcsryw".contains(last_char) {
+                return Some(c_str);
+            }
         }
 
         None
@@ -1323,6 +1339,11 @@ mod tests {
                         nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, 
                         enable_smart_backspace: true,
                         enable_double_pinyin: false,
+                        double_pinyin_scheme: crate::config::DoublePinyinScheme {
+                            name: "Mock".into(),
+                            initials: std::collections::HashMap::new(),
+                            rimes: std::collections::HashMap::new(),
+                        },
                         user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
                         gui_tx: None,
