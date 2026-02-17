@@ -1,6 +1,6 @@
 pub mod tray;
 pub mod web;
-pub mod painter;
+// pub mod painter;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
