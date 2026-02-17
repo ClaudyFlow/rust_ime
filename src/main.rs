@@ -104,6 +104,23 @@ pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
     m
 }
 
+pub fn load_syllables() -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    let mut path = find_project_root();
+    path.push("dicts/chinese/syllables.txt");
+    if let Ok(f) = File::open(path) {
+        use std::io::BufRead;
+        let reader = std::io::BufReader::new(f);
+        for line in reader.lines().flatten() {
+            let s = line.trim().to_lowercase();
+            if !s.is_empty() {
+                set.insert(s);
+            }
+        }
+    }
+    set
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
     unsafe {
@@ -349,6 +366,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let mut processor_obj = Processor::new(tries_map, default_profile, punctuation, Some(gui_tx_main.clone()));
     processor_obj.apply_config(&conf_guard);
+    processor_obj.set_syllables(load_syllables());
 
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);

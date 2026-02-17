@@ -49,6 +49,7 @@ pub struct Processor {
     pub tries: HashMap<String, Trie>, 
     pub active_profiles: Vec<String>,
     pub punctuation: HashMap<String, Vec<String>>,
+    pub syllables: std::collections::HashSet<String>,
     pub candidates: Vec<String>,
     pub candidate_hints: Vec<String>, 
     pub selected: usize,
@@ -183,7 +184,9 @@ impl Processor {
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
-            punctuation, candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
+            punctuation,
+            syllables: std::collections::HashSet::new(),
+            candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
@@ -310,6 +313,56 @@ impl Processor {
         } else {
             let _ = self.lookup();
         }
+    }
+
+    pub fn set_syllables(&mut self, syllables: std::collections::HashSet<String>) {
+        self.syllables = syllables;
+    }
+
+    /// 将输入的连续字母切分为音节或简拼
+    fn segment_buffer(&self, input: &str) -> Vec<String> {
+        let mut segments = Vec::new();
+        let mut remaining = input.to_lowercase();
+        
+        while !remaining.is_empty() {
+            let mut matched = false;
+            
+            // 1. 尝试全拼最大匹配 (从最长 6 位开始，拼音最长一般是 zhuang)
+            for len in (1..=6).rev() {
+                if len <= remaining.len() {
+                    let part = &remaining[..len];
+                    if self.syllables.contains(part) {
+                        segments.push(part.to_string());
+                        remaining = remaining[len..].to_string();
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            
+            if matched { continue; }
+            
+            // 2. 如果全拼没匹配上，看第一个字母是否是合法的简拼（声母）
+            // 拼音声母包括：b p m f d t n l g k h j q x zh ch sh r z c s y w
+            let c = remaining.chars().next().unwrap();
+            let is_initial = "bpmfdtnlgkhjqxzcsryw".contains(c);
+            
+            if is_initial {
+                // 特殊处理 zh ch sh
+                let initial_len = if remaining.starts_with("zh") || remaining.starts_with("ch") || remaining.starts_with("sh") {
+                    2
+                } else {
+                    1
+                };
+                segments.push(remaining[..initial_len].to_string());
+                remaining = remaining[initial_len..].to_string();
+            } else {
+                // 实在不认识，当做一个普通字母吃掉
+                segments.push(remaining[..1].to_string());
+                remaining = remaining[1..].to_string();
+            }
+        }
+        segments
     }
 
     pub fn toggle(&mut self) -> Action {
@@ -813,6 +866,7 @@ impl Processor {
     pub fn lookup(&mut self) -> Option<Action> {
         if self.buffer.is_empty() { self.reset(); return None; }
 
+        // 1. 优先处理分页过滤模式
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_cands = Vec::new();
@@ -843,46 +897,81 @@ impl Processor {
             return None;
         }
 
-        let parsed_parts = self.parse_buffer();
-        self.last_lookup_pinyin = parsed_parts.iter().map(|p| p.pinyin.clone()).collect::<Vec<_>>().join("");
+        // 2. 准备切分方案
+        // A. 原始切分（基于空格/大写/数字）
+        let raw_parsed = self.parse_buffer();
+        // B. 智能切分（针对 mtian 这种无分隔符的）
+        let mut smart_segments = Vec::new();
+        if !self.buffer.contains(' ') && !self.buffer.contains('\'') {
+            smart_segments = self.segment_buffer(&self.buffer);
+        }
 
-        let mut greedy_sentence = String::new(); let mut all_raw_segments = Vec::new(); let mut last_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
-        let has_trailing_space = self.buffer.ends_with(' ');
+        // 我们尝试两种检索策略：全量检索 (raw) 和 智能切分检索 (smart)
+        let mut final_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
 
-        for (i, part) in parsed_parts.iter().enumerate() {
-            all_raw_segments.push(part.raw.clone());
-            let mut combined_matches = Vec::new();
-            let mut seen = std::collections::HashSet::new();
+        // 策略 1: 原始检索逻辑 (保持对空格、辅助码的支持)
+        let mut greedy_sentence = String::new();
+        let mut last_matches_raw = Vec::new();
+        for (i, part) in raw_parsed.iter().enumerate() {
+            let mut matches = Vec::new();
             for profile in &self.active_profiles {
                 if let Some(d) = self.tries.get(profile) {
-                    if let Some(matches) = d.get_all_exact(&part.pinyin) {
-                        for (w, t, e, weight) in matches {
-                            if seen.insert(w.clone()) { combined_matches.push((w, t, e, weight, true)); }
-                        }
+                    if let Some(m) = d.get_all_exact(&part.pinyin) {
+                        for (w, t, e, weight) in m { matches.push((w, t, e, weight, true)); }
                     }
                     if self.enable_prefix_matching && !part.pinyin.is_empty() {
                         let limit = if part.aux_code.is_some() { 50 } else { 20 };
-                        let prefix_matches = d.search_bfs(&part.pinyin, limit);
-                        for (w, t, e, weight) in prefix_matches {
-                            if seen.insert(w.clone()) { combined_matches.push((w, t, e, weight, false)); }
-                        }
+                        let m = d.search_bfs(&part.pinyin, limit);
+                        for (w, t, e, weight) in m { matches.push((w, t, e, weight, false)); }
                     }
                 }
             }
-            combined_matches.sort_by(|a, b| {
-                b.4.cmp(&a.4).then_with(|| a.0.chars().count().cmp(&b.0.chars().count())).then_with(|| b.3.cmp(&a.3))
-            });
-            let idx = part.specified_idx.unwrap_or(1).saturating_sub(1);
-            if let Some((w, _, _, _, _)) = combined_matches.get(idx) { greedy_sentence.push_str(w); } else { greedy_sentence.push_str(&part.raw); }
-            if i == parsed_parts.len() - 1 { last_matches = combined_matches; }
+            matches.sort_by(|a, b| b.4.cmp(&a.4).then_with(|| b.3.cmp(&a.3)));
+            if let Some((w, _, _, _, _)) = matches.get(part.specified_idx.unwrap_or(1).saturating_sub(1)) {
+                greedy_sentence.push_str(w);
+            } else {
+                greedy_sentence.push_str(&part.raw);
+            }
+            if i == raw_parsed.len() - 1 { last_matches_raw = matches; }
         }
 
-        if has_trailing_space && !greedy_sentence.is_empty() { greedy_sentence.push(' '); }
-        self.joined_sentence = greedy_sentence;
-        self.best_segmentation = all_raw_segments;
-        self.candidates.clear(); self.candidate_hints.clear(); self.has_dict_match = !last_matches.is_empty();
+        for m in last_matches_raw {
+            if seen.insert(m.0.clone()) { final_matches.push(m); }
+        }
 
-        for (cand, tone, en, _, _) in last_matches {
+        // 策略 2: 如果开启了简拼且当前是连续字母输入，尝试智能切分检索
+        if self.enable_abbreviation_matching && !smart_segments.is_empty() && smart_segments.len() > 1 {
+            // 合并所有切分音节作为拼音键（例如 mtian -> m + tian）
+            let combined_py = smart_segments.join("");
+            for profile in &self.active_profiles {
+                if let Some(d) = self.tries.get(profile) {
+                    // 检索那些简拼符合 smart_segments 的词
+                    // 目前 Trie 存储的是全拼，所以我们通过 search_bfs 搜 combined_py 的前缀
+                    // 这能搜到 "mtian" 开头的词，如果词库里有简拼词条
+                    let m = d.search_bfs(&combined_py, 20);
+                    for (w, t, e, weight) in m {
+                        if seen.insert(w.clone()) { final_matches.push((w, t, e, weight, false)); }
+                    }
+                }
+            }
+        }
+
+        // 3. 排序与结果填充
+        final_matches.sort_by(|a, b| {
+            // 排序规则：精确匹配 > 权重 > 长度
+            b.4.cmp(&a.4).then_with(|| b.3.cmp(&a.3)).then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
+        });
+
+        self.joined_sentence = if self.buffer.ends_with(' ') { format!("{} ", greedy_sentence) } else { greedy_sentence };
+        self.best_segmentation = raw_parsed.iter().map(|p| p.raw.clone()).collect();
+        self.last_lookup_pinyin = raw_parsed.iter().map(|p| p.pinyin.clone()).collect::<Vec<_>>().join("");
+        
+        self.candidates.clear();
+        self.candidate_hints.clear();
+        self.has_dict_match = !final_matches.is_empty();
+
+        for (cand, tone, en, _, _) in final_matches {
             self.candidates.push(cand);
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
@@ -890,47 +979,39 @@ impl Processor {
             self.candidate_hints.push(h);
         }
 
-        // 根据用户词库重排
+        // 4. 用户词库重排
         if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
             if let Some(user_entries) = self.user_dict.get(&self.last_lookup_pinyin) {
                 let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
-                
                 for (word, _count) in user_entries.iter().rev() {
                     if let Some(pos) = self.candidates.iter().position(|c| c == word) {
-                        // 如果固定首词开启且当前词就是第一名，跳过重排（保持在第一）
                         if insert_pos == 1 && pos == 0 { continue; }
-                        
                         let c = self.candidates.remove(pos);
                         let h = self.candidate_hints.remove(pos);
                         self.candidates.insert(insert_pos, c);
                         self.candidate_hints.insert(insert_pos, h);
                     } else {
-                        // 如果系统词库没有，但是用户词库有（新词），也加入候选
                         self.candidates.insert(insert_pos, word.clone());
-                        // 使用更兼容的符号 ★ 替代 Emoji，并改为更简洁的标注
                         self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
                     }
                 }
             }
         }
 
+        // 5. 全局过滤 (Shift + 字母)
         if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
-            let mut filtered_candidates = Vec::new();
-            let mut filtered_hints = Vec::new();
+            let mut fc = Vec::new();
+            let mut fh = Vec::new();
             for (i, hint) in self.candidate_hints.iter().enumerate() {
-                let hint_lower = hint.to_lowercase();
-                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
-                let mut matched = false;
-                for part in parts { if part.starts_with(&filter_lower) { matched = true; break; } }
-                if matched {
-                    filtered_candidates.push(self.candidates[i].clone());
-                    filtered_hints.push(hint.clone());
+                if hint.to_lowercase().split_whitespace().any(|p| p.starts_with(&filter_lower)) {
+                    fc.push(self.candidates[i].clone());
+                    fh.push(hint.clone());
                 }
             }
-            if !filtered_candidates.is_empty() {
-                self.candidates = filtered_candidates;
-                self.candidate_hints = filtered_hints;
+            if !fc.is_empty() {
+                self.candidates = fc;
+                self.candidate_hints = fh;
                 if self.candidates.len() == 1 {
                     let word = self.candidates[0].clone();
                     return Some(self.commit_candidate(word));
