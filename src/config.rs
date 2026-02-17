@@ -283,9 +283,6 @@ impl Config {
                     DoubleTap { trigger_key: "n".into(), insert_text: "ian".into() },
                     DoubleTap { trigger_key: "m".into(), insert_text: "ian".into() },
                     DoubleTap { trigger_key: "a".into(), insert_text: "ang".into() },
-                    DoubleTap { trigger_key: "z".into(), insert_text: "zh".into() },
-                    DoubleTap { trigger_key: "c".into(), insert_text: "ch".into() },
-                    DoubleTap { trigger_key: "s".into(), insert_text: "sh".into() },
                     DoubleTap { trigger_key: "f".into(), insert_text: "en".into() },
                     DoubleTap { trigger_key: "d".into(), insert_text: "ai".into() },
                     DoubleTap { trigger_key: "w".into(), insert_text: "ei".into() },
@@ -349,7 +346,7 @@ impl Config {
                         ("v", "zh"), ("u", "sh"), ("i", "ch")
                     ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
                     rimes: [
-                        ("p", "ie"), ("b", "in"), ("m", "ian"), ("h", "ang"), ("q", "iu"),
+                        ("p", "ie"), ("b", "in"), ("m", "ian"),  ("q", "iu"),
                         ("r", "uan"), ("x", "ia"), ("k", "ao"), ("f", "en"), ("g", "eng"),
                         ("d", "ai"), ("j", "an"), ("t", "ue"), ("c", "ao"), ("s", "ong"),
                         ("z", "ou"), ("y", "un"), ("w", "ei"), ("n", "iao"), ("l", "iang")

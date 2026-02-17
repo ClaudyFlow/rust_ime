@@ -20,7 +20,7 @@
     "show_candidates": true,
     "show_modern_candidates": false,
     "show_notifications": true,
-    "show_keystrokes": true,
+    "show_keystrokes": false,
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,
@@ -69,15 +69,20 @@
     "keystroke_font_size": 24,
     "keystroke_timeout_ms": 1500,
     "keystroke_bg_color": "rgba(0, 0, 0, 0.7)",
+    "keystroke_color": "#ffffff",
+    "keystroke_font_family": "Microsoft YaHei",
     "keystroke_margin_x": 20,
     "keystroke_margin_y": 20,
-    "learning_mode": true,
+    "learning_mode": false,
     "learning_anchor": "top_right",
     "learning_interval_sec": 10,
     "learning_font_size": 24,
     "learning_margin_x": 20,
     "learning_margin_y": 40,
     "learning_bg_color": "rgba(20, 20, 20, 0.85)",
+    "learning_color": "#ffffff",
+    "learning_hint_color": "#abb2bf",
+    "learning_font_family": "Microsoft YaHei",
     "learning_dict_path": "dicts/chinese/words/words.json",
     "preview_mode": "pinyin",
     "learning_interval": 10
@@ -88,17 +93,13 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": true,
+    "enable_anti_typo": false,
     "enable_double_tap": true,
     "double_tap_timeout_ms": 250,
     "double_taps": [
       {
         "trigger_key": "i",
         "insert_text": "ing"
-      },
-      {
-        "trigger_key": "u",
-        "insert_text": "sh"
       },
       {
         "trigger_key": "l",
@@ -109,12 +110,8 @@
         "insert_text": "ong"
       },
       {
-        "trigger_key": "p",
-        "insert_text": "un"
-      },
-      {
         "trigger_key": "j",
-        "insert_text": "iang"
+        "insert_text": "an"
       },
       {
         "trigger_key": "k",
@@ -130,23 +127,51 @@
       },
       {
         "trigger_key": "a",
-        "insert_text": "ch"
-      },
-      {
-        "trigger_key": "e",
-        "insert_text": "zh"
+        "insert_text": "ang"
       },
       {
         "trigger_key": "z",
-        "insert_text": "ou"
+        "insert_text": "zh"
       },
       {
         "trigger_key": "c",
-        "insert_text": "ao"
+        "insert_text": "ch"
       },
       {
         "trigger_key": "s",
+        "insert_text": "sh"
+      },
+      {
+        "trigger_key": "f",
+        "insert_text": "en"
+      },
+      {
+        "trigger_key": "d",
         "insert_text": "ai"
+      },
+      {
+        "trigger_key": "w",
+        "insert_text": "ei"
+      },
+      {
+        "trigger_key": "g",
+        "insert_text": "ao"
+      },
+      {
+        "trigger_key": "h",
+        "insert_text": "ou"
+      },
+      {
+        "trigger_key": "p",
+        "insert_text": "iong"
+      },
+      {
+        "trigger_key": "u",
+        "insert_text": "ui"
+      },
+      {
+        "trigger_key": "x",
+        "insert_text": "ua"
       }
     ],
     "enable_long_press": true,
@@ -276,7 +301,35 @@
     "enable_caps_selection": true,
     "enable_number_selection": true,
     "enable_user_dict": true,
-    "enable_fixed_first_candidate": false
+    "enable_fixed_first_candidate": false,
+    "enable_smart_backspace": true,
+    "enable_double_pinyin": true,
+    "double_pinyin_scheme": {
+      "name": "小鹤双拼",
+      "initials": {},
+      "rimes": {
+        "p": "ie",
+        "b": "in",
+        "m": "ian",
+        "h": "ang",
+        "q": "iu",
+        "r": "uan",
+        "x": "ia",
+        "k": "ao",
+        "f": "en",
+        "g": "eng",
+        "d": "ai",
+        "j": "an",
+        "t": "ue",
+        "c": "ao",
+        "s": "ong",
+        "z": "ou",
+        "y": "un",
+        "w": "ei",
+        "n": "iao",
+        "l": "iang"
+      }
+    }
   },
   "hotkeys": {
     "switch_language": {
