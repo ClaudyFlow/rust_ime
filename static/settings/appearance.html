@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>视觉与样式 - rust-ime</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/static/index.html" class="back-link">← 返回主页</a>
+            <h1>视觉与样式</h1>
+        </header>
+
+        <div class="card">
+            <h2>候选框显示</h2>
+            <div class="grid-2">
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示候选窗口</div><div class="desc">控制拼写时是否出现选词框</div></div>
+                    <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示注音/提示</div><div class="desc">在候选词旁显示辅助码或英文翻译</div></div>
+                    <label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <h2>候选框样式 (GDI)</h2>
+        <div class="card">
+            <div class="setting-item">
+                <div class="info"><div class="title">窗口位置</div><div class="desc">相对于光标的偏移位置</div></div>
+                <select id="candidate_anchor">
+                    <option value="bottom">光标下方</option>
+                    <option value="top">光标上方</option>
+                </select>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item">
+                    <div class="info"><div class="title">背景颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="window_bg_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="window_bg_color_picker"></div>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">边框颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="window_border_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="window_border_color_picker"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">选中项背景色</div></div>
+                <div class="color-picker-group">
+                    <input type="text" id="window_highlight_color" style="width:100px;">
+                    <div class="color-preview"><input type="color" id="window_highlight_color_picker"></div>
+                </div>
+            </div>
+        </div>
+
+        <h2>字体与字号</h2>
+        <div class="card">
+            <h3>拼音行 (Pinyin)</h3>
+            <div class="setting-item">
+                <div class="info"><div class="title">字体家族</div></div>
+                <select id="pinyin_font_family" class="font-select" style="width:250px;"></select>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="pinyin_font_size"></div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">文字颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="pinyin_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="pinyin_color_picker"></div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 style="margin-top:20px;">候选词行 (Candidate)</h3>
+            <div class="setting-item">
+                <div class="info"><div class="title">字体家族</div></div>
+                <select id="candidate_font_family" class="font-select" style="width:250px;"></select>
+            </div>
+            <div class="grid-2">
+                <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="candidate_font_size"></div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">文字颜色</div></div>
+                    <div class="color-picker-group">
+                        <input type="text" id="candidate_color" style="width:100px;">
+                        <div class="color-preview"><input type="color" id="candidate_color_picker"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2>其他显示</h2>
+        <div class="card">
+            <div class="grid-2">
+                <div class="setting-item">
+                    <div class="info"><div class="title">按键回显</div><div class="desc">在屏幕角显示按下的键</div></div>
+                    <label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">学习模式</div><div class="desc">在屏幕角显示词条学习提示</div></div>
+                    <label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <button class="btn" onclick="save()">保存更改</button>
+        <button class="btn btn-danger" onclick="resetConfig()">重置默认</button>
+    </div>
+
+    <div id="toast" class="status-toast">已保存并应用</div>
+
+    <script src="/static/js/settings.js"></script>
+    <script>
+        async function init() {
+            await loadConfig();
+            
+            // 绑定基础设置
+            bindInput('show_candidates', 'appearance');
+            bindInput('show_en_hint', 'appearance');
+            bindInput('candidate_anchor', 'appearance');
+            bindInput('window_bg_color', 'appearance');
+            bindInput('window_border_color', 'appearance');
+            bindInput('window_highlight_color', 'appearance');
+            bindInput('show_keystrokes', 'appearance');
+            bindInput('learning_mode', 'appearance');
+
+            // 绑定 Pinyin 样式
+            const p = config.appearance.pinyin_text;
+            document.getElementById('pinyin_font_size').value = p.font_size;
+            document.getElementById('pinyin_color').value = p.color;
+            document.getElementById('pinyin_font_family').setAttribute('data-value', p.font_family);
+            
+            // 绑定 Candidate 样式
+            const c = config.appearance.candidate_text;
+            document.getElementById('candidate_font_size').value = c.font_size;
+            document.getElementById('candidate_color').value = c.color;
+            document.getElementById('candidate_font_family').setAttribute('data-value', c.font_family);
+
+            linkColor('window_bg_color', 'appearance');
+            linkColor('window_border_color', 'appearance');
+            linkColor('window_highlight_color', 'appearance');
+            linkColor('pinyin_color');
+            linkColor('candidate_color');
+
+            await loadFonts(['pinyin_font_family', 'candidate_font_family']);
+        }
+
+        async function save() {
+            // 手动同步一些复杂的嵌套对象
+            config.appearance.pinyin_text.font_size = parseFloat(document.getElementById('pinyin_font_size').value);
+            config.appearance.pinyin_text.color = document.getElementById('pinyin_color').value;
+            config.appearance.pinyin_text.font_family = document.getElementById('pinyin_font_family').value;
+
+            config.appearance.candidate_text.font_size = parseFloat(document.getElementById('candidate_font_size').value);
+            config.appearance.candidate_text.color = document.getElementById('candidate_color').value;
+            config.appearance.candidate_text.font_family = document.getElementById('candidate_font_family').value;
+
+            await saveConfig();
+        }
+
+        init();
+    </script>
+</body>
+</html>

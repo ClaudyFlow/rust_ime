@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>系统设置 - rust-ime</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/static/index.html" class="back-link">← 返回主页</a>
+            <h1>系统设置</h1>
+        </header>
+
+        <div class="card">
+            <h2>输入方案</h2>
+            <div class="setting-item" style="display: block;">
+                <div class="info">
+                    <div class="title">活跃输入方案 (多选混输)</div>
+                    <div class="desc">勾选您想要启用的输入方案，它们将同时生效。</div>
+                </div>
+                <div id="active_profiles_container" class="profile-chip-group"></div>
+            </div>
+        </div>
+
+        <h2>输入行为</h2>
+        <div class="card">
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">上屏模式</div>
+                    <div class="desc">词模式：空格直接上屏；句模式：支持连续输入。</div>
+                </div>
+                <select id="commit_mode">
+                    <option value="single">词模式 (单空格)</option>
+                    <option value="double">句模式 (双空格)</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数。</div></div>
+                <input type="number" id="page_size">
+            </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">开机自启</div>
+                    <div class="desc">在系统启动时自动运行 rust-ime。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">按键错误提示音</div></div>
+                <label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky-footer">
+        <button class="btn" onclick="save()">保存更改</button>
+        <button class="btn btn-danger" onclick="resetConfig()">重置默认</button>
+    </div>
+
+    <div id="toast" class="status-toast">已保存并应用</div>
+
+    <script src="/static/js/settings.js"></script>
+    <script>
+        async function init() {
+            await loadConfig();
+            
+            // 方案选择
+            const pc = document.getElementById('active_profiles_container');
+            pc.innerHTML = config.files.profiles.map(p => `
+                <div class="profile-chip ${config.input.active_profiles.includes(p.name)?'active':''}" onclick="toggleProfile('${p.name}', this)">
+                    <span>${p.name}</span>
+                </div>
+            `).join('');
+
+            bindInput('commit_mode', 'input');
+            bindInput('page_size', 'input');
+            bindInput('autostart', 'input');
+            bindInput('enable_error_sound', 'input');
+        }
+
+        function toggleProfile(name, el) {
+            const idx = config.input.active_profiles.indexOf(name);
+            if (idx === -1) {
+                config.input.active_profiles.push(name);
+                el.classList.add('active');
+            } else {
+                config.input.active_profiles.splice(idx, 1);
+                el.classList.remove('active');
+            }
+        }
+
+        async function save() {
+            await saveConfig();
+        }
+
+        init();
+    </script>
+</body>
+</html>

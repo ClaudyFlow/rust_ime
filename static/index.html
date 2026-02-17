@@ -4,669 +4,120 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>rust-ime 控制中心</title>
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        :root {
-            --apple-bg: #f5f5f7;
-            --apple-card: rgba(255, 255, 255, 0.95);
-            --apple-accent: #0071e3;
-            --apple-text: #1d1d1f;
-            --apple-secondary: #86868b;
-            --apple-border: #d2d2d7;
-            --apple-glass: blur(20px) saturate(180%);
+        .grid-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
         }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Myriad Set Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
-            background-color: var(--apple-bg); color: var(--apple-text); margin: 0; display: flex; height: 100vh; overflow: hidden;
+        .nav-card {
+            background: var(--apple-card);
+            border-radius: 24px;
+            padding: 32px;
+            text-decoration: none;
+            color: var(--apple-text);
+            border: 1px solid var(--apple-border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.04);
         }
 
-        aside {
-            width: 260px; background: rgba(245, 245, 247, 0.8); backdrop-filter: var(--apple-glass);
-            border-right: 1px solid var(--apple-border); padding: 40px 20px; display: flex; flex-direction: column; gap: 8px;
+        .nav-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+            border-color: var(--apple-accent);
         }
 
-        .logo { font-size: 22px; font-weight: 700; margin-bottom: 30px; padding-left: 15px; letter-spacing: -0.5px; }
-
-        nav button {
-            width: 100%; text-align: left; padding: 12px 15px; border: none; background: transparent;
-            border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--apple-text); cursor: pointer;
-            transition: all 0.2s; display: flex; align-items: center; gap: 10px;
+        .nav-card .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
         }
-        nav button:hover { background: rgba(0, 0, 0, 0.05); }
-        nav button.active { background: var(--apple-accent); color: white; }
 
-        main { flex: 1; overflow-y: auto; padding: 60px 80px; scroll-behavior: smooth; }
-
-        .tab-content { display: none; max-width: 850px; }
-        .tab-content.active { display: block; animation: fadeIn 0.4s ease; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        h1 { font-size: 40px; font-weight: 700; margin-bottom: 40px; letter-spacing: -1px; }
-        h2 { font-size: 22px; font-weight: 600; margin: 40px 0 20px; border-bottom: 1px solid var(--apple-border); padding-bottom: 10px; }
-
-        .card { background: var(--apple-card); border-radius: 20px; padding: 24px; margin-bottom: 24px; border: 1px solid var(--apple-border); box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-
-        .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid #efefef; }
-        .setting-item:last-child { border-bottom: none; }
-
-        .info { flex: 1; margin-right: 20px; }
-        .info .title { font-weight: 600; font-size: 16px; }
-        .info .desc { font-size: 13px; color: var(--apple-secondary); margin-top: 4px; }
-
-        input[type="text"], input[type="number"], select {
-            background: #ffffff; border: 2px solid #8e8e93; border-radius: 10px;
-            padding: 10px 14px; font-size: 14px; min-width: 120px; width: 120px; outline: none; transition: all 0.2s;
-            color: #000; font-weight: 600;
+        .nav-card h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
         }
-        input:focus { border-color: var(--apple-accent); box-shadow: 0 0 0 4px rgba(0,113,227,0.15); }
-        input::placeholder { color: #ccc; font-weight: 400; }
 
-        .color-picker-group { display: flex; align-items: center; gap: 12px; }
-        .color-preview { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--apple-border); cursor: pointer; padding: 0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .color-preview input[type="color"] { width: 100%; height: 100%; transform: scale(1.5); cursor: pointer; border: none; background: none; }
+        .nav-card p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--apple-secondary);
+            line-height: 1.4;
+        }
 
-        .btn { background: var(--apple-accent); color: white; border: none; border-radius: 14px; padding: 14px 28px; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,113,227,0.3); }
-        .btn:hover { transform: scale(1.02); filter: brightness(1.1); }
+        .logo-area {
+            text-align: center;
+            margin-bottom: 60px;
+        }
 
-        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #d1d1d6; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input:checked + .slider { background-color: #34c759; }
-        input:checked + .slider:before { transform: translateX(22px); }
-
-        .profile-chip-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .profile-chip { display: flex; align-items: center; gap: 8px; background: white; border: 2px solid var(--apple-border); padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
-        .profile-chip.active { border-color: var(--apple-accent); background: rgba(0,113,227,0.05); color: var(--apple-accent); }
-        .profile-chip input { display: none; }
-
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .status-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 14px 34px; border-radius: 20px; display: none; z-index: 1000; backdrop-filter: blur(10px); }
-
-        /* Keyboard layout styles */
-        .keyboard { display: flex; flex-direction: column; gap: 10px; background: #d2d2d7; padding: 15px; border-radius: 15px; width: fit-content; margin: 20px auto; }
-        .keyboard-row { display: flex; justify-content: center; gap: 6px; }
-        .kb-key { width: 50px; height: 50px; background: white; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s; user-select: none; position: relative; }
-        .kb-key:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); background: #fdfdfd; }
-        .kb-key.active { border: 2px solid var(--apple-accent); }
-        .kb-key.type-diacritic { background: #e1f5fe; } /* 变音符号/音调类背景色 */
-        .kb-key.type-special { background: #fff9c4; }   /* 特殊符号类背景色 */
-        .kb-key.type-profile { background: #e8f5e9; }   /* 方案切换类背景色 */
-        .kb-key-main { font-size: 16px; font-weight: 700; }
-        .kb-key-sub { font-size: 10px; color: var(--apple-secondary); overflow: hidden; white-space: nowrap; max-width: 45px; text-align: center; }
-        .kb-edit-box { display: none; background: var(--apple-card); border-radius: 15px; padding: 20px; margin-top: 20px; border: 1px solid var(--apple-border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .version {
+            display: inline-block;
+            background: #e1e1e6;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
-    <aside>
-        <div class="logo">rust-ime</div>
-        <nav id="main-nav">
-            <button id="nav-general" class="active" onclick="showTab('general')">系统总览</button>
-            <button id="nav-matching" onclick="showTab('matching')">搜索与匹配</button>
-            <button id="nav-appearance" onclick="showTab('appearance')">视觉与样式</button>
-            <button id="nav-dicts" onclick="showTab('dicts')">词库管理</button>
-            <button id="nav-dict-editor" onclick="showTab('dict-editor')">词典编辑器</button>
-            <button id="nav-profilekeys" onclick="showTab('profilekeys')">快捷切换映射</button>
-            <button id="nav-hotkeys" onclick="showTab('hotkeys')">快捷键</button>
-            <button id="nav-keybehavior" onclick="showTab('keybehavior')">按键行为定制</button>
-            <button id="nav-help" onclick="window.open('/static/help.html')">使用帮助</button>
-        </nav>
-        <div style="margin-top: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
-            <button class="btn" onclick="saveAll()">保存更改</button>
-            <button class="btn" style="background: #ff3b30; box-shadow: none;" onclick="resetAll()">重置默认</button>
-        </div>
-    </aside>
-
-    <main>
-        <div id="tab-general" class="tab-content active">
-            <h1>系统总览</h1>
-            <div class="card">
-                <div class="setting-item" style="display: block;">
-                    <div class="info"><div class="title">活跃输入方案 (多选混输)</div></div>
-                    <div id="active_profiles_container" class="profile-chip-group"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">上屏模式</div></div><select id="commit_mode"><option value="single">词模式 (单空格)</option><option value="double">句模式 (双空格)</option></select></div>
-                <div class="setting-item"><div class="info"><div class="title">候选词数量</div></div><input type="number" id="page_size"></div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">激活翻页键组 (多选)</div><div class="desc">未选中的键在拼写时将进入缓冲区</div></div>
-                    <div id="page_flipping_keys_container" class="profile-chip-group">
-                        <div class="profile-chip" onclick="toggleChip(this)"><input type="checkbox" value="arrow"><span>方向键</span></div>
-                        <div class="profile-chip" onclick="toggleChip(this)"><input type="checkbox" value="minus_equal"><span>-=</span></div>
-                        <div class="profile-chip" onclick="toggleChip(this)"><input type="checkbox" value="comma_dot"><span>, .</span></div>
-                    </div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">互换方向键角色</div><div class="desc">开启后: 上下选词，左右翻页</div></div><label class="switch"><input type="checkbox" id="swap_arrow_keys"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">按键错误提示音</div></div><label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label></div>
-            </div>
+    <div class="container">
+        <div class="logo-area">
+            <h1>rust-ime 控制中心</h1>
+            <span class="version">v0.1.0-alpha</span>
         </div>
 
-        <div id="tab-matching" class="tab-content">
-            <h1>搜索与匹配</h1>
-            <div class="card">
-                <div class="setting-item"><div class="info"><div class="title">精准匹配自动上屏</div></div><label class="switch"><input type="checkbox" id="auto_commit_unique_full_match"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">开启前缀联想</div></div><label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">开启简拼匹配</div></div><label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">防呆模式</div></div><label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">启用个人词库 (自学习)</div><div class="desc">记录您的选词习惯，让常用词排在前面</div></div><label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">固定首词 (不参与排序)</div><div class="desc">开启后，候选词首位始终保持系统默认词库顺序，不随学习改变</div></div><label class="switch"><input type="checkbox" id="enable_fixed_first_candidate"><span class="slider"></span></label></div>
-                
-                <h2>快捷功能开关</h2>
-                <div class="setting-item"><div class="info"><div class="title">Shift 筛选模式</div><div class="desc">输入拼音时按一次 Shift 进入全局筛选</div></div><label class="switch"><input type="checkbox" id="enable_english_filter"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">CapsLock 选词模式</div><div class="desc">输入拼音时按一次 CapsLock 开启当前页筛选</div></div><label class="switch"><input type="checkbox" id="enable_caps_selection"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">数字键选词</div><div class="desc">关闭后数字键将作为普通拼音输入</div></div><label class="switch"><input type="checkbox" id="enable_number_selection"><span class="slider"></span></label></div>
-                
-                <h2>双击快捷输入 (Double-Tap)</h2>
-                <div class="setting-item"><div class="info"><div class="title">启用双击功能</div></div><label class="switch"><input type="checkbox" id="enable_double_tap"><span class="slider"></span></label></div>
-                <div class="setting-item"><div class="info"><div class="title">双击判定间隔 (ms)</div><div class="desc">两次按键间隔小于此值触发替换</div></div><input type="number" id="double_tap_timeout_ms"></div>
-            </div>
+        <div class="grid-dashboard">
+            <a href="/static/settings/system.html" class="nav-card">
+                <div class="icon">⚙️</div>
+                <h3>系统设置</h3>
+                <p>输入方案、自启动、按键音及基础行为设置。</p>
+            </a>
+
+            <a href="/static/settings/appearance.html" class="nav-card">
+                <div class="icon">🎨</div>
+                <h3>视觉与样式</h3>
+                <p>自定义候选词窗口的颜色、字体、大小和位置。</p>
+            </a>
+
+            <a href="/static/settings/keybehavior.html" class="nav-card">
+                <div class="icon">⌨️</div>
+                <h3>按键反馈</h3>
+                <p>按键回显显示位置、时长及样式定制。</p>
+            </a>
+
+            <a href="/static/settings/learning.html" class="nav-card">
+                <div class="icon">🎓</div>
+                <h3>学习模式</h3>
+                <p>配置词条学习、提示间隔及数据源词典。</p>
+            </a>
+
+            <a href="/static/settings/dictionary.html" class="nav-card">
+                <div class="icon">📚</div>
+                <h3>词库管理</h3>
+                <p>启用或禁用词典、编译词库及在线编辑词条。</p>
+            </a>
+
+            <a href="/static/settings/hotkeys.html" class="nav-card">
+                <div class="icon">⚡</div>
+                <h3>快捷键</h3>
+                <p>管理全局功能快捷键及输入方案切换映射。</p>
+            </a>
+
+            <a href="/static/help.html" class="nav-card">
+                <div class="icon">📖</div>
+                <h3>使用帮助</h3>
+                <p>查看详细的操作指南、快捷键说明及常见问题。</p>
+            </a>
         </div>
-
-        <div id="tab-appearance" class="tab-content">
-            <h1>视觉与样式</h1>
-            <div class="card">
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">显示传统窗</div></div><label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示卡片窗</div></div><label class="switch"><input type="checkbox" id="show_modern_candidates"><span class="slider"></span></label></div>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">显示提示 (Hint)</div></div><label class="switch"><input type="checkbox" id="show_en_hint"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示注音 (Tone)</div></div><label class="switch"><input type="checkbox" id="show_tone_hint"><span class="slider"></span></label></div>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">按键回显</div></div><label class="switch"><input type="checkbox" id="show_keystrokes"><span class="slider"></span></label></div>
-                    <div class="setting-item"><div class="info"><div class="title">汉字学习</div></div><label class="switch"><input type="checkbox" id="learning_mode"><span class="slider"></span></label></div>
-                </div>
-            </div>
-
-            <h2>候选框容器 (Window)</h2>
-            <div class="card">
-                <div class="setting-item"><div class="info"><div class="title">窗口位置</div></div><select id="candidate_anchor"><option value="bottom">屏幕底部</option><option value="top">屏幕顶部</option></select></div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">内边距 (X/Y)</div></div><div style="display:flex; gap:5px;"><input type="number" id="window_padding_x" style="width:60px;"> <input type="number" id="window_padding_y" style="width:60px;"></div></div>
-                    <div class="setting-item"><div class="info"><div class="title">圆角半径</div></div><input type="number" id="corner_radius"></div>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="window_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_bg_color_picker"></div></div></div>
-                    <div class="setting-item"><div class="info"><div class="title">边框颜色</div></div><div class="color-picker-group"><input type="text" id="window_border_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_border_color_picker"></div></div></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">强调色 (选中项背景)</div></div><div class="color-picker-group"><input type="text" id="window_highlight_color" style="width:80px;"><div class="color-preview"><input type="color" id="window_highlight_color_picker"></div></div></div>
-            </div>
-
-            <h2>1. 拼音样式 (Pinyin)</h2>
-            <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">字体家族</div></div>
-                    <select id="pinyin_text_font_family" class="font-select" style="width: 250px;"></select>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="pinyin_text_font_size"></div>
-                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="pinyin_text_alpha"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="pinyin_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="pinyin_text_color_picker"></div></div></div>
-            </div>
-
-            <h2>2. 候选词样式 (Candidate)</h2>
-            <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">字体家族</div></div>
-                    <select id="candidate_text_font_family" class="font-select" style="width: 250px;"></select>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="candidate_text_font_size"></div>
-                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="candidate_text_alpha"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="candidate_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="candidate_text_color_picker"></div></div></div>
-            </div>
-
-            <h2>3. 提示/辅助码样式 (Hint)</h2>
-            <div class="card">
-                <div class="setting-item">
-                    <div class="info"><div class="title">字体家族</div></div>
-                    <select id="hint_text_font_family" class="font-select" style="width: 250px;"></select>
-                </div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">字体大小</div></div><input type="number" id="hint_text_font_size"></div>
-                    <div class="setting-item"><div class="info"><div class="title">不透明度</div></div><input type="number" step="0.1" min="0" max="1" id="hint_text_alpha"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="hint_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="hint_text_color_picker"></div></div></div>
-            </div>
-
-            <h2>卡片窗口样式</h2>
-            <div class="card">
-                <div class="setting-item"><div class="info"><div class="title">锚定位置</div></div><select id="modern_cand_anchor"><option value="bottom_left">左下角</option><option value="bottom_right">右下角</option><option value="top_left">左上角</option><option value="top_right">右上角</option></select></div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">文字颜色</div></div><div class="color-picker-group"><input type="text" id="modern_cand_text_color" style="width:80px;"><div class="color-preview"><input type="color" id="modern_cand_text_color_picker"></div></div></div>
-                    <div class="setting-item"><div class="info"><div class="title">高亮颜色</div></div><div class="color-picker-group"><input type="text" id="modern_cand_highlight_color" style="width:80px;"><div class="color-preview"><input type="color" id="modern_cand_highlight_color_picker"></div></div></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="modern_cand_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="modern_cand_bg_color_picker"></div></div></div>
-            </div>
-
-            <h2>按键回显样式</h2>
-            <div class="card">
-                <div class="setting-item"><div class="info"><div class="title">锚定位置</div></div><select id="keystroke_anchor"><option value="bottom_right">右下角</option><option value="top_right">右上角</option><option value="bottom_left">左下角</option><option value="top_left">左上角</option></select></div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="keystroke_font_size"></div>
-                    <div class="setting-item"><div class="info"><div class="title">显示时长 (ms)</div></div><input type="number" id="keystroke_timeout_ms"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="keystroke_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="keystroke_bg_color_picker"></div></div></div>
-            </div>
-
-            <h2>学习模式样式</h2>
-            <div class="card">
-                <div class="setting-item"><div class="info"><div class="title">数据源 (词典)</div></div><select id="learning_dict_path"></select></div>
-                <div class="setting-item"><div class="info"><div class="title">锚定位置</div></div><select id="learning_anchor"><option value="top_right">右上角</option><option value="top_left">左上角</option><option value="bottom_right">右下角</option><option value="bottom_left">左下角</option></select></div>
-                <div class="grid-2">
-                    <div class="setting-item"><div class="info"><div class="title">字号</div></div><input type="number" id="learning_font_size"></div>
-                    <div class="setting-item"><div class="info"><div class="title">切换间隔 (秒)</div></div><input type="number" id="learning_interval_sec"></div>
-                </div>
-                <div class="setting-item"><div class="info"><div class="title">背景颜色</div></div><div class="color-picker-group"><input type="text" id="learning_bg_color" style="width:80px;"><div class="color-preview"><input type="color" id="learning_bg_color_picker"></div></div></div>
-            </div>
-        </div>
-
-        <div id="tab-dicts" class="tab-content"><h1>词库管理</h1><div class="card"><button class="btn" onclick="compile()">立即编译</button></div><div id="dicts-container"></div></div>
-        <div id="tab-dict-editor" class="tab-content">
-            <h1>词典编辑器</h1>
-            <div class="card">
-                <h3>添加新词条</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end;">
-                    <div><label><small>拼音</small></label><input type="text" id="add-pinyin" placeholder="例如: nihao" style="width:100%;"></div>
-                    <div><label><small>词汇</small></label><input type="text" id="add-word" placeholder="例如: 你好" style="width:100%;"></div>
-                    <div><label><small>提示/翻译</small></label><input type="text" id="add-hint" placeholder="例如: hello" style="width:100%;"></div>
-                    <div><label><small>保存至词典</small></label><select id="add-target-file" style="width:100%; height: 42px;"></select></div>
-                    <button class="btn" onclick="addNewEntry()">添加</button>
-                </div>
-            </div>
-            <div class="card"><input type="text" id="dict-search" placeholder="搜索现有词条..." style="width:100%;" oninput="doSearch()"></div>
-            <div id="dict-results"></div>
-        </div>
-        <div id="tab-profilekeys" class="tab-content">
-            <h1>快捷切换映射</h1>
-            <div class="card">
-                <div class="info">
-                    <div class="desc">在输入缓冲区为空时，按 ` 进入切换模式，随后按下以下映射的按键即可快速切换方案。</div>
-                </div>
-                <div class="keyboard" id="kb-profilekeys"></div>
-                <div id="edit-profilekeys" class="kb-edit-box">
-                    <h3 id="pk-edit-title">编辑切换键: </h3>
-                    <div class="setting-item">
-                        <div class="info">
-                            <div class="title">目标方案</div>
-                            <div class="desc">按下此键后切换到的方案名称（多个用逗号隔开）</div>
-                        </div>
-                        <input type="text" id="pk-edit-input" style="width: 200px;" placeholder="例如: chinese">
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="tab-hotkeys" class="tab-content"><h1>快捷键</h1><div class="card" id="hk-container"></div></div>
-        
-        <div id="tab-keybehavior" class="tab-content">
-            <h1>按键行为定制</h1>
-            
-            <div class="card">
-                <h2>长按行为 (Long Press)</h2>
-                <div class="setting-item">
-                    <div class="info"><div class="title">启用长按功能</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_long_press"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">长按判定时长 (ms)</div></div>
-                    <input type="number" id="long_press_timeout_ms">
-                </div>
-                
-                <div class="keyboard" id="kb-longpress"></div>
-                <div id="edit-longpress" class="kb-edit-box">
-                    <h3 id="lp-edit-title">编辑按键: </h3>
-                    <div class="setting-item">
-                        <div class="info"><div class="title">映射内容</div><div class="desc">长按后输入的文字</div></div>
-                        <input type="text" id="lp-edit-input" style="width: 200px;">
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>双击行为 (Double Click)</h2>
-                <div class="setting-item">
-                    <div class="info"><div class="title">启用双击功能</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_double_tap_alt"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
-                    <div class="info"><div class="title">双击判定时长 (ms)</div></div>
-                    <input type="number" id="double_tap_timeout_ms_alt">
-                </div>
-                
-                <div class="keyboard" id="kb-doubletap"></div>
-                <div id="edit-doubletap" class="kb-edit-box">
-                    <h3 id="dt-edit-title">编辑按键: </h3>
-                    <div class="setting-item">
-                        <div class="info"><div class="title">映射内容</div><div class="desc">双击后输入的文字</div></div>
-                        <input type="text" id="dt-edit-input" style="width: 200px;">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <div id="toast" class="status-toast">已保存并应用</div>
-
-    <script>
-        let config = null;
-
-        function showTab(id) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-            const target = document.getElementById('tab-' + id);
-            if(target) target.classList.add('active');
-            const navBtn = document.getElementById('nav-' + id);
-            if(navBtn) navBtn.classList.add('active');
-        }
-
-        function linkColor(id) {
-            const txt = document.getElementById(id); const picker = document.getElementById(id + '_picker');
-            if(!txt || !picker) return;
-            txt.oninput = () => { picker.value = txt.value; };
-            picker.oninput = () => { txt.value = picker.value; };
-        }
-
-        function toggleChip(el) {
-            const cb = el.querySelector('input'); cb.checked = !cb.checked; el.classList.toggle('active', cb.checked);
-        }
-
-        async function load() {
-            const r = await fetch('/api/config'); config = await r.json();
-            
-            // 加载字体列表
-            const font_r = await fetch('/api/fonts');
-            const system_fonts = await font_r.json();
-            const font_options = system_fonts.map(f => `<option value="${f.name}">${f.name}</option>`).join('');
-            document.querySelectorAll('.font-select').forEach(select => {
-                select.innerHTML = `<option value="">默认系统字体</option>` + font_options;
-            });
-
-            // 方案选择
-            const pc = document.getElementById('active_profiles_container');
-            pc.innerHTML = config.files.profiles.map(p => `
-                <div class="profile-chip ${config.input.active_profiles.includes(p.name)?'active':''}" onclick="toggleChip(this)">
-                    <input type="checkbox" value="${p.name}" ${config.input.active_profiles.includes(p.name)?'checked':''}>
-                    <span>${p.name}</span>
-                </div>
-            `).join('');
-
-            // 翻页键多选
-            const fpc = document.getElementById('page_flipping_keys_container');
-            fpc.querySelectorAll('input').forEach(i => {
-                const active = config.input.page_flipping_keys.includes(i.value);
-                i.checked = active;
-                i.parentElement.classList.toggle('active', active);
-            });
-
-            const d_r = await fetch('/api/dicts'); const dicts = await d_r.json();
-            const jsonDicts = dicts.filter(d => d.path.endsWith('.json'));
-
-            const ls = document.getElementById('learning_dict_path');
-            if(ls) {
-                ls.innerHTML = jsonDicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
-                ls.value = config.appearance.learning_dict_path;
-            }
-
-            const ats = document.getElementById('add-target-file');
-            if(ats) {
-                ats.innerHTML = jsonDicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
-                // 默认选择第一个包含 chinese 的词典，如果没有则选第一个
-                const defaultIdx = jsonDicts.findIndex(d => d.path.includes('chinese/words'));
-                if (defaultIdx !== -1) ats.selectedIndex = defaultIdx;
-            }
-
-            // 绑定普通输入框 (支持嵌套属性路径，用 _ 分隔)
-            const allIds = [
-                'commit_mode', 'page_size', 'candidate_anchor', 'corner_radius', 
-                'window_bg_color', 'window_border_color', 'window_highlight_color',
-                'window_padding_x', 'window_padding_y', 'item_spacing', 'row_spacing',
-                'pinyin_text_font_family', 'pinyin_text_font_size', 'pinyin_text_alpha', 'pinyin_text_color',
-                'candidate_text_font_family', 'candidate_text_font_size', 'candidate_text_alpha', 'candidate_text_color',
-                'hint_text_font_family', 'hint_text_font_size', 'hint_text_alpha', 'hint_text_color',
-                'double_tap_timeout_ms', 'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec',
-                'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color'
-            ];
-            
-            allIds.forEach(id => { 
-                const el = document.getElementById(id); 
-                if(!el) return;
-                
-                // 解析路径，例如 pinyin_text_font_size -> config.appearance.pinyin_text.font_size
-                let val = null;
-                if (id.includes('_text_')) {
-                    const parts = id.split('_text_'); // [pinyin, font_family]
-                    const section = parts[0] + '_text';
-                    const prop = parts[1];
-                    val = config.appearance[section][prop];
-                } else {
-                    val = config.appearance[id] !== undefined ? config.appearance[id] : config.input[id];
-                }
-                el.value = val !== undefined ? val : "";
-            });
-
-            const checkIds = ['autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'enable_user_dict', 'enable_fixed_first_candidate'];
-            checkIds.forEach(id => { 
-                const el = document.getElementById(id); 
-                if(el) el.checked = (config.input[id] !== undefined) ? config.input[id] : config.appearance[id]; 
-                if(id === 'enable_double_tap') {
-                    const alt = document.getElementById('enable_double_tap_alt');
-                    if(alt) alt.checked = el.checked;
-                }
-            });
-
-            document.getElementById('long_press_timeout_ms').value = config.input.long_press_timeout_ms;
-            document.getElementById('double_tap_timeout_ms_alt').value = config.input.double_tap_timeout_ms;
-
-            renderKeyboard('kb-longpress', 'long_press_mappings');
-            renderKeyboard('kb-doubletap', 'double_taps');
-            renderKeyboard('kb-profilekeys', 'profile_keys');
-
-            // 绑定颜色选择器
-            const colorIds = [
-                'window_bg_color', 'window_border_color', 'window_highlight_color',
-                'pinyin_text_color', 'candidate_text_color', 'hint_text_color',
-                'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'keystroke_bg_color', 'learning_bg_color'
-            ];
-            colorIds.forEach(id => {
-                const el = document.getElementById(id); if(!el) return;
-                linkColor(id);
-                const picker = document.getElementById(id + '_picker'); if(el.value && el.value.startsWith('#')) picker.value = el.value;
-            });
-
-            renderHK(); renderDictsList(dicts);
-        }
-
-        async function saveAll() {
-            config.input.active_profiles = Array.from(document.querySelectorAll('#active_profiles_container input:checked')).map(i => i.value);
-            config.input.page_flipping_keys = Array.from(document.querySelectorAll('#page_flipping_keys_container input:checked')).map(i => i.value);
-            
-            ['commit_mode', 'autostart', 'enable_error_sound', 'auto_commit_unique_full_match', 'enable_prefix_matching', 'enable_abbreviation_matching', 'enable_anti_typo', 'swap_arrow_keys', 'enable_english_filter', 'enable_caps_selection', 'enable_number_selection', 'enable_double_tap', 'enable_long_press', 'long_press_timeout_ms', 'enable_user_dict', 'enable_fixed_first_candidate'].forEach(id => {
-                const el = document.getElementById(id); if(!el) return;
-                config.input[id] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? parseFloat(el.value) : el.value);
-            });
-
-            // 特殊处理同步的双击开关和时长
-            const altDtEnable = document.getElementById('enable_double_tap_alt');
-            if(altDtEnable) config.input.enable_double_tap = altDtEnable.checked;
-            const altDtTimeout = document.getElementById('double_tap_timeout_ms_alt');
-            if(altDtTimeout) config.input.double_tap_timeout_ms = parseInt(altDtTimeout.value);
-
-            const appearanceIds = [
-                'show_candidates', 'show_modern_candidates', 'show_keystrokes', 'learning_mode', 'show_notifications', 'show_en_hint', 'show_tone_hint',
-                'candidate_anchor', 'corner_radius', 'window_bg_color', 'window_border_color', 'window_highlight_color',
-                'window_padding_x', 'window_padding_y', 'item_spacing', 'row_spacing',
-                'pinyin_text_font_family', 'pinyin_text_font_size', 'pinyin_text_alpha', 'pinyin_text_color',
-                'candidate_text_font_family', 'candidate_text_font_size', 'candidate_text_alpha', 'candidate_text_color',
-                'hint_text_font_family', 'hint_text_font_size', 'hint_text_alpha', 'hint_text_color',
-                'keystroke_anchor', 'keystroke_font_size', 'keystroke_timeout_ms', 'learning_anchor', 'learning_font_size', 'learning_interval_sec',
-                'modern_cand_anchor', 'modern_cand_text_color', 'modern_cand_highlight_color', 'modern_cand_bg_color', 'learning_dict_path'
-            ];
-
-            appearanceIds.forEach(id => {
-                const el = document.getElementById(id); if(!el) return;
-                const val = el.type === 'number' ? parseFloat(el.value) : (el.type === 'checkbox' ? el.checked : el.value);
-                
-                if (id.includes('_text_')) {
-                    const parts = id.split('_text_');
-                    const section = parts[0] + '_text';
-                    const prop = parts[1];
-                    config.appearance[section][prop] = (prop === 'font_size' || prop === 'alpha') ? parseFloat(val) : val;
-                } else {
-                    config.appearance[id] = val;
-                }
-            });
-
-            await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) });
-            const toast = document.getElementById('toast'); toast.style.display='block'; setTimeout(()=>toast.style.display='none', 2000);
-        }
-
-        function renderPK() { 
-            const available = config.files.profiles.map(p => p.name);
-            document.getElementById('pk-container').innerHTML = (config.input.profile_keys||[]).map((pk, i) => `
-                <div class="setting-item">
-                    <input type="text" value="${pk.key}" onchange="config.input.profile_keys[${i}].key=this.value" style="width:60px; text-align:center;"> ⮕ 
-                    <input type="text" value="${pk.profile}" onchange="config.input.profile_keys[${i}].profile=this.value" style="width:150px;">
-                    <button onclick="config.input.profile_keys.splice(${i},1);renderPK()">✕</button>
-                </div>`).join('');
-        }
-        function addPK() { config.input.profile_keys.push({key:'',profile:''}); renderPK(); }
-        function renderHK() { document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `<div class="setting-item"><span>${val.description}</span><input type="text" value="${val.key}" onchange="config.hotkeys.${id}.key=this.value"></div>`).join(''); }
-        function renderDictsList(ds) {
-            const groups = {}; ds.forEach(d => { if(!groups[d.group]) groups[d.group] = []; groups[d.group].push(d); });
-            document.getElementById('dicts-container').innerHTML = Object.entries(groups).sort().map(([group, files]) => `<div class="card"><h3 style="margin-top:0; color:var(--apple-accent); text-transform:capitalize;">${group}</h3>${files.map(f => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed #eee; ${f.enabled?'':'opacity:0.5'}"><div><b>${f.name.replace('.disabled','')}</b><br><small>${f.entry_count.toLocaleString()} 条</small></div><label class="switch"><input type="checkbox" ${f.enabled?'checked':''} onchange="toggleDict('${f.path}')"><span class="slider"></span></label></div>`).join('')}</div>`).join('');
-        }
-        async function toggleDict(path) { await fetch('/api/dicts/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }); load(); }
-        async function compile() { alert('编译开始'); await fetch('/api/dicts/compile', { method: 'POST' }); alert('完成'); }
-        async function resetAll() { if(confirm("重置所有设置？")) { await fetch('/api/config/reset', { method: 'POST' }); location.reload(); } }
-        let st = null; function doSearch() { const q = document.getElementById('dict-search').value; if(q.length<1) return; if(st) clearTimeout(st); st = setTimeout(async () => { const res = await (await fetch(`/api/dict/search?q=${encodeURIComponent(q)}`)).json(); document.getElementById('dict-results').innerHTML = res.map((item, i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><b>${item.word}</b><input type="text" id="edit-hint-${i}" value="${item.hint}" style="width:50%;"><button class="btn" onclick="updateEntry(${i}, '${item.pinyin}', '${item.word}', '${item.file}')">更新</button></div>`).join(''); }, 300); }
-        async function updateEntry(idx, pinyin, word, file) { const hint = document.getElementById(`edit-hint-${idx}`).value; await fetch('/api/dict/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinyin, word, new_hint: hint, file }) }); alert('成功'); }
-
-        async function addNewEntry() {
-            const pinyin = document.getElementById('add-pinyin').value.trim().toLowerCase();
-            const word = document.getElementById('add-word').value.trim();
-            const hint = document.getElementById('add-hint').value.trim();
-            const file = document.getElementById('add-target-file').value;
-
-            if (!pinyin || !word) { alert('拼音和词汇不能为空'); return; }
-
-            const res = await fetch('/api/dict/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pinyin, word, hint, file })
-            });
-
-            if (res.ok) {
-                alert('词条已成功添加！记得点击“立即编译”以使新词生效。');
-                document.getElementById('add-pinyin').value = '';
-                document.getElementById('add-word').value = '';
-                document.getElementById('add-hint').value = '';
-            } else if (res.status === 409) {
-                alert('该词条在目标文件中已存在。');
-            } else {
-                alert('添加失败，请检查后端日志。');
-            }
-        }
-
-        const KB_LAYOUT = [
-            ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
-            ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-            ['z', 'x', 'c', 'v', 'b', 'n', 'm']
-        ];
-
-        function renderKeyboard(containerId, configKey) {
-            const container = document.getElementById(containerId);
-            const mappings = config.input[configKey] || [];
-            const isProfileKeys = configKey === 'profile_keys';
-            
-            container.innerHTML = KB_LAYOUT.map(row => `
-                <div class="keyboard-row">
-                    ${row.map(key => {
-                        let mapping = "";
-                        if (isProfileKeys) {
-                            const entry = mappings.find(m => m.key === key);
-                            mapping = entry ? entry.profile : "";
-                        } else {
-                            const entry = mappings.find(m => m.trigger_key === key);
-                            mapping = entry ? entry.insert_text : "";
-                        }
-                        
-                        let typeClass = "";
-                        if (mapping) {
-                            if (isProfileKeys) {
-                                typeClass = "type-profile";
-                            } else {
-                                const isDiacritic = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/.test(mapping);
-                                const isSpecial = /[^a-zA-Z0-9\s]/.test(mapping) && !isDiacritic;
-                                if (isDiacritic) typeClass = "type-diacritic";
-                                else if (isSpecial) typeClass = "type-special";
-                            }
-                        }
-
-                        return `
-                            <div class="kb-key ${mapping ? 'active' : ''} ${typeClass}" onclick="editKey('${containerId}', '${configKey}', '${key}')">
-                                <div class="kb-key-main">${key.toUpperCase()}</div>
-                                <div class="kb-key-sub">${mapping}</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `).join('');
-        }
-
-        function editKey(containerId, configKey, key) {
-            const isLongPress = containerId === 'kb-longpress';
-            const isDoubleTap = containerId === 'kb-doubletap';
-            const isProfileKeys = containerId === 'kb-profilekeys';
-
-            let editBoxId, titleId, inputId;
-            if (isLongPress) {
-                editBoxId = 'edit-longpress'; titleId = 'lp-edit-title'; inputId = 'lp-edit-input';
-            } else if (isDoubleTap) {
-                editBoxId = 'edit-doubletap'; titleId = 'dt-edit-title'; inputId = 'dt-edit-input';
-            } else {
-                editBoxId = 'edit-profilekeys'; titleId = 'pk-edit-title'; inputId = 'pk-edit-input';
-            }
-            
-            const editBox = document.getElementById(editBoxId);
-            const title = document.getElementById(titleId);
-            const input = document.getElementById(inputId);
-            
-            // 隐藏其他的编辑框
-            document.querySelectorAll('.kb-edit-box').forEach(el => el.style.display = 'none');
-            
-            editBox.style.display = 'block';
-            title.innerText = `编辑按键: ${key.toUpperCase()}`;
-            
-            const mappings = config.input[configKey];
-            let currentVal = "";
-            if (isProfileKeys) {
-                const entry = mappings.find(m => m.key === key);
-                currentVal = entry ? entry.profile : "";
-            } else {
-                const entry = mappings.find(m => m.trigger_key === key);
-                currentVal = entry ? entry.insert_text : "";
-            }
-            input.value = currentVal;
-            
-            input.oninput = () => {
-                const val = input.value;
-                if (isProfileKeys) {
-                    const idx = mappings.findIndex(m => m.key === key);
-                    if (val === "") { if (idx !== -1) mappings.splice(idx, 1); }
-                    else { if (idx !== -1) mappings[idx].profile = val; else mappings.push({ key: key, profile: val }); }
-                } else {
-                    const idx = mappings.findIndex(m => m.trigger_key === key);
-                    if (val === "") { if (idx !== -1) mappings.splice(idx, 1); }
-                    else { if (idx !== -1) mappings[idx].insert_text = val; else mappings.push({ trigger_key: key, insert_text: val }); }
-                }
-                renderKeyboard(containerId, configKey);
-            };
-        }
-
-        load();
-    </script>
+    </div>
 </body>
 </html>
