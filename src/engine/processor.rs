@@ -431,7 +431,7 @@ impl Processor {
             // 拼音声母包括：b p m f d t n l g k h j q x zh ch sh r z c s y w
             let c = remaining.chars().next()
                 .unwrap_or_else(|| {
-                    log::warn!("输入字符串为空，无法获取字符");
+                    eprintln!("[Processor] 警告: 输入字符串为空，无法获取字符");
                     '\0'
                 });
             let is_initial = "bpmfdtnlgkhjqxzcsryw".contains(c);
@@ -912,11 +912,13 @@ impl Processor {
     }
 
     fn handle_punctuation(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
-        let punc_key = get_punctuation_key(key, shift_pressed)
+        let punc_key_owned = get_punctuation_key(key, shift_pressed)
+            .map(|s| s.to_string())
             .unwrap_or_else(|| {
-                log::warn!("无法获取标点符号键: key={:?}, shift={}", key, shift_pressed);
-                key.to_string()
+                eprintln!("[Processor] 警告: 无法获取标点符号键: key={:?}, shift={}", key, shift_pressed);
+                format!("{:?}", key)
             });
+        let punc_key = punc_key_owned.as_str();
         let zh_puncs = self.punctuation.get(punc_key);
         
         let zh_punc = if let Some(puncs) = zh_puncs {

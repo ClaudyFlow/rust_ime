@@ -10,6 +10,12 @@ pub enum VirtualKey {
     Grave, Minus, Equal, LeftBrace, RightBrace, Backslash, Semicolon, Apostrophe, Comma, Dot, Slash,
 }
 
+impl std::fmt::Display for VirtualKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl VirtualKey {
     pub fn from_u32(v: u32) -> Option<Self> {
         if v <= 25 {
