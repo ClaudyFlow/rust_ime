@@ -35,6 +35,13 @@
                     <option value="top">光标上方</option>
                 </select>
             </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">候选词排列</div><div class="desc">横向或纵向展示候选词</div></div>
+                <select id="candidate_layout">
+                    <option value="horizontal">横向排列 (默认)</option>
+                    <option value="vertical">纵向排列</option>
+                </select>
+            </div>
             <div class="grid-2">
                 <div class="setting-item">
                     <div class="info"><div class="title">背景颜色</div></div>
@@ -112,6 +119,7 @@
             bindInput('show_candidates', 'appearance');
             bindInput('show_en_hint', 'appearance');
             bindInput('candidate_anchor', 'appearance');
+            bindInput('candidate_layout', 'appearance');
             bindInput('window_bg_color', 'appearance');
             bindInput('window_border_color', 'appearance');
             bindInput('window_highlight_color', 'appearance');

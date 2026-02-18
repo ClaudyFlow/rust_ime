@@ -265,7 +265,6 @@ impl Processor {
             self.load_user_dict();
         }
         self.show_candidates = conf.appearance.show_candidates;
-        self.show_modern_candidates = conf.appearance.show_modern_candidates;
         self.show_notifications = conf.appearance.show_notifications;
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.page_size = conf.appearance.page_size;

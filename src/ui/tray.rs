@@ -14,7 +14,6 @@ pub enum TrayEvent {
     Restart,
     Exit,
     ToggleGui,
-    ToggleModernGui,
     ToggleNotify,
     ToggleKeystroke,
     ToggleLearning,
@@ -24,6 +23,7 @@ pub enum TrayEvent {
     ReloadConfig,
     CyclePreview,
     CompileDict,
+    ToggleLayout,
 }
 
 #[cfg(target_os = "linux")]
@@ -31,13 +31,13 @@ pub struct ImeTray {
     pub chinese_enabled: bool,
     pub active_profile: String,
     pub show_candidates: bool,
-    pub show_modern_candidates: bool,
     pub show_notifications: bool,
     pub show_keystrokes: bool,
     pub learning_mode: bool,
     pub anti_typo: bool,
     pub commit_mode: String,
     pub preview_mode: String,
+    pub candidate_layout: String,
     pub tx: Sender<TrayEvent>,
 }
 
@@ -126,9 +126,10 @@ impl Tray for ImeTray {
     fn tool_tip(&self) -> ToolTip {
         ToolTip {
             title: "rust-IME".to_string(),
-            description: format!("Profile: {}\nGUI: {}\nPreview: {}\nLearning: {}", 
+            description: format!("Profile: {}\nGUI: {}\nLayout: {}\nPreview: {}\nLearning: {}", 
                 self.active_profile,
                 if self.show_candidates { "开" } else { "关" },
+                if self.candidate_layout == "vertical" { "竖排" } else { "横排" },
                 self.preview_mode,
                 if self.learning_mode { "开" } else { "关" }
             ),
@@ -150,13 +151,13 @@ impl Tray for ImeTray {
             }.into(),
             MenuItem::Separator,
             StandardItem {
-                label: format!("传统候选窗: {}", if self.show_candidates { "显示" } else { "隐藏" }),
+                label: format!("候选窗: {}", if self.show_candidates { "显示" } else { "隐藏" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleGui); }),
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("卡片式候选窗: {}", if self.show_modern_candidates { "显示" } else { "隐藏" }),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleModernGui); }),
+                label: format!("布局: {}", if self.candidate_layout == "vertical" { "当前竖排 (切横排)" } else { "当前横排 (切竖排)" }),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleLayout); }),
                 ..Default::default()
             }.into(),
             StandardItem {
@@ -223,14 +224,14 @@ impl Tray for ImeTray {
 #[cfg(target_os = "linux")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_modern_candidates: bool,
     show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
     anti_typo: bool,
     commit_mode: String,
     preview_mode: String,
+    candidate_layout: String,
     event_tx: Sender<TrayEvent>
 ) -> Handle<ImeTray> {
-    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_modern_candidates, show_notifications, show_keystrokes, learning_mode, anti_typo, commit_mode, preview_mode, tx: event_tx };
+    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_notifications, show_keystrokes, learning_mode, anti_typo, commit_mode, preview_mode, candidate_layout, tx: event_tx };
     let tray_service = TrayService::new(service);
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });
@@ -259,7 +260,6 @@ pub struct ImeTrayStub {
     pub chinese_enabled: bool,
     pub active_profile: String,
     pub show_candidates: bool,
-    pub show_modern_candidates: bool,
     pub show_notifications: bool,
     pub show_keystrokes: bool,
     pub learning_mode: bool,
@@ -267,6 +267,7 @@ pub struct ImeTrayStub {
     pub double_pinyin: bool,
     pub commit_mode: String,
     pub preview_mode: String,
+    pub candidate_layout: String,
 }
 
 #[cfg(target_os = "windows")]
@@ -293,19 +294,19 @@ impl WindowsTrayHandle {
 #[cfg(target_os = "windows")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_modern_candidates: bool,
     show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
     anti_typo: bool,
     double_pinyin: bool,
     commit_mode: String,
     preview_mode: String,
+    candidate_layout: String,
     event_tx: Sender<TrayEvent>
 ) -> WindowsTrayHandle {
     let state = Arc::new(Mutex::new(ImeTrayStub {
-        chinese_enabled, active_profile, show_candidates, show_modern_candidates,
+        chinese_enabled, active_profile, show_candidates, 
         show_notifications, show_keystrokes, learning_mode, anti_typo,
         double_pinyin,
-        commit_mode, preview_mode,
+        commit_mode, preview_mode, candidate_layout,
     }));
     
     unsafe {
@@ -412,7 +413,6 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1001 => { let _ = tx.send(TrayEvent::ToggleIme); }
                     1002 => { let _ = tx.send(TrayEvent::NextProfile); }
                     1003 => { let _ = tx.send(TrayEvent::ToggleGui); }
-                    1004 => { let _ = tx.send(TrayEvent::ToggleModernGui); }
                     1005 => { let _ = tx.send(TrayEvent::CyclePreview); }
                     1006 => { let _ = tx.send(TrayEvent::ToggleNotify); }
                     1007 => { let _ = tx.send(TrayEvent::ToggleKeystroke); }
@@ -423,6 +423,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
                     1016 => { let _ = tx.send(TrayEvent::CompileDict); }
+                    1017 => { let _ = tx.send(TrayEvent::ToggleLayout); }
                     1013 => { let _ = tx.send(TrayEvent::Restart); }
                     1014 => { let _ = tx.send(TrayEvent::Exit); }
                     _ => {}
@@ -445,10 +446,10 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(HSTRING::from(&profile_label).as_ptr()));
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             
-            let gui_label = format!("传统候选窗: {}", if state.show_candidates { "显示" } else { "隐藏" });
+            let gui_label = format!("候选窗: {}", if state.show_candidates { "显示" } else { "隐藏" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1003, PCWSTR(HSTRING::from(&gui_label).as_ptr()));
-            let modern_label = format!("卡片式候选窗: {}", if state.show_modern_candidates { "显示" } else { "隐藏" });
-            let _ = AppendMenuW(h_menu, MF_STRING, 1004, PCWSTR(HSTRING::from(&modern_label).as_ptr()));
+            let layout_label = format!("布局: {}", if state.candidate_layout == "vertical" { "竖排 (切横排)" } else { "横排 (切竖排)" });
+            let _ = AppendMenuW(h_menu, MF_STRING, 1017, PCWSTR(HSTRING::from(&layout_label).as_ptr()));
             let preview_label = format!("拼音预览: {}", if state.preview_mode == "pinyin" { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1005, PCWSTR(HSTRING::from(&preview_label).as_ptr()));
             let notify_label = format!("系统通知候选词: {}", if state.show_notifications { "开启" } else { "关闭" });

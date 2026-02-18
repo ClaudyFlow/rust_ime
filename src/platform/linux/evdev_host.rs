@@ -185,9 +185,9 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit, toggle_dp) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_ks, toggle_commit, toggle_dp) = {
                             let conf = self.config.read().unwrap();
-                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_modern_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
+                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
                         };
                         
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
@@ -232,13 +232,7 @@ impl InputMethodHost for EvdevHost {
 
                         if is_combo(&held_keys, &toggle_trad) {
                             let mut p = self.processor.lock().unwrap(); p.show_candidates = !p.show_candidates;
-                            let _ = self.notify_tx.send(NotifyEvent::Message("UI".into(), if p.show_candidates { "显示传统窗" } else { "隐藏传统窗" }.into()));
-                            continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_mod) {
-                            let mut p = self.processor.lock().unwrap(); p.show_modern_candidates = !p.show_modern_candidates;
-                            let _ = self.notify_tx.send(NotifyEvent::Message("UI".into(), if p.show_modern_candidates { "显示卡片窗" } else { "隐藏卡片窗" }.into()));
+                            let _ = self.notify_tx.send(NotifyEvent::Message("UI".into(), if p.show_candidates { "显示候选窗" } else { "隐藏候选窗" }.into()));
                             continue;
                         }
 

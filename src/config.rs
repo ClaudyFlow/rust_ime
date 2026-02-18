@@ -28,13 +28,13 @@ pub struct Profile {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appearance {
     pub show_candidates: bool,
-    pub show_modern_candidates: bool,
     pub show_notifications: bool,
     pub show_keystrokes: bool,
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub show_en_hint: bool,
     pub candidate_anchor: String,
+    pub candidate_layout: String, // "horizontal" 或 "vertical"
     
     // Window Style
     pub corner_radius: f32,
@@ -52,17 +52,6 @@ pub struct Appearance {
     pub hint_text: TextStyle,
     pub comment_text: TextStyle, // For extra info like "User", "Emoji"
 
-    // Modern GUI specific
-    pub modern_cand_anchor: String,
-    pub modern_cand_font_size: u32,
-    pub modern_cand_hint_font_size: u32,
-    pub modern_cand_margin_x: i32,
-    pub modern_cand_margin_y: i32,
-    pub modern_cand_text_color: String,
-    pub modern_cand_highlight_color: String,
-    pub modern_cand_bg_color: String,
-    
-    // Keystroke specific
     pub keystroke_anchor: String,
     pub keystroke_font_size: u32,
     pub keystroke_timeout_ms: u64,
@@ -166,7 +155,6 @@ pub struct Hotkeys {
     pub toggle_notifications: Hotkey,
     pub cycle_paste_method: Hotkey,
     pub toggle_traditional_gui: Hotkey,
-    pub toggle_modern_gui: Hotkey,
     pub toggle_keystrokes: Hotkey,
     pub switch_commit_mode: Hotkey,
     pub toggle_double_pinyin: Hotkey,
@@ -191,13 +179,13 @@ impl Config {
             },
             appearance: Appearance {
                 show_candidates: true,
-                show_modern_candidates: false,
                 show_notifications: true,
                 show_keystrokes: false,
                 page_size: 5,
                 show_tone_hint: false,
                 show_en_hint: true,
                 candidate_anchor: "bottom".to_string(),
+                candidate_layout: "horizontal".to_string(),
                 
                 corner_radius: 10.0,
                 window_bg_color: "#ffffff".to_string(),
@@ -233,15 +221,6 @@ impl Config {
                     alpha: 0.7,
                 },
 
-                modern_cand_anchor: "bottom_left".to_string(),
-                modern_cand_font_size: 16,
-                modern_cand_hint_font_size: 10,
-                modern_cand_margin_x: 40,
-                modern_cand_margin_y: 200,
-                modern_cand_text_color: "#0969da".to_string(),
-                modern_cand_highlight_color: "#0969da".to_string(),
-                modern_cand_bg_color: "rgba(255, 255, 255, 0.95)".to_string(),
-                
                 keystroke_anchor: "bottom_right".to_string(),
                 keystroke_font_size: 24,
                 keystroke_timeout_ms: 1500,
@@ -361,8 +340,7 @@ impl Config {
                 cycle_preview_mode: Hotkey { key: "ctrl+alt+p".to_string(), description: "界面: 切换屏幕预览模式".to_string() },
                 toggle_notifications: Hotkey { key: "ctrl+alt+n".to_string(), description: "界面: 开启/关闭系统通知".to_string() },
                 cycle_paste_method: Hotkey { key: "ctrl+alt+v".to_string(), description: "兼容: 切换粘贴注入方式".to_string() },
-                toggle_traditional_gui: Hotkey { key: "ctrl+alt+g".to_string(), description: "界面: 显示/隐藏传统候选窗".to_string() },
-                toggle_modern_gui: Hotkey { key: "ctrl+alt+h".to_string(), description: "界面: 显示/隐藏卡片候选词".to_string() },
+                toggle_traditional_gui: Hotkey { key: "ctrl+alt+g".to_string(), description: "界面: 显示/隐藏候选窗".to_string() },
                 toggle_keystrokes: Hotkey { key: "ctrl+alt+k".to_string(), description: "功能: 开启/关闭按键显示".to_string() },
                 switch_commit_mode: Hotkey { key: "ctrl+alt+m".to_string(), description: "模式: 切换单/双空格上屏".to_string() },
                 toggle_double_pinyin: Hotkey { key: "ctrl+alt+d".to_string(), description: "模式: 开启/关闭双拼模式".to_string() },

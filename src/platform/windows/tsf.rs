@@ -7,6 +7,7 @@ use crate::{Config, NotifyEvent};
 
 pub struct TsfHost {
     processor: Arc<Mutex<Processor>>,
+    config: Arc<RwLock<Config>>,
     gui_tx: Option<Sender<GuiEvent>>,
     notify_tx: Sender<NotifyEvent>,
 }
@@ -15,11 +16,12 @@ impl TsfHost {
     pub fn new(
         processor: Arc<Mutex<Processor>>,
         gui_tx: Option<Sender<GuiEvent>>,
-        _config: Arc<RwLock<Config>>,
+        config: Arc<RwLock<Config>>,
         notify_tx: Sender<NotifyEvent>,
     ) -> Self {
         Self {
             processor,
+            config,
             gui_tx,
             notify_tx,
         }

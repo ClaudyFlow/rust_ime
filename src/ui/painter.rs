@@ -99,6 +99,7 @@ impl CandidatePainter {
         let corner_radius = appearance.corner_radius;
         let item_spacing = appearance.item_spacing;
         let row_spacing = appearance.row_spacing;
+        let is_vertical = appearance.candidate_layout == "vertical";
 
         let font_size_pinyin = appearance.pinyin_text.font_size as f32;
         let font_size_cand = appearance.candidate_text.font_size as f32;
@@ -124,95 +125,114 @@ impl CandidatePainter {
         if let (Some(f_py), Some(f_zh), Some(f_ht)) = (f_pinyin, f_cand, f_hint) {
             let pinyin_w = self.measure_text(f_py, pinyin, font_size_pinyin);
             
-            let mut row_width = 0.0;
-            for (i, cand) in candidates.iter().enumerate() {
-                let prefix = format!("{}.", i + 1);
-                let w_prefix = self.measure_text(f_py, &prefix, font_size_cand);
-                let w_cand = self.measure_text(f_zh, cand, font_size_cand);
-                let hint_w = if let Some(h) = hints.get(i) {
-                    if !h.is_empty() { self.measure_text(f_ht, h, font_size_hint) + 8.0 } else { 0.0 }
-                } else { 0.0 };
-                
-                let total_item_w = w_prefix + w_cand + hint_w + 12.0;
-                cand_widths.push(total_item_w);
-                row_width += total_item_w + if i < candidates.len() - 1 { item_spacing } else { 0.0 };
+            if is_vertical {
+                let mut max_item_w = pinyin_w;
+                for (i, cand) in candidates.iter().enumerate() {
+                    let prefix = format!("{}.", i + 1);
+                    let w_prefix = self.measure_text(f_py, &prefix, font_size_cand);
+                    let w_cand = self.measure_text(f_zh, cand, font_size_cand);
+                    let hint_w = if let Some(h) = hints.get(i) {
+                        if !h.is_empty() { self.measure_text(f_ht, h, font_size_hint) + 12.0 } else { 0.0 }
+                    } else { 0.0 };
+                    let total_item_w = w_prefix + w_cand + hint_w + 12.0;
+                    cand_widths.push(total_item_w);
+                    if total_item_w > max_item_w { max_item_w = total_item_w; }
+                }
+                total_width = (max_item_w + padding_x * 2.0).max(200.0).min(1000.0);
+                total_height = padding_y * 2.0 + line_height_pinyin + row_spacing + (candidates.len() as f32 * line_height_cand) + ((candidates.len().saturating_sub(1)) as f32 * item_spacing);
+            } else {
+                let mut row_width = 0.0;
+                for (i, cand) in candidates.iter().enumerate() {
+                    let prefix = format!("{}.", i + 1);
+                    let w_prefix = self.measure_text(f_py, &prefix, font_size_cand);
+                    let w_cand = self.measure_text(f_zh, cand, font_size_cand);
+                    let hint_w = if let Some(h) = hints.get(i) {
+                        if !h.is_empty() { self.measure_text(f_ht, h, font_size_hint) + 8.0 } else { 0.0 }
+                    } else { 0.0 };
+                    
+                    let total_item_w = w_prefix + w_cand + hint_w + 12.0;
+                    cand_widths.push(total_item_w);
+                    row_width += total_item_w + if i < candidates.len() - 1 { item_spacing } else { 0.0 };
+                }
+                total_width = (pinyin_w + padding_x * 2.0).max(row_width + padding_x * 2.0).max(320.0).min(1200.0);
+                total_height = padding_y * 2.0 + line_height_pinyin + row_spacing + line_height_cand;
             }
-            total_width = (pinyin_w + padding_x * 2.0).max(row_width + padding_x * 2.0).max(320.0).min(1200.0);
-            total_height = padding_y * 2.0 + line_height_pinyin + row_spacing + line_height_cand;
         }
 
         let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
         pixmap.fill(Color::TRANSPARENT);
 
-        // 移除所有阴影逻辑，直接绘制主背景
         let main_rect = Rect::from_xywh(0.0, 0.0, total_width, total_height).unwrap();
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&appearance.window_bg_color));
         bg_paint.anti_alias = true;
         pixmap.fill_path(&self.create_rounded_rect_path(main_rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
 
-        // 边框
         let mut border_paint = Paint::default();
         border_paint.set_color(self.parse_color(&appearance.window_border_color));
         border_paint.anti_alias = true;
         pixmap.stroke_path(&self.create_rounded_rect_path(main_rect, corner_radius), &border_paint, &Stroke { width: 1.0, ..Default::default() }, Transform::identity(), None);
 
         if let (Some(f_py), Some(f_zh), Some(f_ht)) = (f_pinyin, f_cand, f_hint) {
-            // 1. 绘制拼音
             let mut py_color = self.parse_color(&appearance.pinyin_text.color);
             py_color.set_alpha(appearance.pinyin_text.alpha);
             
             let pinyin_y = padding_y + line_height_pinyin * 0.7;
             self.draw_mixed_text(&mut pixmap, f_zh, f_py, pinyin, padding_x, pinyin_y, font_size_pinyin, py_color, false);
 
-            // 2. 绘制候选词
-            let cand_y_base = padding_y + line_height_pinyin + row_spacing;
+            let cand_y_start = padding_y + line_height_pinyin + row_spacing;
             let mut x_cursor = padding_x;
+            let mut y_cursor = cand_y_start;
             
             let text_color = self.parse_color(&appearance.candidate_text.color);
             let mut text_color = text_color;
             text_color.set_alpha(appearance.candidate_text.alpha);
             
             let highlight_color = self.parse_color(&appearance.window_highlight_color);
-            
             let mut hint_color = self.parse_color(&appearance.hint_text.color);
             hint_color.set_alpha(appearance.hint_text.alpha);
 
             for (i, cand) in candidates.iter().enumerate() {
                 let is_selected = i == selected;
-                let item_w = cand_widths[i];
+                let item_w = if is_vertical { total_width - padding_x * 2.0 } else { cand_widths[i] };
                 
                 if is_selected {
                     let mut hp = Paint::default();
                     let mut hc = highlight_color;
-                    hc.set_alpha(0.15); // Highlight background alpha
+                    hc.set_alpha(0.15);
                     hp.set_color(hc);
-                    let hr = Rect::from_xywh(x_cursor - 6.0, cand_y_base, item_w, line_height_cand).unwrap();
+                    let hr = Rect::from_xywh(x_cursor - 6.0, y_cursor, item_w + 12.0, line_height_cand).unwrap();
                     pixmap.fill_path(&self.create_rounded_rect_path(hr, 6.0), &hp, FillRule::Winding, Transform::identity(), None);
                 }
                 
                 let prefix = format!("{}.", i + 1);
                 let current_color = if is_selected { highlight_color } else { text_color };
-                let text_y = cand_y_base + line_height_cand * 0.7;
+                let text_y = y_cursor + line_height_cand * 0.7;
                 
                 let mut prefix_color = current_color;
                 if !is_selected { prefix_color.set_alpha(0.6); }
                 
-                // 绘制序号 (使用拼音字体或候选词字体? 一般候选词字体更统一，但这里保留用 f_py 处理数字)
                 let adv1 = self.draw_text(&mut pixmap, f_py, &prefix, x_cursor, text_y, font_size_cand, prefix_color);
-                // 绘制候选词
                 let adv2 = self.draw_text(&mut pixmap, f_zh, cand, x_cursor + adv1, text_y, font_size_cand, current_color);
                 
                 if let Some(hint) = hints.get(i) {
                     if !hint.is_empty() {
                         let mut hc = if is_selected { highlight_color } else { hint_color };
                         if is_selected { hc.set_alpha(0.6); }
-                        self.draw_text(&mut pixmap, f_ht, hint, x_cursor + adv1 + adv2 + 6.0, text_y, font_size_hint, hc);
+                        self.draw_text(&mut pixmap, f_ht, hint, x_cursor + adv1 + adv2 + 8.0, text_y, font_size_hint, hc);
                     }
                 }
-                x_cursor += item_w + item_spacing;
+
+                if is_vertical {
+                    y_cursor += line_height_cand + item_spacing;
+                } else {
+                    x_cursor += item_w + item_spacing;
+                }
             }
         }
+
+        (pixmap.data().to_vec(), total_width as u32, total_height as u32)
+    }
 
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
