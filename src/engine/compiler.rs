@@ -171,33 +171,43 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
 }
 
 fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, Vec<DictEntry>>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut data_writer = BufWriter::new(File::create(dat_path)?);
-    let mut index_builder = MapBuilder::new(File::create(idx_path)?)?;
-    let mut current_offset = 0u64;
-    for (pinyin, mut pairs) in entries {
-        let mut seen = std::collections::HashSet::new();
-        pairs.retain(|e| seen.insert(e.word.clone()));
-        
-        index_builder.insert(&pinyin, current_offset)?;
-        let mut block = Vec::new();
-        block.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
-        for entry in pairs {
-            let w_bytes = entry.word.as_bytes(); 
-            let t_bytes = entry.tone.as_bytes();
-            let e_bytes = entry.en.as_bytes();
+    let tmp_idx = format!("{}.tmp", idx_path);
+    let tmp_dat = format!("{}.tmp", dat_path);
+    
+    {
+        let mut data_writer = BufWriter::new(File::create(&tmp_dat)?);
+        let mut index_builder = MapBuilder::new(File::create(&tmp_idx)?)?;
+        let mut current_offset = 0u64;
+        for (pinyin, mut pairs) in entries {
+            let mut seen = std::collections::HashSet::new();
+            pairs.retain(|e| seen.insert(e.word.clone()));
             
-            block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(w_bytes);
-            block.extend_from_slice(&(t_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(t_bytes);
-            block.extend_from_slice(&(e_bytes.len() as u16).to_le_bytes());
-            block.extend_from_slice(e_bytes);
-            block.extend_from_slice(&entry.weight.to_le_bytes());
+            index_builder.insert(&pinyin, current_offset)?;
+            let mut block = Vec::new();
+            block.extend_from_slice(&(pairs.len() as u32).to_le_bytes());
+            for entry in pairs {
+                let w_bytes = entry.word.as_bytes(); 
+                let t_bytes = entry.tone.as_bytes();
+                let e_bytes = entry.en.as_bytes();
+                
+                block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
+                block.extend_from_slice(w_bytes);
+                block.extend_from_slice(&(t_bytes.len() as u16).to_le_bytes());
+                block.extend_from_slice(t_bytes);
+                block.extend_from_slice(&(e_bytes.len() as u16).to_le_bytes());
+                block.extend_from_slice(e_bytes);
+                block.extend_from_slice(&entry.weight.to_le_bytes());
+            }
+            data_writer.write_all(&block)?;
+            current_offset += block.len() as u64;
         }
-        data_writer.write_all(&block)?;
-        current_offset += block.len() as u64;
+        index_builder.finish()?;
     }
-    index_builder.finish()?;
+
+    // 原子重命名，确保旧的内存映射在被替换前保持有效（Linux）
+    // 或者在 Windows 上处理可能的冲突
+    fs::rename(tmp_idx, idx_path)?;
+    fs::rename(tmp_dat, dat_path)?;
     Ok(())
 }
 

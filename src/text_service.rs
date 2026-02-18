@@ -32,10 +32,10 @@ impl TextService {
         }
     }
 
-    fn commit_text(&self, context: &ITfContext, text: &str) -> Result<()> {
+    fn commit_text(&self, context: &ITfContext, text: &str, delete_count: usize) -> Result<()> {
         let client_id = self.client_id.load(Ordering::SeqCst);
         unsafe {
-            let session = EditSession::new(context.clone(), text.to_string());
+            let session = EditSession::new(context.clone(), text.to_string(), delete_count);
             let session_ptr: ITfEditSession = session.into();
             let _ = context.RequestEditSession(client_id, &session_ptr, TF_ES_READWRITE);
         }
@@ -55,7 +55,7 @@ impl TextService {
         (x, y)
     }
 
-    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, context: Option<&ITfContext>) -> (u8, String) {
+    fn send_key_to_server(&self, msg_type: u8, key_code: u32, modifiers: u8, context: Option<&ITfContext>) -> (u8, String, usize) {
         let mut x = 0i32;
         let mut y = 0i32;
 
@@ -107,7 +107,7 @@ impl TextService {
             };
 
             if let Ok(handle) = h_pipe {
-                if handle.is_invalid() { return (0, String::new()); }
+                if handle.is_invalid() { return (0, String::new(), 0); }
 
                 let mut request = [0u8; 14];
                 request[0] = msg_type;
@@ -127,19 +127,24 @@ impl TextService {
                     if action == 1 { // Commit
                         let text = String::from_utf8_lossy(&response[1..bytes_read as usize]).to_string();
                         let _ = CloseHandle(handle);
-                        return (action, text);
+                        return (action, text, 0);
                     } else if action == 2 { // Consume (拦截且不提交文本)
                         let _ = CloseHandle(handle);
-                        return (2, String::new());
+                        return (2, String::new(), 0);
+                    } else if action == 3 { // Delete and Commit
+                        let del_count = response[1] as usize;
+                        let text = String::from_utf8_lossy(&response[2..bytes_read as usize]).to_string();
+                        let _ = CloseHandle(handle);
+                        return (3, text, del_count);
                     }
                     // action == 0 (PassThrough)
                     let _ = CloseHandle(handle);
-                    return (0, String::new());
+                    return (0, String::new(), 0);
                 }
                 let _ = CloseHandle(handle);
             }
         }
-        (0, String::new())
+        (0, String::new(), 0)
     }
 }
 
@@ -189,7 +194,7 @@ impl ITfKeyEventSink_Impl for TextService {
             if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
             if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
         }
-        let (action, _) = self.send_key_to_server(2, key_code, modifiers, context);
+        let (action, _, _) = self.send_key_to_server(2, key_code, modifiers, context);
         if action != 0 { return Ok(TRUE); }
         Ok(FALSE)
     }
@@ -202,11 +207,15 @@ impl ITfKeyEventSink_Impl for TextService {
             if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
             if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
         }
-        let (action, text) = self.send_key_to_server(1, key_code, modifiers, context);
+        let (action, text, del_count) = self.send_key_to_server(1, key_code, modifiers, context);
         if action != 0 {
             if action == 1 {
                 if let Some(ctx) = context {
-                    let _ = self.commit_text(ctx, &text);
+                    let _ = self.commit_text(ctx, &text, 0);
+                }
+            } else if action == 3 {
+                if let Some(ctx) = context {
+                    let _ = self.commit_text(ctx, &text, del_count);
                 }
             }
             return Ok(TRUE);
@@ -223,11 +232,12 @@ impl ITfKeyEventSink_Impl for TextService {
 struct EditSession {
     context: ITfContext,
     text: String,
+    delete_count: usize,
 }
 
 impl EditSession {
-    fn new(context: ITfContext, text: String) -> Self {
-        Self { context, text }
+    fn new(context: ITfContext, text: String, delete_count: usize) -> Self {
+        Self { context, text, delete_count }
     }
 }
 
@@ -235,22 +245,36 @@ impl ITfEditSession_Impl for EditSession {
     fn DoEditSession(&self, ec: u32) -> Result<()> {
         unsafe {
             let text_w: Vec<u16> = self.text.encode_utf16().collect();
-            if text_w.is_empty() { return Ok(()); }
             let mut selection = [TF_SELECTION { ..Default::default() }];
             let mut fetched = 0;
             if self.context.GetSelection(ec, TF_DEFAULT_SELECTION, &mut selection, &mut fetched).is_ok() && fetched > 0 {
                 if let Some(range) = &*selection[0].range {
-                    let _ = range.SetText(ec, 0, &text_w);
                     let _ = range.Collapse(ec, TF_ANCHOR_END);
+                    
+                    if self.delete_count > 0 {
+                        let mut shifted = 0;
+                        let _ = range.ShiftStart(ec, -(self.delete_count as i32), &mut shifted, std::ptr::null());
+                    }
+                    
+                    if !text_w.is_empty() {
+                        let _ = range.SetText(ec, 0, &text_w);
+                        let _ = range.Collapse(ec, TF_ANCHOR_END);
+                    } else {
+                        // 如果只是删除，SetText 为空即可
+                        let _ = range.SetText(ec, 0, &[]);
+                    }
+                    
                     let _ = self.context.SetSelection(ec, &[TF_SELECTION {
                         range: std::mem::ManuallyDrop::new(Some(range.clone())),
                         style: selection[0].style,
                     }]);
                 }
             } else {
-                let source_res: Result<ITfInsertAtSelection> = self.context.cast();
-                if let Ok(source) = source_res {
-                    let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
+                if !text_w.is_empty() {
+                    let source_res: Result<ITfInsertAtSelection> = self.context.cast();
+                    if let Ok(source) = source_res {
+                        let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
+                    }
                 }
             }
         }

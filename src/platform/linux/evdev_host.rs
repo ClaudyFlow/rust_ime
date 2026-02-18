@@ -40,12 +40,38 @@ fn map_key_to_display_name(key: Key) -> String {
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
     vkbd: Mutex<Vkbd>,
-    dev: Mutex<Device>,
+    dev: Arc<Mutex<Device>>, // 修改为 Arc 以便在 Guard 中共享
     gui_tx: Option<Sender<GuiEvent>>,
     notify_tx: Sender<NotifyEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
     tab_held_and_not_used: bool,
+}
+
+struct GrabGuard {
+    device: Arc<Mutex<Device>>,
+}
+
+impl GrabGuard {
+    fn new(device: Arc<Mutex<Device>>) -> Self {
+        if let Ok(mut dev) = device.lock() {
+            if let Err(e) = dev.grab() {
+                eprintln!("[EvdevHost] 警告: 无法锁定键盘设备: {}", e);
+            } else {
+                println!("[EvdevHost] 已成功锁定键盘硬件拦截。");
+            }
+        }
+        Self { device }
+    }
+}
+
+impl Drop for GrabGuard {
+    fn drop(&mut self) {
+        if let Ok(mut dev) = self.device.lock() {
+            let _ = dev.ungrab();
+            println!("[EvdevHost] 键盘硬件拦截已安全释放。");
+        }
+    }
 }
 
 impl EvdevHost {
@@ -63,7 +89,7 @@ impl EvdevHost {
             vkbd.apply_config(&conf);
         }
         Ok(Self {
-            processor, vkbd: Mutex::new(vkbd), dev: Mutex::new(dev), gui_tx, notify_tx,
+            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, notify_tx,
             should_exit: Arc::new(AtomicBool::new(false)), config, tab_held_and_not_used: false,
         })
     }
@@ -77,17 +103,35 @@ impl InputMethodHost for EvdevHost {
     fn get_cursor_rect(&self) -> Option<Rect> { None }
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Ok(mut dev) = self.dev.lock() { let _ = dev.grab(); }
+        // 使用 RAII Guard 自动管理 grab 生命周期
+        let _guard = GrabGuard::new(self.dev.clone());
         let mut held_keys = HashSet::new();
-        println!("[EvdevHost] 启动硬件拦截模式...");
+        println!("[EvdevHost] 正在运行硬件拦截循环...");
 
         while !self.should_exit.load(Ordering::Relaxed) {
-            let events: Vec<_> = if let Ok(mut dev) = self.dev.lock() { dev.fetch_events()?.collect() } else { break; };
+            let events: Vec<_> = if let Ok(mut dev) = self.dev.lock() { 
+                match dev.fetch_events() {
+                    Ok(evs) => evs.collect(),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(1));
+                        continue;
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            } else { break; };
 
             for ev in events {
                 if let InputEventKind::Key(key) = ev.kind() {
                     let val = ev.value();
-                    if val == 1 { held_keys.insert(key); } else if val == 0 { held_keys.remove(&key); }
+                    if val == 1 { 
+                        held_keys.insert(key); 
+                        // 如果按下了除 Tab 以外的任何键，标记 Tab 已被使用
+                        if key != Key::KEY_TAB {
+                            self.tab_held_and_not_used = false;
+                        }
+                    } else if val == 0 { 
+                        held_keys.remove(&key); 
+                    }
 
                     let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
                     let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
@@ -267,7 +311,6 @@ impl InputMethodHost for EvdevHost {
                 }
             }
         }
-        if let Ok(mut dev) = self.dev.lock() { let _ = dev.ungrab(); }
         Ok(())
     }
 }

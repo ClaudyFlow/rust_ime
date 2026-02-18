@@ -354,7 +354,15 @@ unsafe fn handle_client(
 
                 match action {
                     Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); }
-                    Action::DeleteAndEmit { delete: _, insert } => { response.push(1); response.extend_from_slice(insert.as_bytes()); }
+                    Action::DeleteAndEmit { delete, insert } => { 
+                        if delete > 0 {
+                            response.push(3);
+                            response.push(delete as u8);
+                        } else {
+                            response.push(1);
+                        }
+                        response.extend_from_slice(insert.as_bytes()); 
+                    }
                     Action::Consume => { response.push(2); }
                     Action::Notify(s, b) => { let _ = notify_tx.send(NotifyEvent::Message(s, b)); response.push(2); }
                     Action::Alert => {
