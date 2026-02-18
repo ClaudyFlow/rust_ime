@@ -149,6 +149,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             if state.pinyin.is_empty() {
                                 ShowWindow(hwnd, SW_HIDE);
                             } else {
+                                ShowWindow(hwnd_status, SW_HIDE); // 避免与候选窗重叠
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                                 InvalidateRect(hwnd, None, BOOL(1));
                                 UpdateWindow(hwnd); 
@@ -187,7 +188,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         if final_y < 0 { final_y = 0; }
 
                         let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-                        let _ = SetWindowPos(hwnd_status, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        
+                        // 只有在 pinyin 为空时才显示/移动状态窗，避免两个框重叠
+                        if let Some(ref state) = *state_ptr {
+                            if state.pinyin.is_empty() {
+                                let _ = SetWindowPos(hwnd_status, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                            } else {
+                                ShowWindow(hwnd_status, SW_HIDE);
+                            }
+                        }
                     }
                     GuiEvent::ShowStatus(text) => {
                         let status_ptr = std::ptr::addr_of_mut!(STATUS_STATE);
