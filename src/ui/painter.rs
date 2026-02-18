@@ -14,6 +14,7 @@ pub struct CandidatePainter {
     font_map: HashMap<String, String>, // Name -> Path
 }
 
+#[allow(dead_code)]
 impl CandidatePainter {
     pub fn new() -> Self {
         let root = crate::find_project_root();

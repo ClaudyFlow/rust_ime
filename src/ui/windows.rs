@@ -13,7 +13,7 @@ static mut WINDOW_STATE: Option<WindowState> = None;
 static mut KEYSTROKE_STATE: Option<KeystrokeState> = None;
 static mut LEARNING_STATE: Option<LearningState> = None;
 static mut STATUS_STATE: Option<StatusState> = None;
-static mut CURRENT_CONFIG: Option<Arc<RwLock<Config>>> = None;
+static CURRENT_CONFIG: std::sync::OnceLock<Arc<RwLock<Config>>> = std::sync::OnceLock::new();
 
 struct WindowState {
     pinyin: String,
@@ -36,7 +36,6 @@ struct LearningState {
 }
 
 struct StatusState {
-    text: String,
     last_update: std::time::Instant,
 }
 
@@ -101,7 +100,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         };
         RegisterClassW(&wc_status);
 
-        CURRENT_CONFIG = Some(Arc::new(RwLock::new(initial_config)));
+        let _ = CURRENT_CONFIG.set(Arc::new(RwLock::new(initial_config)));
 
         let hwnd = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
@@ -168,7 +167,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let screen_w = GetSystemMetrics(SM_CXSCREEN);
                         let screen_h = GetSystemMetrics(SM_CYSCREEN);
 
-                        let anchor = if let Some(ref arc) = CURRENT_CONFIG { 
+                        let anchor = if let Some(arc) = CURRENT_CONFIG.get() { 
                             arc.read().unwrap().appearance.candidate_anchor.clone() 
                         } else { 
                             "bottom".to_string() 
@@ -200,10 +199,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     }
                     GuiEvent::ShowStatus(text) => {
                         let status_ptr = std::ptr::addr_of_mut!(STATUS_STATE);
-                        *status_ptr = Some(StatusState { text: text.clone(), last_update: std::time::Instant::now() });
+                        *status_ptr = Some(StatusState { last_update: std::time::Instant::now() });
                         
                         let (data, w, h) = {
-                            let conf = CURRENT_CONFIG.as_ref().unwrap().read().unwrap();
+                            let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
                             painter.draw_status(&text, &conf)
                         };
                         
@@ -222,7 +221,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         });
                     }
                     GuiEvent::Keystroke(key) => {
-                        let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.show_keystrokes } else { false };
+                        let show = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.show_keystrokes } else { false };
                         if !show { continue; }
 
                         let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
@@ -236,7 +235,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         ShowWindow(hwnd_ks, SW_SHOWNOACTIVATE);
                         InvalidateRect(hwnd_ks, None, BOOL(1));
                         
-                        let timeout = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
+                        let timeout = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(timeout));
                             let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
@@ -253,7 +252,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         ShowWindow(hwnd_ks, SW_HIDE);
                     }
                     GuiEvent::ShowLearning(word, hint) => {
-                        let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.learning_mode } else { false };
+                        let show = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.learning_mode } else { false };
                         if !show { continue; }
 
                         let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
@@ -272,7 +271,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         });
                     }
                     GuiEvent::ApplyConfig(conf) => {
-                        if let Some(ref arc) = CURRENT_CONFIG {
+                        if let Some(arc) = CURRENT_CONFIG.get() {
                             if let Ok(mut w) = arc.write() { *w = conf; }
                         }
                         InvalidateRect(hwnd, None, BOOL(1));
@@ -282,7 +281,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                     GuiEvent::Exit => {
                         PostQuitMessage(0);
                     }
-                    _ => {}
                 }
             }
         });
@@ -317,7 +315,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
             let _ = DeleteObject(brush);
 
             if let Some(ref state) = WINDOW_STATE {
-                if let Some(ref arc) = CURRENT_CONFIG {
+                if let Some(arc) = CURRENT_CONFIG.get() {
                     if let Ok(conf) = arc.read() {
                         draw_content(mem_dc, hwnd, state, &conf);
                     }
@@ -352,7 +350,7 @@ unsafe extern "system" fn ks_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
             let _ = DeleteObject(brush);
 
             if let Some(ref state) = KEYSTROKE_STATE {
-                if let Some(ref arc) = CURRENT_CONFIG {
+                if let Some(arc) = CURRENT_CONFIG.get() {
                     if let Ok(conf) = arc.read() {
                         draw_keystrokes(hdc, hwnd, state, &conf);
                     }
@@ -379,7 +377,7 @@ unsafe extern "system" fn learn_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, l
             let _ = DeleteObject(brush);
 
             if let Some(ref state) = LEARNING_STATE {
-                if let Some(ref arc) = CURRENT_CONFIG {
+                if let Some(arc) = CURRENT_CONFIG.get() {
                     if let Ok(conf) = arc.read() {
                         draw_learning(hdc, hwnd, state, &conf);
                     }
@@ -406,7 +404,7 @@ unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
     let h_bitmap = CreateCompatibleBitmap(screen_dc, w as i32, h as i32);
     let old_bitmap = SelectObject(mem_dc, h_bitmap);
 
-    let mut bmi = BITMAPINFO {
+    let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
             biWidth: w as i32,
@@ -419,7 +417,7 @@ unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
         ..Default::default()
     };
 
-    SetDIBitsToDevice(
+    let _ = SetDIBitsToDevice(
         mem_dc, 0, 0, w, h, 0, 0, 0, h,
         data.as_ptr() as *const _, &bmi, DIB_RGB_COLORS
     );
@@ -430,8 +428,8 @@ unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
     pt_dst.x = rect.left;
     pt_dst.y = rect.top;
 
-    let mut size_src = SIZE { cx: w as i32, cy: h as i32 };
-    let mut pt_src = POINT::default();
+    let size_src = SIZE { cx: w as i32, cy: h as i32 };
+    let pt_src = POINT::default();
     let blend = BLENDFUNCTION {
         BlendOp: AC_SRC_OVER as u8,
         BlendFlags: 0,
@@ -547,7 +545,6 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let pad_y = conf.appearance.window_padding_y;
     let row_space = conf.appearance.row_spacing as i32;
     let item_space = conf.appearance.item_spacing as i32;
-    let radius = conf.appearance.corner_radius as i32;
 
     let bg_color = parse_color_win(&conf.appearance.window_bg_color);
     let border_color = parse_color_win(&conf.appearance.window_border_color);
