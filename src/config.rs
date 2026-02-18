@@ -251,7 +251,7 @@ impl Config {
                 default_profile: "chinese".to_string(),
                 paste_method: "shift_insert".to_string(),
                 clipboard_delay_ms: 10,
-                enable_anti_typo: true,
+                enable_anti_typo: false,
                 enable_double_tap: true,
                 double_tap_timeout_ms: 250,
                 double_taps: vec![
