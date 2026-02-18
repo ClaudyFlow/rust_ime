@@ -23,6 +23,7 @@ pub enum TrayEvent {
     SwitchCommitMode,
     ReloadConfig,
     CyclePreview,
+    CompileDict,
 }
 
 #[cfg(target_os = "linux")]
@@ -197,6 +198,11 @@ impl Tray for ImeTray {
             StandardItem {
                 label: "重新加载配置".to_string(),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ReloadConfig); }),
+                ..Default::default()
+            }.into(),
+            StandardItem {
+                label: "编译词库".to_string(),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::CompileDict); }),
                 ..Default::default()
             }.into(),
             StandardItem {
@@ -416,6 +422,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1010 => { let _ = tx.send(TrayEvent::SwitchCommitMode); }
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
+                    1016 => { let _ = tx.send(TrayEvent::CompileDict); }
                     1013 => { let _ = tx.send(TrayEvent::Restart); }
                     1014 => { let _ = tx.send(TrayEvent::Exit); }
                     _ => {}
@@ -460,6 +467,7 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1011, PCWSTR(HSTRING::from("配置中心 (Web)").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1012, PCWSTR(HSTRING::from("重新加载配置").as_ptr()));
+            let _ = AppendMenuW(h_menu, MF_STRING, 1016, PCWSTR(HSTRING::from("编译词库").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1013, PCWSTR(HSTRING::from("重启服务").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1014, PCWSTR(HSTRING::from("退出程序").as_ptr()));

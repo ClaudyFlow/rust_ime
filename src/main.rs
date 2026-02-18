@@ -297,10 +297,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // 0. 自动检查并增量编译词库
+    // 0. 自动检查并增量编译词库 (已根据用户要求移除自动调用，改为手动触发)
+    /*
     if let Err(e) = engine::compiler::check_and_compile_all() {
         eprintln!("[Main] 词库自动编译失败: {}", e);
     }
+    */
 
     let mut current_config = load_config();
     let mut profiles_changed = false;
@@ -601,6 +603,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }.to_string();
                     tray_handle.update(|t| t.preview_mode = mode_str.to_string());
                     if let Ok(mut w) = config_tray.write() { w.appearance.preview_mode = mode_str; let _ = save_config(&w); }
+                }
+                ui::tray::TrayEvent::CompileDict => {
+                    let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), "正在编译词库，请稍候...".into()));
+                    match engine::compiler::check_and_compile_all() {
+                        Ok(_) => { let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), "✅ 词库编译完成。".into())); }
+                        Err(e) => { let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), format!("❌ 编译失败: {}", e))); }
+                    }
                 }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();
