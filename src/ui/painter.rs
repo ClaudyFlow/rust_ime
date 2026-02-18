@@ -160,10 +160,12 @@ impl CandidatePainter {
             }
         }
 
-        let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
+        let pix_w = (total_width as u32).max(1);
+        let pix_h = (total_height as u32).max(1);
+        let mut pixmap = Pixmap::new(pix_w, pix_h).expect("Failed to create candidate pixmap");
         pixmap.fill(Color::TRANSPARENT);
 
-        let main_rect = Rect::from_xywh(0.0, 0.0, total_width, total_height).unwrap();
+        let main_rect = Rect::from_xywh(0.0, 0.0, total_width.max(1.0), total_height.max(1.0)).expect("Failed to create main rect");
         let mut bg_paint = Paint::default();
         bg_paint.set_color(self.parse_color(&appearance.window_bg_color));
         bg_paint.anti_alias = true;

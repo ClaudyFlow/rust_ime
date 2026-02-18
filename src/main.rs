@@ -329,7 +329,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (notify_tx, notify_rx) = std::sync::mpsc::channel();
     
     // 1. 启动 GUI 线程
-    let gui_config = config.read().unwrap().clone();
+    let gui_config = config.read().expect("Failed to acquire config read lock for GUI").clone();
     let gui_tx_main = gui_tx.clone();
     std::thread::spawn(move || {
         ui::gui::start_gui(gui_rx, gui_config);
@@ -703,8 +703,7 @@ pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
     
 
     let current_exe = env::current_exe()?;
-
-    let exe_path = current_exe.to_str().unwrap();
+    let exe_path = current_exe.to_string_lossy();
 
     
 
