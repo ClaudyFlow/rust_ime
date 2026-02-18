@@ -1,6 +1,6 @@
 pub mod tray;
 pub mod web;
-// pub mod painter;
+pub mod painter;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -28,8 +28,10 @@ pub enum GuiEvent {
     },
     MoveTo { x: i32, y: i32 },
     Keystroke(String),
-    ShowLearning(String, String), // 汉字, 提示
-    ClearKeystrokes,
-    ApplyConfig(Config),
-    Exit,
-}
+        ShowLearning(String, String), // 汉字, 提示
+        ClearKeystrokes,
+        ApplyConfig(Config),
+        ShowStatus(String), // 新增：显示 "中" 或 "英"
+        Exit,
+    }
+    

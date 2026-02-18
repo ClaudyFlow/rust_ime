@@ -12,6 +12,7 @@ use std::sync::{Arc, RwLock};
 static mut WINDOW_STATE: Option<WindowState> = None;
 static mut KEYSTROKE_STATE: Option<KeystrokeState> = None;
 static mut LEARNING_STATE: Option<LearningState> = None;
+static mut STATUS_STATE: Option<StatusState> = None;
 static mut CURRENT_CONFIG: Option<Arc<RwLock<Config>>> = None;
 
 struct WindowState {
@@ -34,30 +35,30 @@ struct LearningState {
     last_update: std::time::Instant,
 }
 
+struct StatusState {
+    text: String,
+    last_update: std::time::Instant,
+}
+
 pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     println!("[GUI] Starting Windows GUI thread...");
     let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
     let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
     let ks_class = PCWSTR("RustImeKeystroke\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
     let learn_class = PCWSTR("RustImeLearning\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+    let status_class = PCWSTR("RustImeStatus\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
     unsafe {
-        // 加载本地字体，让 GDI 可以识别到 Noto Sans SC
+        // ... 前面的字体加载代码保持不变 ...
         let root = crate::find_project_root();
         let font_path = root.join("fonts/NotoSansSC-Bold.ttf");
         let mut font_loaded = false;
         let mut path_u16: Vec<u16> = Vec::new();
 
-        println!("[GUI] Loading font from: {:?}", font_path);
         if font_path.exists() {
             path_u16 = font_path.to_string_lossy().encode_utf16().chain(std::iter::once(0)).collect();
             let res = AddFontResourceExW(PCWSTR(path_u16.as_ptr()), FR_PRIVATE, None);
-            println!("[GUI] AddFontResourceExW result: {}", res);
-            if res > 0 {
-                font_loaded = true;
-            }
-        } else {
-            println!("[GUI] Warning: Font file not found!");
+            if res > 0 { font_loaded = true; }
         }
 
         let wc = WNDCLASSW {
@@ -75,7 +76,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             hInstance: instance.into(),
             lpszClassName: ks_class,
             lpfnWndProc: Some(ks_wnd_proc),
-            hbrBackground: CreateSolidBrush(COLORREF(0x000000)), // Black for keystrokes
+            hbrBackground: CreateSolidBrush(COLORREF(0x000000)),
             ..Default::default()
         };
         RegisterClassW(&wc_ks);
@@ -89,6 +90,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             ..Default::default()
         };
         RegisterClassW(&wc_learn);
+
+        let wc_status = WNDCLASSW {
+            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
+            hInstance: instance.into(),
+            lpszClassName: status_class,
+            lpfnWndProc: Some(status_wnd_proc),
+            hbrBackground: CreateSolidBrush(COLORREF(0x000000)),
+            ..Default::default()
+        };
+        RegisterClassW(&wc_status);
 
         CURRENT_CONFIG = Some(Arc::new(RwLock::new(initial_config)));
 
@@ -112,8 +123,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         );
         let _ = SetLayeredWindowAttributes(hwnd_learn, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
 
+        let hwnd_status = CreateWindowExW(
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
+            status_class, PCWSTR(std::ptr::null()), WS_POPUP,
+            0, 0, 100, 100, None, None, instance, None,
+        );
+        let _ = SetLayeredWindowAttributes(hwnd_status, COLORREF(0x000000), 255, LWA_ALPHA | LWA_COLORKEY);
+
         std::thread::spawn(move || {
-            println!("[GUI Thread] Event receiver thread started.");
+            let painter = crate::ui::painter::CandidatePainter::new();
             while let Ok(event) = rx.recv() {
                 match event {
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
@@ -158,21 +176,41 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         let mut final_x = x;
                         let mut final_y = if anchor == "top" { y - h - 5 } else { y + 20 };
 
-                        if final_x + w > screen_w {
-                            final_x = screen_w - w;
-                        }
-                        
-                        // 智能翻转逻辑
+                        if final_x + w > screen_w { final_x = screen_w - w; }
                         if anchor == "top" {
-                            if final_y < 0 { final_y = y + 20; } // 上方放不下，翻转到下方
+                            if final_y < 0 { final_y = y + 20; }
                         } else {
-                            if final_y + h > screen_h { final_y = y - h - 5; } // 下方放不下，翻转到上方
+                            if final_y + h > screen_h { final_y = y - h - 5; }
                         }
 
                         if final_x < 0 { final_x = 0; }
                         if final_y < 0 { final_y = 0; }
 
                         let _ = SetWindowPos(hwnd, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                        let _ = SetWindowPos(hwnd_status, HWND_TOPMOST, final_x, final_y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
+                    GuiEvent::ShowStatus(text) => {
+                        let status_ptr = std::ptr::addr_of_mut!(STATUS_STATE);
+                        *status_ptr = Some(StatusState { text: text.clone(), last_update: std::time::Instant::now() });
+                        
+                        let (data, w, h) = {
+                            let conf = CURRENT_CONFIG.as_ref().unwrap().read().unwrap();
+                            painter.draw_status(&text, &conf)
+                        };
+                        
+                        // 使用 UpdateLayeredWindow 实现真正的透明和渲染
+                        update_layered_window(hwnd_status, &data, w, h);
+                        ShowWindow(hwnd_status, SW_SHOWNOACTIVATE);
+
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(800));
+                            let status_ptr = std::ptr::addr_of_mut!(STATUS_STATE);
+                            if let Some(ref state) = *status_ptr {
+                                if state.last_update.elapsed().as_millis() >= 800 {
+                                    ShowWindow(hwnd_status, SW_HIDE);
+                                }
+                            }
+                        });
                     }
                     GuiEvent::Keystroke(key) => {
                         let show = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.show_keystrokes } else { false };
@@ -189,7 +227,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         ShowWindow(hwnd_ks, SW_SHOWNOACTIVATE);
                         InvalidateRect(hwnd_ks, None, BOOL(1));
                         
-                        // 定时清除
                         let timeout = if let Some(ref arc) = CURRENT_CONFIG { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(timeout));
@@ -232,6 +269,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         InvalidateRect(hwnd, None, BOOL(1));
                         InvalidateRect(hwnd_ks, None, BOOL(1));
                         InvalidateRect(hwnd_learn, None, BOOL(1));
+                    }
+                    GuiEvent::Exit => {
+                        PostQuitMessage(0);
                     }
                     _ => {}
                 }
@@ -342,6 +382,63 @@ unsafe extern "system" fn learn_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, l
         WM_ERASEBKGND => LRESULT(1),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+unsafe extern "system" fn status_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    match msg {
+        WM_ERASEBKGND => LRESULT(1),
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+    }
+}
+
+unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
+    let screen_dc = GetDC(None);
+    let mem_dc = CreateCompatibleDC(screen_dc);
+    let h_bitmap = CreateCompatibleBitmap(screen_dc, w as i32, h as i32);
+    let old_bitmap = SelectObject(mem_dc, h_bitmap);
+
+    let mut bmi = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: w as i32,
+            biHeight: -(h as i32), // Top-down
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0 as u32,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    SetDIBitsToDevice(
+        mem_dc, 0, 0, w, h, 0, 0, 0, h,
+        data.as_ptr() as *const _, &bmi, DIB_RGB_COLORS
+    );
+
+    let mut pt_dst = POINT::default();
+    let mut rect = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut rect);
+    pt_dst.x = rect.left;
+    pt_dst.y = rect.top;
+
+    let mut size_src = SIZE { cx: w as i32, cy: h as i32 };
+    let mut pt_src = POINT::default();
+    let blend = BLENDFUNCTION {
+        BlendOp: AC_SRC_OVER as u8,
+        BlendFlags: 0,
+        SourceConstantAlpha: 255,
+        AlphaFormat: AC_SRC_ALPHA as u8,
+    };
+
+    let _ = UpdateLayeredWindow(
+        hwnd, screen_dc, Some(&pt_dst), Some(&size_src),
+        mem_dc, Some(&pt_src), COLORREF(0), Some(&blend), ULW_ALPHA
+    );
+
+    SelectObject(mem_dc, old_bitmap);
+    let _ = DeleteObject(h_bitmap);
+    let _ = DeleteDC(mem_dc);
+    ReleaseDC(None, screen_dc);
 }
 
 unsafe fn draw_keystrokes(hdc: HDC, hwnd: HWND, state: &KeystrokeState, conf: &Config) {

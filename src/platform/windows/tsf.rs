@@ -7,7 +7,6 @@ use crate::{Config, NotifyEvent};
 
 pub struct TsfHost {
     processor: Arc<Mutex<Processor>>,
-    config: Arc<RwLock<Config>>,
     gui_tx: Option<Sender<GuiEvent>>,
     notify_tx: Sender<NotifyEvent>,
 }
@@ -16,12 +15,11 @@ impl TsfHost {
     pub fn new(
         processor: Arc<Mutex<Processor>>,
         gui_tx: Option<Sender<GuiEvent>>,
-        config: Arc<RwLock<Config>>,
+        _config: Arc<RwLock<Config>>,
         notify_tx: Sender<NotifyEvent>,
     ) -> Self {
         Self {
             processor,
-            config,
             gui_tx,
             notify_tx,
         }
@@ -206,6 +204,39 @@ impl InputMethodHost for TsfHost {
 }
 
 #[cfg(target_os = "windows")]
+fn is_hk_match(config_key: &str, pressed_key_code: u32, ctrl: bool, alt: bool, shift: bool) -> bool {
+    let binding = config_key.to_lowercase();
+    let parts: Vec<&str> = binding.split('+').map(|s| s.trim()).collect();
+    let mut req_ctrl = false;
+    let mut req_alt = false;
+    let mut req_shift = false;
+    let mut target_key = "";
+
+    for part in parts {
+        match part {
+            "ctrl" => req_ctrl = true,
+            "alt" => req_alt = true,
+            "shift" => req_shift = true,
+            _ => target_key = part,
+        }
+    }
+
+    if req_ctrl != ctrl || req_alt != alt || req_shift != shift { return false; }
+
+    let target_code = match target_key {
+        "space" => 0x20,
+        "tab" => 0x09,
+        "backspace" => 0x08,
+        "enter" => 0x0D,
+        "esc" => 0x1B,
+        s if s.len() == 1 => s.chars().next().unwrap().to_ascii_uppercase() as u32,
+        _ => 0,
+    };
+
+    pressed_key_code == target_code
+}
+
+#[cfg(target_os = "windows")]
 unsafe fn handle_client(
     handle: windows::Win32::Foundation::HANDLE, 
     processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>,
@@ -234,50 +265,22 @@ unsafe fn handle_client(
         
         // 1. 优先检查切换热键
         let (is_lang_toggle, is_dp_toggle) = {
-            let _p = processor.lock().unwrap();
-            let c = crate::load_config(); // 重新加载以获取最新热键配置
-            
-            // 简单的组合键解析
-            let key_str = match key_code {
-                0x20 => "space".to_string(),
-                0x09 => "tab".to_string(),
-                0x41..=0x5A => {
-                    let c = (key_code as u8) as char;
-                    c.to_ascii_lowercase().to_string()
-                },
-                _ => "".to_string()
-            };
-
-            let mut current_combo = String::new();
-            if ctrl { current_combo.push_str("ctrl+"); }
-            if alt { current_combo.push_str("alt+"); }
-            if shift { current_combo.push_str("shift+"); }
-            current_combo.push_str(&key_str);
-
-            let lang_match = c.hotkeys.switch_language.key.to_lowercase() == current_combo ||
-                             c.hotkeys.switch_language_alt.key.to_lowercase() == current_combo;
-            let dp_match = c.hotkeys.toggle_double_pinyin.key.to_lowercase() == current_combo;
-            
+            let c = crate::load_config(); 
+            let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||
+                             is_hk_match(&c.hotkeys.switch_language_alt.key, key_code, ctrl, alt, shift);
+            let dp_match = is_hk_match(&c.hotkeys.toggle_double_pinyin.key, key_code, ctrl, alt, shift);
             (lang_match, dp_match)
         };
         
         if is_lang_toggle {
             if msg_type == 1 {
                 let mut p = processor.lock().unwrap();
-                let action = p.toggle();
+                p.toggle();
                 let enabled = p.chinese_enabled;
-                let profile_name = p.get_current_profile_display();
                 drop(p);
                 
-                if let Action::Notify(title, msg) = action {
-                    let _ = notify_tx.send(NotifyEvent::Message(title, msg));
-                } else {
-                    let (title, msg) = if enabled {
-                        ("中", format!("中文模式 ({})", profile_name))
-                    } else {
-                        ("英", "英文直通模式".to_string())
-                    };
-                    let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
+                if let Some(ref tx) = gui_tx {
+                    let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() }));
                 }
                 update_gui_impl(&gui_tx, &processor);
             }
@@ -289,7 +292,7 @@ unsafe fn handle_client(
 
         if is_dp_toggle {
             if msg_type == 1 {
-                let (enabled, profile) = {
+                let (enabled, _profile) = {
                     let mut p = processor.lock().unwrap();
                     p.enable_double_pinyin = !p.enable_double_pinyin;
                     (p.enable_double_pinyin, p.get_current_profile_display())
@@ -298,8 +301,10 @@ unsafe fn handle_client(
                 c.input.enable_double_pinyin = enabled;
                 let _ = crate::save_config(&c);
                 
-                let msg = if enabled { "开启双拼模式" } else { "关闭双拼模式" };
-                let _ = notify_tx.send(NotifyEvent::Message(profile, msg.into()));
+                if let Some(ref tx) = gui_tx {
+                    let msg = if enabled { "双拼: 开".into() } else { "双拼: 关".into() };
+                    let _ = tx.send(crate::ui::GuiEvent::ShowStatus(msg));
+                }
             }
             let response = vec![2u8];
             let mut bytes_written = 0;
