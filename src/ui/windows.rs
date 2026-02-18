@@ -105,7 +105,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
 
         let hwnd = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
-            window_class, PCWSTR(std::ptr::null()), WS_POPUP | WS_BORDER,
+            window_class, PCWSTR(std::ptr::null()), WS_POPUP,
             100, 100, 400, 120, None, None, instance, None,
         );
 
@@ -553,7 +553,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let old_brush = SelectObject(hdc, bg_brush);
     let old_pen = SelectObject(hdc, border_pen);
     
-    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius * 2, radius * 2);
+    Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
     
     SelectObject(hdc, old_brush);
     SelectObject(hdc, old_pen);
@@ -650,7 +650,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
             let h_pen = CreatePen(PS_NULL, 0, COLORREF(0));
             let old_b = SelectObject(hdc, h_brush);
             let old_p = SelectObject(hdc, h_pen);
-            RoundRect(hdc, r.left, r.top, r.right, r.bottom, 8, 8);
+            Rectangle(hdc, r.left, r.top, r.right, r.bottom);
             SelectObject(hdc, old_b);
             SelectObject(hdc, old_p);
             let _ = DeleteObject(h_brush);

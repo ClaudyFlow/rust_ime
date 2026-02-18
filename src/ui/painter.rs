@@ -477,18 +477,12 @@ impl CandidatePainter {
         }
     }
 
-    fn create_rounded_rect_path(&self, rect: Rect, radius: f32) -> Path {
+    fn create_rounded_rect_path(&self, rect: Rect, _radius: f32) -> Path {
         let mut pb = PathBuilder::new();
-        let r = radius.min(rect.width() / 2.0).min(rect.height() / 2.0);
-        pb.move_to(rect.left() + r, rect.top());
-        pb.line_to(rect.right() - r, rect.top());
-        pb.quad_to(rect.right(), rect.top(), rect.right(), rect.top() + r);
-        pb.line_to(rect.right(), rect.bottom() - r);
-        pb.quad_to(rect.right(), rect.bottom(), rect.right() - r, rect.bottom());
-        pb.line_to(rect.left() + r, rect.bottom());
-        pb.quad_to(rect.left(), rect.bottom(), rect.left(), rect.bottom() - r);
-        pb.line_to(rect.left(), rect.top() + r);
-        pb.quad_to(rect.left(), rect.top(), rect.left() + r, rect.top());
+        pb.move_to(rect.left(), rect.top());
+        pb.line_to(rect.right(), rect.top());
+        pb.line_to(rect.right(), rect.bottom());
+        pb.line_to(rect.left(), rect.bottom());
         pb.close();
         pb.finish().unwrap()
     }
