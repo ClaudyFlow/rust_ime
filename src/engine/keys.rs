@@ -18,18 +18,14 @@ impl std::fmt::Display for VirtualKey {
 
 impl VirtualKey {
     pub fn from_u32(v: u32) -> Option<Self> {
-        if v <= 25 {
-            return Some(unsafe { std::mem::transmute(v) });
-        }
-        if v >= 26 && v <= 35 {
-            return Some(unsafe { std::mem::transmute(v) });
-        }
-        // 对于非连续区域或特殊按键，我们可以继续按需添加分支，
-        // 或者简单地在 0..=66 (假设总数) 范围内进行安全校验。
-        // 目前 VirtualKey 定义中有 67 个元素 (0-66)。
-        if v <= 66 {
-            return Some(unsafe { std::mem::transmute(v) });
-        }
-        None
+        const ALL: &[VirtualKey] = &[
+            VirtualKey::A, VirtualKey::B, VirtualKey::C, VirtualKey::D, VirtualKey::E, VirtualKey::F, VirtualKey::G, VirtualKey::H, VirtualKey::I, VirtualKey::J, VirtualKey::K, VirtualKey::L, VirtualKey::M, VirtualKey::N, VirtualKey::O, VirtualKey::P, VirtualKey::Q, VirtualKey::R, VirtualKey::S, VirtualKey::T, VirtualKey::U, VirtualKey::V, VirtualKey::W, VirtualKey::X, VirtualKey::Y, VirtualKey::Z,
+            VirtualKey::Digit0, VirtualKey::Digit1, VirtualKey::Digit2, VirtualKey::Digit3, VirtualKey::Digit4, VirtualKey::Digit5, VirtualKey::Digit6, VirtualKey::Digit7, VirtualKey::Digit8, VirtualKey::Digit9,
+            VirtualKey::Space, VirtualKey::Enter, VirtualKey::Tab, VirtualKey::Backspace, VirtualKey::Esc, VirtualKey::CapsLock,
+            VirtualKey::Left, VirtualKey::Right, VirtualKey::Up, VirtualKey::Down,
+            VirtualKey::PageUp, VirtualKey::PageDown, VirtualKey::Home, VirtualKey::End, VirtualKey::Delete,
+            VirtualKey::Grave, VirtualKey::Minus, VirtualKey::Equal, VirtualKey::LeftBrace, VirtualKey::RightBrace, VirtualKey::Backslash, VirtualKey::Semicolon, VirtualKey::Apostrophe, VirtualKey::Comma, VirtualKey::Dot, VirtualKey::Slash,
+        ];
+        ALL.get(v as usize).copied()
     }
 }
