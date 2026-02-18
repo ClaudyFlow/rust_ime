@@ -454,10 +454,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_web = config.clone();
     let tries_web = tries_arc.clone();
     let tray_tx_web = tray_tx.clone();
+    let actual_web_port = Arc::new(std::sync::atomic::AtomicU16::new(18765));
+    let actual_web_port_web = actual_web_port.clone();
+
     std::thread::spawn(move || {
         if let Ok(rt) = tokio::runtime::Runtime::new() {
             rt.block_on(async {
-                let server = ui::web::WebServer::new(8765, config_web, tries_web, tray_tx_web);
+                let server = ui::web::WebServer::new(18765, actual_web_port_web, config_web, tries_web, tray_tx_web);
                 server.start().await;
             });
         }
@@ -472,6 +475,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gui_tx_tray = gui_tx.clone();
     let config_tray = config.clone();
     let notify_tx_tray = notify_tx.clone();
+    let actual_web_port_tray = actual_web_port.clone();
     
     std::thread::spawn(move || {
         while let Ok(event) = tray_rx.recv() {
@@ -630,10 +634,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(mut w) = config_tray.write() { *w = new_conf; }
                 }
                 ui::tray::TrayEvent::OpenConfig => {
+                    let port = actual_web_port_tray.load(std::sync::atomic::Ordering::SeqCst);
+                    let url = format!("http://localhost:{}", port);
                     #[cfg(target_os = "linux")]
-                    let _ = std::process::Command::new("xdg-open").arg("http://localhost:8765").spawn();
+                    let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
                     #[cfg(target_os = "windows")]
-                    let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg("http://localhost:8765").spawn();
+                    let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg(&url).spawn();
                 }
                 ui::tray::TrayEvent::Restart => {
                     let args: Vec<String> = std::env::args().collect();

@@ -7,6 +7,7 @@ use axum::{
 };
 use serde::{Serialize};
 use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::collections::HashMap;
 use crate::config::Config;
 use crate::engine::trie::Trie;
@@ -19,6 +20,7 @@ struct Assets;
 // Web server implementation for IME configuration
 pub struct WebServer {
     pub port: u16,
+    pub actual_port: Arc<AtomicU16>,
     pub config: Arc<RwLock<Config>>,
     pub tries: Arc<RwLock<HashMap<String, Trie>>>,
     pub tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>,
@@ -33,11 +35,12 @@ type WebState = (
 impl WebServer {
     pub fn new(
         port: u16, 
+        actual_port: Arc<AtomicU16>,
         config: Arc<RwLock<Config>>, 
         tries: Arc<RwLock<HashMap<String, Trie>>>,
         tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>
     ) -> Self {
-        Self { port, config, tries, tray_tx }
+        Self { port, actual_port, config, tries, tray_tx }
     }
 
     pub async fn start(self) {
@@ -58,16 +61,30 @@ impl WebServer {
             .fallback(index_handler)
             .with_state(state);
 
-        let addr = format!("127.0.0.1:{}", self.port);
-        match tokio::net::TcpListener::bind(&addr).await {
-            Ok(listener) => {
-                println!("[Web] 服务器启动在 http://{}", addr);
-                if let Err(e) = axum::serve(listener, app).await {
-                    eprintln!("[Web] Server error: {}", e);
+        let mut current_port = self.port;
+        loop {
+            let addr = format!("127.0.0.1:{}", current_port);
+            match tokio::net::TcpListener::bind(&addr).await {
+                Ok(listener) => {
+                    self.actual_port.store(current_port, Ordering::SeqCst);
+                    println!("[Web] 服务器启动在 http://{}", addr);
+                    if let Err(e) = axum::serve(listener, app).await {
+                        eprintln!("[Web] Server error: {}", e);
+                    }
+                    break;
                 }
-            }
-            Err(e) => {
-                eprintln!("[Web] Failed to bind to {}: {}", addr, e);
+                Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                    eprintln!("[Web] 端口 {} 已被占用，正在尝试 {}...", current_port, current_port + 1);
+                    current_port += 1;
+                    if current_port > self.port + 100 {
+                        eprintln!("[Web] 已尝试 100 个端口均无法启动，退出。");
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[Web] Failed to bind to {}: {}", addr, e);
+                    break;
+                }
             }
         }
     }
