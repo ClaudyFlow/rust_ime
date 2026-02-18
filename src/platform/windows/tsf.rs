@@ -263,7 +263,7 @@ unsafe fn handle_client(
         let ctrl = (modifiers & 2) != 0;
         let alt = (modifiers & 4) != 0;
         
-        // 1. 优先检查切换热键
+        // 1. 优先检查切换热键 (必须在 ctrl || alt 逻辑之前，否则会被拦截)
         let (is_lang_toggle, is_dp_toggle) = {
             let c = crate::load_config(); 
             let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||

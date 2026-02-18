@@ -453,13 +453,12 @@ impl Processor {
     pub fn toggle(&mut self) -> Action {
         self.chinese_enabled = !self.chinese_enabled;
         let enabled = self.chinese_enabled;
-        let profile = self.get_current_profile_display();
         self.reset();
         
         if enabled {
-            Action::Notify("中".into(), format!("中文模式 ({})", profile))
+            Action::Notify("中".into(), "中文模式".into())
         } else {
-            Action::Notify("英".into(), "英文直通模式".into())
+            Action::Notify("英".into(), "英文模式".into())
         }
     }
 
