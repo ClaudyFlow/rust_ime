@@ -97,190 +97,55 @@
     "enable_double_tap": true,
     "double_tap_timeout_ms": 250,
     "double_taps": [
-      {
-        "trigger_key": "i",
-        "insert_text": "ing"
-      },
-      {
-        "trigger_key": "l",
-        "insert_text": "uang"
-      },
-      {
-        "trigger_key": "o",
-        "insert_text": "ong"
-      },
-      {
-        "trigger_key": "j",
-        "insert_text": "an"
-      },
-      {
-        "trigger_key": "k",
-        "insert_text": "uai"
-      },
-      {
-        "trigger_key": "n",
-        "insert_text": "ian"
-      },
-      {
-        "trigger_key": "m",
-        "insert_text": "ian"
-      },
-      {
-        "trigger_key": "a",
-        "insert_text": "ang"
-      },
-      {
-        "trigger_key": "z",
-        "insert_text": "zh"
-      },
-      {
-        "trigger_key": "c",
-        "insert_text": "ch"
-      },
-      {
-        "trigger_key": "s",
-        "insert_text": "sh"
-      },
-      {
-        "trigger_key": "f",
-        "insert_text": "en"
-      },
-      {
-        "trigger_key": "d",
-        "insert_text": "ai"
-      },
-      {
-        "trigger_key": "w",
-        "insert_text": "ei"
-      },
-      {
-        "trigger_key": "g",
-        "insert_text": "ao"
-      },
-      {
-        "trigger_key": "h",
-        "insert_text": "ou"
-      },
-      {
-        "trigger_key": "p",
-        "insert_text": "iong"
-      },
-      {
-        "trigger_key": "u",
-        "insert_text": "ui"
-      },
-      {
-        "trigger_key": "x",
-        "insert_text": "ua"
-      }
+      { "trigger_key": "i", "insert_text": "ing" },
+      { "trigger_key": "l", "insert_text": "uang" },
+      { "trigger_key": "o", "insert_text": "ong" },
+      { "trigger_key": "j", "insert_text": "an" },
+      { "trigger_key": "k", "insert_text": "uai" },
+      { "trigger_key": "n", "insert_text": "ian" },
+      { "trigger_key": "m", "insert_text": "ian" },
+      { "trigger_key": "a", "insert_text": "ang" },
+      { "trigger_key": "z", "insert_text": "zh" },
+      { "trigger_key": "c", "insert_text": "ch" },
+      { "trigger_key": "s", "insert_text": "sh" },
+      { "trigger_key": "f", "insert_text": "en" },
+      { "trigger_key": "d", "insert_text": "ai" },
+      { "trigger_key": "w", "insert_text": "ei" },
+      { "trigger_key": "g", "insert_text": "ao" },
+      { "trigger_key": "h", "insert_text": "ou" },
+      { "trigger_key": "p", "insert_text": "iong" },
+      { "trigger_key": "u", "insert_text": "ui" },
+      { "trigger_key": "x", "insert_text": "ua" }
     ],
     "enable_long_press": true,
     "long_press_timeout_ms": 400,
     "long_press_mappings": [
-      {
-        "trigger_key": "q",
-        "insert_text": "Q"
-      },
-      {
-        "trigger_key": "w",
-        "insert_text": "W"
-      },
-      {
-        "trigger_key": "e",
-        "insert_text": "E"
-      },
-      {
-        "trigger_key": "r",
-        "insert_text": "R"
-      },
-      {
-        "trigger_key": "t",
-        "insert_text": "T"
-      },
-      {
-        "trigger_key": "y",
-        "insert_text": "Y"
-      },
-      {
-        "trigger_key": "u",
-        "insert_text": "U"
-      },
-      {
-        "trigger_key": "i",
-        "insert_text": "I"
-      },
-      {
-        "trigger_key": "o",
-        "insert_text": "O"
-      },
-      {
-        "trigger_key": "p",
-        "insert_text": "P"
-      },
-      {
-        "trigger_key": "a",
-        "insert_text": "A"
-      },
-      {
-        "trigger_key": "s",
-        "insert_text": "S"
-      },
-      {
-        "trigger_key": "d",
-        "insert_text": "D"
-      },
-      {
-        "trigger_key": "f",
-        "insert_text": "F"
-      },
-      {
-        "trigger_key": "g",
-        "insert_text": "G"
-      },
-      {
-        "trigger_key": "h",
-        "insert_text": "H"
-      },
-      {
-        "trigger_key": "j",
-        "insert_text": "J"
-      },
-      {
-        "trigger_key": "k",
-        "insert_text": "K"
-      },
-      {
-        "trigger_key": "l",
-        "insert_text": "L"
-      },
-      {
-        "trigger_key": "z",
-        "insert_text": "Z"
-      },
-      {
-        "trigger_key": "x",
-        "insert_text": "X"
-      },
-      {
-        "trigger_key": "c",
-        "insert_text": "C"
-      },
-      {
-        "trigger_key": "v",
-        "insert_text": "V"
-      },
-      {
-        "trigger_key": "b",
-        "insert_text": "B"
-      },
-      {
-        "trigger_key": "n",
-        "insert_text": "N"
-      },
-      {
-        "trigger_key": "m",
-        "insert_text": "M"
-      }
+      { "trigger_key": "q", "insert_text": "Q" },
+      { "trigger_key": "w", "insert_text": "W" },
+      { "trigger_key": "e", "insert_text": "E" },
+      { "trigger_key": "r", "insert_text": "R" },
+      { "trigger_key": "t", "insert_text": "T" },
+      { "trigger_key": "y", "insert_text": "Y" },
+      { "trigger_key": "u", "insert_text": "U" },
+      { "trigger_key": "i", "insert_text": "I" },
+      { "trigger_key": "o", "insert_text": "O" },
+      { "trigger_key": "p", "insert_text": "P" },
+      { "trigger_key": "a", "insert_text": "A" },
+      { "trigger_key": "s", "insert_text": "S" },
+      { "trigger_key": "d", "insert_text": "D" },
+      { "trigger_key": "f", "insert_text": "F" },
+      { "trigger_key": "g", "insert_text": "G" },
+      { "trigger_key": "h", "insert_text": "H" },
+      { "trigger_key": "j", "insert_text": "J" },
+      { "trigger_key": "k", "insert_text": "K" },
+      { "trigger_key": "l", "insert_text": "L" },
+      { "trigger_key": "z", "insert_text": "Z" },
+      { "trigger_key": "x", "insert_text": "X" },
+      { "trigger_key": "c", "insert_text": "C" },
+      { "trigger_key": "v", "insert_text": "V" },
+      { "trigger_key": "b", "insert_text": "B" },
+      { "trigger_key": "n", "insert_text": "N" },
+      { "trigger_key": "m", "insert_text": "M" }
     ],
     "auto_commit_unique_en_fuzhuma": false,
     "auto_commit_unique_full_match": false,
@@ -288,13 +153,9 @@
     "prefix_matching_limit": 20,
     "enable_abbreviation_matching": true,
     "filter_proper_nouns_by_case": true,
-    "active_profiles": [
-      "chinese"
-    ],
+    "active_profiles": ["chinese"],
     "profile_keys": [],
-    "page_flipping_keys": [
-      "arrow"
-    ],
+    "page_flipping_keys": ["arrow"],
     "swap_arrow_keys": false,
     "enable_error_sound": true,
     "enable_english_filter": true,
@@ -305,72 +166,29 @@
     "enable_smart_backspace": true,
     "enable_double_pinyin": true,
     "double_pinyin_scheme": {
-      "name": "小鹤双拼",
-      "initials": {},
+      "name": "无缝兼容双拼",
+      "initials": {
+        "v": "zh", "u": "sh", "i": "ch"
+      },
       "rimes": {
-        "p": "ie",
-        "b": "in",
-        "m": "ian",
-        "h": "ang",
-        "q": "iu",
-        "r": "uan",
-        "x": "ia",
-        "k": "ao",
-        "f": "en",
-        "g": "eng",
-        "d": "ai",
-        "j": "an",
-        "t": "ue",
-        "c": "ao",
-        "s": "ong",
-        "z": "ou",
-        "y": "un",
-        "w": "ei",
-        "n": "iao",
-        "l": "iang"
+        "p": "ie", "b": "in", "m": "ian", "q": "iu",
+        "r": "uan", "x": "ia", "k": "ao", "f": "en",
+        "d": "ai", "j": "an", "t": "ue", "c": "ao", "s": "ong",
+        "z": "ou", "y": "un", "w": "ei", "l": "iang"
       }
     }
   },
   "hotkeys": {
-    "switch_language": {
-      "key": "tab",
-      "description": "核心: 切换中/英文模式"
-    },
-    "switch_language_alt": {
-      "key": "ctrl+space",
-      "description": "核心: 切换中/英文模式 (备选)"
-    },
-    "switch_dictionary": {
-      "key": "ctrl+alt+s",
-      "description": "功能: 切换输入方案/词库"
-    },
-    "cycle_preview_mode": {
-      "key": "ctrl+alt+p",
-      "description": "界面: 切换屏幕预览模式"
-    },
-    "toggle_notifications": {
-      "key": "ctrl+alt+n",
-      "description": "界面: 开启/关闭系统通知"
-    },
-    "cycle_paste_method": {
-      "key": "ctrl+alt+v",
-      "description": "兼容: 切换粘贴注入方式"
-    },
-    "toggle_traditional_gui": {
-      "key": "ctrl+alt+g",
-      "description": "界面: 显示/隐藏传统候选窗"
-    },
-    "toggle_modern_gui": {
-      "key": "ctrl+alt+h",
-      "description": "界面: 显示/隐藏卡片候选词"
-    },
-    "toggle_keystrokes": {
-      "key": "ctrl+alt+k",
-      "description": "功能: 开启/关闭按键显示"
-    },
-    "switch_commit_mode": {
-      "key": "ctrl+alt+m",
-      "description": "模式: 切换单/双空格上屏"
-    }
+    "switch_language": { "key": "tab", "description": "核心: 切换中/英文模式" },
+    "switch_language_alt": { "key": "ctrl+space", "description": "核心: 切换中/英文模式 (备选)" },
+    "switch_dictionary": { "key": "ctrl+alt+s", "description": "功能: 切换输入方案/词库" },
+    "cycle_preview_mode": { "key": "ctrl+alt+p", "description": "界面: 切换屏幕预览模式" },
+    "toggle_notifications": { "key": "ctrl+alt+n", "description": "界面: 开启/关闭系统通知" },
+    "cycle_paste_method": { "key": "ctrl+alt+v", "description": "兼容: 切换粘贴注入方式" },
+    "toggle_traditional_gui": { "key": "ctrl+alt+g", "description": "界面: 显示/隐藏传统候选窗" },
+    "toggle_modern_gui": { "key": "ctrl+alt+h", "description": "界面: 显示/隐藏卡片候选词" },
+    "toggle_keystrokes": { "key": "ctrl+alt+k", "description": "功能: 开启/关闭按键显示" },
+    "switch_commit_mode": { "key": "ctrl+alt+m", "description": "模式: 切换单/双空格上屏" },
+    "toggle_double_pinyin": { "key": "ctrl+alt+d", "description": "模式: 开启/关闭无缝双拼" }
   }
 }

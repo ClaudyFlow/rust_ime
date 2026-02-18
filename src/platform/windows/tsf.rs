@@ -231,10 +231,35 @@ unsafe fn handle_client(
         let alt = (modifiers & 4) != 0;
         
         // 1. 优先检查切换热键
-        let is_ctrl_space = (key_code == 0x20) && ctrl;
-        let is_tab = (key_code == 0x09) && !ctrl && !alt;
+        let (is_lang_toggle, is_dp_toggle) = {
+            let _p = processor.lock().unwrap();
+            let c = crate::load_config(); // 重新加载以获取最新热键配置
+            
+            // 简单的组合键解析
+            let key_str = match key_code {
+                0x20 => "space".to_string(),
+                0x09 => "tab".to_string(),
+                0x41..=0x5A => {
+                    let c = (key_code as u8) as char;
+                    c.to_ascii_lowercase().to_string()
+                },
+                _ => "".to_string()
+            };
+
+            let mut current_combo = String::new();
+            if ctrl { current_combo.push_str("ctrl+"); }
+            if alt { current_combo.push_str("alt+"); }
+            if shift { current_combo.push_str("shift+"); }
+            current_combo.push_str(&key_str);
+
+            let lang_match = c.hotkeys.switch_language.key.to_lowercase() == current_combo ||
+                             c.hotkeys.switch_language_alt.key.to_lowercase() == current_combo;
+            let dp_match = c.hotkeys.toggle_double_pinyin.key.to_lowercase() == current_combo;
+            
+            (lang_match, dp_match)
+        };
         
-        if is_tab || is_ctrl_space {
+        if is_lang_toggle {
             if msg_type == 1 {
                 let mut p = processor.lock().unwrap();
                 let action = p.toggle();
@@ -253,6 +278,26 @@ unsafe fn handle_client(
                     let _ = notify_tx.send(NotifyEvent::Message(title.to_string(), msg));
                 }
                 update_gui_impl(&gui_tx, &processor);
+            }
+            let response = vec![2u8];
+            let mut bytes_written = 0;
+            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+            continue;
+        }
+
+        if is_dp_toggle {
+            if msg_type == 1 {
+                let (enabled, profile) = {
+                    let mut p = processor.lock().unwrap();
+                    p.enable_double_pinyin = !p.enable_double_pinyin;
+                    (p.enable_double_pinyin, p.get_current_profile_display())
+                };
+                let mut c = crate::load_config();
+                c.input.enable_double_pinyin = enabled;
+                let _ = crate::save_config(&c);
+                
+                let msg = if enabled { "开启双拼模式" } else { "关闭双拼模式" };
+                let _ = notify_tx.send(NotifyEvent::Message(profile, msg.into()));
             }
             let response = vec![2u8];
             let mut bytes_written = 0;

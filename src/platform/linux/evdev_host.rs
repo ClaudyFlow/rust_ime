@@ -185,9 +185,9 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_mod, toggle_ks, toggle_commit, toggle_dp) = {
                             let conf = self.config.read().unwrap();
-                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_modern_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key))
+                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_modern_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
                         };
                         
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
@@ -257,6 +257,18 @@ impl InputMethodHost for EvdevHost {
                             if let Ok(mut w) = self.config.write() { w.input.commit_mode = mode.clone(); let _ = crate::save_config(&w); }
                             let msg = format!("上屏模式: {}", mode);
                             let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg));
+                            continue;
+                        }
+
+                        if is_combo(&held_keys, &toggle_dp) {
+                            let (enabled, summary) = {
+                                let mut p = self.processor.lock().unwrap();
+                                p.enable_double_pinyin = !p.enable_double_pinyin;
+                                (p.enable_double_pinyin, p.get_current_profile_display())
+                            };
+                            if let Ok(mut w) = self.config.write() { w.input.enable_double_pinyin = enabled; let _ = crate::save_config(&w); }
+                            let msg = if enabled { "开启双拼模式" } else { "关闭双拼模式" };
+                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.into()));
                             continue;
                         }
                     }

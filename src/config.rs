@@ -169,6 +169,7 @@ pub struct Hotkeys {
     pub toggle_modern_gui: Hotkey,
     pub toggle_keystrokes: Hotkey,
     pub switch_commit_mode: Hotkey,
+    pub toggle_double_pinyin: Hotkey,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -347,9 +348,9 @@ impl Config {
                     ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
                     rimes: [
                         ("p", "ie"), ("b", "in"), ("m", "ian"),  ("q", "iu"),
-                        ("r", "uan"), ("x", "ia"), ("k", "ao"), ("f", "en"), ("g", "eng"),
+                        ("r", "uan"), ("x", "ia"), ("k", "ao"), ("f", "en"),
                         ("d", "ai"), ("j", "an"), ("t", "ue"), ("c", "ao"), ("s", "ong"),
-                        ("z", "ou"), ("y", "un"), ("w", "ei"), ("n", "iao"), ("l", "iang")
+                        ("z", "ou"), ("y", "un"), ("w", "ei"), ("l", "iang")
                     ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
                 },
             },
@@ -364,6 +365,7 @@ impl Config {
                 toggle_modern_gui: Hotkey { key: "ctrl+alt+h".to_string(), description: "界面: 显示/隐藏卡片候选词".to_string() },
                 toggle_keystrokes: Hotkey { key: "ctrl+alt+k".to_string(), description: "功能: 开启/关闭按键显示".to_string() },
                 switch_commit_mode: Hotkey { key: "ctrl+alt+m".to_string(), description: "模式: 切换单/双空格上屏".to_string() },
+                toggle_double_pinyin: Hotkey { key: "ctrl+alt+d".to_string(), description: "模式: 开启/关闭双拼模式".to_string() },
             },
         }
     }

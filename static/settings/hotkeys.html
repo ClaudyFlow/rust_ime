@@ -58,7 +58,7 @@
         }
 
         function renderHK() { 
-            document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).map(([id, val]) => `
+            document.getElementById('hk-container').innerHTML = Object.entries(config.hotkeys).filter(([id, val]) => typeof val === 'object' && val.key).map(([id, val]) => `
                 <div class="setting-item">
                     <div class="info">
                         <div class="title">${val.description}</div>
