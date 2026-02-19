@@ -6,17 +6,17 @@ import os
 SB_MAP = {'e': 1, 'i': 2, 'u': 3, 'o': 4, 'a': 5}
 
 # 2. 你的 5x5 键盘矩阵 (首笔区 x 次笔区)
-# 横(1): q w e r t
-# 竖(2): a s d f g
-# 撇(3): z x c v b
-# 捺(4): y u i o p
-# 折(5): h j k l n (M 不用)
+# 横(1): G F D S A
+# 竖(2): H J K L M
+# 撇(3): T R E W Q
+# 捺(4): Y U I O P
+# 折(5): N B V C X
 MATRIX = {
-    1: {1: 'q', 2: 'w', 3: 'e', 4: 'r', 5: 't'},
-    2: {1: 'a', 2: 's', 3: 'd', 4: 'f', 5: 'g'},
-    3: {1: 'z', 2: 'x', 3: 'c', 4: 'v', 5: 'b'},
+    1: {1: 'g', 2: 'f', 3: 'd', 4: 's', 5: 'a'},
+    2: {1: 'h', 2: 'j', 3: 'k', 4: 'l', 5: 'm'},
+    3: {1: 't', 2: 'r', 3: 'e', 4: 'w', 5: 'q'},
     4: {1: 'y', 2: 'u', 3: 'i', 4: 'o', 5: 'p'},
-    5: {1: 'h', 2: 'j', 3: 'k', 4: 'l', 5: 'n'}
+    5: {1: 'n', 2: 'b', 3: 'v', 4: 'c', 5: 'x'}
 }
 
 def load_sbsrf_data():
@@ -63,7 +63,7 @@ def load_sbsrf_data():
                         aux += MATRIX[s3][1]
                 
                 if aux:
-                    char_map[char] = aux
+                    char_map[char] = aux.capitalize()
     return char_map
 
 def process_file(file_path, stroke_map):

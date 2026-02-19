@@ -131,7 +131,7 @@ pub struct Processor {
 }
 
 fn get_stroke_desc(code: &str) -> String {
-    code.to_lowercase()
+    code.to_string()
 }
 
 impl Processor {
@@ -216,7 +216,7 @@ impl Processor {
             has_dict_match: false,
             page_size: 5,
             show_tone_hint: false,
-            aux_mode: AuxMode::Stroke,
+            aux_mode: AuxMode::English,
             page_flipping_styles: vec!["arrow".to_string()],
             swap_arrow_keys: false,
             aux_filter: String::new(),
@@ -1382,7 +1382,7 @@ mod tests {
                         user_dict_tx: None,
             
                         profile_keys: Vec::new(),
-             auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, show_en_hint: true, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
+             auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, aux_mode: AuxMode::English, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
         }
     }
     #[test] fn test_dummy() { let _p = setup_mock_processor(); }
