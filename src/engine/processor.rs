@@ -131,41 +131,7 @@ pub struct Processor {
 }
 
 fn get_stroke_desc(code: &str) -> String {
-    let code = code.to_uppercase();
-    let names = ["", "横", "竖", "撇", "捺", "折"];
-    let matrix = [
-        ('Q', 1, 1), ('W', 1, 2), ('E', 1, 3), ('R', 1, 4), ('T', 1, 5),
-        ('A', 2, 1), ('S', 2, 2), ('D', 2, 3), ('F', 2, 4), ('G', 2, 5),
-        ('Z', 3, 1), ('X', 3, 2), ('C', 3, 3), ('V', 3, 4), ('B', 3, 5),
-        ('Y', 4, 1), ('U', 4, 2), ('I', 4, 3), ('O', 4, 4), ('P', 4, 5),
-        ('H', 5, 1), ('J', 5, 2), ('K', 5, 3), ('L', 5, 4), ('N', 5, 5),
-    ];
-
-    let mut result = String::new();
-    let chars: Vec<char> = code.chars().collect();
-    
-    // 处理前两笔
-    if chars.len() >= 1 {
-        for (c, s1, s2) in matrix {
-            if c == chars[0] {
-                result.push_str(&format!("{}({}{})", chars[0], names[s1], names[s2]));
-                break;
-            }
-        }
-    }
-    
-    // 处理末两笔
-    if chars.len() >= 2 {
-        for (c, s1, s2) in matrix {
-            if c == chars[1] {
-                if !result.is_empty() { result.push(' '); }
-                result.push_str(&format!("{}({}{})", chars[1], names[s1], names[s2]));
-                break;
-            }
-        }
-    }
-    
-    if result.is_empty() { code } else { result }
+    code.to_lowercase()
 }
 
 impl Processor {
@@ -1125,6 +1091,12 @@ impl Processor {
         }
 
         for m in last_matches_raw {
+            if let Some(ref aux) = raw_parsed.last().and_then(|p| p.aux_code.as_ref()) {
+                let aux_lower = aux.to_lowercase();
+                if !m.3.to_lowercase().starts_with(&aux_lower) {
+                    continue;
+                }
+            }
             if seen.insert(m.0.clone()) { final_matches.push(m); }
         }
 
