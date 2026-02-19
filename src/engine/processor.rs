@@ -132,14 +132,6 @@ pub struct Processor {
 
 fn get_stroke_desc(code: &str) -> String {
     let code = code.to_uppercase();
-    let char_code = code.chars().next().unwrap_or(' ');
-    
-    // 我们的 5x5 矩阵:
-    // 横(1): Q W E R T
-    // 竖(2): A S D F G
-    // 撇(3): Z X C V B
-    // 捺(4): Y U I O P
-    // 折(5): H J K L N
     let names = ["", "横", "竖", "撇", "捺", "折"];
     let matrix = [
         ('Q', 1, 1), ('W', 1, 2), ('E', 1, 3), ('R', 1, 4), ('T', 1, 5),
@@ -149,12 +141,31 @@ fn get_stroke_desc(code: &str) -> String {
         ('H', 5, 1), ('J', 5, 2), ('K', 5, 3), ('L', 5, 4), ('N', 5, 5),
     ];
 
-    for (c, s1, s2) in matrix {
-        if c == char_code {
-            return format!("{}({}{})", code, names[s1], names[s2]);
+    let mut result = String::new();
+    let chars: Vec<char> = code.chars().collect();
+    
+    // 处理前两笔
+    if chars.len() >= 1 {
+        for (c, s1, s2) in matrix {
+            if c == chars[0] {
+                result.push_str(&format!("{}({}{})", chars[0], names[s1], names[s2]));
+                break;
+            }
         }
     }
-    code
+    
+    // 处理末两笔
+    if chars.len() >= 2 {
+        for (c, s1, s2) in matrix {
+            if c == chars[1] {
+                if !result.is_empty() { result.push(' '); }
+                result.push_str(&format!("{}({}{})", chars[1], names[s1], names[s2]));
+                break;
+            }
+        }
+    }
+    
+    if result.is_empty() { code } else { result }
 }
 
 impl Processor {

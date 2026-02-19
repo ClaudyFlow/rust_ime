@@ -32,11 +32,24 @@ def load_sbsrf_data():
             if len(parts) >= 2:
                 char = parts[0]
                 code = parts[1]
+                
                 # 获取前两笔
                 s1 = SB_MAP.get(code[0])
-                s2 = SB_MAP.get(code[1]) if len(code) >= 2 else 1 # 补横
-                if s1 and s2:
-                    char_map[char] = MATRIX[s1][s2]
+                s2 = SB_MAP.get(code[1]) if len(code) >= 2 else 1
+                
+                # 获取末两笔
+                if len(code) >= 4:
+                    s3 = SB_MAP.get(code[-2])
+                    s4 = SB_MAP.get(code[-1])
+                elif len(code) == 3:
+                    s3 = SB_MAP.get(code[-1])
+                    s4 = 1 # 补横
+                else:
+                    s3 = 1
+                    s4 = 1
+                
+                if s1 and s2 and s3 and s4:
+                    char_map[char] = MATRIX[s1][s2] + MATRIX[s3][s4]
     return char_map
 
 def process_file(file_path, stroke_map):
