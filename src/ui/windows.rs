@@ -148,7 +148,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             } else {
                                 ShowWindow(hwnd_status, SW_HIDE);
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-                                InvalidateRect(hwnd, None, BOOL(1));
+                                // 改为 FALSE，禁用系统自动擦除背景，消除闪烁
+                                InvalidateRect(hwnd, None, BOOL(0));
                                 UpdateWindow(hwnd);
                             }
                         }
@@ -411,19 +412,13 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
     
-    // 1. 设置物理裁切区域 (严格对应当前窗口物理尺寸)
-    let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right, rect.bottom, radius, radius);
-    let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
-
     let bg_brush = CreateSolidBrush(bg_color);
     let border_pen = CreatePen(PS_SOLID, border_width, border_color);
     let old_brush = SelectObject(hdc, bg_brush);
     let old_pen = SelectObject(hdc, border_pen);
     
     // 2. 绘制圆角矩形。
-    // 使用“过量绘制”技巧：向外扩 border_visible 像素。
-    // 这样 20px 宽的笔触，有 10px 在内（可见），10px 在外（被裁切）。
-    // 这能保证边框线条从窗口边缘向内延伸 10 像素，且边缘绝对整齐。
+    // 使用“过量绘制”技巧，并利用 SetWindowPos 触发的裁切。
     RoundRect(hdc, rect.left - border_visible, rect.top - border_visible, rect.right + border_visible, rect.bottom + border_visible, radius, radius);
     
     SelectObject(hdc, old_brush);
