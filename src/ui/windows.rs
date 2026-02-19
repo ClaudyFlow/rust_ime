@@ -101,7 +101,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         let _ = CURRENT_CONFIG.set(Arc::new(RwLock::new(initial_config)));
 
         let hwnd = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED,
+            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
             window_class, PCWSTR(std::ptr::null()), WS_POPUP,
             100, 100, 400, 120, None, None, instance, None,
         );
@@ -146,14 +146,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             if state.pinyin.is_empty() {
                                 ShowWindow(hwnd, SW_HIDE);
                             } else {
-                                ShowWindow(hwnd_status, SW_HIDE); // 避免与候选窗重叠
-                                
-                                let (data, w, h) = {
-                                    let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
-                                    painter.draw(&state.pinyin, &state.candidates, &state.hints, state.selected, &conf)
-                                };
-                                update_layered_window(hwnd, &data, w, h);
+                                ShowWindow(hwnd_status, SW_HIDE);
                                 ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+                                InvalidateRect(hwnd, None, BOOL(1));
+                                UpdateWindow(hwnd);
                             }
                         }
                     }
@@ -328,7 +324,34 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     match msg {
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
-            let _hdc = BeginPaint(hwnd, &mut ps);
+            let hdc = BeginPaint(hwnd, &mut ps);
+            
+            let mut rect = RECT::default();
+            let _ = GetClientRect(hwnd, &mut rect);
+            let mem_dc = CreateCompatibleDC(hdc);
+            let mem_bm = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+            let old_bm = SelectObject(mem_dc, mem_bm);
+            
+            if let Some(ref state) = WINDOW_STATE {
+                if let Some(arc) = CURRENT_CONFIG.get() {
+                    if let Ok(conf) = arc.read() {
+                        // 使用配置背景色填充背景，避免残留
+                        let bg_color = parse_color_win(&conf.appearance.window_bg_color);
+                        let brush = CreateSolidBrush(bg_color);
+                        let _ = FillRect(mem_dc, &rect, brush);
+                        let _ = DeleteObject(brush);
+                        
+                        draw_content(mem_dc, hwnd, state, &conf);
+                    }
+                }
+            }
+            
+            let _ = BitBlt(hdc, 0, 0, rect.right, rect.bottom, mem_dc, 0, 0, SRCCOPY);
+            
+            SelectObject(mem_dc, old_bm);
+            let _ = DeleteObject(mem_bm);
+            let _ = DeleteDC(mem_dc);
+            
             EndPaint(hwnd, &ps);
             LRESULT(0)
         }
@@ -369,6 +392,178 @@ unsafe extern "system" fn status_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, 
         WM_ERASEBKGND => LRESULT(1),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config) {
+    SetBkMode(hdc, TRANSPARENT);
+    
+    let pad_x = conf.appearance.window_padding_x;
+    let pad_y = conf.appearance.window_padding_y;
+    let row_space = conf.appearance.row_spacing as i32;
+    let item_space = conf.appearance.item_spacing as i32;
+
+    let bg_color = parse_color_win(&conf.appearance.window_bg_color);
+    let border_color = parse_color_win(&conf.appearance.window_border_color);
+    let radius = (conf.appearance.corner_radius as i32) * 2;
+
+    // 绘制圆角背景
+    let mut rect = RECT::default();
+    let _ = GetClientRect(hwnd, &mut rect);
+    
+    // 实现圆角裁切 (物理裁切，不产生白边)
+    let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right + 1, rect.bottom + 1, radius, radius);
+    let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
+
+    let bg_brush = CreateSolidBrush(bg_color);
+    let border_pen = CreatePen(PS_SOLID, 1, border_color);
+    let old_brush = SelectObject(hdc, bg_brush);
+    let old_pen = SelectObject(hdc, border_pen);
+    
+    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+    
+    SelectObject(hdc, old_brush);
+    SelectObject(hdc, old_pen);
+    let _ = DeleteObject(bg_brush);
+    let _ = DeleteObject(border_pen);
+
+    // 字体和其余绘制逻辑（GDI 路径下极快）
+    let py_font_name = HSTRING::from(&conf.appearance.pinyin_text.font_family);
+    let h_font_py = CreateFontW(
+        -(conf.appearance.pinyin_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(py_font_name.as_ptr())
+    );
+
+    let cand_font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
+    let h_font_cand = CreateFontW(
+        -(conf.appearance.candidate_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(cand_font_name.as_ptr())
+    );
+
+    let hint_font_name = HSTRING::from(&conf.appearance.hint_text.font_family);
+    let h_font_hint = CreateFontW(
+        -(conf.appearance.hint_text.font_size as i32 * 96 / 72),
+        0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
+        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
+        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32,
+        PCWSTR(hint_font_name.as_ptr())
+    );
+
+    // --- 绘制拼音行 ---
+    SelectObject(hdc, h_font_py);
+    SetTextColor(hdc, parse_color_win(&conf.appearance.pinyin_text.color));
+    let py_u16: Vec<u16> = state.pinyin.encode_utf16().collect();
+    TextOutW(hdc, pad_x, pad_y, &py_u16);
+    let mut py_size = SIZE::default();
+    GetTextExtentPoint32W(hdc, &py_u16, &mut py_size);
+
+    // --- 绘制候选词行 ---
+    let cand_y = pad_y + py_size.cy + row_space;
+    let mut x_cursor = pad_x;
+    let cand_color = parse_color_win(&conf.appearance.candidate_text.color);
+    let hint_color = parse_color_win(&conf.appearance.hint_text.color);
+    let page_size = conf.appearance.page_size;
+    let start = (state.selected / page_size) * page_size;
+    let end = (start + page_size).min(state.candidates.len());
+    let mut max_row_height = 0;
+
+    for i in start..end {
+        let is_selected = i == state.selected;
+        SelectObject(hdc, h_font_cand);
+        let idx_text = format!("{}.", i - start + 1);
+        let idx_u16: Vec<u16> = idx_text.encode_utf16().collect();
+        let mut idx_size = SIZE::default();
+        GetTextExtentPoint32W(hdc, &idx_u16, &mut idx_size);
+
+        let cand_text = &state.candidates[i];
+        let cand_u16: Vec<u16> = cand_text.encode_utf16().collect();
+        let mut text_size = SIZE::default();
+        GetTextExtentPoint32W(hdc, &cand_u16, &mut text_size);
+
+        let mut hint_w = 0;
+        let mut h_size = SIZE::default();
+        if let Some(hint) = state.hints.get(i) {
+            if !hint.is_empty() {
+                SelectObject(hdc, h_font_hint);
+                let hint_u16: Vec<u16> = hint.encode_utf16().collect();
+                GetTextExtentPoint32W(hdc, &hint_u16, &mut h_size);
+                hint_w = h_size.cx + 8;
+            }
+        }
+
+        let item_total_w = idx_size.cx + 4 + text_size.cx + hint_w;
+        if is_selected {
+            // 高亮背景使用 AlphaBlend (GDI+ 效果)
+            let h_brush = CreateSolidBrush(parse_color_win(&conf.appearance.window_highlight_color));
+            let r = RECT { 
+                left: x_cursor - 6, 
+                top: cand_y - 2, 
+                right: x_cursor + item_total_w + 6, 
+                bottom: cand_y + text_size.cy + 2 
+            };
+            let h_pen = CreatePen(PS_NULL, 0, COLORREF(0));
+            let old_b = SelectObject(hdc, h_brush);
+            let old_p = SelectObject(hdc, h_pen);
+            RoundRect(hdc, r.left, r.top, r.right, r.bottom, 8, 8);
+            SelectObject(hdc, old_b);
+            SelectObject(hdc, old_p);
+            let _ = DeleteObject(h_brush);
+            let _ = DeleteObject(h_pen);
+        }
+        
+        SelectObject(hdc, h_font_cand);
+        SetTextColor(hdc, if is_selected { COLORREF(0xFFFFFF) } else { cand_color });
+        TextOutW(hdc, x_cursor, cand_y, &idx_u16);
+        x_cursor += idx_size.cx + 4;
+        TextOutW(hdc, x_cursor, cand_y, &cand_u16);
+        x_cursor += text_size.cx;
+
+        if hint_w > 0 {
+            SelectObject(hdc, h_font_hint);
+            SetTextColor(hdc, if is_selected { COLORREF(0xDDDDDD) } else { hint_color });
+            let hint_u16: Vec<u16> = state.hints[i].encode_utf16().collect();
+            TextOutW(hdc, x_cursor + 4, cand_y + (text_size.cy - h_size.cy), &hint_u16);
+            x_cursor += hint_w;
+        }
+        x_cursor += item_space;
+        max_row_height = max_row_height.max(text_size.cy);
+    }
+
+    let _ = DeleteObject(h_font_py);
+    let _ = DeleteObject(h_font_cand);
+    let _ = DeleteObject(h_font_hint);
+    
+    // 动态调整窗口尺寸
+    let final_w = (x_cursor + pad_x - item_space).max(200);
+    let final_h = cand_y + max_row_height + pad_y;
+    let mut current_rect = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut current_rect);
+    if final_w != (current_rect.right - current_rect.left) || final_h != (current_rect.bottom - current_rect.top) {
+        let _ = SetWindowPos(hwnd, HWND_TOPMOST, current_rect.left, current_rect.top, final_w, final_h, SWP_NOACTIVATE);
+    }
+}
+
+fn parse_color_win(s: &str) -> COLORREF {
+    if s.starts_with('#') && s.len() == 7 {
+        let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(0);
+        return COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16));
+    } else if s.starts_with("rgba") {
+        let parts: Vec<&str> = s.trim_start_matches("rgba(").trim_end_matches(')').split(',').map(|p| p.trim()).collect();
+        if parts.len() >= 3 {
+            let r = parts[0].parse::<u8>().unwrap_or(0);
+            let g = parts[1].parse::<u8>().unwrap_or(0);
+            let b = parts[2].parse::<u8>().unwrap_or(0);
+            return COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16));
+        }
+    }
+    COLORREF(0)
 }
 
 unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
