@@ -405,20 +405,22 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let bg_color = parse_color_win(&conf.appearance.window_bg_color);
     let border_color = parse_color_win(&conf.appearance.window_border_color);
     let radius = (conf.appearance.corner_radius as i32) * 2;
+    let border_width = 2;
 
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
     
-    // 初始化圆角裁切，如果没有内容则使用当前 rect，否则后面在调整尺寸时会动态重置
+    // 物理裁切区域 (比绘图区大 1 像素，确保边框不被切掉边缘)
     let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right + 1, rect.bottom + 1, radius, radius);
     let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
 
     let bg_brush = CreateSolidBrush(bg_color);
-    let border_pen = CreatePen(PS_SOLID, 1, border_color);
+    let border_pen = CreatePen(PS_SOLID, border_width, border_color);
     let old_brush = SelectObject(hdc, bg_brush);
     let old_pen = SelectObject(hdc, border_pen);
     
-    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+    // 线条向内偏移，确保 2px 边框完全在裁切区内显示
+    RoundRect(hdc, rect.left, rect.top, rect.right - 1, rect.bottom - 1, radius, radius);
     
     SelectObject(hdc, old_brush);
     SelectObject(hdc, old_pen);
@@ -550,11 +552,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let cur_h = current_rect.bottom - current_rect.top;
 
     if final_w != cur_w || final_h != cur_h {
-        // 如果尺寸有变，立即更新窗口大小
         let _ = SetWindowPos(hwnd, HWND_TOPMOST, current_rect.left, current_rect.top, final_w, final_h, SWP_NOACTIVATE);
-        // 重新设置裁切区域以匹配新尺寸
-        let hrgn = CreateRoundRectRgn(0, 0, final_w + 1, final_h + 1, radius, radius);
-        let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
     }
 }
 
