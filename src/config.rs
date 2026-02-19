@@ -317,7 +317,7 @@ impl Config {
                 filter_proper_nouns_by_case: true,
                 active_profiles: vec!["chinese".to_string()],
                 profile_keys: vec![],
-                page_flipping_keys: vec!["arrow".to_string()],
+                page_flipping_keys: vec!["arrow".to_string(), "minus_equal".to_string(), "comma_dot".to_string()],
                 swap_arrow_keys: false,
                 enable_error_sound: true,
                 enable_english_filter: true,

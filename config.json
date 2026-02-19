@@ -147,7 +147,7 @@
     "filter_proper_nouns_by_case": true,
     "active_profiles": ["chinese"],
     "profile_keys": [],
-    "page_flipping_keys": ["arrow"],
+    "page_flipping_keys": ["arrow", "minus_equal", "comma_dot"],
     "swap_arrow_keys": false,
     "enable_error_sound": true,
     "enable_english_filter": true,
