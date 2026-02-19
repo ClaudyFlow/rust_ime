@@ -405,7 +405,8 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let bg_color = parse_color_win(&conf.appearance.window_bg_color);
     let border_color = parse_color_win(&conf.appearance.window_border_color);
     let radius = (conf.appearance.corner_radius as i32) * 2;
-    let border_width = 4; // 加粗到 4 像素
+    let border_visible = 10; // 我们想要的可见边框厚度
+    let border_width = border_visible * 2; // GDI 画笔宽度 (向两侧扩展)
 
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
@@ -420,15 +421,19 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let old_pen = SelectObject(hdc, border_pen);
     
     // 2. 绘制圆角矩形。
-    // 使用“过量绘制”技巧：故意向外扩 1 像素绘图。
-    // 这样 4px 宽的笔触，有 2px 在内（可见），2px 在外（被裁切）。
-    // 这能保证边框线条与窗口边缘完美重合，彻底根治双边框。
-    RoundRect(hdc, rect.left - 1, rect.top - 1, rect.right + 1, rect.bottom + 1, radius, radius);
+    // 使用“过量绘制”技巧：向外扩 border_visible 像素。
+    // 这样 20px 宽的笔触，有 10px 在内（可见），10px 在外（被裁切）。
+    // 这能保证边框线条从窗口边缘向内延伸 10 像素，且边缘绝对整齐。
+    RoundRect(hdc, rect.left - border_visible, rect.top - border_visible, rect.right + border_visible, rect.bottom + border_visible, radius, radius);
     
     SelectObject(hdc, old_brush);
     SelectObject(hdc, old_pen);
     let _ = DeleteObject(bg_brush);
     let _ = DeleteObject(border_pen);
+
+    // 补偿：因为边框有 10px 厚，文字必须再往里挪，避免压在边框上
+    let effective_pad_x = pad_x + border_visible;
+    let effective_pad_y = pad_y + border_visible;
 
     // 字体和其余绘制逻辑（GDI 路径下极快）
     let py_font_name = HSTRING::from(&conf.appearance.pinyin_text.font_family);
@@ -462,13 +467,13 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     SelectObject(hdc, h_font_py);
     SetTextColor(hdc, parse_color_win(&conf.appearance.pinyin_text.color));
     let py_u16: Vec<u16> = state.pinyin.encode_utf16().collect();
-    TextOutW(hdc, pad_x, pad_y, &py_u16);
+    TextOutW(hdc, effective_pad_x, effective_pad_y, &py_u16);
     let mut py_size = SIZE::default();
     GetTextExtentPoint32W(hdc, &py_u16, &mut py_size);
 
     // --- 绘制候选词行 ---
-    let cand_y = pad_y + py_size.cy + row_space;
-    let mut x_cursor = pad_x;
+    let cand_y = effective_pad_y + py_size.cy + row_space;
+    let mut x_cursor = effective_pad_x;
     let cand_color = parse_color_win(&conf.appearance.candidate_text.color);
     let hint_color = parse_color_win(&conf.appearance.hint_text.color);
     let page_size = conf.appearance.page_size;
@@ -543,10 +548,10 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let _ = DeleteObject(h_font_hint);
     
     // 动态调整窗口尺寸
-    let candidates_width = x_cursor + pad_x - item_space;
-    let pinyin_width = py_size.cx + pad_x * 2;
+    let candidates_width = x_cursor + effective_pad_x - item_space;
+    let pinyin_width = py_size.cx + effective_pad_x * 2;
     let final_w = (candidates_width.max(pinyin_width) + 25).max(200); 
-    let final_h = cand_y + max_row_height + pad_y;
+    let final_h = cand_y + max_row_height + effective_pad_y;
 
     let mut current_rect = RECT::default();
     let _ = GetWindowRect(hwnd, &mut current_rect);
@@ -560,6 +565,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         let hrgn = CreateRoundRectRgn(0, 0, final_w, final_h, radius, radius);
         let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
     }
+}
 }
 
 fn parse_color_win(s: &str) -> COLORREF {
