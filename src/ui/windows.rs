@@ -406,11 +406,10 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let border_color = parse_color_win(&conf.appearance.window_border_color);
     let radius = (conf.appearance.corner_radius as i32) * 2;
 
-    // 绘制圆角背景
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
     
-    // 实现圆角裁切 (物理裁切，不产生白边)
+    // 初始化圆角裁切，如果没有内容则使用当前 rect，否则后面在调整尺寸时会动态重置
     let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right + 1, rect.bottom + 1, radius, radius);
     let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
 
@@ -539,12 +538,23 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let _ = DeleteObject(h_font_hint);
     
     // 动态调整窗口尺寸
-    let final_w = (x_cursor + pad_x - item_space).max(200);
+    // 宽度需要同时考虑：候选词总宽、拼音行宽度，并加上右边距
+    let candidates_width = x_cursor + pad_x - item_space;
+    let pinyin_width = py_size.cx + pad_x * 2;
+    let final_w = (candidates_width.max(pinyin_width) + 10).max(200); 
     let final_h = cand_y + max_row_height + pad_y;
+
     let mut current_rect = RECT::default();
     let _ = GetWindowRect(hwnd, &mut current_rect);
-    if final_w != (current_rect.right - current_rect.left) || final_h != (current_rect.bottom - current_rect.top) {
+    let cur_w = current_rect.right - current_rect.left;
+    let cur_h = current_rect.bottom - current_rect.top;
+
+    if final_w != cur_w || final_h != cur_h {
+        // 如果尺寸有变，立即更新窗口大小
         let _ = SetWindowPos(hwnd, HWND_TOPMOST, current_rect.left, current_rect.top, final_w, final_h, SWP_NOACTIVATE);
+        // 重新设置裁切区域以匹配新尺寸
+        let hrgn = CreateRoundRectRgn(0, 0, final_w + 1, final_h + 1, radius, radius);
+        let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
     }
 }
 
