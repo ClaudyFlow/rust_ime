@@ -259,7 +259,7 @@ impl Config {
                 paste_method: "shift_insert".to_string(),
                 clipboard_delay_ms: 10,
                 enable_anti_typo: false,
-                enable_double_tap: true,
+                enable_double_tap: false,
                 double_tap_timeout_ms: 250,
                 double_taps: vec![
                     DoubleTap { trigger_key: "i".into(), insert_text: "ing".into() },
@@ -279,7 +279,7 @@ impl Config {
                     DoubleTap { trigger_key: "u".into(), insert_text: "ui".into() },
                     DoubleTap { trigger_key: "x".into(), insert_text: "ua".into() },
                 ],
-                enable_long_press: true,
+                enable_long_press: false,
                 long_press_timeout_ms: 400,
                 long_press_mappings: vec![
                     LongPressMapping { trigger_key: "q".into(), insert_text: "Q".into() },
@@ -325,7 +325,7 @@ impl Config {
                 enable_number_selection: true,
                 enable_user_dict: true,
                 enable_fixed_first_candidate: false,
-                enable_smart_backspace: true,
+                enable_smart_backspace: false,
                 enable_double_pinyin: false,
                 double_pinyin_scheme: DoublePinyinScheme {
                     name: "小鹤双拼".to_string(),

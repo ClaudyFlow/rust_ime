@@ -58,55 +58,6 @@
                 <div class="info"><div class="title">数字键选词</div><div class="desc">关闭后数字键将作为普通字符输入</div></div>
                 <label class="switch"><input type="checkbox" id="enable_number_selection"><span class="slider"></span></label>
             </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">智能退格 (Smart Deletion)</div><div class="desc">退格时优先删除韵母，保留声母</div></div>
-                <label class="switch"><input type="checkbox" id="enable_smart_backspace"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">小鹤双拼模式</div><div class="desc">启用后按双拼键位输入，自动转换为全拼</div></div>
-                <label class="switch"><input type="checkbox" id="enable_double_pinyin"><span class="slider"></span></label>
-            </div>
-        </div>
-
-        <h2>特殊行为 (Long Press & Double Tap)</h2>
-        <div class="card">
-            <h3>双击行为</h3>
-            <div class="setting-item">
-                <div class="info"><div class="title">启用双击替换</div><div class="desc">连续按两次相同键触发映射</div></div>
-                <label class="switch"><input type="checkbox" id="enable_double_tap"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">双击判定间隔 (ms)</div></div>
-                <input type="number" id="double_tap_timeout_ms" style="width:100px;">
-            </div>
-            <div class="keyboard" id="kb-doubletap"></div>
-            <div id="edit-doubletap" class="kb-edit-box">
-                <h3 id="dt-edit-title">编辑按键</h3>
-                <div class="setting-item">
-                    <div class="info"><div class="title">映射内容</div><div class="desc">触发后输入的文字</div></div>
-                    <input type="text" id="dt-edit-input" style="width: 200px;">
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>长按行为</h3>
-            <div class="setting-item">
-                <div class="info"><div class="title">启用长按映射</div></div>
-                <label class="switch"><input type="checkbox" id="enable_long_press"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">长按判定时长 (ms)</div></div>
-                <input type="number" id="long_press_timeout_ms" style="width:100px;">
-            </div>
-            <div class="keyboard" id="kb-longpress"></div>
-            <div id="edit-longpress" class="kb-edit-box">
-                <h3 id="lp-edit-title">编辑按键</h3>
-                <div class="setting-item">
-                    <div class="info"><div class="title">映射内容</div></div>
-                    <input type="text" id="lp-edit-input" style="width: 200px;">
-                </div>
-            </div>
         </div>
     </div>
 
@@ -135,19 +86,10 @@
             bindInput('enable_user_dict', 'input');
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');
-            bindInput('enable_smart_backspace', 'input');
-            bindInput('enable_double_pinyin', 'input');
-            bindInput('enable_double_tap', 'input');
-            bindInput('double_tap_timeout_ms', 'input');
-            bindInput('enable_long_press', 'input');
-            bindInput('long_press_timeout_ms', 'input');
 
             bindPaging('flip-arrow', 'arrow');
             bindPaging('flip-minus-equal', 'minus_equal');
             bindPaging('flip-comma-dot', 'comma_dot');
-
-            renderKeyboard('kb-doubletap', 'double_taps');
-            renderKeyboard('kb-longpress', 'long_press_mappings');
         }
 
         function bindPaging(id, value) {

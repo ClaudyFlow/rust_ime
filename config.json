@@ -86,7 +86,7 @@
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
     "enable_anti_typo": false,
-    "enable_double_tap": true,
+    "enable_double_tap": false,
     "double_tap_timeout_ms": 250,
     "double_taps": [
       { "trigger_key": "i", "insert_text": "ing" },
@@ -109,7 +109,7 @@
       { "trigger_key": "u", "insert_text": "ui" },
       { "trigger_key": "x", "insert_text": "ua" }
     ],
-    "enable_long_press": true,
+    "enable_long_press": false,
     "long_press_timeout_ms": 400,
     "long_press_mappings": [
       { "trigger_key": "q", "insert_text": "Q" },
@@ -155,10 +155,10 @@
     "enable_number_selection": true,
     "enable_user_dict": true,
     "enable_fixed_first_candidate": false,
-    "enable_smart_backspace": true,
-    "enable_double_pinyin": true,
+    "enable_smart_backspace": false,
+    "enable_double_pinyin": false,
     "double_pinyin_scheme": {
-      "name": "无缝兼容双拼",
+      "name": "小鹤双拼",
       "initials": {
         "v": "zh", "u": "sh", "i": "ch"
       },
@@ -180,6 +180,6 @@
     "toggle_traditional_gui": { "key": "ctrl+alt+g", "description": "界面: 显示/隐藏候选窗" },
     "toggle_keystrokes": { "key": "ctrl+alt+k", "description": "功能: 开启/关闭按键显示" },
     "switch_commit_mode": { "key": "ctrl+alt+m", "description": "模式: 切换单/双空格上屏" },
-    "toggle_double_pinyin": { "key": "ctrl+alt+d", "description": "模式: 开启/关闭无缝双拼" }
+    "toggle_double_pinyin": { "key": "ctrl+alt+d", "description": "模式: 开启/关闭双拼模式" }
   }
 }
