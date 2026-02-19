@@ -405,7 +405,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let bg_color = parse_color_win(&conf.appearance.window_bg_color);
     let border_color = parse_color_win(&conf.appearance.window_border_color);
     let radius = (conf.appearance.corner_radius as i32) * 2;
-    let border_width = 2;
+    let border_width = 4; // 加粗到 4 像素
 
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
@@ -420,9 +420,10 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let old_pen = SelectObject(hdc, border_pen);
     
     // 2. 绘制圆角矩形。
-    // 在 GDI 中，RoundRect 的右/底坐标是包含的。
-    // 我们绘制在 (0, 0) 到 (width-1, height-1) 范围内，这会紧贴裁切边缘内侧。
-    RoundRect(hdc, rect.left, rect.top, rect.right - 1, rect.bottom - 1, radius, radius);
+    // 使用“过量绘制”技巧：故意向外扩 1 像素绘图。
+    // 这样 4px 宽的笔触，有 2px 在内（可见），2px 在外（被裁切）。
+    // 这能保证边框线条与窗口边缘完美重合，彻底根治双边框。
+    RoundRect(hdc, rect.left - 1, rect.top - 1, rect.right + 1, rect.bottom + 1, radius, radius);
     
     SelectObject(hdc, old_brush);
     SelectObject(hdc, old_pen);
