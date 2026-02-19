@@ -195,7 +195,7 @@ impl Config {
                 candidate_layout: "horizontal".to_string(),
                 
                 corner_radius: 10.0,
-                window_bg_color: "#ffffff".to_string(),
+                window_bg_color: "#efefef".to_string(),
                 window_highlight_color: "#0969da".to_string(),
                 window_border_color: "rgba(0, 0, 0, 0.2)".to_string(),
                 window_padding_x: 18,

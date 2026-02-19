@@ -3,7 +3,7 @@ Write-Host "Building release version..." -ForegroundColor Cyan
 cargo build --release
 
 # 2. Create release directory
-$ReleaseDir = "rust-ime-windows-v0.4.8"
+$ReleaseDir = "rust-ime-windows-v0.4.9"
 if (Test-Path $ReleaseDir) { Remove-Item -Recurse -Force $ReleaseDir }
 New-Item -ItemType Directory $ReleaseDir
 
@@ -19,6 +19,7 @@ if (Test-Path "fonts") { Copy-Item -Recurse "fonts" $ReleaseDir }
 if (Test-Path "sounds") { Copy-Item -Recurse "sounds" $ReleaseDir }
 if (Test-Path "data") { Copy-Item -Recurse "data" $ReleaseDir }
 if (Test-Path "picture") { Copy-Item -Recurse "picture" $ReleaseDir }
+if (Test-Path "config.json") { Copy-Item "config.json" $ReleaseDir }
 Copy-Item "INSTALL_GUIDE.md" $ReleaseDir
 Copy-Item "INSTALL_GUIDE_ZH.md" $ReleaseDir
 
