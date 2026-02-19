@@ -32,6 +32,27 @@
         aside nav a:hover { background: rgba(0,0,0,0.05); }
         aside nav a.active { color: var(--apple-accent); font-weight: 600; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 
+        .keyboard-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            background: #f0f0f2;
+            padding: 15px;
+            border-radius: 16px;
+        }
+        .key-cap {
+            background: white;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .key-letter { font-weight: 800; color: var(--apple-accent); display: block; font-size: 18px; }
+        .key-desc { font-size: 12px; color: var(--apple-secondary); margin-top: 4px; }
+        .row-label { grid-column: 1 / -1; font-weight: 600; font-size: 13px; color: var(--apple-secondary); margin-top: 10px; border-top: 1px solid #e5e5e5; padding-top: 5px; }
+
         main { flex: 1; padding: 60px 10%; max-width: 1000px; }
 
         h1 { font-size: 44px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1.5px; }
@@ -71,13 +92,14 @@
         <nav>
             <a href="#intro">1. 产品定位</a>
             <a href="#aux-code">2. 核心：英文辅助码</a>
-            <a href="#proper-nouns">3. 专有名词原生隔离</a>
-            <a href="#mixed-input">4. 多方案混输</a>
-            <a href="#quick-rime">5. 长按与双击定制</a>
-            <a href="#nav-mode">6. 智能导航与平卷互换</a>
-            <a href="#sentence-mode">7. 智能长句模式</a>
-            <a href="#ui-custom">8. 视觉与样式定制</a>
-            <a href="#extra-tools">9. 屏幕演示与学习</a>
+            <a href="#stroke-aux">3. 进阶：笔画辅助码</a>
+            <a href="#proper-nouns">4. 专有名词原生隔离</a>
+            <a href="#mixed-input">5. 多方案混输</a>
+            <a href="#quick-rime">6. 长按与双击定制</a>
+            <a href="#nav-mode">7. 智能导航与平卷互换</a>
+            <a href="#sentence-mode">8. 智能长句模式</a>
+            <a href="#ui-custom">9. 视觉与样式定制</a>
+            <a href="#extra-tools">10. 屏幕演示与学习</a>
         </nav>
     </aside>
 
@@ -138,8 +160,73 @@
             </div>
         </section>
 
+        <section id="stroke-aux">
+            <h2>进阶：笔画辅助码 (SBSRF)</h2>
+            <div class="feature-card">
+                <p>笔画辅助码是基于汉字<b>笔画结构</b>的精准过滤方案。它使用 5x5 的 <b>QWER 按键矩阵</b>，每个按键代表两个连续笔画。</p>
+                
+                <h3>1. 笔画映射键盘布局</h3>
+                <p>我们将 1(横)、2(竖)、3(撇)、4(捺/点)、5(折) 映射到键盘。矩阵的<b>行代表第 1 笔</b>，<b>列代表第 2 笔</b>。</p>
+
+                <div class="keyboard-grid">
+                    <div class="row-label">横 (1) 行：第 1 笔是“横”</div>
+                    <div class="key-cap"><span class="key-letter">Q</span><span class="key-desc">横横</span></div>
+                    <div class="key-cap"><span class="key-letter">W</span><span class="key-desc">横竖</span></div>
+                    <div class="key-cap"><span class="key-letter">E</span><span class="key-desc">横撇</span></div>
+                    <div class="key-cap"><span class="key-letter">R</span><span class="key-desc">横捺</span></div>
+                    <div class="key-cap"><span class="key-letter">T</span><span class="key-desc">横折</span></div>
+
+                    <div class="row-label">竖 (2) 行：第 1 笔是“竖”</div>
+                    <div class="key-cap"><span class="key-letter">A</span><span class="key-desc">竖横</span></div>
+                    <div class="key-cap"><span class="key-letter">S</span><span class="key-desc">竖竖</span></div>
+                    <div class="key-cap"><span class="key-letter">D</span><span class="key-desc">竖撇</span></div>
+                    <div class="key-cap"><span class="key-letter">F</span><span class="key-desc">竖捺</span></div>
+                    <div class="key-cap"><span class="key-letter">G</span><span class="key-desc">竖折</span></div>
+
+                    <div class="row-label">撇 (3) 行：第 1 笔是“撇”</div>
+                    <div class="key-cap"><span class="key-letter">Z</span><span class="key-desc">撇横</span></div>
+                    <div class="key-cap"><span class="key-letter">X</span><span class="key-desc">撇竖</span></div>
+                    <div class="key-cap"><span class="key-letter">C</span><span class="key-desc">撇撇</span></div>
+                    <div class="key-cap"><span class="key-letter">V</span><span class="key-desc">撇捺</span></div>
+                    <div class="key-cap"><span class="key-letter">B</span><span class="key-desc">撇折</span></div>
+
+                    <div class="row-label">捺 (4) 行：第 1 笔是“捺”</div>
+                    <div class="key-cap"><span class="key-letter">Y</span><span class="key-desc">捺横</span></div>
+                    <div class="key-cap"><span class="key-letter">U</span><span class="key-desc">捺竖</span></div>
+                    <div class="key-cap"><span class="key-letter">I</span><span class="key-desc">捺撇</span></div>
+                    <div class="key-cap"><span class="key-letter">O</span><span class="key-desc">捺捺</span></div>
+                    <div class="key-cap"><span class="key-letter">P</span><span class="key-desc">捺折</span></div>
+
+                    <div class="row-label">折 (5) 行：第 1 笔是“折”</div>
+                    <div class="key-cap"><span class="key-letter">H</span><span class="key-desc">折横</span></div>
+                    <div class="key-cap"><span class="key-letter">J</span><span class="key-desc">折竖</span></div>
+                    <div class="key-cap"><span class="key-letter">K</span><span class="key-desc">折撇</span></div>
+                    <div class="key-cap"><span class="key-letter">L</span><span class="key-desc">折捺</span></div>
+                    <div class="key-cap"><span class="key-letter">N</span><span class="key-desc">折折</span></div>
+                </div>
+
+                <h3>2. 编码规则</h3>
+                <ul>
+                    <li><b>首 2 笔 (第 1 键)</b>：汉字的前两画。例如“的”前两画是撇、竖，对应 <code>x</code>。</li>
+                    <li><b>末 2 笔 (第 2 键)</b>：汉字的最后两画。例如“的”最后两画是捺、点（按捺处理），对应 <code>o</code>，但系统规则为了兼容性，此处对应 <code>y</code> (捺横)。</li>
+                </ul>
+
+                <div class="example-box">
+                    <p><b>实战演练</b></p>
+                    <ul>
+                        <li><b>人</b> (ren)：前两画“撇捺” ⮕ 输入 <code>renv</code> 瞬间定位。</li>
+                        <li><b>的</b> (de)：前两画“撇竖”(x)，末两画“捺横”(y) ⮕ 输入 <code>dexy</code> 精准定位。</li>
+                    </ul>
+                </div>
+
+                <div class="pro-tip">
+                    <b>说明：</b>笔画辅助码默认开启。如果发现某个字无法定位，可以在 Web 端“词库编辑器”中查看该字的 <code>stroke_aux</code> 字段进行确认。
+                </div>
+            </div>
+        </section>
+
         <section id="proper-nouns">
-            <h2>专有名词原生隔离</h2>
+            <h2>4. 专有名词原生隔离</h2>
             <div class="feature-card">
                 <p>在普通输入法中，输入 <code>beijing</code> 可能会混杂“背景”和“北京”。在 rust-ime 中：</p>
                 <ul>
@@ -151,7 +238,7 @@
         </section>
 
         <section id="mixed-input">
-            <h2>多方案混输</h2>
+            <h2>5. 多方案混输</h2>
             <div class="feature-card">
                 <p>rust-ime 允许您在网页端自由组合活跃方案（如 <b>中文+英文</b>）。</p>
                 <ul>
@@ -162,7 +249,7 @@
         </section>
 
         <section id="quick-rime">
-            <h2>长按与双击定制 <span class="tag">New</span></h2>
+            <h2>6. 长按与双击定制 <span class="tag">New</span></h2>
             <div class="feature-card">
                 <p>rust-ime 提供了极致的按键行为定制能力，您可以利用<b>双击</b>或<b>长按</b>来实现极速输入。</p>
                 
@@ -183,7 +270,7 @@
         </section>
 
         <section id="nav-mode">
-            <h2>智能导航与平卷互换 <span class="tag">New</span></h2>
+            <h2>7. 智能导航与平卷互换 <span class="tag">New</span></h2>
             <div class="feature-card">
                 <h3>1. HJKL 导航模式</h3>
                 <p>在输入拼音的过程中，按下 <code>`</code> (反引号) 即可进入导航模式。此时您可以像使用 Vim 一样操作候选词：</p>
@@ -202,7 +289,7 @@
         </section>
 
         <section id="sentence-mode">
-            <h2>智能长句模式</h2>
+            <h2>8. 智能长句模式</h2>
             <div class="feature-card">
                 <p>在“系统总览”中将上屏模式切换为<b>“双空格上屏”</b>即可进入长句模式。</p>
                 <p>在此模式下，输入法会尝试进行全句切分和联想。虽然目前仍处于完善阶段，但我们计划在未来引入基于语境的智能纠错，让长篇大论的输入更加流畅。</p>
@@ -210,7 +297,7 @@
         </section>
 
         <section id="ui-custom">
-            <h2>视觉与样式定制</h2>
+            <h2>9. 视觉与样式定制</h2>
             <div class="feature-card">
                 <p>我们提供了一个极致自由的皮肤引擎，全部可通过网页控制中心调节：</p>
                 <ul>
@@ -222,7 +309,7 @@
         </section>
 
         <section id="extra-tools">
-            <h2>屏幕演示与学习</h2>
+            <h2>10. 屏幕演示与学习</h2>
             <div class="feature-card">
                 <h3>按键回显 (Keystroke)</h3>
                 <p>专为 Up 主和讲师设计。开启后，屏幕角落实时显示按键名称（如 <code>Ctrl</code>, <code>Alt</code>, <code>S</code>），且支持自定义消失延迟。</p>
