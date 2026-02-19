@@ -26,7 +26,7 @@
     "candidate_anchor": "bottom",
     "candidate_layout": "horizontal",
     "corner_radius": 10.0,
-    "window_bg_color": "#ffffff",
+    "window_bg_color": "#efefef",
     "window_highlight_color": "#0969da",
     "window_border_color": "rgba(0, 0, 0, 0.2)",
     "window_padding_x": 18,

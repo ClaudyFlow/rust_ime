@@ -63,7 +63,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             hInstance: instance.into(),
             lpszClassName: window_class,
             lpfnWndProc: Some(wnd_proc),
-            hbrBackground: CreateSolidBrush(COLORREF(0xFFFFFF)), 
+            hbrBackground: CreateSolidBrush(COLORREF(0xEFEFEF)), 
             ..Default::default()
         };
         RegisterClassW(&wc);
