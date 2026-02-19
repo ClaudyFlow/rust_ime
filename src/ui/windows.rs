@@ -566,7 +566,6 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
     }
 }
-}
 
 fn parse_color_win(s: &str) -> COLORREF {
     if s.starts_with('#') && s.len() == 7 {
