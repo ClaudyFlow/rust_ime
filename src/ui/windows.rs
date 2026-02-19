@@ -30,8 +30,6 @@ struct KeystrokeState {
 }
 
 struct LearningState {
-    word: String,
-    hint: String,
     last_update: std::time::Instant,
 }
 
@@ -236,8 +234,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         } else {
                             *ks_ptr = Some(KeystrokeState { keys: vec![key], last_update: std::time::Instant::now() });
                         }
-                        ShowWindow(hwnd_ks, SW_SHOWNOACTIVATE);
-                        InvalidateRect(hwnd_ks, None, BOOL(1));
+                        
+                        if let Some(ref state) = *ks_ptr {
+                            let (data, w, h) = {
+                                let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
+                                painter.draw_keystrokes(&state.keys, &conf)
+                            };
+                            update_layered_window(hwnd_ks, &data, w, h);
+                            ShowWindow(hwnd_ks, SW_SHOWNOACTIVATE);
+                        }
                         
                         let timeout = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
                         std::thread::spawn(move || {
@@ -260,9 +265,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         if !show { continue; }
 
                         let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
-                        *ln_ptr = Some(LearningState { word, hint, last_update: std::time::Instant::now() });
+                        *ln_ptr = Some(LearningState { last_update: std::time::Instant::now() });
+                        
+                        let (data, w, h) = {
+                            let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
+                            painter.draw_learning(&word, &hint, &conf)
+                        };
+                        update_layered_window(hwnd_learn, &data, w, h);
                         ShowWindow(hwnd_learn, SW_SHOWNOACTIVATE);
-                        InvalidateRect(hwnd_learn, None, BOOL(1));
 
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_secs(3));
@@ -318,7 +328,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
     match msg {
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
-            let hdc = BeginPaint(hwnd, &mut ps);
+            let _hdc = BeginPaint(hwnd, &mut ps);
             EndPaint(hwnd, &ps);
             LRESULT(0)
         }
@@ -332,21 +342,7 @@ unsafe extern "system" fn ks_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lpar
     match msg {
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
-            let hdc = BeginPaint(hwnd, &mut ps);
-            let mut rect = RECT::default();
-            let _ = GetClientRect(hwnd, &mut rect);
-            
-            let brush = CreateSolidBrush(COLORREF(0x000000));
-            let _ = FillRect(hdc, &rect, brush);
-            let _ = DeleteObject(brush);
-
-            if let Some(ref state) = KEYSTROKE_STATE {
-                if let Some(arc) = CURRENT_CONFIG.get() {
-                    if let Ok(conf) = arc.read() {
-                        draw_keystrokes(hdc, hwnd, state, &conf);
-                    }
-                }
-            }
+            let _hdc = BeginPaint(hwnd, &mut ps);
             EndPaint(hwnd, &ps);
             LRESULT(0)
         }
@@ -359,21 +355,7 @@ unsafe extern "system" fn learn_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, l
     match msg {
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
-            let hdc = BeginPaint(hwnd, &mut ps);
-            let mut rect = RECT::default();
-            let _ = GetClientRect(hwnd, &mut rect);
-            
-            let brush = CreateSolidBrush(COLORREF(0x000000));
-            let _ = FillRect(hdc, &rect, brush);
-            let _ = DeleteObject(brush);
-
-            if let Some(ref state) = LEARNING_STATE {
-                if let Some(arc) = CURRENT_CONFIG.get() {
-                    if let Ok(conf) = arc.read() {
-                        draw_learning(hdc, hwnd, state, &conf);
-                    }
-                }
-            }
+            let _hdc = BeginPaint(hwnd, &mut ps);
             EndPaint(hwnd, &ps);
             LRESULT(0)
         }
@@ -457,112 +439,4 @@ unsafe fn update_layered_window(hwnd: HWND, data: &[u8], w: u32, h: u32) {
     let _ = DeleteObject(h_bitmap);
     let _ = DeleteDC(mem_dc);
     ReleaseDC(None, screen_dc);
-}
-
-unsafe fn draw_keystrokes(hdc: HDC, hwnd: HWND, state: &KeystrokeState, conf: &Config) {
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, COLORREF(0xFFFFFF));
-    
-    let font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
-    let font_size = conf.appearance.keystroke_font_size as i32;
-    let h_font = CreateFontW(
-        -(font_size * 96 / 72), 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
-        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
-        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32, PCWSTR(font_name.as_ptr())
-    );
-    SelectObject(hdc, h_font);
-
-    let text = state.keys.join("  ");
-    let text_u16: Vec<u16> = text.encode_utf16().collect();
-    let mut size = SIZE::default();
-    GetTextExtentPoint32W(hdc, &text_u16, &mut size);
-
-    let screen_w = GetSystemMetrics(SM_CXSCREEN);
-    let screen_h = GetSystemMetrics(SM_CYSCREEN);
-    let margin_x = conf.appearance.keystroke_margin_x;
-    let margin_y = conf.appearance.keystroke_margin_y;
-
-    let (win_x, win_y) = match conf.appearance.keystroke_anchor.as_str() {
-        "bottom_right" => (screen_w - size.cx - margin_x - 40, screen_h - size.cy - margin_y - 60),
-        "bottom_left" => (margin_x, screen_h - size.cy - margin_y - 60),
-        "top_right" => (screen_w - size.cx - margin_x - 40, margin_y),
-        _ => (margin_x, margin_y),
-    };
-
-    let final_w = size.cx + 40;
-    let final_h = size.cy + 20;
-    let _ = SetWindowPos(hwnd, HWND_TOPMOST, win_x, win_y, final_w, final_h, SWP_NOACTIVATE);
-    
-    TextOutW(hdc, 20, 10, &text_u16);
-    let _ = DeleteObject(h_font);
-}
-
-unsafe fn draw_learning(hdc: HDC, hwnd: HWND, state: &LearningState, conf: &Config) {
-    SetBkMode(hdc, TRANSPARENT);
-    
-    let font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
-    let h_font_word = CreateFontW(
-        -(conf.appearance.learning_font_size as i32 * 96 / 72), 0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
-        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
-        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32, PCWSTR(font_name.as_ptr())
-    );
-
-    let h_font_hint = CreateFontW(
-        -16, 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
-        OUT_DEFAULT_PRECIS.0 as u32, CLIP_DEFAULT_PRECIS.0 as u32,
-        CLEARTYPE_QUALITY.0 as u32, DEFAULT_PITCH.0 as u32, PCWSTR(font_name.as_ptr())
-    );
-
-    SelectObject(hdc, h_font_word);
-    SetTextColor(hdc, COLORREF(0x00FFFF)); // Cyan for word
-    let word_u16: Vec<u16> = state.word.encode_utf16().collect();
-    let mut word_size = SIZE::default();
-    GetTextExtentPoint32W(hdc, &word_u16, &mut word_size);
-
-    SelectObject(hdc, h_font_hint);
-    SetTextColor(hdc, COLORREF(0xCCCCCC)); // Gray for hint
-    let hint_u16: Vec<u16> = state.hint.encode_utf16().collect();
-    let mut hint_size = SIZE::default();
-    GetTextExtentPoint32W(hdc, &hint_u16, &mut hint_size);
-
-    let screen_w = GetSystemMetrics(SM_CXSCREEN);
-    let margin_x = conf.appearance.learning_margin_x;
-    let margin_y = conf.appearance.learning_margin_y;
-    
-    let final_w = word_size.cx.max(hint_size.cx) + 40;
-    let final_h = word_size.cy + hint_size.cy + 30;
-
-    let (win_x, win_y) = match conf.appearance.learning_anchor.as_str() {
-        "top_right" => (screen_w - final_w - margin_x, margin_y),
-        "top_left" => (margin_x, margin_y),
-        _ => (screen_w - final_w - margin_x, margin_y),
-    };
-
-    let _ = SetWindowPos(hwnd, HWND_TOPMOST, win_x, win_y, final_w, final_h, SWP_NOACTIVATE);
-    
-    SelectObject(hdc, h_font_word);
-    TextOutW(hdc, 20, 10, &word_u16);
-    SelectObject(hdc, h_font_hint);
-    TextOutW(hdc, 20, 15 + word_size.cy, &hint_u16);
-
-    let _ = DeleteObject(h_font_word);
-    let _ = DeleteObject(h_font_hint);
-}
-
-fn parse_color_win(s: &str) -> COLORREF {
-    if s.starts_with('#') && s.len() == 7 {
-        let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(0);
-        let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(0);
-        let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(0);
-        return COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16));
-    } else if s.starts_with("rgba") {
-        let parts: Vec<&str> = s.trim_start_matches("rgba(").trim_end_matches(')').split(',').map(|p| p.trim()).collect();
-        if parts.len() >= 3 {
-            let r = parts[0].parse::<u8>().unwrap_or(0);
-            let g = parts[1].parse::<u8>().unwrap_or(0);
-            let b = parts[2].parse::<u8>().unwrap_or(0);
-            return COLORREF((r as u32) | ((g as u32) << 8) | ((b as u32) << 16));
-        }
-    }
-    COLORREF(0)
 }
