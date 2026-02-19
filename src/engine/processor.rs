@@ -134,7 +134,7 @@ fn get_stroke_desc(code: &str) -> String {
     let code = code.to_uppercase();
     let char_code = code.chars().next().unwrap_or(' ');
     
-    // 我们之前的矩阵: 
+    // 我们的 5x5 矩阵:
     // 横(1): Q W E R T
     // 竖(2): A S D F G
     // 撇(3): Z X C V B

@@ -50,6 +50,7 @@ struct DictEntry {
     word: String,
     tone: String,
     en: String,
+    stroke_aux: String,
     weight: u32,
 }
 
@@ -62,22 +63,23 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                 if is_english {
                     let en_hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
                     entries.entry(key.clone()).or_default().push(DictEntry {
-                        word: key.clone(), tone: String::new(), en: en_hint, weight: 0,
+                        word: key.clone(), tone: String::new(), en: en_hint, stroke_aux: String::new(), weight: 0,
                     });
                 } else {
                     for v in arr {
                         if let Some(s) = v.as_str() { 
                             entries.entry(key.clone()).or_default().push(DictEntry {
-                                word: s.to_string(), tone: String::new(), en: String::new(), weight: 0,
+                                word: s.to_string(), tone: String::new(), en: String::new(), stroke_aux: String::new(), weight: 0,
                             });
                         }
                         else if let Some(o) = v.as_object() {
                             if let Some(c) = o.get("char").and_then(|c| c.as_str()) {
                                 let en_hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("");
                                 let tone_hint = o.get("tone").and_then(|t| t.as_str()).unwrap_or("");
+                                let stroke_aux = o.get("stroke_aux").and_then(|s| s.as_str()).unwrap_or("");
                                 let weight = o.get("weight").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                                 entries.entry(key.clone()).or_default().push(DictEntry {
-                                    word: c.to_string(), tone: tone_hint.to_string(), en: en_hint.to_string(), weight,
+                                    word: c.to_string(), tone: tone_hint.to_string(), en: en_hint.to_string(), stroke_aux: stroke_aux.to_string(), weight,
                                 });
                             }
                         }
@@ -102,7 +104,7 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
             let pinyin = parts[1].replace(' ', "");
             let weight = if parts.len() >= 3 { parts[2].parse::<u32>().unwrap_or(0) } else { 0 };
             entries.entry(pinyin).or_default().push(DictEntry {
-                word, tone: String::new(), en: String::new(), weight,
+                word, tone: String::new(), en: String::new(), stroke_aux: String::new(), weight,
             });
         }
     }
@@ -124,12 +126,15 @@ fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, V
             let w_bytes = entry.word.as_bytes(); 
             let t_bytes = entry.tone.as_bytes();
             let e_bytes = entry.en.as_bytes();
+            let s_bytes = entry.stroke_aux.as_bytes();
             block.extend_from_slice(&(w_bytes.len() as u16).to_le_bytes());
             block.extend_from_slice(w_bytes);
             block.extend_from_slice(&(t_bytes.len() as u16).to_le_bytes());
             block.extend_from_slice(t_bytes);
             block.extend_from_slice(&(e_bytes.len() as u16).to_le_bytes());
             block.extend_from_slice(e_bytes);
+            block.extend_from_slice(&(s_bytes.len() as u16).to_le_bytes());
+            block.extend_from_slice(s_bytes);
             block.extend_from_slice(&entry.weight.to_le_bytes());
         }
         data_writer.write_all(&block)?;
