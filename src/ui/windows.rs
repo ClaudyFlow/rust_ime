@@ -410,8 +410,8 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let mut rect = RECT::default();
     let _ = GetClientRect(hwnd, &mut rect);
     
-    // 物理裁切区域 (比绘图区大 1 像素，确保边框不被切掉边缘)
-    let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right + 1, rect.bottom + 1, radius, radius);
+    // 1. 设置物理裁切区域 (严格对应当前窗口物理尺寸)
+    let hrgn = CreateRoundRectRgn(rect.left, rect.top, rect.right, rect.bottom, radius, radius);
     let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
 
     let bg_brush = CreateSolidBrush(bg_color);
@@ -419,7 +419,9 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let old_brush = SelectObject(hdc, bg_brush);
     let old_pen = SelectObject(hdc, border_pen);
     
-    // 线条向内偏移，确保 2px 边框完全在裁切区内显示
+    // 2. 绘制圆角矩形。
+    // 在 GDI 中，RoundRect 的右/底坐标是包含的。
+    // 我们绘制在 (0, 0) 到 (width-1, height-1) 范围内，这会紧贴裁切边缘内侧。
     RoundRect(hdc, rect.left, rect.top, rect.right - 1, rect.bottom - 1, radius, radius);
     
     SelectObject(hdc, old_brush);
@@ -540,10 +542,9 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let _ = DeleteObject(h_font_hint);
     
     // 动态调整窗口尺寸
-    // 宽度需要同时考虑：候选词总宽、拼音行宽度，并加上右边距
     let candidates_width = x_cursor + pad_x - item_space;
     let pinyin_width = py_size.cx + pad_x * 2;
-    let final_w = (candidates_width.max(pinyin_width) + 10).max(200); 
+    let final_w = (candidates_width.max(pinyin_width) + 25).max(200); 
     let final_h = cand_y + max_row_height + pad_y;
 
     let mut current_rect = RECT::default();
@@ -552,7 +553,11 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let cur_h = current_rect.bottom - current_rect.top;
 
     if final_w != cur_w || final_h != cur_h {
+        // 1. 立即调整窗口物理大小
         let _ = SetWindowPos(hwnd, HWND_TOPMOST, current_rect.left, current_rect.top, final_w, final_h, SWP_NOACTIVATE);
+        // 2. 立即同步更新裁切区域，确保新区域不被截断
+        let hrgn = CreateRoundRectRgn(0, 0, final_w, final_h, radius, radius);
+        let _ = SetWindowRgn(hwnd, hrgn, BOOL(1));
     }
 }
 
