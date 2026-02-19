@@ -435,8 +435,13 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
     let effective_pad_x = pad_x + border_visible;
     let effective_pad_y = pad_y + border_visible;
 
-    // 字体和其余绘制逻辑（GDI 路径下极快）
-    let py_font_name = HSTRING::from(&conf.appearance.pinyin_text.font_family);
+    // 确定要使用的字体名称
+    // 如果本地 Noto 字体文件存在，优先使用 "Noto Sans SC" (系统已由 start_gui 注册该资源)
+    let root = crate::find_project_root();
+    let has_noto = root.join("fonts/NotoSansSC-Bold.ttf").exists();
+    let preferred_font = if has_noto { "Noto Sans SC" } else { &conf.appearance.candidate_text.font_family };
+    
+    let py_font_name = HSTRING::from(preferred_font);
     let h_font_py = CreateFontW(
         -(conf.appearance.pinyin_text.font_size as i32 * 96 / 72),
         0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
@@ -445,7 +450,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         PCWSTR(py_font_name.as_ptr())
     );
 
-    let cand_font_name = HSTRING::from(&conf.appearance.candidate_text.font_family);
+    let cand_font_name = HSTRING::from(preferred_font);
     let h_font_cand = CreateFontW(
         -(conf.appearance.candidate_text.font_size as i32 * 96 / 72),
         0, 0, 0, 700, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
@@ -454,7 +459,7 @@ unsafe fn draw_content(hdc: HDC, hwnd: HWND, state: &WindowState, conf: &Config)
         PCWSTR(cand_font_name.as_ptr())
     );
 
-    let hint_font_name = HSTRING::from(&conf.appearance.hint_text.font_family);
+    let hint_font_name = HSTRING::from(preferred_font);
     let h_font_hint = CreateFontW(
         -(conf.appearance.hint_text.font_size as i32 * 96 / 72),
         0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET.0 as u32,
