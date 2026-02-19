@@ -53,12 +53,16 @@ function bindInput(id, section, property) {
         };
     } else {
         el.value = val !== undefined ? val : "";
-        el.oninput = () => {
+        const update = () => {
             const newVal = el.type === 'number' ? parseFloat(el.value) : el.value;
             if (section && property) config[section][property] = newVal;
             else if (section) config[section][id] = newVal;
             else config[id] = newVal;
         };
+        el.oninput = update;
+        if (el.tagName === 'SELECT') {
+            el.onchange = update;
+        }
     }
 }
 

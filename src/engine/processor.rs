@@ -43,10 +43,12 @@ struct ParsedPart {
     raw: String,
 }
 
+use crate::config::AuxMode;
+
 pub struct Processor {
     pub state: ImeState,
     pub buffer: String,
-    pub tries: HashMap<String, Trie>, 
+    pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
     pub punctuation: HashMap<String, Vec<String>>,
     pub syllables: std::collections::HashSet<String>,
@@ -72,9 +74,8 @@ pub struct Processor {
     pub profile_keys: Vec<(String, String)>,
     pub page_size: usize,
     pub show_tone_hint: bool,
-    pub show_en_hint: bool,
-    pub auto_commit_unique_en_fuzhuma: bool,
-    pub auto_commit_unique_full_match: bool,
+    pub aux_mode: AuxMode,
+    pub auto_commit_unique_en_fuzhuma: bool,    pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
     pub prefix_matching_limit: usize,
     pub enable_abbreviation_matching: bool,
@@ -127,6 +128,33 @@ pub struct Processor {
     // 标点状态相关
     pub quote_open: bool,
     pub single_quote_open: bool,
+}
+
+fn get_stroke_desc(code: &str) -> String {
+    let code = code.to_uppercase();
+    let char_code = code.chars().next().unwrap_or(' ');
+    
+    // 我们之前的矩阵: 
+    // 横(1): Q W E R T
+    // 竖(2): A S D F G
+    // 撇(3): Z X C V B
+    // 捺(4): Y U I O P
+    // 折(5): H J K L N
+    let names = ["", "横", "竖", "撇", "捺", "折"];
+    let matrix = [
+        ('Q', 1, 1), ('W', 1, 2), ('E', 1, 3), ('R', 1, 4), ('T', 1, 5),
+        ('A', 2, 1), ('S', 2, 2), ('D', 2, 3), ('F', 2, 4), ('G', 2, 5),
+        ('Z', 3, 1), ('X', 3, 2), ('C', 3, 3), ('V', 3, 4), ('B', 3, 5),
+        ('Y', 4, 1), ('U', 4, 2), ('I', 4, 3), ('O', 4, 4), ('P', 4, 5),
+        ('H', 5, 1), ('J', 5, 2), ('K', 5, 3), ('L', 5, 4), ('N', 5, 5),
+    ];
+
+    for (c, s1, s2) in matrix {
+        if c == char_code {
+            return format!("{}({}{})", code, names[s1], names[s2]);
+        }
+    }
+    code
 }
 
 impl Processor {
@@ -211,7 +239,7 @@ impl Processor {
             has_dict_match: false,
             page_size: 5,
             show_tone_hint: false,
-            show_en_hint: true,
+            aux_mode: AuxMode::Stroke,
             page_flipping_styles: vec!["arrow".to_string()],
             swap_arrow_keys: false,
             aux_filter: String::new(),
@@ -269,7 +297,7 @@ impl Processor {
         self.show_keystrokes = conf.appearance.show_keystrokes;
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
-        self.show_en_hint = conf.appearance.show_en_hint;
+        self.aux_mode = conf.appearance.aux_mode;
         self.enable_anti_typo = conf.input.enable_anti_typo;
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
@@ -1056,7 +1084,7 @@ impl Processor {
         }
 
         // 我们尝试两种检索策略：全量检索 (raw) 和 智能切分检索 (smart)
-        let mut final_matches: Vec<(String, String, String, u32, bool)> = Vec::new();
+        let mut final_matches: Vec<(String, String, String, String, u32, bool)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
         // 策略 1: 原始检索逻辑 (保持对空格、辅助码的支持)
@@ -1067,17 +1095,17 @@ impl Processor {
             for profile in &self.active_profiles {
                 if let Some(d) = self.tries.get(profile) {
                     if let Some(m) = d.get_all_exact(&part.pinyin) {
-                        for (w, t, e, weight) in m { matches.push((w, t, e, weight, true)); }
+                        for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, true)); }
                     }
                     if self.enable_prefix_matching && !part.pinyin.is_empty() {
                         let limit = if part.aux_code.is_some() { 50 } else { 20 };
                         let m = d.search_bfs(&part.pinyin, limit);
-                        for (w, t, e, weight) in m { matches.push((w, t, e, weight, false)); }
+                        for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, false)); }
                     }
                 }
             }
-            matches.sort_by(|a, b| b.4.cmp(&a.4).then_with(|| b.3.cmp(&a.3)));
-            if let Some((w, _, _, _, _)) = matches.get(part.specified_idx.unwrap_or(1).saturating_sub(1)) {
+            matches.sort_by(|a, b| b.5.cmp(&a.5).then_with(|| b.4.cmp(&a.4)));
+            if let Some((w, _, _, _, _, _)) = matches.get(part.specified_idx.unwrap_or(1).saturating_sub(1)) {
                 greedy_sentence.push_str(w);
             } else {
                 greedy_sentence.push_str(&part.raw);
@@ -1099,8 +1127,8 @@ impl Processor {
                     // 目前 Trie 存储的是全拼，所以我们通过 search_bfs 搜 combined_py 的前缀
                     // 这能搜到 "mtian" 开头的词，如果词库里有简拼词条
                     let m = d.search_bfs(&combined_py, 20);
-                    for (w, t, e, weight) in m {
-                        if seen.insert(w.clone()) { final_matches.push((w, t, e, weight, false)); }
+                    for (w, t, e, s, weight) in m {
+                        if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, false)); }
                     }
                 }
             }
@@ -1109,7 +1137,7 @@ impl Processor {
         // 3. 排序与结果填充
         final_matches.sort_by(|a, b| {
             // 排序规则：精确匹配 > 权重 > 长度
-            b.4.cmp(&a.4).then_with(|| b.3.cmp(&a.3)).then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
+            b.5.cmp(&a.5).then_with(|| b.4.cmp(&a.4)).then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
         });
 
         self.joined_sentence = if self.buffer.ends_with(' ') { format!("{} ", greedy_sentence) } else { greedy_sentence };
@@ -1120,11 +1148,26 @@ impl Processor {
         self.candidate_hints.clear();
         self.has_dict_match = !final_matches.is_empty();
 
-        for (cand, tone, en, _, _) in final_matches {
+        for (cand, tone, en, stroke_aux, _, _) in final_matches {
             self.candidates.push(cand);
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
-            if self.show_en_hint && !en.is_empty() { if !h.is_empty() { h.push(' '); } h.push_str(&en); }
+            
+            match self.aux_mode {
+                AuxMode::English => {
+                    if !en.is_empty() {
+                        if !h.is_empty() { h.push(' '); }
+                        h.push_str(&en);
+                    }
+                }
+                AuxMode::Stroke => {
+                    if !stroke_aux.is_empty() {
+                        if !h.is_empty() { h.push(' '); }
+                        h.push_str(&get_stroke_desc(&stroke_aux));
+                    }
+                }
+                AuxMode::None => {}
+            }
             self.candidate_hints.push(h);
         }
 

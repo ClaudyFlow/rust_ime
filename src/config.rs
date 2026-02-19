@@ -25,6 +25,13 @@ pub struct Profile {
     pub path: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum AuxMode {
+    None,
+    English,
+    Stroke,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appearance {
     pub show_candidates: bool,
@@ -32,7 +39,7 @@ pub struct Appearance {
     pub show_keystrokes: bool,
     pub page_size: usize,
     pub show_tone_hint: bool,
-    pub show_en_hint: bool,
+    pub aux_mode: AuxMode,
     pub candidate_anchor: String,
     pub candidate_layout: String, // "horizontal" 或 "vertical"
     
@@ -183,7 +190,7 @@ impl Config {
                 show_keystrokes: false,
                 page_size: 5,
                 show_tone_hint: false,
-                show_en_hint: true,
+                aux_mode: AuxMode::Stroke,
                 candidate_anchor: "bottom".to_string(),
                 candidate_layout: "horizontal".to_string(),
                 
