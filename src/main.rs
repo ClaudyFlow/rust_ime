@@ -451,9 +451,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
                         (p.get_current_profile_display(), p.chinese_enabled)
                     };
-                    let msg = if enabled { "中文模式" } else { "直通模式 (无输入法)" };
+                    let msg = if enabled { "输入法模式" } else { "直通键盘模式" };
+                    let status_text = if enabled { "中" } else { "英" };
                     let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
+                    
+                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(status_text.into()));
                     let _ = gui_tx_tray.send(GuiEvent::Update { 
                         pinyin: "".into(), 
                         candidates: vec![], 

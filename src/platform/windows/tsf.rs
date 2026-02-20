@@ -274,7 +274,19 @@ unsafe fn handle_client(
         let ctrl = (modifiers & 2) != 0;
         let alt = (modifiers & 4) != 0;
         
-        // 1. 优先检查切换热键 (必须在 ctrl || alt 逻辑之前，否则会被拦截)
+        // 提取位置信息（无论是否切换模式，只要是 Press 事件就尝试更新位置）
+        if msg_type == 1 {
+            let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
+            let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
+            if x == 0 && y == 0 {
+                if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; }
+            }
+            if (x != 0 || y != 0) && gui_tx.is_some() {
+                let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y });
+            }
+        }
+
+        // 1. 优先检查切换热键 (必须在 ctrl || alt 逻辑之前)
         let (is_lang_toggle, is_dp_toggle) = {
             let c = crate::load_config(); 
             let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||
@@ -327,17 +339,6 @@ unsafe fn handle_client(
             let mut bytes_written = 0;
             let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
             continue;
-        }
-
-        if msg_type == 1 {
-            let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
-            let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
-            if x == 0 && y == 0 {
-                if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; }
-            }
-            if (x != 0 || y != 0) && gui_tx.is_some() {
-                let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y });
-            }
         }
 
         if (key_code == 0x14 || key_code == 0x10) && !ctrl && !alt {
