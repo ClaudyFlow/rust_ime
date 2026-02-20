@@ -58,6 +58,8 @@ pub enum NotifyEvent {
     Close,
 }
 
+static WEB_SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn find_project_root() -> PathBuf {
     let mut curr = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for _ in 0..3 {
@@ -424,25 +426,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 5. 启动 Web Server
-    let config_web = config.clone();
-    let tries_web = tries_arc.clone();
-    let tray_tx_web = tray_tx.clone();
+    // 5. 准备 Web Server 端口
     let actual_web_port = Arc::new(std::sync::atomic::AtomicU16::new(18765));
-    let actual_web_port_web = actual_web_port.clone();
-
-    std::thread::spawn(move || {
-        if let Ok(rt) = tokio::runtime::Runtime::new() {
-            rt.block_on(async {
-                let server = ui::web::WebServer::new(18765, actual_web_port_web, config_web, tries_web, tray_tx_web);
-                server.start().await;
-            });
-        }
-    });
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -450,6 +439,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_tray = config.clone();
     let notify_tx_tray = notify_tx.clone();
     let actual_web_port_tray = actual_web_port.clone();
+    let tries_tray = tries_arc.clone();
+    let tray_tx_for_web = tray_tx.clone();
     
     std::thread::spawn(move || {
         while let Ok(event) = tray_rx.recv() {
@@ -584,6 +575,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(mut w) = config_tray.write() { *w = new_conf; }
                 }
                 ui::tray::TrayEvent::OpenConfig => {
+                    if !WEB_SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+                        WEB_SERVER_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
+                        let config_web = config_tray.clone();
+                        let tries_web = tries_tray.clone();
+                        let tray_tx_web = tray_tx_for_web.clone();
+                        let actual_web_port_web = actual_web_port_tray.clone();
+
+                        std::thread::spawn(move || {
+                            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                                rt.block_on(async {
+                                    let server = ui::web::WebServer::new(18765, actual_web_port_web, config_web, tries_web, tray_tx_web);
+                                    server.start().await;
+                                });
+                            }
+                        });
+                        // 首次启动给一点预热时间
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+
                     let port = actual_web_port_tray.load(std::sync::atomic::Ordering::SeqCst);
                     let url = format!("http://localhost:{}", port);
                     #[cfg(target_os = "linux")]
