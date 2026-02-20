@@ -51,13 +51,6 @@ pub use config::Config;
 use ui::GuiEvent;
 use serde_json::Value;
 
-#[derive(Debug)]
-pub enum NotifyEvent {
-    Update(String, String),
-    Message(String, String), // Summary, Body
-    Close,
-}
-
 static WEB_SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn find_project_root() -> PathBuf {
@@ -338,95 +331,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if profiles_changed { let _ = save_config(&current_config); }
 
-    let config = Arc::new(RwLock::new(current_config));
-    let (gui_tx, gui_rx) = std::sync::mpsc::channel();
-    let (tray_tx, tray_rx) = std::sync::mpsc::channel();
-    let (notify_tx, notify_rx) = std::sync::mpsc::channel();
+        let config = Arc::new(RwLock::new(current_config));
+        let (gui_tx, gui_rx) = std::sync::mpsc::channel();
+        let (tray_tx, tray_rx) = std::sync::mpsc::channel();
+        
+        // 1. 启动 GUI 线程
+        let gui_config = config.read().expect("Failed to acquire config read lock for GUI").clone();
+        let gui_tx_main = gui_tx.clone();
+        std::thread::spawn(move || {
+            ui::gui::start_gui(gui_rx, gui_config);
+        });
     
-    // 1. 启动 GUI 线程
-    let gui_config = config.read().expect("Failed to acquire config read lock for GUI").clone();
-    let gui_tx_main = gui_tx.clone();
-    std::thread::spawn(move || {
-        ui::gui::start_gui(gui_rx, gui_config);
-    });
-
-    // 2. 加载词库
-    let mut tries_map = HashMap::new();
-    if let Ok(entries) = std::fs::read_dir("data") {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let dir_name = entry.file_name().to_string_lossy().to_string().to_lowercase();
-                if dir_name == "ngram" || dir_name.contains("user_adapter") { continue; }
-                let trie_idx = entry.path().join("trie.index");
-                let trie_dat = entry.path().join("trie.data");
-                if trie_idx.exists() && trie_dat.exists() {
-                    if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
-                        println!("[Main] 加载方案: {}", dir_name);
-                        tries_map.insert(dir_name.clone(), trie);
+        // 2. 加载词库
+        let mut tries_map = HashMap::new();
+        if let Ok(entries) = std::fs::read_dir("data") {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    let dir_name = entry.file_name().to_string_lossy().to_string().to_lowercase();
+                    if dir_name == "ngram" || dir_name.contains("user_adapter") { continue; }
+                    let trie_idx = entry.path().join("trie.index");
+                    let trie_dat = entry.path().join("trie.data");
+                    if trie_idx.exists() && trie_dat.exists() {
+                        if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
+                            println!("[Main] 加载方案: {}", dir_name);
+                            tries_map.insert(dir_name.clone(), trie);
+                        }
                     }
                 }
             }
         }
-    }
-    let tries_arc = Arc::new(RwLock::new(tries_map.clone()));
-
-    let conf_guard = config.read().unwrap();
-    let punctuation = load_punctuation_dict(&conf_guard.files.punctuation_file);
-    let mut default_profile = conf_guard.input.default_profile.to_lowercase();
-    if default_profile.is_empty() || !tries_map.contains_key(&default_profile) {
-        if tries_map.contains_key("chinese") {
-            default_profile = "chinese".to_string();
-        } else if let Some(k) = tries_map.keys().next() {
-            default_profile = k.clone();
-        }
-    }
+        let tries_arc = Arc::new(RwLock::new(tries_map.clone()));
     
-    let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
-    processor_obj.apply_config(&conf_guard);
-    processor_obj.set_syllables(load_syllables());
-
-    let processor = Arc::new(Mutex::new(processor_obj));
-    drop(conf_guard);
-
-    // 3. 通知线程
-    #[cfg(target_os = "linux")]
-    std::thread::spawn(move || {
-        let mut handle: Option<notify_rust::NotificationHandle> = None;
-        while let Ok(event) = notify_rx.recv() {
-            match event {
-                NotifyEvent::Message(summary, body) => { let _ = notify_rust::Notification::new().summary(&summary).body(&body).timeout(1500).show(); },
-                NotifyEvent::Update(s, b) => { if let Ok(h) = notify_rust::Notification::new().summary(&s).body(&b).id(9999).timeout(0).show() { handle = Some(h); } },
-                NotifyEvent::Close => { if let Some(h) = handle.take() { h.close(); } }
+        let conf_guard = config.read().unwrap();
+        let punctuation = load_punctuation_dict(&conf_guard.files.punctuation_file);
+        let mut default_profile = conf_guard.input.default_profile.to_lowercase();
+        if default_profile.is_empty() || !tries_map.contains_key(&default_profile) {
+            if tries_map.contains_key("chinese") {
+                default_profile = "chinese".to_string();
+            } else if let Some(k) = tries_map.keys().next() {
+                default_profile = k.clone();
             }
         }
-    });
-
-    #[cfg(target_os = "windows")]
-    std::thread::spawn(move || {
-        while let Ok(event) = notify_rx.recv() {
-            match event {
-                NotifyEvent::Message(summary, body) => { 
-                    let _ = notify_rust::Notification::new()
-                        .summary(&summary)
-                        .body(&body)
-                        .appname("Rust IME")
-                        .timeout(notify_rust::Timeout::Milliseconds(3000))
-                        .show(); 
-                },
-                NotifyEvent::Update(s, b) => { 
-                    let _ = notify_rust::Notification::new()
-                        .summary(&s)
-                        .body(&b)
-                        .appname("Rust IME")
-                        .timeout(notify_rust::Timeout::Milliseconds(1000))
-                        .show(); 
-                },
-                NotifyEvent::Close => {}
-            }
-        }
-    });
-
-    // 5. 准备 Web Server 端口
+        
+        let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
+        processor_obj.apply_config(&conf_guard);
+        processor_obj.set_syllables(load_syllables());
+    
+        let processor = Arc::new(Mutex::new(processor_obj));
+        drop(conf_guard);
+    
+        // 5. 准备 Web Server 端口
     let actual_web_port = Arc::new(std::sync::atomic::AtomicU16::new(18765));
 
     // 6. 托盘处理器
@@ -437,7 +391,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processor_clone = processor.clone();
     let gui_tx_tray = gui_tx.clone();
     let config_tray = config.clone();
-    let notify_tx_tray = notify_tx.clone();
     let actual_web_port_tray = actual_web_port.clone();
     let tries_tray = tries_arc.clone();
     let tray_tx_for_web = tray_tx.clone();
@@ -446,14 +399,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(event) = tray_rx.recv() {
             match event {
                 ui::tray::TrayEvent::ToggleIme => {
-                    let (profile, enabled) = {
+                    let (_profile, enabled) = {
                         let mut p = processor_clone.lock().unwrap();
                         let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
                         (p.get_current_profile_display(), p.chinese_enabled)
                     };
-                    let msg = if enabled { "输入法模式" } else { "直通键盘模式" };
                     let status_text = if enabled { "中" } else { "英" };
-                    let _ = notify_tx_tray.send(NotifyEvent::Message(profile, msg.to_string()));
                     tray_handle.update(|t| t.chinese_enabled = enabled);
                     
                     let _ = gui_tx_tray.send(GuiEvent::ShowStatus(status_text.into()));
@@ -472,7 +423,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let mut p = processor_clone.lock().unwrap();
                         p.next_profile()
                     };
-                    let _ = notify_tx_tray.send(NotifyEvent::Message(profile.clone(), "已切换方案".to_string()));
                     tray_handle.update(|t| t.active_profile = profile);
                 }
                 ui::tray::TrayEvent::ToggleGui => {
@@ -501,7 +451,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     processor_clone.lock().unwrap().anti_typo_mode = next_mode;
                 }
                 ui::tray::TrayEvent::ToggleDoublePinyin => {
-                    let (enabled, profile) = {
+                    let (enabled, _profile) = {
                         let mut w = config_tray.write().unwrap();
                         w.input.enable_double_pinyin = !w.input.enable_double_pinyin;
                         let e = w.input.enable_double_pinyin;
@@ -511,8 +461,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         (e, p.get_current_profile_display())
                     };
                     tray_handle.update(|t| t.double_pinyin = enabled);
-                    let msg = if enabled { "开启" } else { "关闭" };
-                    let _ = notify_tx_tray.send(NotifyEvent::Message(profile, format!("小鹤双拼模式: {}", msg)));
                 }
                 ui::tray::TrayEvent::SwitchCommitMode => {
                     let mut w = config_tray.write().unwrap();
@@ -521,8 +469,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.commit_mode = mode.clone());
                     let _ = save_config(&w);
                     processor_clone.lock().unwrap().commit_mode = mode.clone();
-                    let msg = if mode == "single" { "词模式(单空格)" } else { "长句模式(双空格)" };
-                    let _ = notify_tx_tray.send(NotifyEvent::Message("上屏模式切换".into(), msg.into()));
                 }
                 ui::tray::TrayEvent::CyclePreview => {
                     let mode_str = {
@@ -601,14 +547,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         println!("[Main] 启动 Evdev 兼容模式 (原生 Wayland 协议暂避)...");
         let device_path = find_keyboard_device()?;
-        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), notify_tx.clone(), tray_tx.clone())?;
+        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), tray_tx.clone())?;
         host.run()?;
     }
 
     #[cfg(target_os = "windows")]
     {
         println!("[Main] 启动 Windows TSF 模式 (实验中)...");
-        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx_main), config.clone(), notify_tx.clone(), tray_tx.clone());
+        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx_main), config.clone(), tray_tx.clone());
         host.run()?;
     }
 

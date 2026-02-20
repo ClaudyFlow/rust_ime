@@ -3,12 +3,11 @@ use std::sync::mpsc::Sender;
 use crate::platform::traits::{InputMethodHost, Rect};
 use crate::engine::Processor;
 use crate::ui::GuiEvent;
-use crate::{Config, NotifyEvent};
+use crate::Config;
 
 pub struct TsfHost {
     processor: Arc<Mutex<Processor>>,
     gui_tx: Option<Sender<GuiEvent>>,
-    notify_tx: Sender<NotifyEvent>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
 }
 
@@ -17,13 +16,11 @@ impl TsfHost {
         processor: Arc<Mutex<Processor>>,
         gui_tx: Option<Sender<GuiEvent>>,
         _config: Arc<RwLock<Config>>,
-        notify_tx: Sender<NotifyEvent>,
         tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Self {
         Self {
             processor,
             gui_tx,
-            notify_tx,
             tray_tx,
         }
     }
@@ -145,14 +142,12 @@ impl InputMethodHost for TsfHost {
 
             let processor = self.processor.clone();
             let gui_tx = self.gui_tx.clone();
-            let notify_tx = self.notify_tx.clone();
             let tray_tx = self.tray_tx.clone();
 
             for _i in 0..3 {
                 let pipe_name_u16 = pipe_name_w.clone();
                 let processor = processor.clone();
                 let gui_tx = gui_tx.clone();
-                let notify_tx = notify_tx.clone();
                 let tray_tx = tray_tx.clone();
                 
                 std::thread::spawn(move || {
@@ -187,11 +182,10 @@ impl InputMethodHost for TsfHost {
                             if connect_res.is_ok() || already_connected {
                                 let proc_inner = processor.clone();
                                 let gui_inner = gui_tx.clone();
-                                let notify_inner = notify_tx.clone();
                                 let tray_inner = tray_tx.clone();
                                 
                                 std::thread::spawn(move || {
-                                    handle_client(h_pipe, proc_inner, gui_inner, notify_inner, tray_inner);
+                                    handle_client(h_pipe, proc_inner, gui_inner, tray_inner);
                                     let _ = CloseHandle(h_pipe);
                                 });
                             } else {
@@ -251,12 +245,10 @@ unsafe fn handle_client(
     handle: windows::Win32::Foundation::HANDLE, 
     processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>,
     gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
-    notify_tx: std::sync::mpsc::Sender<crate::NotifyEvent>,
     tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>,
 ) {
     use windows::Win32::Storage::FileSystem::*;
     use crate::engine::processor::Action;
-    use crate::NotifyEvent;
     
     let mut buffer = [0u8; 1024];
     loop {
@@ -434,7 +426,6 @@ unsafe fn handle_client(
                         response.extend_from_slice(insert.as_bytes()); 
                     }
                     Action::Consume => { response.push(2); }
-                    Action::Notify(s, b) => { let _ = notify_tx.send(NotifyEvent::Message(s, b)); response.push(2); }
                     Action::Alert => {
                         use windows::Win32::Media::Audio::*;
                         let root = crate::find_project_root();

@@ -9,14 +9,12 @@ use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use crate::config::parse_key;
-use crate::NotifyEvent;
 
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
     vkbd: Mutex<Vkbd>,
     dev: Arc<Mutex<Device>>, // 修改为 Arc 以便在 Guard 中共享
     gui_tx: Option<Sender<GuiEvent>>,
-    notify_tx: Sender<NotifyEvent>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
@@ -55,7 +53,6 @@ impl EvdevHost {
         device_path: &str, 
         gui_tx: Option<Sender<GuiEvent>>,
         config: Arc<std::sync::RwLock<Config>>,
-        notify_tx: Sender<NotifyEvent>,
         tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
@@ -65,7 +62,7 @@ impl EvdevHost {
             vkbd.apply_config(&conf);
         }
         Ok(Self {
-            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, notify_tx, tray_tx,
+            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, tray_tx,
             should_exit: Arc::new(AtomicBool::new(false)), config, tab_held_and_not_used: false,
         })
     }
@@ -117,11 +114,6 @@ impl InputMethodHost for EvdevHost {
                     if key == Key::KEY_TAB && !has_mod {
                         if val == 1 { self.tab_held_and_not_used = true; } 
                         else if val == 0 {
-                            if self.tab_held_and_not_used {
-                                let mut p = self.processor.lock().unwrap();
-                                p.toggle();
-                                let msg = if p.chinese_enabled { "中文模式" } else { "直通模式" };
-                                let summary = p.get_current_profile_display();
                                 let enabled = p.chinese_enabled;
                                 let profile = p.get_current_profile_display();
                                 drop(p);
@@ -131,8 +123,6 @@ impl InputMethodHost for EvdevHost {
                                     active_profile: profile 
                                 });
 
-                                let _ = self.notify_tx.send(NotifyEvent::Close);
-                                let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
                                 self.update_gui();
                             }
                             self.tab_held_and_not_used = false;
@@ -177,12 +167,8 @@ impl InputMethodHost for EvdevHost {
                         
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
                             let mut p = self.processor.lock().unwrap(); p.toggle();
-                            let summary = p.get_current_profile_display();
-                            let msg = if p.chinese_enabled { "中文模式" } else { "直通模式" };
                             let enabled = p.chinese_enabled;
                             let profile = p.get_current_profile_display();
-                            let _ = self.notify_tx.send(NotifyEvent::Close);
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
                             drop(p);
 
                             let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
@@ -197,7 +183,6 @@ impl InputMethodHost for EvdevHost {
                             let mut p = self.processor.lock().unwrap(); let profile = p.next_profile();
                             let enabled = p.chinese_enabled;
                             let profile_copy = profile.clone();
-                            let _ = self.notify_tx.send(NotifyEvent::Message(profile.clone(), "方案已切换".to_string()));
                             if let Ok(mut w) = self.config.write() { w.input.active_profiles = vec![profile]; let _ = crate::save_config(&w); }
                             drop(p);
 
@@ -212,46 +197,36 @@ impl InputMethodHost for EvdevHost {
                         if is_combo(&held_keys, &cycle_preview) {
                             let mut p = self.processor.lock().unwrap();
                             p.phantom_mode = match p.phantom_mode { crate::engine::processor::PhantomMode::None => crate::engine::processor::PhantomMode::Pinyin, _ => crate::engine::processor::PhantomMode::None };
-                            let msg = if p.phantom_mode == crate::engine::processor::PhantomMode::Pinyin { "预览: 开启" } else { "预览: 关闭" };
-                            let summary = p.get_current_profile_display();
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
                             drop(p); continue;
                         }
 
                         if is_combo(&held_keys, &cycle_paste) {
-                            let msg = if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.cycle_paste_mode() } else { "失败".into() };
-                            let summary = self.processor.lock().unwrap().get_current_profile_display();
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg));
+                            let _ = if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.cycle_paste_mode() } else { "失败".into() };
                             continue;
                         }
 
                         if is_combo(&held_keys, &toggle_trad) {
                             let mut p = self.processor.lock().unwrap(); p.show_candidates = !p.show_candidates;
-                            let _ = self.notify_tx.send(NotifyEvent::Message("UI".into(), if p.show_candidates { "显示候选窗" } else { "隐藏候选窗" }.into()));
                             continue;
                         }
 
                         if is_combo(&held_keys, &toggle_commit) {
-                            let (mode, summary) = {
+                            let (mode, _) = {
                                 let mut p = self.processor.lock().unwrap();
                                 p.commit_mode = if p.commit_mode == "single" { "double".into() } else { "single".into() };
                                 (p.commit_mode.clone(), p.get_current_profile_display())
                             };
                             if let Ok(mut w) = self.config.write() { w.input.commit_mode = mode.clone(); let _ = crate::save_config(&w); }
-                            let msg = format!("上屏模式: {}", mode);
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg));
                             continue;
                         }
 
                         if is_combo(&held_keys, &toggle_dp) {
-                            let (enabled, summary) = {
+                            let (enabled, _) = {
                                 let mut p = self.processor.lock().unwrap();
                                 p.enable_double_pinyin = !p.enable_double_pinyin;
                                 (p.enable_double_pinyin, p.get_current_profile_display())
                             };
                             if let Ok(mut w) = self.config.write() { w.input.enable_double_pinyin = enabled; let _ = crate::save_config(&w); }
-                            let msg = if enabled { "开启双拼模式" } else { "关闭双拼模式" };
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.into()));
                             continue;
                         }
                     }
@@ -262,18 +237,8 @@ impl InputMethodHost for EvdevHost {
                         match p.handle_key(key, val, shift) {
                             Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
                             Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                            Action::Notify(s, b) => { 
-                                if s == "位置切换" {
-                                    let new_pos = if b.contains("顶部") { "top".to_string() } else { "bottom".to_string() };
-                                    if let Ok(mut w) = self.config.write() {
-                                        w.appearance.candidate_anchor = new_pos;
-                                        let _ = crate::save_config(&w);
-                                        if let Some(ref tx) = self.gui_tx {
-                                            let _ = tx.send(GuiEvent::ApplyConfig(w.clone()));
-                                        }
-                                    }
-                                }
-                                let _ = self.notify_tx.send(NotifyEvent::Message(s, b)); 
+                            Action::Notify(_, _) => { 
+                                // 此处原本负责位置切换提示，现在已无处发送通知，仅保持逻辑通过
                             }
                             Action::Alert => { 
                                 if self.config.read().unwrap().input.enable_error_sound { 
