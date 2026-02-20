@@ -245,11 +245,12 @@ async fn toggle_dict(Json(req): Json<ToggleRequest>) -> StatusCode {
 }
 
 async fn compile_dicts_handler() -> StatusCode {
-    let mut cmd = std::process::Command::new("cargo");
-    cmd.arg("run").arg("--bin").arg("compile_dict");
-    match cmd.status() {
-        Ok(s) if s.success() => StatusCode::OK,
-        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    match crate::engine::compiler::check_and_compile_all() {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+            eprintln!("[Web] 词库编译失败: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 
