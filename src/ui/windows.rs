@@ -10,7 +10,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
 
 static mut WINDOW_STATE: Option<WindowState> = None;
-static mut LEARNING_STATE: Option<LearningState> = None;
 static mut STATUS_STATE: Option<StatusState> = None;
 static CURRENT_CONFIG: std::sync::OnceLock<Arc<RwLock<Config>>> = std::sync::OnceLock::new();
 
@@ -23,10 +22,6 @@ struct WindowState {
     y: i32,
 }
 
-struct LearningState {
-    last_update: std::time::Instant,
-}
-
 struct StatusState {
     last_update: std::time::Instant,
 }
@@ -35,7 +30,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     println!("[GUI] Starting Windows GUI thread...");
     let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
     let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-    let learn_class = PCWSTR("RustImeLearning\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
     let status_class = PCWSTR("RustImeStatus\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
     unsafe {
@@ -61,16 +55,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         };
         RegisterClassW(&wc);
 
-        let wc_learn = WNDCLASSW {
-            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-            hInstance: instance.into(),
-            lpszClassName: learn_class,
-            lpfnWndProc: Some(learn_wnd_proc),
-            hbrBackground: CreateSolidBrush(COLORREF(0x000000)),
-            ..Default::default()
-        };
-        RegisterClassW(&wc_learn);
-
         let wc_status = WNDCLASSW {
             hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
             hInstance: instance.into(),
@@ -88,13 +72,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             window_class, PCWSTR(std::ptr::null()), WS_POPUP,
             100, 100, 400, 120, None, None, instance, None,
         );
-
-        let hwnd_learn = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
-            learn_class, PCWSTR(std::ptr::null()), WS_POPUP,
-            0, 0, 400, 80, None, None, instance, None,
-        );
-        let _ = SetLayeredWindowAttributes(hwnd_learn, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
 
         let hwnd_status = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
@@ -195,30 +172,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             }
                         });
                     }
-                    GuiEvent::ShowLearning(word, hint) => {
-                        let show = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.learning_mode } else { false };
-                        if !show { continue; }
-
-                        let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
-                        *ln_ptr = Some(LearningState { last_update: std::time::Instant::now() });
-                        
-                        let (data, w, h) = {
-                            let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
-                            painter.draw_learning(&word, &hint, &conf)
-                        };
-                        update_layered_window(hwnd_learn, &data, w, h);
-                        ShowWindow(hwnd_learn, SW_SHOWNOACTIVATE);
-
-                        std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_secs(3));
-                            let ln_ptr = std::ptr::addr_of_mut!(LEARNING_STATE);
-                            if let Some(ref state) = *ln_ptr {
-                                if state.last_update.elapsed().as_secs() >= 3 {
-                                    ShowWindow(hwnd_learn, SW_HIDE);
-                                }
-                            }
-                        });
-                    }
                     GuiEvent::ApplyConfig(conf) => {
                         if let Some(arc) = CURRENT_CONFIG.get() {
                             if let Ok(mut w) = arc.write() { *w = conf; }
@@ -236,7 +189,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         }
 
                         InvalidateRect(hwnd, None, BOOL(1));
-                        InvalidateRect(hwnd_learn, None, BOOL(1));
                     }
                     GuiEvent::Exit => {
                         PostQuitMessage(0);
@@ -295,19 +247,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
         }
         WM_ERASEBKGND => LRESULT(1),
         WM_DESTROY => { PostQuitMessage(0); LRESULT(0) }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
-unsafe extern "system" fn learn_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_PAINT => {
-            let mut ps = PAINTSTRUCT::default();
-            let _hdc = BeginPaint(hwnd, &mut ps);
-            EndPaint(hwnd, &ps);
-            LRESULT(0)
-        }
-        WM_ERASEBKGND => LRESULT(1),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }

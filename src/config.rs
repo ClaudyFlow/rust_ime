@@ -58,21 +58,7 @@ pub struct Appearance {
     pub hint_text: TextStyle,
     pub comment_text: TextStyle, // For extra info like "User", "Emoji"
 
-    // Learning mode
-    pub learning_mode: bool,
-    pub learning_anchor: String,
-    pub learning_interval_sec: u64,
-    pub learning_font_size: u32,
-    pub learning_margin_x: i32,
-    pub learning_margin_y: i32,
-    pub learning_bg_color: String,
-    pub learning_color: String,
-    pub learning_hint_color: String,
-    pub learning_font_family: String,
-    pub learning_dict_path: String,
-    
     pub preview_mode: String,
-    pub learning_interval: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -216,20 +202,7 @@ impl Config {
                     alpha: 0.7,
                 },
 
-                learning_mode: false,
-                learning_anchor: "top_right".to_string(),
-                learning_interval_sec: 10,
-                learning_font_size: 24,
-                learning_margin_x: 20,
-                learning_margin_y: 40,
-                learning_bg_color: "rgba(20, 20, 20, 0.85)".to_string(),
-                learning_color: "#ffffff".to_string(),
-                learning_hint_color: "#abb2bf".to_string(),
-                learning_font_family: "Microsoft YaHei".to_string(),
-                learning_dict_path: "dicts/chinese/words/words.json".to_string(),
-                
                 preview_mode: "pinyin".to_string(),
-                learning_interval: 10,
             },
             input: Input {
                 autostart: false,

@@ -3,7 +3,8 @@ Write-Host "Building release version..." -ForegroundColor Cyan
 cargo build --release
 
 # 2. Create release directory
-$ReleaseDir = "rust-ime-windows-v0.5.1"
+$Timestamp = Get-Date -Format "yyyyMMdd_HHmm"
+$ReleaseDir = "rust-ime-windows-$Timestamp"
 if (Test-Path $ReleaseDir) { Remove-Item -Recurse -Force $ReleaseDir }
 New-Item -ItemType Directory $ReleaseDir
 

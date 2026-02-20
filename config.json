@@ -56,19 +56,7 @@
       "color": "#0969da",
       "alpha": 0.7
     },
-    "learning_mode": false,
-    "learning_anchor": "top_right",
-    "learning_interval_sec": 10,
-    "learning_font_size": 24,
-    "learning_margin_x": 20,
-    "learning_margin_y": 40,
-    "learning_bg_color": "rgba(20, 20, 20, 0.85)",
-    "learning_color": "#ffffff",
-    "learning_hint_color": "#abb2bf",
-    "learning_font_family": "Microsoft YaHei",
-    "learning_dict_path": "dicts/chinese/words/words.json",
-    "preview_mode": "pinyin",
-    "learning_interval": 10
+    "preview_mode": "pinyin"
   },
   "input": {
     "autostart": false,

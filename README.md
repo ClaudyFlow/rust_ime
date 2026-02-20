@@ -257,4 +257,3 @@ Please refer to the following guides for detailed installation instructions:
 - **视觉样式**：实时调整颜色球、字号、边距、阴影。
 - **词库管理**：支持递归扫描子目录下的词典，一键重新编译。
 - **词典编辑器**：快速搜索并修改任何词条的翻译/提示。
-- **汉字学习**：挑选您的单词本，在屏幕角落开启背单词模式。

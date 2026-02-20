@@ -49,16 +49,7 @@ use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
 pub use config::Config;
 use ui::GuiEvent;
-use serde::Deserialize;
 use serde_json::Value;
-
-#[derive(Debug, Deserialize, Clone)]
-struct DictEntry {
-    #[serde(alias = "char")]
-    word: String,
-    #[serde(alias = "en")]
-    hint: Option<String>,
-}
 
 #[derive(Debug)]
 pub enum NotifyEvent {
@@ -411,45 +402,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 4. 学习模式线程
-    let gui_tx_learn = gui_tx.clone();
-    let conf_learn = config.clone();
-    std::thread::spawn(move || {
-        let mut current_data: Option<(String, Vec<(String, String)>)> = None;
-        loop {
-            let (enabled, dict_path, interval) = {
-                let c = conf_learn.read().unwrap();
-                (c.appearance.learning_mode, c.appearance.learning_dict_path.clone(), c.appearance.learning_interval_sec)
-            };
-            if enabled {
-                if current_data.as_ref().map_or(true, |(p, _)| p != &dict_path) {
-                    if let Ok(file) = File::open(&dict_path) {
-                        if let Ok(json) = serde_json::from_reader::<_, Value>(BufReader::new(file)) {
-                            if let Some(obj) = json.as_object() {
-                                let mut entries = Vec::new();
-                                for (_, val) in obj {
-                                    if let Some(arr) = val.as_array() {
-                                        for v in arr { if let Ok(e) = serde_json::from_value::<DictEntry>(v.clone()) { entries.push((e.word, e.hint.unwrap_or_default())); } }
-                                    }
-                                }
-                                current_data = Some((dict_path, entries));
-                            }
-                        }
-                    }
-                }
-                if let Some((_, ref entries)) = current_data {
-                    if !entries.is_empty() {
-                        use rand::Rng;
-                        let idx = rand::thread_rng().gen_range(0..entries.len());
-                        let (h, t) = &entries[idx];
-                        let _ = gui_tx_learn.send(GuiEvent::ShowLearning(h.clone(), t.clone()));
-                    }
-                }
-                std::thread::sleep(std::time::Duration::from_secs(interval.max(1)));
-            } else { std::thread::sleep(std::time::Duration::from_secs(2)); }
-        }
-    });
-
     // 5. 启动 Web Server
     let config_web = config.clone();
     let tries_web = tries_arc.clone();
@@ -468,7 +420,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx);
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -540,14 +492,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.show_notifications = enabled);
                     if let Ok(mut w) = config_tray.write() { w.appearance.show_notifications = enabled; let _ = save_config(&w); }
                 }
-                ui::tray::TrayEvent::ToggleLearning => {
-                    let mut w = config_tray.write().unwrap();
-                    w.appearance.learning_mode = !w.appearance.learning_mode;
-                    let enabled = w.appearance.learning_mode;
-                    tray_handle.update(|t| t.learning_mode = enabled);
-                    let _ = save_config(&w);
-                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
-                }
                 ui::tray::TrayEvent::ToggleAntiTypo => {
                     let mut w = config_tray.write().unwrap();
                     w.input.enable_anti_typo = !w.input.enable_anti_typo;
@@ -608,7 +552,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| {
                         t.show_candidates = new_conf.appearance.show_candidates;
                         t.show_notifications = new_conf.appearance.show_notifications;
-                        t.learning_mode = new_conf.appearance.learning_mode;
                         t.preview_mode = new_conf.appearance.preview_mode.clone();
                         t.candidate_layout = new_conf.appearance.candidate_layout.clone();
                         t.anti_typo = new_conf.input.enable_anti_typo;

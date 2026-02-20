@@ -27,7 +27,6 @@ pub enum GuiEvent {
         commit_mode: String,
     },
     MoveTo { x: i32, y: i32 },
-    ShowLearning(String, String), // 汉字, 提示
     ApplyConfig(Config),
         ShowStatus(String), // 新增：显示 "中" 或 "英"
         Exit,
