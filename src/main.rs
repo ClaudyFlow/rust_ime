@@ -114,6 +114,28 @@ pub fn load_syllables() -> std::collections::HashSet<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
+    let _mutex_handle = unsafe {
+        use windows::Win32::System::Threading::*;
+        use windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
+        use windows::core::PCWSTR;
+
+        let name = PCWSTR("Global\\RustImeUniqueMutex\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
+        let handle = CreateMutexW(None, true, name)?;
+        if let Err(e) = windows::Win32::Foundation::GetLastError() {
+            if e.code() == ERROR_ALREADY_EXISTS.to_hresult() {
+                let _ = notify_rust::Notification::new()
+                    .summary("Rust IME")
+                    .body("程序已经在运行中。")
+                    .appname("Rust IME")
+                    .timeout(notify_rust::Timeout::Milliseconds(3000))
+                    .show();
+                return Ok(());
+            }
+        }
+        handle
+    };
+
+    #[cfg(target_os = "windows")]
     unsafe {
         use windows::Win32::UI::HiDpi::*;
         let _ = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
