@@ -266,7 +266,7 @@ unsafe fn handle_client(
         let ctrl = (modifiers & 2) != 0;
         let alt = (modifiers & 4) != 0;
         
-        // 提取位置信息（无论是否切换模式，只要是 Press 事件就尝试更新位置）
+        // 1. 提取位置信息（无论是否切换模式，Press 事件就更新位置）
         if msg_type == 1 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
@@ -278,7 +278,7 @@ unsafe fn handle_client(
             }
         }
 
-        // 1. 优先检查切换热键 (必须在 ctrl || alt 逻辑之前)
+        // 2. 核心切换热键优先匹配 (解决 Ctrl + Space 失效的关键)
         let (is_lang_toggle, is_dp_toggle) = {
             let c = crate::load_config(); 
             let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||
@@ -294,18 +294,11 @@ unsafe fn handle_client(
                 let enabled = p.chinese_enabled;
                 let profile = p.get_current_profile_display();
                 drop(p);
-                
-                let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
-                    chinese_enabled: enabled, 
-                    active_profile: profile 
-                });
-
-                if let Some(ref tx) = gui_tx {
-                    let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() }));
-                }
+                let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
+                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() })); }
                 update_gui_impl(&gui_tx, &processor);
             }
-            let response = vec![2u8];
+            let response = vec![2u8]; // Consume
             let mut bytes_written = 0;
             let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
             continue;
@@ -313,7 +306,7 @@ unsafe fn handle_client(
 
         if is_dp_toggle {
             if msg_type == 1 {
-                let (enabled, _profile) = {
+                let (enabled, _) = {
                     let mut p = processor.lock().unwrap();
                     p.enable_double_pinyin = !p.enable_double_pinyin;
                     (p.enable_double_pinyin, p.get_current_profile_display())
@@ -321,18 +314,15 @@ unsafe fn handle_client(
                 let mut c = crate::load_config();
                 c.input.enable_double_pinyin = enabled;
                 let _ = crate::save_config(&c);
-                
-                if let Some(ref tx) = gui_tx {
-                    let msg = if enabled { "双拼: 开".into() } else { "双拼: 关".into() };
-                    let _ = tx.send(crate::ui::GuiEvent::ShowStatus(msg));
-                }
+                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "双拼: 开".into() } else { "双拼: 关".into() })); }
             }
-            let response = vec![2u8];
+            let response = vec![2u8]; // Consume
             let mut bytes_written = 0;
             let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
             continue;
         }
 
+        // 3. 特殊辅助按键拦截 (Caps / Page Filter)
         if (key_code == 0x14 || key_code == 0x10) && !ctrl && !alt {
             let mut p = processor.lock().unwrap();
             if p.chinese_enabled && !p.buffer.is_empty() {
@@ -348,6 +338,7 @@ unsafe fn handle_client(
             }
         }
 
+        // 4. 输入状态下的默认热键拦截 (Esc, Enter 等)
         if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
             let p = processor.lock().unwrap();
             if p.buffer.is_empty() {
@@ -358,13 +349,7 @@ unsafe fn handle_client(
             }
         }
 
-        if key_code == 0x10 && !ctrl && !alt {
-            let response = vec![0u8]; 
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-            continue;
-        }
-
+        // 5. 通用 Ctrl/Alt 屏蔽与拦截
         if ctrl || alt {
             if msg_type == 1 {
                 let mut p = processor.lock().unwrap();
@@ -374,7 +359,7 @@ unsafe fn handle_client(
                     update_gui_impl(&gui_tx, &processor);
                 }
             }
-            let response = vec![0u8];
+            let response = vec![0u8]; // Pass through
             let mut bytes_written = 0;
             let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
             continue;
