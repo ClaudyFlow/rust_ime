@@ -19,8 +19,6 @@ pub enum TrayEvent {
     SwitchCommitMode,
     ReloadConfig,
     CyclePreview,
-    CompileDict,
-    ToggleLayout,
 }
 
 #[cfg(target_os = "linux")]
@@ -120,10 +118,9 @@ impl Tray for ImeTray {
     fn tool_tip(&self) -> ToolTip {
         ToolTip {
             title: "rust-IME".to_string(),
-            description: format!("Profile: {}\nGUI: {}\nLayout: {}\nPreview: {}", 
+            description: format!("Profile: {}\nGUI: {}\nPreview: {}", 
                 self.active_profile,
                 if self.show_candidates { "开" } else { "关" },
-                if self.candidate_layout == "vertical" { "竖排" } else { "横排" },
                 self.preview_mode,
             ),
             ..Default::default()
@@ -146,11 +143,6 @@ impl Tray for ImeTray {
             StandardItem {
                 label: format!("候选窗: {}", if self.show_candidates { "显示" } else { "隐藏" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleGui); }),
-                ..Default::default()
-            }.into(),
-            StandardItem {
-                label: format!("布局: {}", if self.candidate_layout == "vertical" { "当前竖排 (切横排)" } else { "当前横排 (切竖排)" }),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleLayout); }),
                 ..Default::default()
             }.into(),
             StandardItem {
@@ -181,11 +173,6 @@ impl Tray for ImeTray {
             StandardItem {
                 label: "重新加载配置".to_string(),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ReloadConfig); }),
-                ..Default::default()
-            }.into(),
-            StandardItem {
-                label: "编译词库".to_string(),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::CompileDict); }),
                 ..Default::default()
             }.into(),
             StandardItem {
@@ -396,8 +383,6 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1010 => { let _ = tx.send(TrayEvent::SwitchCommitMode); }
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
-                    1016 => { let _ = tx.send(TrayEvent::CompileDict); }
-                    1017 => { let _ = tx.send(TrayEvent::ToggleLayout); }
                     1013 => { let _ = tx.send(TrayEvent::Restart); }
                     1014 => { let _ = tx.send(TrayEvent::Exit); }
                     _ => {}
@@ -422,8 +407,6 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             
             let gui_label = format!("候选窗: {}", if state.show_candidates { "显示" } else { "隐藏" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1003, PCWSTR(HSTRING::from(&gui_label).as_ptr()));
-            let layout_label = format!("布局: {}", if state.candidate_layout == "vertical" { "竖排 (切横排)" } else { "横排 (切竖排)" });
-            let _ = AppendMenuW(h_menu, MF_STRING, 1017, PCWSTR(HSTRING::from(&layout_label).as_ptr()));
             let preview_label = format!("拼音预览: {}", if state.preview_mode == "pinyin" { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1005, PCWSTR(HSTRING::from(&preview_label).as_ptr()));
             let anti_label = format!("防呆模式: {}", match state.anti_typo_mode {
@@ -440,7 +423,6 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1011, PCWSTR(HSTRING::from("配置中心 (Web)").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1012, PCWSTR(HSTRING::from("重新加载配置").as_ptr()));
-            let _ = AppendMenuW(h_menu, MF_STRING, 1016, PCWSTR(HSTRING::from("编译词库").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1013, PCWSTR(HSTRING::from("重启服务").as_ptr()));
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             let _ = AppendMenuW(h_menu, MF_STRING, 1014, PCWSTR(HSTRING::from("退出程序").as_ptr()));

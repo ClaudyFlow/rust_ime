@@ -485,17 +485,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
                     }
                 }
-                ui::tray::TrayEvent::ToggleLayout => {
-                    let new_layout = {
-                        let mut w = config_tray.write().unwrap();
-                        w.appearance.candidate_layout = if w.appearance.candidate_layout == "vertical" { "horizontal".into() } else { "vertical".into() };
-                        let layout = w.appearance.candidate_layout.clone();
-                        let _ = save_config(&w);
-                        let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
-                        layout
-                    };
-                    tray_handle.update(|t| t.candidate_layout = new_layout);
-                }
                 ui::tray::TrayEvent::ToggleAntiTypo => {
                     let mut w = config_tray.write().unwrap();
                     let next_mode = match w.input.anti_typo_mode {
@@ -543,13 +532,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }.to_string();
                     tray_handle.update(|t| t.preview_mode = mode_str.to_string());
                     if let Ok(mut w) = config_tray.write() { w.appearance.preview_mode = mode_str; let _ = save_config(&w); }
-                }
-                ui::tray::TrayEvent::CompileDict => {
-                    let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), "正在编译词库，请稍候...".into()));
-                    match engine::compiler::check_and_compile_all() {
-                        Ok(_) => { let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), "✅ 词库编译完成。".into())); }
-                        Err(e) => { let _ = notify_tx_tray.send(NotifyEvent::Message("词库编译".into(), format!("❌ 编译失败: {}", e))); }
-                    }
                 }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();
