@@ -431,7 +431,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -496,15 +496,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     tray_handle.update(|t| t.candidate_layout = new_layout);
                 }
-                ui::tray::TrayEvent::ToggleNotify => {
-                    let enabled = {
-                        let mut p = processor_clone.lock().unwrap();
-                        p.show_notifications = !p.show_notifications;
-                        p.show_notifications
-                    };
-                    tray_handle.update(|t| t.show_notifications = enabled);
-                    if let Ok(mut w) = config_tray.write() { w.appearance.show_notifications = enabled; let _ = save_config(&w); }
-                }
                 ui::tray::TrayEvent::ToggleAntiTypo => {
                     let mut w = config_tray.write().unwrap();
                     w.input.enable_anti_typo = !w.input.enable_anti_typo;
@@ -564,7 +555,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // 同步更新托盘菜单状态
                     tray_handle.update(|t| {
                         t.show_candidates = new_conf.appearance.show_candidates;
-                        t.show_notifications = new_conf.appearance.show_notifications;
                         t.preview_mode = new_conf.appearance.preview_mode.clone();
                         t.candidate_layout = new_conf.appearance.candidate_layout.clone();
                         t.anti_typo = new_conf.input.enable_anti_typo;

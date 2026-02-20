@@ -18,7 +18,6 @@
   },
   "appearance": {
     "show_candidates": true,
-    "show_notifications": true,
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,
@@ -154,7 +153,6 @@
     "switch_language_alt": { "key": "ctrl+space", "description": "核心: 切换中/英文模式 (备选)" },
     "switch_dictionary": { "key": "ctrl+alt+s", "description": "功能: 切换输入方案/词库" },
     "cycle_preview_mode": { "key": "ctrl+alt+p", "description": "界面: 切换屏幕预览模式" },
-    "toggle_notifications": { "key": "ctrl+alt+n", "description": "界面: 开启/关闭系统通知" },
     "cycle_paste_method": { "key": "ctrl+alt+v", "description": "兼容: 切换粘贴注入方式" },
     "toggle_traditional_gui": { "key": "ctrl+alt+g", "description": "界面: 显示/隐藏候选窗" },
     "switch_commit_mode": { "key": "ctrl+alt+m", "description": "模式: 切换单/双空格上屏" },

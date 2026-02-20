@@ -35,7 +35,6 @@ pub enum AuxMode {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appearance {
     pub show_candidates: bool,
-    pub show_notifications: bool,
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub aux_mode: AuxMode,
@@ -135,7 +134,6 @@ pub struct Hotkeys {
     pub switch_language_alt: Hotkey,
     pub switch_dictionary: Hotkey,
     pub cycle_preview_mode: Hotkey,
-    pub toggle_notifications: Hotkey,
     pub cycle_paste_method: Hotkey,
     pub toggle_traditional_gui: Hotkey,
     pub switch_commit_mode: Hotkey,
@@ -161,7 +159,6 @@ impl Config {
             },
             appearance: Appearance {
                 show_candidates: true,
-                show_notifications: true,
                 page_size: 5,
                 show_tone_hint: false,
                 aux_mode: AuxMode::English,
@@ -297,7 +294,6 @@ impl Config {
                 switch_language_alt: Hotkey { key: "ctrl+space".to_string(), description: "核心: 切换中/英文模式 (备选)".to_string() },
                 switch_dictionary: Hotkey { key: "ctrl+alt+s".to_string(), description: "功能: 切换输入方案/词库".to_string() },
                 cycle_preview_mode: Hotkey { key: "ctrl+alt+p".to_string(), description: "界面: 切换屏幕预览模式".to_string() },
-                toggle_notifications: Hotkey { key: "ctrl+alt+n".to_string(), description: "界面: 开启/关闭系统通知".to_string() },
                 cycle_paste_method: Hotkey { key: "ctrl+alt+v".to_string(), description: "兼容: 切换粘贴注入方式".to_string() },
                 toggle_traditional_gui: Hotkey { key: "ctrl+alt+g".to_string(), description: "界面: 显示/隐藏候选窗".to_string() },
                 switch_commit_mode: Hotkey { key: "ctrl+alt+m".to_string(), description: "模式: 切换单/双空格上屏".to_string() },

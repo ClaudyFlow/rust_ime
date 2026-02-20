@@ -14,7 +14,6 @@ pub enum TrayEvent {
     Restart,
     Exit,
     ToggleGui,
-    ToggleNotify,
     ToggleAntiTypo,
     ToggleDoublePinyin,
     SwitchCommitMode,
@@ -29,7 +28,6 @@ pub struct ImeTray {
     pub chinese_enabled: bool,
     pub active_profile: String,
     pub show_candidates: bool,
-    pub show_notifications: bool,
     pub anti_typo: bool,
     pub commit_mode: String,
     pub preview_mode: String,
@@ -161,11 +159,6 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("系统通知候选词: {}", if self.show_notifications { "开启" } else { "关闭" }),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleNotify); }),
-                ..Default::default()
-            }.into(),
-            StandardItem {
                 label: format!("防呆模式: {}", if self.anti_typo { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleAntiTypo); }),
                 ..Default::default()
@@ -209,14 +202,13 @@ impl Tray for ImeTray {
 #[cfg(target_os = "linux")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_notifications: bool,
     anti_typo: bool,
     commit_mode: String,
     preview_mode: String,
     candidate_layout: String,
     event_tx: Sender<TrayEvent>
 ) -> Handle<ImeTray> {
-    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_notifications, anti_typo, commit_mode, preview_mode, candidate_layout, tx: event_tx };
+    let service = ImeTray { chinese_enabled, active_profile, show_candidates, anti_typo, commit_mode, preview_mode, candidate_layout, tx: event_tx };
     let tray_service = TrayService::new(service);
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });
@@ -245,7 +237,6 @@ pub struct ImeTrayStub {
     pub chinese_enabled: bool,
     pub active_profile: String,
     pub show_candidates: bool,
-    pub show_notifications: bool,
     pub anti_typo: bool,
     pub double_pinyin: bool,
     pub commit_mode: String,
@@ -277,7 +268,6 @@ impl WindowsTrayHandle {
 #[cfg(target_os = "windows")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_notifications: bool,
     anti_typo: bool,
     double_pinyin: bool,
     commit_mode: String,
@@ -287,7 +277,7 @@ pub fn start_tray(
 ) -> WindowsTrayHandle {
     let state = Arc::new(Mutex::new(ImeTrayStub {
         chinese_enabled, active_profile, show_candidates, 
-        show_notifications, anti_typo,
+        anti_typo,
         double_pinyin,
         commit_mode, preview_mode, candidate_layout,
     }));
@@ -397,7 +387,6 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1002 => { let _ = tx.send(TrayEvent::NextProfile); }
                     1003 => { let _ = tx.send(TrayEvent::ToggleGui); }
                     1005 => { let _ = tx.send(TrayEvent::CyclePreview); }
-                    1006 => { let _ = tx.send(TrayEvent::ToggleNotify); }
                     1009 => { let _ = tx.send(TrayEvent::ToggleAntiTypo); }
                     1015 => { let _ = tx.send(TrayEvent::ToggleDoublePinyin); }
                     1010 => { let _ = tx.send(TrayEvent::SwitchCommitMode); }
@@ -433,8 +422,6 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_STRING, 1017, PCWSTR(HSTRING::from(&layout_label).as_ptr()));
             let preview_label = format!("拼音预览: {}", if state.preview_mode == "pinyin" { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1005, PCWSTR(HSTRING::from(&preview_label).as_ptr()));
-            let notify_label = format!("系统通知候选词: {}", if state.show_notifications { "开启" } else { "关闭" });
-            let _ = AppendMenuW(h_menu, MF_STRING, 1006, PCWSTR(HSTRING::from(&notify_label).as_ptr()));
             let anti_label = format!("防呆模式: {}", if state.anti_typo { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1009, PCWSTR(HSTRING::from(&anti_label).as_ptr()));
             let dp_label = format!("小鹤双拼模式: {}", if state.double_pinyin { "开启" } else { "关闭" });

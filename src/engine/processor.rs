@@ -62,7 +62,6 @@ pub struct Processor {
     
     pub show_candidates: bool,
     pub show_modern_candidates: bool,
-    pub show_notifications: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
@@ -194,7 +193,7 @@ impl Processor {
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, best_segmentation: vec![],
             joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false, show_notifications: true,
+            show_candidates: true, show_modern_candidates: false,
             phantom_mode,
             phantom_text: String::new(),
             preview_selected_candidate: false,
@@ -266,7 +265,6 @@ impl Processor {
             self.load_user_dict();
         }
         self.show_candidates = conf.appearance.show_candidates;
-        self.show_notifications = conf.appearance.show_notifications;
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
@@ -1340,7 +1338,7 @@ mod tests {
         Processor {
             state: ImeState::Direct, buffer: String::new(), tries, active_profiles: vec!["chinese".to_string()], punctuation: HashMap::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false, show_notifications: true, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
+            show_candidates: true, show_modern_candidates: false, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
             preview_selected_candidate: false, enable_anti_typo: false, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
             aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,

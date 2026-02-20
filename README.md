@@ -182,7 +182,6 @@ rust-ime now has preliminary support for Windows using the native TSF architectu
 ### Windows 特有功能 (Windows Specific Features)
 - **原生分层窗口 (Native Layered Windows)**：Win32 API based high-performance candidate window.
 - **系统托盘图标 (System Tray)**：Switch modes, select dictionaries, and toggle features.
-- **系统通知 (System Notifications)**：Feedback via Windows Toast notifications.
 - **自动开机自启 (Autostart)**：`.\target\debug\rust-ime.exe --install` writes to the registry.
 
 ---
@@ -225,7 +224,6 @@ rust-ime now has preliminary support for Windows using the native TSF architectu
 | **`Enter`** | 确认当前输入缓冲区内容直接上屏 |
 | **`Ctrl + Alt + G`** | 显示 / 隐藏 **传统窗口** |
 | **`Ctrl + Alt + H`** | 显示 / 隐藏 **卡片式窗口** |
-| **`Ctrl + Alt + N`** | 开启 / 关闭 **系统通知候选词** |
 
 ---
 

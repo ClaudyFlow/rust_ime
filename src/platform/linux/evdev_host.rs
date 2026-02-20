@@ -159,9 +159,9 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_commit, toggle_dp) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, cycle_paste, toggle_trad, toggle_commit, toggle_dp) = {
                             let conf = self.config.read().unwrap();
-                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
+                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
                         };
                         
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
@@ -184,14 +184,6 @@ impl InputMethodHost for EvdevHost {
                             let mut p = self.processor.lock().unwrap();
                             p.phantom_mode = match p.phantom_mode { crate::engine::processor::PhantomMode::None => crate::engine::processor::PhantomMode::Pinyin, _ => crate::engine::processor::PhantomMode::None };
                             let msg = if p.phantom_mode == crate::engine::processor::PhantomMode::Pinyin { "预览: 开启" } else { "预览: 关闭" };
-                            let summary = p.get_current_profile_display();
-                            let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                            drop(p); continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_notify) {
-                            let mut p = self.processor.lock().unwrap(); p.show_notifications = !p.show_notifications;
-                            let msg = if p.show_notifications { "通知: 开启" } else { "通知: 关闭" };
                             let summary = p.get_current_profile_display();
                             let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
                             drop(p); continue;
@@ -273,7 +265,7 @@ impl InputMethodHost for EvdevHost {
                             Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
                             _ => {}
                         }
-                        drop(p); if val != 0 { self.update_gui(); self.notify_preview(); }
+                        drop(p); if val != 0 { self.update_gui(); }
                     } else {
                         if has_mod && p.state != crate::engine::processor::ImeState::Direct { let del = p.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
                         drop(p); if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
@@ -350,21 +342,6 @@ impl EvdevHost {
                 }); 
             }
         }
-    }
-
-    fn notify_preview(&self) {
-        let p = self.processor.lock().unwrap();
-        if !p.show_notifications || (p.buffer.is_empty() && !p.switch_mode) { let _ = self.notify_tx.send(NotifyEvent::Close); return; }
-        let summary = if p.switch_mode { format!("[快捷切换] {}: {}", p.get_current_profile_display(), p.joined_sentence) } else { format!("{}: {}", p.get_current_profile_display(), p.joined_sentence) };
-        let mut body = String::new();
-        if p.switch_mode && p.buffer.is_empty() { body.push_str("请按键切换方案: C(中) E(英) R(雾) J(日)"); }
-        let start = p.page; let end = (start + p.page_size).min(p.candidates.len());
-        for (i, cand) in p.candidates[start..end].iter().enumerate() {
-            let abs_idx = start + i; let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
-            if abs_idx == p.selected { body.push_str(&format!("【{}.{} {}】", (i % p.page_size)+1, cand, hint)); }
-            else { body.push_str(&format!("{}.{}{} ", (i % p.page_size)+1, cand, hint)); }
-        }
-        let _ = self.notify_tx.send(NotifyEvent::Update(summary, body));
     }
 }
 
