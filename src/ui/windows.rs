@@ -17,7 +17,6 @@ struct WindowsGui {
     painter: CandidatePainter,
     config: Arc<RwLock<Config>>,
     state: Option<WindowState>,
-    status_state: Option<StatusState>,
 }
 
 struct WindowState {
@@ -27,10 +26,6 @@ struct WindowState {
     selected: usize,
     x: i32,
     y: i32,
-}
-
-struct StatusState {
-    last_update: std::time::Instant,
 }
 
 static CURRENT_CONFIG: std::sync::OnceLock<Arc<RwLock<Config>>> = std::sync::OnceLock::new();
@@ -85,7 +80,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             painter: CandidatePainter::new(),
             config: config_arc,
             state: None,
-            status_state: None,
         };
 
         let gui_ptr = &mut gui as *mut WindowsGui;
@@ -108,7 +102,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         let gui_ptr_val = gui_ptr as isize;
 
         std::thread::spawn(move || {
-            let gui = unsafe { &mut *(gui_ptr_val as *mut WindowsGui) };
+            let gui = &mut *(gui_ptr_val as *mut WindowsGui);
             while let Ok(event) = rx.recv() {
                 gui.handle_gui_event(event);
             }
@@ -227,8 +221,6 @@ impl WindowsGui {
                 }
             }
             GuiEvent::ShowStatus(text) => {
-                self.status_state = Some(StatusState { last_update: std::time::Instant::now() });
-                
                 let (data, w, h) = {
                     let conf = self.config.read().unwrap();
                     self.painter.draw_status(&text, &conf)
