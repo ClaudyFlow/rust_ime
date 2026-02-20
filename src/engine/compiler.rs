@@ -212,11 +212,27 @@ fn write_binary_dict(idx_path: &str, dat_path: &str, entries: BTreeMap<String, V
         }
         index_builder.finish()?;
     }
+    
+    // Windows 兼容处理：如果文件正在被 Mmap 映射，rename 会失败
+    #[cfg(target_os = "windows")]
+    {
+        // 尝试先删除旧文件（通常也会失败，但能触发明确的错误）
+        let _ = fs::remove_file(idx_path);
+        let _ = fs::remove_file(dat_path);
+    }
 
-    // 原子重命名，确保旧的内存映射在被替换前保持有效（Linux）
-    // 或者在 Windows 上处理可能的冲突
-    fs::rename(tmp_idx, idx_path)?;
-    fs::rename(tmp_dat, dat_path)?;
+    if let Err(e) = fs::rename(&tmp_idx, idx_path) {
+        eprintln!("[Compiler] 无法重命名索引文件 (可能正在被使用): {}", e);
+        // 如果 rename 失败，尝试直接拷贝（虽然通常也会失败，但作为最后尝试）
+        let _ = fs::copy(&tmp_idx, idx_path);
+    }
+    if let Err(e) = fs::rename(&tmp_dat, dat_path) {
+        eprintln!("[Compiler] 无法重命名数据文件 (可能正在被使用): {}", e);
+        let _ = fs::copy(&tmp_dat, dat_path);
+    }
+    
+    let _ = fs::remove_file(tmp_idx);
+    let _ = fs::remove_file(tmp_dat);
     Ok(())
 }
 

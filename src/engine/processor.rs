@@ -192,7 +192,7 @@ impl Processor {
             punctuation,
             syllables: std::collections::HashSet::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
-            chinese_enabled: false, best_segmentation: vec![],
+            chinese_enabled: true, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false,
             phantom_mode,
@@ -328,6 +328,7 @@ impl Processor {
     }
 
     pub fn set_syllables(&mut self, syllables: std::collections::HashSet<String>) {
+        println!("[Processor] 加载音节表成功，条目数: {}", syllables.len());
         self.syllables = syllables;
     }
 

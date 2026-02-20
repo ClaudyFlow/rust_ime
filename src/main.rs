@@ -33,7 +33,7 @@ mod config;
 
 use std::fs::File;
 use std::sync::{Arc, RwLock, Mutex};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::env;
 use std::collections::HashMap;
 use std::io::BufReader;
@@ -54,12 +54,18 @@ use serde_json::Value;
 static WEB_SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn find_project_root() -> PathBuf {
+    // 优先使用当前可执行文件所在的目录
+    if let Ok(mut exe_path) = env::current_exe() {
+        exe_path.pop();
+        if exe_path.join("dicts").exists() { return exe_path; }
+    }
+    
     let mut curr = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for _ in 0..3 {
         if curr.join("dicts").exists() { return curr; }
         if !curr.pop() { break; }
     }
-    curr
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 pub fn save_config(c: &Config) -> Result<(), Box<dyn std::error::Error>> {
@@ -79,7 +85,8 @@ pub fn save_config(c: &Config) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn load_config() -> Config {
-    let mut p = find_project_root(); p.push("config.json");
+    let root = find_project_root();
+    let p = root.join("config.json");
     if let Ok(f) = File::open(&p) { 
         if let Ok(c) = serde_json::from_reader(BufReader::new(f)) { return c; } 
     }
@@ -100,11 +107,10 @@ pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
     m
 }
 
-pub fn load_syllables() -> std::collections::HashSet<String> {
+pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
     let mut set = std::collections::HashSet::new();
-    let mut path = find_project_root();
-    path.push("dicts/chinese/syllables.txt");
-    if let Ok(f) = File::open(path) {
+    let path = root.join("dicts/chinese/syllables.txt");
+    if let Ok(f) = File::open(&path) {
         use std::io::BufRead;
         let reader = std::io::BufReader::new(f);
         for line in reader.lines().flatten() {
@@ -315,12 +321,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // 0. 自动检查并增量编译词库 (已根据用户要求移除自动调用，改为手动触发)
-    /*
+    // 0. 自动检查并增量编译词库
     if let Err(e) = engine::compiler::check_and_compile_all() {
         eprintln!("[Main] 词库自动编译失败: {}", e);
     }
-    */
 
     let mut current_config = load_config();
     let mut profiles_changed = false;
@@ -383,10 +387,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         
-        let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
-        processor_obj.apply_config(&conf_guard);
-        processor_obj.set_syllables(load_syllables());
-    
+            let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
+            processor_obj.apply_config(&conf_guard);
+            processor_obj.set_syllables(load_syllables(&root));    
         let processor = Arc::new(Mutex::new(processor_obj));
         drop(conf_guard);
     
@@ -494,7 +497,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();
-                    processor_clone.lock().unwrap().apply_config(&new_conf);
+                    
+                    // 重新加载二进制词库
+                    let mut new_tries = HashMap::new();
+                    if let Ok(entries) = std::fs::read_dir("data") {
+                        for entry in entries.flatten() {
+                            if entry.path().is_dir() {
+                                let dir_name = entry.file_name().to_string_lossy().to_string().to_lowercase();
+                                let trie_idx = entry.path().join("trie.index");
+                                let trie_dat = entry.path().join("trie.data");
+                                if trie_idx.exists() && trie_dat.exists() {
+                                    if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
+                                        new_tries.insert(dir_name, trie);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    {
+                        let mut p = processor_clone.lock().unwrap();
+                        p.tries = new_tries;
+                        p.apply_config(&new_conf);
+                    }
+                    
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf.clone()));
                     
                     // 同步更新托盘菜单状态

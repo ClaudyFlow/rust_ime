@@ -9,19 +9,21 @@ pub struct TsfHost {
     processor: Arc<Mutex<Processor>>,
     gui_tx: Option<Sender<GuiEvent>>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
+    config: Arc<RwLock<Config>>,
 }
 
 impl TsfHost {
     pub fn new(
         processor: Arc<Mutex<Processor>>,
         gui_tx: Option<Sender<GuiEvent>>,
-        _config: Arc<RwLock<Config>>,
+        config: Arc<RwLock<Config>>,
         tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Self {
         Self {
             processor,
             gui_tx,
             tray_tx,
+            config,
         }
     }
 }
@@ -143,16 +145,19 @@ impl InputMethodHost for TsfHost {
             let processor = self.processor.clone();
             let gui_tx = self.gui_tx.clone();
             let tray_tx = self.tray_tx.clone();
+            let config = self.config.clone();
 
             for _i in 0..3 {
                 let pipe_name_u16 = pipe_name_w.clone();
                 let processor = processor.clone();
                 let gui_tx = gui_tx.clone();
                 let tray_tx = tray_tx.clone();
+                let config = config.clone();
                 
                 std::thread::spawn(move || {
                     loop {
                         unsafe {
+                            // ... 创建管道逻辑保持不变 ...
                             let pipe_pcwstr = PCWSTR(pipe_name_u16.as_ptr());
                             let sa = SECURITY_ATTRIBUTES {
                                 nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -183,9 +188,10 @@ impl InputMethodHost for TsfHost {
                                 let proc_inner = processor.clone();
                                 let gui_inner = gui_tx.clone();
                                 let tray_inner = tray_tx.clone();
+                                let config_inner = config.clone();
                                 
                                 std::thread::spawn(move || {
-                                    handle_client(h_pipe, proc_inner, gui_inner, tray_inner);
+                                    handle_client(h_pipe, proc_inner, gui_inner, tray_inner, config_inner);
                                     let _ = CloseHandle(h_pipe);
                                 });
                             } else {
@@ -246,6 +252,7 @@ unsafe fn handle_client(
     processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>,
     gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
     tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>,
+    config: Arc<RwLock<Config>>,
 ) {
     use windows::Win32::Storage::FileSystem::*;
     use crate::engine::processor::Action;
@@ -266,7 +273,7 @@ unsafe fn handle_client(
         let ctrl = (modifiers & 2) != 0;
         let alt = (modifiers & 4) != 0;
         
-        // 1. 提取位置信息（无论是否切换模式，Press 事件就更新位置）
+        // 1. 提取位置信息
         if msg_type == 1 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
@@ -278,9 +285,9 @@ unsafe fn handle_client(
             }
         }
 
-        // 2. 核心切换热键优先匹配 (解决 Ctrl + Space 失效的关键)
+        // 2. 核心切换热键优先匹配 (使用传入的 config)
         let (is_lang_toggle, is_dp_toggle) = {
-            let c = crate::load_config(); 
+            let c = config.read().unwrap(); 
             let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||
                              is_hk_match(&c.hotkeys.switch_language_alt.key, key_code, ctrl, alt, shift);
             let dp_match = is_hk_match(&c.hotkeys.toggle_double_pinyin.key, key_code, ctrl, alt, shift);
@@ -311,7 +318,7 @@ unsafe fn handle_client(
                     p.enable_double_pinyin = !p.enable_double_pinyin;
                     (p.enable_double_pinyin, p.get_current_profile_display())
                 };
-                let mut c = crate::load_config();
+                let mut c = config.write().unwrap();
                 c.input.enable_double_pinyin = enabled;
                 let _ = crate::save_config(&c);
                 if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "双拼: 开".into() } else { "双拼: 关".into() })); }

@@ -7,7 +7,7 @@ use windows::{
 use crate::ui::GuiEvent;
 use crate::config::Config;
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use crate::ui::painter::CandidatePainter;
 
@@ -16,7 +16,7 @@ struct WindowsGui {
     hwnd_status: HWND,
     painter: CandidatePainter,
     config: Arc<RwLock<Config>>,
-    state: Option<WindowState>,
+    state: Arc<Mutex<Option<WindowState>>>,
 }
 
 struct WindowState {
@@ -73,16 +73,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
         let config_arc = Arc::new(RwLock::new(initial_config));
         let _ = CURRENT_CONFIG.set(config_arc.clone());
 
-        // 预创建对象（暂时不完整，因为没有 HWND）
-        let mut gui = WindowsGui {
+        // 预创建对象（使用 Box 确保堆内存地址稳定）
+        let mut gui = Box::new(WindowsGui {
             hwnd: HWND(0),
             hwnd_status: HWND(0),
             painter: CandidatePainter::new(),
             config: config_arc,
-            state: None,
-        };
+            state: Arc::new(Mutex::new(None)),
+        });
 
-        let gui_ptr = &mut gui as *mut WindowsGui;
+        let gui_ptr = &mut *gui as *mut WindowsGui;
 
         let hwnd = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
@@ -107,6 +107,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                 gui.handle_gui_event(event);
             }
         });
+
+        // 此时必须通过 Box::into_raw 泄露内存，防止在函数结束时 gui 被释放
+        // 因为 WndProc 需要持续访问它
+        let _ = Box::into_raw(gui);
 
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
@@ -153,34 +157,39 @@ impl WindowsGui {
     fn handle_gui_event(&mut self, event: GuiEvent) {
         match event {
             GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-                if let Some(ref mut state) = self.state {
-                    state.pinyin = pinyin;
-                    state.candidates = candidates;
-                    state.hints = hints;
-                    state.selected = selected;
-                } else {
-                    self.state = Some(WindowState { pinyin, candidates, hints, selected, x: 100, y: 100 });
+                {
+                    let mut state_lock = self.state.lock().unwrap();
+                    if let Some(ref mut state) = *state_lock {
+                        state.pinyin = pinyin;
+                        state.candidates = candidates;
+                        state.hints = hints;
+                        state.selected = selected;
+                    } else {
+                        *state_lock = Some(WindowState { pinyin, candidates, hints, selected, x: 100, y: 100 });
+                    }
                 }
                 
-                if let Some(ref state) = self.state {
-                    unsafe {
-                        if state.pinyin.is_empty() {
-                            ShowWindow(self.hwnd, SW_HIDE);
-                        } else {
-                            ShowWindow(self.hwnd_status, SW_HIDE);
-                            ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
-                            InvalidateRect(self.hwnd, None, BOOL(0));
-                            UpdateWindow(self.hwnd);
-                        }
+                let pinyin_empty = self.state.lock().unwrap().as_ref().map(|s| s.pinyin.is_empty()).unwrap_or(true);
+                unsafe {
+                    if pinyin_empty {
+                        ShowWindow(self.hwnd, SW_HIDE);
+                    } else {
+                        ShowWindow(self.hwnd_status, SW_HIDE);
+                        ShowWindow(self.hwnd, SW_SHOWNOACTIVATE);
+                        InvalidateRect(self.hwnd, None, BOOL(0));
+                        UpdateWindow(self.hwnd);
                     }
                 }
             }
             GuiEvent::MoveTo { x, y } => {
                 let mut pinyin_is_empty = true;
-                if let Some(ref mut state) = self.state { 
-                    state.x = x; 
-                    state.y = y; 
-                    pinyin_is_empty = state.pinyin.is_empty();
+                {
+                    let mut state_lock = self.state.lock().unwrap();
+                    if let Some(ref mut state) = *state_lock { 
+                        state.x = x; 
+                        state.y = y; 
+                        pinyin_is_empty = state.pinyin.is_empty();
+                    }
                 }
                 
                 let mut rect = RECT::default();
@@ -243,10 +252,9 @@ impl WindowsGui {
             GuiEvent::ApplyConfig(conf) => {
                 if let Ok(mut w) = self.config.write() { *w = conf; }
                 
-                if let Some(ref state) = self.state {
-                    if !state.pinyin.is_empty() {
-                        unsafe { InvalidateRect(self.hwnd, None, BOOL(1)); }
-                    }
+                let pinyin_empty = self.state.lock().unwrap().as_ref().map(|s| s.pinyin.is_empty()).unwrap_or(true);
+                if !pinyin_empty {
+                    unsafe { InvalidateRect(self.hwnd, None, BOOL(1)); }
                 }
             }
             GuiEvent::Exit => {
@@ -268,7 +276,7 @@ impl WindowsGui {
                     let mem_bm = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
                     let old_bm = SelectObject(mem_dc, mem_bm);
                     
-                    if let Some(ref state) = self.state {
+                    if let Some(ref state) = *self.state.lock().unwrap() {
                         if let Ok(conf) = self.config.read() {
                             let bg_color = parse_color_win(&conf.appearance.window_bg_color);
                             let brush = CreateSolidBrush(bg_color);
