@@ -11,32 +11,6 @@ use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use crate::config::parse_key;
 use crate::NotifyEvent;
 
-fn map_key_to_display_name(key: Key) -> String {
-    match key {
-        Key::KEY_LEFTCTRL | Key::KEY_RIGHTCTRL => "Ctrl".to_string(),
-        Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => "Shift".to_string(),
-        Key::KEY_LEFTALT | Key::KEY_RIGHTALT => "Alt".to_string(),
-        Key::KEY_LEFTMETA | Key::KEY_RIGHTMETA => "Win".to_string(),
-        Key::KEY_CAPSLOCK => "Caps".to_string(),
-        Key::KEY_ESC => "Esc".to_string(),
-        Key::KEY_TAB => "Tab".to_string(),
-        Key::KEY_ENTER => "Enter".to_string(),
-        Key::KEY_SPACE => "Space".to_string(),
-        Key::KEY_BACKSPACE => "Backspace".to_string(),
-        Key::KEY_DELETE => "Delete".to_string(),
-        Key::KEY_INSERT => "Insert".to_string(),
-        Key::KEY_HOME => "Home".to_string(),
-        Key::KEY_END => "End".to_string(),
-        Key::KEY_PAGEUP => "PgUp".to_string(),
-        Key::KEY_PAGEDOWN => "PgDn".to_string(),
-        Key::KEY_UP => "↑".to_string(),
-        Key::KEY_DOWN => "↓".to_string(),
-        Key::KEY_LEFT => "←".to_string(),
-        Key::KEY_RIGHT => "→".to_string(),
-        _ => format!("{:?}", key).replace("KEY_", "")
-    }
-}
-
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
     vkbd: Mutex<Vkbd>,
@@ -185,9 +159,9 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_ks, toggle_commit, toggle_dp) = {
+                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, toggle_notify, cycle_paste, toggle_trad, toggle_commit, toggle_dp) = {
                             let conf = self.config.read().unwrap();
-                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.toggle_keystrokes.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
+                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.toggle_notifications.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
                         };
                         
                         if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
@@ -233,12 +207,6 @@ impl InputMethodHost for EvdevHost {
                         if is_combo(&held_keys, &toggle_trad) {
                             let mut p = self.processor.lock().unwrap(); p.show_candidates = !p.show_candidates;
                             let _ = self.notify_tx.send(NotifyEvent::Message("UI".into(), if p.show_candidates { "显示候选窗" } else { "隐藏候选窗" }.into()));
-                            continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_ks) {
-                            let mut p = self.processor.lock().unwrap(); p.show_keystrokes = !p.show_keystrokes;
-                            if !p.show_keystrokes { if let Some(ref tx) = self.gui_tx { let _ = tx.send(GuiEvent::ClearKeystrokes); } }
                             continue;
                         }
 

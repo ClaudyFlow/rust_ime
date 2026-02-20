@@ -27,10 +27,8 @@ pub enum GuiEvent {
         commit_mode: String,
     },
     MoveTo { x: i32, y: i32 },
-    Keystroke(String),
-        ShowLearning(String, String), // 汉字, 提示
-        ClearKeystrokes,
-        ApplyConfig(Config),
+    ShowLearning(String, String), // 汉字, 提示
+    ApplyConfig(Config),
         ShowStatus(String), // 新增：显示 "中" 或 "英"
         Exit,
     }

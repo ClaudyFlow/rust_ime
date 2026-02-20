@@ -225,7 +225,6 @@ rust-ime now has preliminary support for Windows using the native TSF architectu
 | **`Enter`** | 确认当前输入缓冲区内容直接上屏 |
 | **`Ctrl + Alt + G`** | 显示 / 隐藏 **传统窗口** |
 | **`Ctrl + Alt + H`** | 显示 / 隐藏 **卡片式窗口** |
-| **`Ctrl + Alt + K`** | 开启 / 关闭 **按键显示** |
 | **`Ctrl + Alt + N`** | 开启 / 关闭 **系统通知候选词** |
 
 ---

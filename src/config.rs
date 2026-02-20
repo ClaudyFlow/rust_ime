@@ -36,7 +36,6 @@ pub enum AuxMode {
 pub struct Appearance {
     pub show_candidates: bool,
     pub show_notifications: bool,
-    pub show_keystrokes: bool,
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub aux_mode: AuxMode,
@@ -59,15 +58,6 @@ pub struct Appearance {
     pub hint_text: TextStyle,
     pub comment_text: TextStyle, // For extra info like "User", "Emoji"
 
-    pub keystroke_anchor: String,
-    pub keystroke_font_size: u32,
-    pub keystroke_timeout_ms: u64,
-    pub keystroke_bg_color: String,
-    pub keystroke_color: String,
-    pub keystroke_font_family: String,
-    pub keystroke_margin_x: i32,
-    pub keystroke_margin_y: i32,
-    
     // Learning mode
     pub learning_mode: bool,
     pub learning_anchor: String,
@@ -162,7 +152,6 @@ pub struct Hotkeys {
     pub toggle_notifications: Hotkey,
     pub cycle_paste_method: Hotkey,
     pub toggle_traditional_gui: Hotkey,
-    pub toggle_keystrokes: Hotkey,
     pub switch_commit_mode: Hotkey,
     pub toggle_double_pinyin: Hotkey,
 }
@@ -187,7 +176,6 @@ impl Config {
             appearance: Appearance {
                 show_candidates: true,
                 show_notifications: true,
-                show_keystrokes: false,
                 page_size: 5,
                 show_tone_hint: false,
                 aux_mode: AuxMode::English,
@@ -228,15 +216,6 @@ impl Config {
                     alpha: 0.7,
                 },
 
-                keystroke_anchor: "bottom_right".to_string(),
-                keystroke_font_size: 24,
-                keystroke_timeout_ms: 1500,
-                keystroke_bg_color: "rgba(0, 0, 0, 0.7)".to_string(),
-                keystroke_color: "#ffffff".to_string(),
-                keystroke_font_family: "Microsoft YaHei".to_string(),
-                keystroke_margin_x: 20,
-                keystroke_margin_y: 20,
-                
                 learning_mode: false,
                 learning_anchor: "top_right".to_string(),
                 learning_interval_sec: 10,
@@ -348,7 +327,6 @@ impl Config {
                 toggle_notifications: Hotkey { key: "ctrl+alt+n".to_string(), description: "界面: 开启/关闭系统通知".to_string() },
                 cycle_paste_method: Hotkey { key: "ctrl+alt+v".to_string(), description: "兼容: 切换粘贴注入方式".to_string() },
                 toggle_traditional_gui: Hotkey { key: "ctrl+alt+g".to_string(), description: "界面: 显示/隐藏候选窗".to_string() },
-                toggle_keystrokes: Hotkey { key: "ctrl+alt+k".to_string(), description: "功能: 开启/关闭按键显示".to_string() },
                 switch_commit_mode: Hotkey { key: "ctrl+alt+m".to_string(), description: "模式: 切换单/双空格上屏".to_string() },
                 toggle_double_pinyin: Hotkey { key: "ctrl+alt+d".to_string(), description: "模式: 开启/关闭双拼模式".to_string() },
             },

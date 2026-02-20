@@ -63,7 +63,6 @@ pub struct Processor {
     pub show_candidates: bool,
     pub show_modern_candidates: bool,
     pub show_notifications: bool,
-    pub show_keystrokes: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
@@ -122,7 +121,6 @@ pub struct Processor {
     // 连续选词记忆
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
-    pub gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
     pub user_dict_tx: Option<std::sync::mpsc::Sender<HashMap<String, Vec<(String, u32)>>>>,
 
     // 标点状态相关
@@ -177,7 +175,6 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
         punctuation_raw: HashMap<String, Value>, 
-        gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
     ) -> Self {
         let mut punctuation = HashMap::new();
         for (k, v) in punctuation_raw {
@@ -197,7 +194,7 @@ impl Processor {
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: false, best_segmentation: vec![],
             joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true,
+            show_candidates: true, show_modern_candidates: false, show_notifications: true,
             phantom_mode,
             phantom_text: String::new(),
             preview_selected_candidate: false,
@@ -252,7 +249,6 @@ impl Processor {
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
-            gui_tx,
             user_dict_tx: None,
             quote_open: false,
             single_quote_open: false,
@@ -271,7 +267,6 @@ impl Processor {
         }
         self.show_candidates = conf.appearance.show_candidates;
         self.show_notifications = conf.appearance.show_notifications;
-        self.show_keystrokes = conf.appearance.show_keystrokes;
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
@@ -509,23 +504,6 @@ impl Processor {
     pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool) -> Action {
         let now = Instant::now();
         let is_press = val == 1;
-
-        // 统一按键回显处理 (放在最前面，确保中英文模式都生效)
-        if is_press {
-            if let Some(ref tx) = self.gui_tx {
-                let display_name = match key {
-                    VirtualKey::Backspace => Some("Back".to_string()),
-                    VirtualKey::Enter => Some("Enter".to_string()),
-                    VirtualKey::Space => Some("Space".to_string()),
-                    VirtualKey::Esc => Some("Esc".to_string()),
-                    VirtualKey::Tab => Some("Tab".to_string()),
-                    _ => key_to_char(key, shift_pressed).map(|c| c.to_string()),
-                };
-                if let Some(name) = display_name {
-                    let _ = tx.send(crate::ui::GuiEvent::Keystroke(name));
-                }
-            }
-        }
 
         if !self.chinese_enabled {
             return Action::PassThrough;
@@ -1362,7 +1340,7 @@ mod tests {
         Processor {
             state: ImeState::Direct, buffer: String::new(), tries, active_profiles: vec!["chinese".to_string()], punctuation: HashMap::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false, show_notifications: true, show_keystrokes: true, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
+            show_candidates: true, show_modern_candidates: false, show_notifications: true, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
             preview_selected_candidate: false, enable_anti_typo: false, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
             aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
@@ -1378,7 +1356,6 @@ mod tests {
                         },
                         user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
-                        gui_tx: None,
                         user_dict_tx: None,
             
                         profile_keys: Vec::new(),

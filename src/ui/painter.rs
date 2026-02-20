@@ -274,61 +274,6 @@ impl CandidatePainter {
         (pixmap.data().to_vec(), total_width as u32, total_height as u32)
     }
 
-    pub fn draw_keystrokes(&self, keys: &[String], config: &Config) -> (Vec<u8>, u32, u32) {
-        let padding = config.appearance.keystroke_margin_x as f32; // Reuse margin_x for internal padding
-        let font_size = config.appearance.keystroke_font_size as f32;
-        let item_spacing = 8.0;
-        let corner_radius = 6.0;
-
-        let mut total_width = padding * 2.0;
-        let mut widths = Vec::new();
-
-        let f_custom = self.get_font_by_family(&config.appearance.keystroke_font_family);
-        let f_main = f_custom.as_ref().or(self.font_en.as_ref()).or(self.font_zh.as_ref());
-        
-        if let Some(font) = f_main {
-            for key in keys {
-                let w = self.measure_text(font, key, font_size);
-                widths.push(w);
-                total_width += w + padding * 2.0 + item_spacing;
-            }
-        }
-        total_width = total_width.max(10.0);
-        let total_height = font_size * 1.5 + padding * 2.0 + 10.0;
-
-        let mut pixmap = Pixmap::new(total_width as u32, total_height as u32).unwrap();
-        pixmap.fill(Color::TRANSPARENT);
-
-        let mut x_cursor = padding;
-        if let Some(font) = f_main {
-            let text_color = self.parse_color(&config.appearance.keystroke_color);
-            for (i, key) in keys.iter().enumerate() {
-                let item_w = widths[i] + padding * 2.0;
-                let item_h = font_size * 1.5;
-                
-                // 背景
-                let mut bg_paint = Paint::default();
-                bg_paint.set_color(self.parse_color(&config.appearance.keystroke_bg_color));
-                bg_paint.anti_alias = true;
-                let rect = Rect::from_xywh(x_cursor, padding, item_w, item_h).unwrap();
-                pixmap.fill_path(&self.create_rounded_rect_path(rect, corner_radius), &bg_paint, FillRule::Winding, Transform::identity(), None);
-                
-                // 边框
-                let mut border_paint = Paint::default();
-                border_paint.set_color(Color::from_rgba8(200, 200, 200, 100));
-                let stroke = Stroke { width: 1.0, ..Default::default() };
-                pixmap.stroke_path(&self.create_rounded_rect_path(rect, corner_radius), &border_paint, &stroke, Transform::identity(), None);
-
-                // 文字
-                self.draw_text(&mut pixmap, font, key, x_cursor + padding, padding + item_h * 0.75, font_size, text_color);
-                
-                x_cursor += item_w + item_spacing;
-            }
-        }
-
-        (pixmap.data().to_vec(), total_width as u32, total_height as u32)
-    }
-
     pub fn draw_learning(&self, word: &str, hint: &str, config: &Config) -> (Vec<u8>, u32, u32) {
         let padding = 16.0;
         let font_size_word = config.appearance.learning_font_size as f32;

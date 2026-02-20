@@ -15,7 +15,6 @@ pub enum TrayEvent {
     Exit,
     ToggleGui,
     ToggleNotify,
-    ToggleKeystroke,
     ToggleLearning,
     ToggleAntiTypo,
     ToggleDoublePinyin,
@@ -32,7 +31,6 @@ pub struct ImeTray {
     pub active_profile: String,
     pub show_candidates: bool,
     pub show_notifications: bool,
-    pub show_keystrokes: bool,
     pub learning_mode: bool,
     pub anti_typo: bool,
     pub commit_mode: String,
@@ -171,11 +169,6 @@ impl Tray for ImeTray {
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("按键显示: {}", if self.show_keystrokes { "开启" } else { "关闭" }),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleKeystroke); }),
-                ..Default::default()
-            }.into(),
-            StandardItem {
                 label: format!("学习模式: {}", if self.learning_mode { "开启" } else { "关闭" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleLearning); }),
                 ..Default::default()
@@ -224,14 +217,14 @@ impl Tray for ImeTray {
 #[cfg(target_os = "linux")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
+    show_notifications: bool, learning_mode: bool,
     anti_typo: bool,
     commit_mode: String,
     preview_mode: String,
     candidate_layout: String,
     event_tx: Sender<TrayEvent>
 ) -> Handle<ImeTray> {
-    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_notifications, show_keystrokes, learning_mode, anti_typo, commit_mode, preview_mode, candidate_layout, tx: event_tx };
+    let service = ImeTray { chinese_enabled, active_profile, show_candidates, show_notifications, learning_mode, anti_typo, commit_mode, preview_mode, candidate_layout, tx: event_tx };
     let tray_service = TrayService::new(service);
     let handle = tray_service.handle();
     std::thread::spawn(move || { let _ = tray_service.run(); });
@@ -261,7 +254,6 @@ pub struct ImeTrayStub {
     pub active_profile: String,
     pub show_candidates: bool,
     pub show_notifications: bool,
-    pub show_keystrokes: bool,
     pub learning_mode: bool,
     pub anti_typo: bool,
     pub double_pinyin: bool,
@@ -294,7 +286,7 @@ impl WindowsTrayHandle {
 #[cfg(target_os = "windows")]
 pub fn start_tray(
     chinese_enabled: bool, active_profile: String, show_candidates: bool,
-    show_notifications: bool, show_keystrokes: bool, learning_mode: bool,
+    show_notifications: bool, learning_mode: bool,
     anti_typo: bool,
     double_pinyin: bool,
     commit_mode: String,
@@ -304,7 +296,7 @@ pub fn start_tray(
 ) -> WindowsTrayHandle {
     let state = Arc::new(Mutex::new(ImeTrayStub {
         chinese_enabled, active_profile, show_candidates, 
-        show_notifications, show_keystrokes, learning_mode, anti_typo,
+        show_notifications, learning_mode, anti_typo,
         double_pinyin,
         commit_mode, preview_mode, candidate_layout,
     }));
@@ -415,7 +407,6 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1003 => { let _ = tx.send(TrayEvent::ToggleGui); }
                     1005 => { let _ = tx.send(TrayEvent::CyclePreview); }
                     1006 => { let _ = tx.send(TrayEvent::ToggleNotify); }
-                    1007 => { let _ = tx.send(TrayEvent::ToggleKeystroke); }
                     1008 => { let _ = tx.send(TrayEvent::ToggleLearning); }
                     1009 => { let _ = tx.send(TrayEvent::ToggleAntiTypo); }
                     1015 => { let _ = tx.send(TrayEvent::ToggleDoublePinyin); }
@@ -454,8 +445,6 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
             let _ = AppendMenuW(h_menu, MF_STRING, 1005, PCWSTR(HSTRING::from(&preview_label).as_ptr()));
             let notify_label = format!("系统通知候选词: {}", if state.show_notifications { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1006, PCWSTR(HSTRING::from(&notify_label).as_ptr()));
-            let key_label = format!("按键显示: {}", if state.show_keystrokes { "开启" } else { "关闭" });
-            let _ = AppendMenuW(h_menu, MF_STRING, 1007, PCWSTR(HSTRING::from(&key_label).as_ptr()));
             let learn_label = format!("学习模式: {}", if state.learning_mode { "开启" } else { "关闭" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1008, PCWSTR(HSTRING::from(&learn_label).as_ptr()));
             let anti_label = format!("防呆模式: {}", if state.anti_typo { "开启" } else { "关闭" });

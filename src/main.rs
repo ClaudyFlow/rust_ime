@@ -234,7 +234,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 let input = args[1..].join(" ");
-                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new(), None);
+                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new());
                 p.buffer = input;
                 p.lookup();
                 for (i, cand) in p.candidates.iter().take(10).enumerate() {
@@ -366,7 +366,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
-    let mut processor_obj = Processor::new(tries_map, default_profile, punctuation, Some(gui_tx_main.clone()));
+    let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
     processor_obj.apply_config(&conf_guard);
     processor_obj.set_syllables(load_syllables());
 
@@ -468,7 +468,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.appearance.show_keystrokes, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx);
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.appearance.show_notifications, conf.appearance.learning_mode, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx);
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -540,20 +540,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.show_notifications = enabled);
                     if let Ok(mut w) = config_tray.write() { w.appearance.show_notifications = enabled; let _ = save_config(&w); }
                 }
-                ui::tray::TrayEvent::ToggleKeystroke => {
-                    let enabled = {
-                        let mut p = processor_clone.lock().unwrap();
-                        p.show_keystrokes = !p.show_keystrokes;
-                        p.show_keystrokes
-                    };
-                    tray_handle.update(|t| t.show_keystrokes = enabled);
-                    if let Ok(mut w) = config_tray.write() { w.appearance.show_keystrokes = enabled; let _ = save_config(&w); }
-                    
-                    // 如果关闭按键显示，清除当前的按键显示
-                    if !enabled {
-                        let _ = gui_tx_tray.send(GuiEvent::ClearKeystrokes);
-                    }
-                }
                 ui::tray::TrayEvent::ToggleLearning => {
                     let mut w = config_tray.write().unwrap();
                     w.appearance.learning_mode = !w.appearance.learning_mode;
@@ -622,7 +608,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| {
                         t.show_candidates = new_conf.appearance.show_candidates;
                         t.show_notifications = new_conf.appearance.show_notifications;
-                        t.show_keystrokes = new_conf.appearance.show_keystrokes;
                         t.learning_mode = new_conf.appearance.learning_mode;
                         t.preview_mode = new_conf.appearance.preview_mode.clone();
                         t.candidate_layout = new_conf.appearance.candidate_layout.clone();

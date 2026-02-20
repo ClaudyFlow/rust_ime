@@ -19,7 +19,6 @@
   "appearance": {
     "show_candidates": true,
     "show_notifications": true,
-    "show_keystrokes": false,
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,
@@ -57,14 +56,6 @@
       "color": "#0969da",
       "alpha": 0.7
     },
-    "keystroke_anchor": "bottom_right",
-    "keystroke_font_size": 24,
-    "keystroke_timeout_ms": 1500,
-    "keystroke_bg_color": "rgba(0, 0, 0, 0.7)",
-    "keystroke_color": "#ffffff",
-    "keystroke_font_family": "Microsoft YaHei",
-    "keystroke_margin_x": 20,
-    "keystroke_margin_y": 20,
     "learning_mode": false,
     "learning_anchor": "top_right",
     "learning_interval_sec": 10,
@@ -178,7 +169,6 @@
     "toggle_notifications": { "key": "ctrl+alt+n", "description": "界面: 开启/关闭系统通知" },
     "cycle_paste_method": { "key": "ctrl+alt+v", "description": "兼容: 切换粘贴注入方式" },
     "toggle_traditional_gui": { "key": "ctrl+alt+g", "description": "界面: 显示/隐藏候选窗" },
-    "toggle_keystrokes": { "key": "ctrl+alt+k", "description": "功能: 开启/关闭按键显示" },
     "switch_commit_mode": { "key": "ctrl+alt+m", "description": "模式: 切换单/双空格上屏" },
     "toggle_double_pinyin": { "key": "ctrl+alt+d", "description": "模式: 开启/关闭双拼模式" }
   }

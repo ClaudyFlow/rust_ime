@@ -10,7 +10,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
 
 static mut WINDOW_STATE: Option<WindowState> = None;
-static mut KEYSTROKE_STATE: Option<KeystrokeState> = None;
 static mut LEARNING_STATE: Option<LearningState> = None;
 static mut STATUS_STATE: Option<StatusState> = None;
 static CURRENT_CONFIG: std::sync::OnceLock<Arc<RwLock<Config>>> = std::sync::OnceLock::new();
@@ -22,11 +21,6 @@ struct WindowState {
     selected: usize,
     x: i32,
     y: i32,
-}
-
-struct KeystrokeState {
-    keys: Vec<String>,
-    last_update: std::time::Instant,
 }
 
 struct LearningState {
@@ -41,7 +35,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
     println!("[GUI] Starting Windows GUI thread...");
     let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap() };
     let window_class = PCWSTR("RustImeGui\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
-    let ks_class = PCWSTR("RustImeKeystroke\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
     let learn_class = PCWSTR("RustImeLearning\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
     let status_class = PCWSTR("RustImeStatus\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
 
@@ -67,16 +60,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             ..Default::default()
         };
         RegisterClassW(&wc);
-
-        let wc_ks = WNDCLASSW {
-            hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
-            hInstance: instance.into(),
-            lpszClassName: ks_class,
-            lpfnWndProc: Some(ks_wnd_proc),
-            hbrBackground: CreateSolidBrush(COLORREF(0x000000)),
-            ..Default::default()
-        };
-        RegisterClassW(&wc_ks);
 
         let wc_learn = WNDCLASSW {
             hCursor: LoadCursorW(None, IDC_ARROW).unwrap(),
@@ -105,13 +88,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
             window_class, PCWSTR(std::ptr::null()), WS_POPUP,
             100, 100, 400, 120, None, None, instance, None,
         );
-
-        let hwnd_ks = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
-            ks_class, PCWSTR(std::ptr::null()), WS_POPUP,
-            0, 0, 800, 100, None, None, instance, None,
-        );
-        let _ = SetLayeredWindowAttributes(hwnd_ks, COLORREF(0x000000), 200, LWA_ALPHA | LWA_COLORKEY);
 
         let hwnd_learn = CreateWindowExW(
             WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT,
@@ -219,44 +195,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                             }
                         });
                     }
-                    GuiEvent::Keystroke(key) => {
-                        let show = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.show_keystrokes } else { false };
-                        if !show { continue; }
-
-                        let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
-                        if let Some(ref mut state) = *ks_ptr {
-                            state.keys.push(key);
-                            if state.keys.len() > 10 { state.keys.remove(0); }
-                            state.last_update = std::time::Instant::now();
-                        } else {
-                            *ks_ptr = Some(KeystrokeState { keys: vec![key], last_update: std::time::Instant::now() });
-                        }
-                        
-                        if let Some(ref state) = *ks_ptr {
-                            let (data, w, h) = {
-                                let conf = CURRENT_CONFIG.get().unwrap().read().unwrap();
-                                painter.draw_keystrokes(&state.keys, &conf)
-                            };
-                            update_layered_window(hwnd_ks, &data, w, h);
-                            ShowWindow(hwnd_ks, SW_SHOWNOACTIVATE);
-                        }
-                        
-                        let timeout = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.keystroke_timeout_ms } else { 1500 };
-                        std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_millis(timeout));
-                            let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
-                            if let Some(ref state) = *ks_ptr {
-                                if state.last_update.elapsed().as_millis() >= timeout as u128 {
-                                    ShowWindow(hwnd_ks, SW_HIDE);
-                                }
-                            }
-                        });
-                    }
-                    GuiEvent::ClearKeystrokes => {
-                        let ks_ptr = std::ptr::addr_of_mut!(KEYSTROKE_STATE);
-                        *ks_ptr = None;
-                        ShowWindow(hwnd_ks, SW_HIDE);
-                    }
                     GuiEvent::ShowLearning(word, hint) => {
                         let show = if let Some(arc) = CURRENT_CONFIG.get() { arc.read().unwrap().appearance.learning_mode } else { false };
                         if !show { continue; }
@@ -298,7 +236,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, initial_config: Config) {
                         }
 
                         InvalidateRect(hwnd, None, BOOL(1));
-                        InvalidateRect(hwnd_ks, None, BOOL(1));
                         InvalidateRect(hwnd_learn, None, BOOL(1));
                     }
                     GuiEvent::Exit => {
@@ -358,19 +295,6 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam:
         }
         WM_ERASEBKGND => LRESULT(1),
         WM_DESTROY => { PostQuitMessage(0); LRESULT(0) }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    }
-}
-
-unsafe extern "system" fn ks_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_PAINT => {
-            let mut ps = PAINTSTRUCT::default();
-            let _hdc = BeginPaint(hwnd, &mut ps);
-            EndPaint(hwnd, &ps);
-            LRESULT(0)
-        }
-        WM_ERASEBKGND => LRESULT(1),
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
