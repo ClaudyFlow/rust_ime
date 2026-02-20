@@ -47,8 +47,15 @@
                 <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
             </div>
             <div class="setting-item">
-                <div class="info"><div class="title">按键错误提示音</div></div>
-                <label class="switch"><input type="checkbox" id="enable_error_sound"><span class="slider"></span></label>
+                <div class="info">
+                    <div class="title">防呆模式</div>
+                    <div class="desc">智能：拦截一次非法拼音，再次输入则放行；严格：禁止任何非法拼音。</div>
+                </div>
+                <select id="anti_typo_mode">
+                    <option value="None">已关闭</option>
+                    <option value="Strict">严格模式</option>
+                    <option value="Smart">智能模式</option>
+                </select>
             </div>
         </div>
     </div>
@@ -76,7 +83,7 @@
             bindInput('commit_mode', 'input');
             bindInput('page_size', 'input');
             bindInput('autostart', 'input');
-            bindInput('enable_error_sound', 'input');
+            bindInput('anti_typo_mode', 'input');
         }
 
         function toggleProfile(name, el) {

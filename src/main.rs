@@ -431,7 +431,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. 托盘处理器
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.input.enable_anti_typo, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
     let processor_clone = processor.clone();
@@ -498,11 +498,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 ui::tray::TrayEvent::ToggleAntiTypo => {
                     let mut w = config_tray.write().unwrap();
-                    w.input.enable_anti_typo = !w.input.enable_anti_typo;
-                    let enabled = w.input.enable_anti_typo;
-                    tray_handle.update(|t| t.anti_typo = enabled);
+                    let next_mode = match w.input.anti_typo_mode {
+                        config::AntiTypoMode::None => config::AntiTypoMode::Strict,
+                        config::AntiTypoMode::Strict => config::AntiTypoMode::Smart,
+                        config::AntiTypoMode::Smart => config::AntiTypoMode::None,
+                    };
+                    w.input.anti_typo_mode = next_mode;
+                    tray_handle.update(|t| t.anti_typo_mode = next_mode);
                     let _ = save_config(&w);
-                    processor_clone.lock().unwrap().enable_anti_typo = enabled;
+                    processor_clone.lock().unwrap().anti_typo_mode = next_mode;
                 }
                 ui::tray::TrayEvent::ToggleDoublePinyin => {
                     let (enabled, profile) = {
@@ -557,7 +561,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         t.show_candidates = new_conf.appearance.show_candidates;
                         t.preview_mode = new_conf.appearance.preview_mode.clone();
                         t.candidate_layout = new_conf.appearance.candidate_layout.clone();
-                        t.anti_typo = new_conf.input.enable_anti_typo;
+                        t.anti_typo_mode = new_conf.input.anti_typo_mode;
                         t.double_pinyin = new_conf.input.enable_double_pinyin;
                         t.commit_mode = new_conf.input.commit_mode.clone();
                     });

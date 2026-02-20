@@ -68,6 +68,13 @@ pub struct TextStyle {
     pub alpha: f32,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum AntiTypoMode {
+    None,
+    Strict,
+    Smart,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Input {
     pub autostart: bool,
@@ -75,7 +82,7 @@ pub struct Input {
     pub default_profile: String,
     pub paste_method: String,
     pub clipboard_delay_ms: u64,
-    pub enable_anti_typo: bool,
+    pub anti_typo_mode: AntiTypoMode,
     pub enable_double_tap: bool,
     pub double_tap_timeout_ms: u64,
     pub double_taps: Vec<DoubleTap>,
@@ -207,7 +214,7 @@ impl Config {
                 default_profile: "chinese".to_string(),
                 paste_method: "shift_insert".to_string(),
                 clipboard_delay_ms: 10,
-                enable_anti_typo: false,
+                anti_typo_mode: AntiTypoMode::Smart,
                 enable_double_tap: false,
                 double_tap_timeout_ms: 250,
                 double_taps: vec![

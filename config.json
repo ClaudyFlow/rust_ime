@@ -63,7 +63,7 @@
     "default_profile": "chinese",
     "paste_method": "shift_insert",
     "clipboard_delay_ms": 10,
-    "enable_anti_typo": false,
+    "anti_typo_mode": "Smart",
     "enable_double_tap": false,
     "double_tap_timeout_ms": 250,
     "double_taps": [

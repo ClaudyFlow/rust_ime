@@ -65,7 +65,8 @@ pub struct Processor {
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
-    pub enable_anti_typo: bool,
+    pub anti_typo_mode: crate::config::AntiTypoMode,
+    pub last_blocked_buffer: String,
     pub commit_mode: String,
     pub switch_mode: bool,
     pub cursor_pos: usize,
@@ -197,7 +198,8 @@ impl Processor {
             phantom_mode,
             phantom_text: String::new(),
             preview_selected_candidate: false,
-            enable_anti_typo: false,
+            anti_typo_mode: crate::config::AntiTypoMode::None,
+            last_blocked_buffer: String::new(),
             commit_mode: "single".to_string(),
             switch_mode: false,
             cursor_pos: 0,
@@ -268,7 +270,7 @@ impl Processor {
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
-        self.enable_anti_typo = conf.input.enable_anti_typo;
+        self.anti_typo_mode = conf.input.anti_typo_mode;
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
         self.auto_commit_unique_full_match = conf.input.auto_commit_unique_full_match;
@@ -624,7 +626,7 @@ impl Processor {
 
                 self.state = ImeState::Composing;
                 if let Some(act) = self.lookup() { return act; }
-                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
+                if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                 return self.update_phantom_action();
             }
         }
@@ -853,7 +855,7 @@ impl Processor {
                     if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); }
                 }
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
-                if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
+                if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
             }
             _ => {
@@ -885,7 +887,7 @@ impl Processor {
                     }
 
                     self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
-                    if self.enable_anti_typo && !self.has_dict_match { self.buffer = old_buffer; let _ = self.lookup(); return Action::Alert; }
+                    if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                     if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
                 } else { Action::PassThrough }
             }
@@ -1221,6 +1223,37 @@ impl Processor {
         None
     }
 
+    /// 核心防呆逻辑：根据模式决定是否拦截非法拼音。
+    /// 返回 true 表示应该拦截并报警。
+    fn should_block_invalid_input(&mut self, old_buffer: &str) -> bool {
+        if self.has_dict_match {
+            self.last_blocked_buffer.clear();
+            return false;
+        }
+
+        match self.anti_typo_mode {
+            crate::config::AntiTypoMode::None => false,
+            crate::config::AntiTypoMode::Strict => {
+                self.buffer = old_buffer.to_string();
+                let _ = self.lookup();
+                true
+            }
+            crate::config::AntiTypoMode::Smart => {
+                // 如果当前 buffer 与上次被拦截的一样，说明用户坚持输入，放行
+                if !self.last_blocked_buffer.is_empty() && self.buffer == self.last_blocked_buffer {
+                    self.last_blocked_buffer.clear();
+                    false
+                } else {
+                    // 第一次拦截，记录状态
+                    self.last_blocked_buffer = self.buffer.clone();
+                    self.buffer = old_buffer.to_string();
+                    let _ = self.lookup();
+                    true
+                }
+            }
+        }
+    }
+
     pub fn start_global_filter(&mut self) {
         if self.state == ImeState::Direct { return; }
         self.filter_mode = FilterMode::Global;
@@ -1339,7 +1372,7 @@ mod tests {
             state: ImeState::Direct, buffer: String::new(), tries, active_profiles: vec!["chinese".to_string()], punctuation: HashMap::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
             show_candidates: true, show_modern_candidates: false, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
-            preview_selected_candidate: false, enable_anti_typo: false, commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
+            preview_selected_candidate: false, anti_typo_mode: crate::config::AntiTypoMode::None, last_blocked_buffer: String::new(), commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
             aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
             enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
             enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
