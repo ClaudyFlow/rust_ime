@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use fst::MapBuilder;
 use std::collections::BTreeMap;
 use std::fs::{self, File};

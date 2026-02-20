@@ -577,6 +577,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     #[cfg(target_os = "windows")]
                     let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg(&url).spawn();
                 }
+                ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => {
+                    tray_handle.update(|t| {
+                        t.chinese_enabled = chinese_enabled;
+                        t.active_profile = active_profile;
+                    });
+                }
                 ui::tray::TrayEvent::Restart => {
                     let args: Vec<String> = std::env::args().collect();
                     let _ = std::process::Command::new(&args[0]).args(&args[1..]).spawn();
@@ -592,14 +598,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         println!("[Main] 启动 Evdev 兼容模式 (原生 Wayland 协议暂避)...");
         let device_path = find_keyboard_device()?;
-        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), notify_tx.clone())?;
+        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &device_path, Some(gui_tx_main), config.clone(), notify_tx.clone(), tray_tx.clone())?;
         host.run()?;
     }
 
     #[cfg(target_os = "windows")]
     {
         println!("[Main] 启动 Windows TSF 模式 (实验中)...");
-        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx_main), config.clone(), notify_tx.clone());
+        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx_main), config.clone(), notify_tx.clone(), tray_tx.clone());
         host.run()?;
     }
 

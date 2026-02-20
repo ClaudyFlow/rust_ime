@@ -17,6 +17,7 @@ pub struct EvdevHost {
     dev: Arc<Mutex<Device>>, // 修改为 Arc 以便在 Guard 中共享
     gui_tx: Option<Sender<GuiEvent>>,
     notify_tx: Sender<NotifyEvent>,
+    tray_tx: Sender<crate::ui::tray::TrayEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
     tab_held_and_not_used: bool,
@@ -55,6 +56,7 @@ impl EvdevHost {
         gui_tx: Option<Sender<GuiEvent>>,
         config: Arc<std::sync::RwLock<Config>>,
         notify_tx: Sender<NotifyEvent>,
+        tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
         let mut vkbd = Vkbd::new(&dev)?;
@@ -63,7 +65,7 @@ impl EvdevHost {
             vkbd.apply_config(&conf);
         }
         Ok(Self {
-            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, notify_tx,
+            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, notify_tx, tray_tx,
             should_exit: Arc::new(AtomicBool::new(false)), config, tab_held_and_not_used: false,
         })
     }
@@ -120,9 +122,18 @@ impl InputMethodHost for EvdevHost {
                                 p.toggle();
                                 let msg = if p.chinese_enabled { "中文模式" } else { "直通模式" };
                                 let summary = p.get_current_profile_display();
+                                let enabled = p.chinese_enabled;
+                                let profile = p.get_current_profile_display();
+                                drop(p);
+
+                                let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                                    chinese_enabled: enabled, 
+                                    active_profile: profile 
+                                });
+
                                 let _ = self.notify_tx.send(NotifyEvent::Close);
                                 let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                                drop(p); self.update_gui();
+                                self.update_gui();
                             }
                             self.tab_held_and_not_used = false;
                         }
@@ -168,16 +179,34 @@ impl InputMethodHost for EvdevHost {
                             let mut p = self.processor.lock().unwrap(); p.toggle();
                             let summary = p.get_current_profile_display();
                             let msg = if p.chinese_enabled { "中文模式" } else { "直通模式" };
+                            let enabled = p.chinese_enabled;
+                            let profile = p.get_current_profile_display();
                             let _ = self.notify_tx.send(NotifyEvent::Close);
                             let _ = self.notify_tx.send(NotifyEvent::Message(summary, msg.to_string()));
-                            drop(p); self.update_gui(); continue;
+                            drop(p);
+
+                            let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                                chinese_enabled: enabled, 
+                                active_profile: profile 
+                            });
+
+                            self.update_gui(); continue;
                         }
 
                         if is_combo(&held_keys, &switch_prof) {
                             let mut p = self.processor.lock().unwrap(); let profile = p.next_profile();
+                            let enabled = p.chinese_enabled;
+                            let profile_copy = profile.clone();
                             let _ = self.notify_tx.send(NotifyEvent::Message(profile.clone(), "方案已切换".to_string()));
                             if let Ok(mut w) = self.config.write() { w.input.active_profiles = vec![profile]; let _ = crate::save_config(&w); }
-                            drop(p); self.update_gui(); continue;
+                            drop(p);
+
+                            let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                                chinese_enabled: enabled, 
+                                active_profile: profile_copy 
+                            });
+
+                            self.update_gui(); continue;
                         }
 
                         if is_combo(&held_keys, &cycle_preview) {

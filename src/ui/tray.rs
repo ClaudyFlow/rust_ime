@@ -19,6 +19,7 @@ pub enum TrayEvent {
     SwitchCommitMode,
     ReloadConfig,
     CyclePreview,
+    SyncStatus { chinese_enabled: bool, active_profile: String },
 }
 
 #[cfg(target_os = "linux")]
@@ -128,14 +129,22 @@ impl Tray for ImeTray {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
+        let profile_zh = match self.active_profile.as_str() {
+            "chinese" => "中文",
+            "english" => "英语",
+            "japanese" => "日语",
+            "Mixed" | "Mixed (All)" => "混合模式",
+            other => other,
+        };
+
         vec![
             StandardItem {
-                label: format!("模式: {}", if self.chinese_enabled { "中文" } else { "直通 (无输入法)" }),
+                label: format!("当前模式: {}", if self.chinese_enabled { "输入法模式" } else { "直通键盘模式" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleIme); }),
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("词库: {}", self.active_profile),
+                label: format!("当前词库: {}", profile_zh),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::NextProfile); }),
                 ..Default::default()
             }.into(),
@@ -399,9 +408,17 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
     let h_menu = CreatePopupMenu().unwrap();
     if let Some(ref state_arc) = TRAY_STATE {
         if let Ok(state) = state_arc.lock() {
-            let mode_label = format!("模式: {}", if state.chinese_enabled { "中文" } else { "直通" });
+            let mode_label = format!("当前模式: {}", if state.chinese_enabled { "输入法模式" } else { "直通键盘模式" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(HSTRING::from(&mode_label).as_ptr()));
-            let profile_label = format!("词库: {}", state.active_profile);
+            
+            let profile_zh = match state.active_profile.as_str() {
+                "chinese" => "中文",
+                "english" => "英语",
+                "japanese" => "日语",
+                "Mixed" | "Mixed (All)" => "混合模式",
+                other => other,
+            };
+            let profile_label = format!("当前词库: {}", profile_zh);
             let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(HSTRING::from(&profile_label).as_ptr()));
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
             

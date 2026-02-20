@@ -9,6 +9,7 @@ pub struct TsfHost {
     processor: Arc<Mutex<Processor>>,
     gui_tx: Option<Sender<GuiEvent>>,
     notify_tx: Sender<NotifyEvent>,
+    tray_tx: Sender<crate::ui::tray::TrayEvent>,
 }
 
 impl TsfHost {
@@ -17,11 +18,13 @@ impl TsfHost {
         gui_tx: Option<Sender<GuiEvent>>,
         _config: Arc<RwLock<Config>>,
         notify_tx: Sender<NotifyEvent>,
+        tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Self {
         Self {
             processor,
             gui_tx,
             notify_tx,
+            tray_tx,
         }
     }
 }
@@ -140,11 +143,17 @@ impl InputMethodHost for TsfHost {
 
             println!("[TSF Server] Starting multi-threaded named pipe server: \\\\.\\pipe\\rust_ime_pipe");
 
+            let processor = self.processor.clone();
+            let gui_tx = self.gui_tx.clone();
+            let notify_tx = self.notify_tx.clone();
+            let tray_tx = self.tray_tx.clone();
+
             for _i in 0..3 {
                 let pipe_name_u16 = pipe_name_w.clone();
-                let processor = self.processor.clone();
-                let gui_tx = self.gui_tx.clone();
-                let notify_tx = self.notify_tx.clone();
+                let processor = processor.clone();
+                let gui_tx = gui_tx.clone();
+                let notify_tx = notify_tx.clone();
+                let tray_tx = tray_tx.clone();
                 
                 std::thread::spawn(move || {
                     loop {
@@ -179,9 +188,10 @@ impl InputMethodHost for TsfHost {
                                 let proc_inner = processor.clone();
                                 let gui_inner = gui_tx.clone();
                                 let notify_inner = notify_tx.clone();
+                                let tray_inner = tray_tx.clone();
                                 
                                 std::thread::spawn(move || {
-                                    handle_client(h_pipe, proc_inner, gui_inner, notify_inner);
+                                    handle_client(h_pipe, proc_inner, gui_inner, notify_inner, tray_inner);
                                     let _ = CloseHandle(h_pipe);
                                 });
                             } else {
@@ -242,6 +252,7 @@ unsafe fn handle_client(
     processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>,
     gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
     notify_tx: std::sync::mpsc::Sender<crate::NotifyEvent>,
+    tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>,
 ) {
     use windows::Win32::Storage::FileSystem::*;
     use crate::engine::processor::Action;
@@ -277,8 +288,14 @@ unsafe fn handle_client(
                 let mut p = processor.lock().unwrap();
                 p.toggle();
                 let enabled = p.chinese_enabled;
+                let profile = p.get_current_profile_display();
                 drop(p);
                 
+                let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                    chinese_enabled: enabled, 
+                    active_profile: profile 
+                });
+
                 if let Some(ref tx) = gui_tx {
                     let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() }));
                 }
