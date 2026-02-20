@@ -63,8 +63,18 @@ pub fn find_project_root() -> PathBuf {
 }
 
 pub fn save_config(c: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    let mut p = find_project_root(); p.push("config.json");
-    let f = File::create(p)?; serde_json::to_writer_pretty(f, c)?;
+    let root = find_project_root();
+    let p = root.join("config.json");
+    let tmp_p = root.join("config.json.tmp");
+    
+    // 1. 先写入临时文件
+    {
+        let f = File::create(&tmp_p)?;
+        serde_json::to_writer_pretty(f, c)?;
+    }
+    
+    // 2. 原子重命名覆盖原文件
+    std::fs::rename(tmp_p, p)?;
     Ok(())
 }
 
