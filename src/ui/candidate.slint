@@ -1,9 +1,11 @@
 export component CandidateWindow inherits Window {
+    title: "RustImeCandidateWindow";
     // 状态数据
     in property <string> pinyin;
     in property <[string]> candidates;
     in property <int> selected_index: 0;
     in property <bool> is_visible: false;
+    in property <bool> is_horizontal: true; // 布局方向开关
 
     // 窗口属性
     no-frame: true;
@@ -11,10 +13,10 @@ export component CandidateWindow inherits Window {
     always-on-top: true;
     
     // 样式常量
-    property <length> border_radius: 8px;
-    property <color> bg_color: #f5f5f5;
+    property <length> border_radius: 6px;
+    property <color> bg_color: #ffffff;
     property <color> accent_color: #3498db;
-    property <color> text_color: #333333;
+    property <color> text_color: #2c3e50;
     property <color> highlight_text_color: #ffffff;
 
     Rectangle {
@@ -22,51 +24,49 @@ export component CandidateWindow inherits Window {
         background: bg_color;
         border-radius: border_radius;
         border-width: 1px;
-        border-color: #dddddd;
-        drop-shadow-blur: 8px;
-        drop-shadow-color: rgba(0, 0, 0, 0.2);
+        border-color: #dcdde1;
+        drop-shadow-blur: 10px;
+        drop-shadow-color: rgba(0, 0, 0, 0.15);
 
         VerticalLayout {
-            padding: 8px;
-            spacing: 6px;
+            padding: 10px;
+            spacing: 8px;
 
             // 拼音显示栏
             if pinyin != "" : Text {
                 text: pinyin;
-                color: #666666;
+                color: #7f8c8d;
                 font-size: 14px;
+                font-italic: true;
                 horizontal-alignment: left;
             }
 
-            // 5 个候选词列表
-            VerticalLayout {
+            // 动态布局容器
+            if is_horizontal : HorizontalLayout {
+                spacing: 15px;
+                for cand[i] in candidates : Rectangle {
+                    background: i == selected_index ? accent_color : transparent;
+                    border-radius: 4px;
+                    HorizontalLayout {
+                        padding-left: 6px; padding-right: 6px; padding-top: 4px; padding-bottom: 4px;
+                        spacing: 4px;
+                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
+                        Text { text: cand; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                    }
+                }
+            }
+
+            if !is_horizontal : VerticalLayout {
                 spacing: 4px;
                 for cand[i] in candidates : Rectangle {
                     height: 32px;
                     background: i == selected_index ? accent_color : transparent;
                     border-radius: 4px;
-
                     HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
+                        padding-left: 8px; padding-right: 8px;
                         spacing: 8px;
-                        
-                        // 序号
-                        Text {
-                            text: (i + 1) + ".";
-                            color: i == selected_index ? highlight_text_color : #999999;
-                            vertical-alignment: center;
-                            font-size: 16px;
-                        }
-                        
-                        // 候选词文本
-                        Text {
-                            text: cand;
-                            color: i == selected_index ? highlight_text_color : text_color;
-                            vertical-alignment: center;
-                            font-size: 18px;
-                            font-weight: i == selected_index ? 600 : 400;
-                        }
+                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
+                        Text { text: cand; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
                     }
                 }
             }
