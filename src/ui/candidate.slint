@@ -1,11 +1,19 @@
+export struct CandidateData {
+    text: string,
+    english_aux: string,
+    stroke_aux: string,
+}
+
 export component CandidateWindow inherits Window {
     title: "RustImeCandidateWindow";
     // 状态数据
     in property <string> pinyin;
-    in property <[string]> candidates;
+    in property <[CandidateData]> candidates;
     in property <int> selected_index: 0;
     in property <bool> is_visible: false;
-    in property <bool> is_horizontal: true; // 布局方向开关
+    in property <bool> is_horizontal: true;
+    in property <bool> show_english_aux: true;
+    in property <bool> show_stroke_aux: true;
 
     // 窗口属性
     no-frame: true;
@@ -18,6 +26,8 @@ export component CandidateWindow inherits Window {
     property <color> accent_color: #3498db;
     property <color> text_color: #2c3e50;
     property <color> highlight_text_color: #ffffff;
+    property <color> aux_text_color: #95a5a6;
+    property <color> aux_highlight_color: #dcdde1;
 
     Rectangle {
         visible: is_visible;
@@ -28,9 +38,11 @@ export component CandidateWindow inherits Window {
         drop-shadow-blur: 10px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 
+        // 使用 VerticalLayout 确保窗口宽度随内容收缩
         VerticalLayout {
-            padding: 10px;
-            spacing: 8px;
+            padding: 8px;
+            spacing: 6px;
+            alignment: start;
 
             // 拼音显示栏
             if pinyin != "" : Text {
@@ -43,30 +55,72 @@ export component CandidateWindow inherits Window {
 
             // 动态布局容器
             if is_horizontal : HorizontalLayout {
-                spacing: 15px;
+                spacing: 12px;
+                alignment: start;
                 for cand[i] in candidates : Rectangle {
                     background: i == selected_index ? accent_color : transparent;
                     border-radius: 4px;
                     HorizontalLayout {
                         padding-left: 6px; padding-right: 6px; padding-top: 4px; padding-bottom: 4px;
                         spacing: 4px;
+                        alignment: center;
                         Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
-                        Text { text: cand; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                        
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 0px;
+                            Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                            
+                            // 辅助码 (横向模式下放在下面，字体缩小)
+                            HorizontalLayout {
+                                spacing: 4px;
+                                if show_english_aux && cand.english_aux != "" : Text {
+                                    text: cand.english_aux;
+                                    color: i == selected_index ? aux_highlight_color : aux_text_color;
+                                    font-size: 11px;
+                                }
+                                if show_stroke_aux && cand.stroke_aux != "" : Text {
+                                    text: cand.stroke_aux;
+                                    color: i == selected_index ? aux_highlight_color : aux_text_color;
+                                    font-size: 11px;
+                                }
+                            }
+                        }
                     }
                 }
             }
 
+            // 修复竖向布局：确保它可见且高度自适应
             if !is_horizontal : VerticalLayout {
-                spacing: 4px;
+                spacing: 2px;
+                alignment: start;
                 for cand[i] in candidates : Rectangle {
-                    height: 32px;
                     background: i == selected_index ? accent_color : transparent;
                     border-radius: 4px;
                     HorizontalLayout {
-                        padding-left: 8px; padding-right: 8px;
+                        padding: 6px;
                         spacing: 8px;
-                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
-                        Text { text: cand; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                        alignment: start;
+                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; width: 20px; }
+                        Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                        
+                        // 辅助码 (竖向模式下放在后面)
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: end;
+                            if show_english_aux && cand.english_aux != "" : Text {
+                                text: cand.english_aux;
+                                color: i == selected_index ? aux_highlight_color : aux_text_color;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                            if show_stroke_aux && cand.stroke_aux != "" : Text {
+                                text: cand.stroke_aux;
+                                color: i == selected_index ? aux_highlight_color : aux_text_color;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
                 }
             }

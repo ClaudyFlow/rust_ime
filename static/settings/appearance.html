@@ -27,6 +27,14 @@
                         <option value="Stroke">笔画辅助码 (QWER布局)</option>
                     </select>
                 </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示英文辅助码</div></div>
+                    <label class="switch"><input type="checkbox" id="show_english_aux"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">显示笔画辅助码</div></div>
+                    <label class="switch"><input type="checkbox" id="show_stroke_aux"><span class="slider"></span></label>
+                </div>
             </div>
         </div>
 
@@ -121,6 +129,8 @@
             
             // 绑定基础设置
             bindInput('show_candidates', 'appearance');
+            bindInput('show_english_aux', 'appearance');
+            bindInput('show_stroke_aux', 'appearance');
             bindInput('aux_mode', 'appearance');
             bindInput('candidate_anchor', 'appearance');
             bindInput('candidate_layout', 'appearance');

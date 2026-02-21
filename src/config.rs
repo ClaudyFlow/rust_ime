@@ -58,6 +58,8 @@ pub struct Appearance {
     pub comment_text: TextStyle, // For extra info like "User", "Emoji"
 
     pub preview_mode: String,
+    pub show_english_aux: bool,
+    pub show_stroke_aux: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -207,6 +209,8 @@ impl Config {
                 },
 
                 preview_mode: "pinyin".to_string(),
+                show_english_aux: true,
+                show_stroke_aux: true,
             },
             input: Input {
                 autostart: false,

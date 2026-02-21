@@ -16,9 +16,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     let window = CandidateWindow::new().expect("Failed to create CandidateWindow");
     let window_handle = window.as_weak();
 
-    // 初始布局设置
-    let initial_horizontal = config.appearance.candidate_layout == "horizontal";
-    window.set_is_horizontal(initial_horizontal);
+    // 初始设置
+    window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
+    window.set_show_english_aux(config.appearance.show_english_aux);
+    window.set_show_stroke_aux(config.appearance.show_stroke_aux);
 
     // 1. 初始化窗口特殊的系统属性 (Windows): 隐藏任务栏图标与不抢焦点
     #[cfg(target_os = "windows")]
@@ -43,13 +44,30 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = handle.upgrade() {
                     match event {
-                        GuiEvent::Update { pinyin, candidates, selected, .. } => {
+                        GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                             if pinyin.is_empty() && candidates.is_empty() {
                                 w.set_is_visible(false);
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
-                                let cands: Vec<SharedString> = candidates.into_iter().take(5).map(SharedString::from).collect();
-                                w.set_candidates(ModelRc::new(VecModel::from(cands)));
+                                
+                                // 合并候选词和提示信息（英辅或笔辅）
+                                let mut data_vec = Vec::new();
+                                for (i, cand) in candidates.iter().take(5).enumerate() {
+                                    let hint = hints.get(i).cloned().unwrap_or_default();
+                                    
+                                    // 引擎目前的提示信息可能是复合的，简单拆分
+                                    // 注意：这里需要根据具体的引擎输出格式微调
+                                    let english = if hint.contains('/') { hint.split('/').next().unwrap_or("").to_string() } else if hint.chars().all(|c| c.is_ascii_alphabetic()) { hint.clone() } else { "".into() };
+                                    let stroke = if hint.contains('/') { hint.split('/').last().unwrap_or("").to_string() } else if !hint.chars().all(|c| c.is_ascii_alphabetic()) { hint.clone() } else { "".into() };
+
+                                    data_vec.push(CandidateData {
+                                        text: SharedString::from(cand),
+                                        english_aux: SharedString::from(english),
+                                        stroke_aux: SharedString::from(stroke),
+                                    });
+                                }
+
+                                w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(selected as i32);
                                 w.set_is_visible(true);
                             }
@@ -84,6 +102,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         }
                         GuiEvent::ApplyConfig(new_conf) => {
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
+                            w.set_show_english_aux(new_conf.appearance.show_english_aux);
+                            w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                         }
                         GuiEvent::Exit => {
                             let _ = w.window().hide();
