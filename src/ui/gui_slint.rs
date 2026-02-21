@@ -25,30 +25,36 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
     
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
-    let show_candidates_clone = show_candidates.clone();
 
     // 1. 初始化窗口特殊的系统属性 (Windows)
     #[cfg(target_os = "windows")]
     {
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(350));
+            std::thread::sleep(std::time::Duration::from_millis(400));
             unsafe {
+                // 处理候选窗
                 let title = "RustImeCandidateWindow\0".encode_utf16().collect::<Vec<u16>>();
                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                 if hwnd.0 != 0 {
                     let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-                    let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0) as isize);
+                    // WS_EX_TOOLWINDOW: 隐藏任务栏图标
+                    // WS_EX_NOACTIVATE: 窗口不获取焦点
+                    // WS_EX_TOPMOST: 置顶
+                    // WS_EX_TRANSPARENT: 鼠标穿透 (可选，如果不再使用鼠标点击候选词)
+                    let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0) as isize);
                 }
 
+                // 处理状态栏
                 let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
                 let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
                 if s_hwnd.0 != 0 {
                     let ex_style = GetWindowLongPtrW(s_hwnd, GWL_EXSTYLE);
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0) as isize);
                     
+                    // 固定在右下角，并强制尺寸为 32x32，防止占满屏幕
                     let screen_width = GetSystemMetrics(SM_CXSCREEN);
                     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-                    let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 80, screen_height - 80, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                    let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 80, screen_height - 80, 32, 32, SWP_NOACTIVATE);
                 }
             }
         });
@@ -66,7 +72,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
                             if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
-                                w.set_is_visible(false);
+                                // 真正隐藏窗口，释放所有鼠标区域
+                                let _ = w.window().hide();
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
                                 let mut data_vec = Vec::new();
@@ -93,7 +100,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 }
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(selected as i32);
-                                w.set_is_visible(true);
+                                
+                                // 显示窗口
+                                let _ = w.window().show();
                             }
                         }
                     }
@@ -141,6 +150,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
         }
     });
 
-    let _ = status_bar.show();
-    window.run().expect("Failed to run Slint event loop");
+    status_bar.show().expect("Failed to show StatusBar");
+    // window 初始不调用 show，由 Update 事件驱动
+    slint::run_event_loop().expect("Failed to run Slint event loop");
 }

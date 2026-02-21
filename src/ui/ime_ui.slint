@@ -9,7 +9,6 @@ export component CandidateWindow inherits Window {
     in property <string> pinyin;
     in property <[CandidateData]> candidates;
     in property <int> selected_index: 0;
-    in property <bool> is_visible: false;
     in property <bool> is_horizontal: true;
     in property <bool> show_english_aux: true;
     in property <bool> show_stroke_aux: true;
@@ -26,9 +25,9 @@ export component CandidateWindow inherits Window {
     property <color> aux_text_color: #95a5a6;
     property <color> aux_highlight_color: #dcdde1;
 
-    if is_visible : Rectangle {
+    Rectangle {
         background: bg_color;
-        border_radius: border_radius;
+        border-radius: border_radius;
         border-width: 1px;
         border-color: #dcdde1;
         drop-shadow-blur: 10px;
