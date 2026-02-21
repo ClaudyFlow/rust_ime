@@ -22,10 +22,10 @@ fst = "0.4"
 memmap2 = "0.9"
 rand = "0.8"
 bitflags = "2.4"
-tiny-skia = "0.11"
-fontdue = "0.8"
 image = "0.24"
 log = "0.4"
+raw-window-handle = "0.6"
+slint = "1.9"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev = "0.12.1"
@@ -35,11 +35,6 @@ daemonize = "0.5"
 libc = "0.2.180"
 ksni = "0.2.1"
 nix = { version = "0.27", features = ["poll"] }
-gtk4-layer-shell = "0.2"
-gtk4 = { version = "0.7", package = "gtk4", features = ["v4_6"] }
-glib = "0.17"
-gdk4 = "0.7"
-pango = "0.17"
 
 # Wayland protocols for IME
 wayland-client = "0.31"
@@ -75,6 +70,7 @@ windows = { version = "0.52", features = [
 windows-core = "0.52"
 
 [build-dependencies]
+slint-build = "1.9"
 
 [[bin]]
 name = "rust-ime"

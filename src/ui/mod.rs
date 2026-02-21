@@ -1,16 +1,7 @@
 pub mod tray;
 pub mod web;
-pub mod painter;
-
-#[cfg(target_os = "linux")]
-pub mod linux;
-#[cfg(target_os = "linux")]
-pub use linux as gui;
-
-#[cfg(target_os = "windows")]
-pub mod windows;
-#[cfg(target_os = "windows")]
-pub use windows as gui;
+pub mod gui_slint;
+pub use gui_slint as gui;
 
 use crate::config::Config;
 
