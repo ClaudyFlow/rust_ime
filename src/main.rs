@@ -438,63 +438,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     tray_handle.update(|t| t.active_profile = profile);
                 }
-                ui::tray::TrayEvent::ToggleGui => {
-                    let enabled = {
-                        let mut p = processor_clone.lock().unwrap();
-                        p.show_candidates = !p.show_candidates;
-                        p.show_candidates
-                    };
-                    tray_handle.update(|t| t.show_candidates = enabled);
-                    if let Ok(mut w) = config_tray.write() { 
-                        w.appearance.show_candidates = enabled; 
-                        let _ = save_config(&w); 
-                        let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(w.clone()));
-                    }
-                }
-                ui::tray::TrayEvent::ToggleAntiTypo => {
-                    let mut w = config_tray.write().unwrap();
-                    let next_mode = match w.input.anti_typo_mode {
-                        config::AntiTypoMode::None => config::AntiTypoMode::Strict,
-                        config::AntiTypoMode::Strict => config::AntiTypoMode::Smart,
-                        config::AntiTypoMode::Smart => config::AntiTypoMode::None,
-                    };
-                    w.input.anti_typo_mode = next_mode;
-                    tray_handle.update(|t| t.anti_typo_mode = next_mode);
-                    let _ = save_config(&w);
-                    processor_clone.lock().unwrap().anti_typo_mode = next_mode;
-                }
-                ui::tray::TrayEvent::ToggleDoublePinyin => {
-                    let (enabled, _profile) = {
-                        let mut w = config_tray.write().unwrap();
-                        w.input.enable_double_pinyin = !w.input.enable_double_pinyin;
-                        let e = w.input.enable_double_pinyin;
-                        let _ = save_config(&w);
-                        let mut p = processor_clone.lock().unwrap();
-                        p.enable_double_pinyin = e;
-                        (e, p.get_current_profile_display())
-                    };
-                    tray_handle.update(|t| t.double_pinyin = enabled);
-                }
-                ui::tray::TrayEvent::SwitchCommitMode => {
-                    let mut w = config_tray.write().unwrap();
-                    w.input.commit_mode = if w.input.commit_mode == "single" { "double".into() } else { "single".into() };
-                    let mode = w.input.commit_mode.clone();
-                    tray_handle.update(|t| t.commit_mode = mode.clone());
-                    let _ = save_config(&w);
-                    processor_clone.lock().unwrap().commit_mode = mode.clone();
-                }
-                ui::tray::TrayEvent::CyclePreview => {
-                    let mode_str = {
-                        let mut p = processor_clone.lock().unwrap();
-                        p.phantom_mode = match p.phantom_mode {
-                            engine::processor::PhantomMode::None => engine::processor::PhantomMode::Pinyin,
-                            engine::processor::PhantomMode::Pinyin => engine::processor::PhantomMode::None,
-                        };
-                        match p.phantom_mode { engine::processor::PhantomMode::Pinyin => "pinyin", _ => "none" }
-                    }.to_string();
-                    tray_handle.update(|t| t.preview_mode = mode_str.to_string());
-                    if let Ok(mut w) = config_tray.write() { w.appearance.preview_mode = mode_str; let _ = save_config(&w); }
-                }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();
                     
@@ -525,12 +468,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     // 同步更新托盘菜单状态
                     tray_handle.update(|t| {
-                        t.show_candidates = new_conf.appearance.show_candidates;
-                        t.preview_mode = new_conf.appearance.preview_mode.clone();
-                        t.candidate_layout = new_conf.appearance.candidate_layout.clone();
-                        t.anti_typo_mode = new_conf.input.anti_typo_mode;
-                        t.double_pinyin = new_conf.input.enable_double_pinyin;
-                        t.commit_mode = new_conf.input.commit_mode.clone();
+                        t.chinese_enabled = new_conf.input.default_profile == "chinese";
+                        t.active_profile = new_conf.input.default_profile.clone();
                     });
 
                     if let Ok(mut w) = config_tray.write() { *w = new_conf; }

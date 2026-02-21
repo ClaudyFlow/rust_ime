@@ -1,0 +1,43 @@
+export component StatusBar inherits Window {
+    title: "RustImeStatusBar";
+    in property <string> status_text: "中";
+    in property <bool> chinese_enabled: true;
+
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+    
+    property <length> bar_width: 32px;
+    property <length> bar_height: 32px;
+
+    Rectangle {
+        width: bar_width;
+        height: bar_height;
+        background: chinese_enabled ? #3498db : #7f8c8d;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: #ffffff;
+        drop-shadow-blur: 4px;
+        drop-shadow-color: rgba(0, 0, 0, 0.2);
+
+        // 状态文字
+        Text {
+            text: status_text;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 700;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+
+        // 鼠标悬停自适应：滑过时变淡（防止挡住视线）
+        touch := TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+
+        // 逻辑：如果鼠标在上面，矩形变透明
+        opacity: touch.has-hover ? 0.2 : 0.8;
+        animate opacity { duration: 200ms; }
+    }
+}

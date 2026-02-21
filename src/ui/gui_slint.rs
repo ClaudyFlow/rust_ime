@@ -14,18 +14,24 @@ use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORIN
 
 pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     let window = CandidateWindow::new().expect("Failed to create CandidateWindow");
+    let status_bar = StatusBar::new().expect("Failed to create StatusBar");
+    
     let window_handle = window.as_weak();
+    let status_bar_handle = status_bar.as_weak();
 
     // 初始设置
     window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
     window.set_show_english_aux(config.appearance.show_english_aux);
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
+    
+    let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
+    let show_candidates_clone = show_candidates.clone();
 
-    // 1. 初始化窗口特殊的系统属性 (Windows): 隐藏任务栏图标与不抢焦点
+    // 1. 初始化窗口特殊的系统属性 (Windows)
     #[cfg(target_os = "windows")]
     {
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(200));
+            std::thread::sleep(std::time::Duration::from_millis(350));
             unsafe {
                 let title = "RustImeCandidateWindow\0".encode_utf16().collect::<Vec<u16>>();
                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
@@ -33,87 +39,108 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
                     let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0) as isize);
                 }
+
+                let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
+                let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
+                if s_hwnd.0 != 0 {
+                    let ex_style = GetWindowLongPtrW(s_hwnd, GWL_EXSTYLE);
+                    let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0) as isize);
+                    
+                    let screen_width = GetSystemMetrics(SM_CXSCREEN);
+                    let screen_height = GetSystemMetrics(SM_CYSCREEN);
+                    let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 80, screen_height - 80, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+                }
             }
         });
     }
 
-    // 2. 启动事件轮询线程，监控来自引擎的消息
+    // 2. 启动事件轮询线程
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
-            let handle = window_handle.clone();
+            let h = window_handle.clone();
+            let s = status_bar_handle.clone();
+            let show_candidates_for_loop = show_candidates.clone();
+            
             let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = handle.upgrade() {
-                    match event {
-                        GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-                            if pinyin.is_empty() && candidates.is_empty() {
+                match event {
+                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
+                        if let Some(w) = h.upgrade() {
+                            if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                 w.set_is_visible(false);
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
-                                
-                                // 合并候选词和提示信息（英辅或笔辅）
                                 let mut data_vec = Vec::new();
                                 for (i, cand) in candidates.iter().take(5).enumerate() {
                                     let hint = hints.get(i).cloned().unwrap_or_default();
-                                    
-                                    // 引擎目前的提示信息可能是复合的，简单拆分
-                                    // 注意：这里需要根据具体的引擎输出格式微调
-                                    let english = if hint.contains('/') { hint.split('/').next().unwrap_or("").to_string() } else if hint.chars().all(|c| c.is_ascii_alphabetic()) { hint.clone() } else { "".into() };
-                                    let stroke = if hint.contains('/') { hint.split('/').last().unwrap_or("").to_string() } else if !hint.chars().all(|c| c.is_ascii_alphabetic()) { hint.clone() } else { "".into() };
-
+                                    let mut english = String::new();
+                                    let mut stroke = String::new();
+                                    if !hint.is_empty() {
+                                        if hint.contains('/') {
+                                            let parts: Vec<&str> = hint.split('/').collect();
+                                            english = parts[0].to_string();
+                                            stroke = parts[1].to_string();
+                                        } else if hint.chars().all(|c| c.is_ascii_alphabetic()) {
+                                            english = hint.clone();
+                                        } else {
+                                            stroke = hint.clone();
+                                        }
+                                    }
                                     data_vec.push(CandidateData {
                                         text: SharedString::from(cand),
                                         english_aux: SharedString::from(english),
                                         stroke_aux: SharedString::from(stroke),
                                     });
                                 }
-
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(selected as i32);
                                 w.set_is_visible(true);
                             }
                         }
-                        GuiEvent::MoveTo { x, y } => {
+                    }
+                    GuiEvent::ShowStatus(status) => {
+                        if let Some(sb) = s.upgrade() {
+                            sb.set_status_text(SharedString::from(status.clone()));
+                            sb.set_chinese_enabled(status == "中");
+                        }
+                    }
+                    GuiEvent::MoveTo { x, y } => {
+                        if let Some(w) = h.upgrade() {
                             let mut final_x = x;
                             let mut final_y = y;
-
                             #[cfg(target_os = "windows")]
                             unsafe {
                                 let win_size = w.window().size();
                                 let width = win_size.width as i32;
                                 let height = win_size.height as i32;
-
                                 let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x, y }, MONITOR_DEFAULTTONEAREST);
-                                let mut mi = MONITORINFO {
-                                    cbSize: std::mem::size_of::<MONITORINFO>() as u32,
-                                    ..Default::default()
-                                };
+                                let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
                                 if GetMonitorInfoW(monitor, &mut mi).as_bool() {
-                                    if final_x + width > mi.rcMonitor.right {
-                                        final_x = mi.rcMonitor.right - width - 10;
-                                    }
-                                    if final_y + height > mi.rcMonitor.bottom {
-                                        final_y = mi.rcMonitor.bottom - height - 10;
-                                    }
+                                    if final_x + width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - width - 10; }
+                                    if final_y + height > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - height - 10; }
                                     if final_x < mi.rcMonitor.left { final_x = mi.rcMonitor.left + 5; }
                                     if final_y < mi.rcMonitor.top { final_y = mi.rcMonitor.top + 5; }
                                 }
                             }
-                            w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
+                            let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
                         }
-                        GuiEvent::ApplyConfig(new_conf) => {
+                    }
+                    GuiEvent::ApplyConfig(new_conf) => {
+                        show_candidates_for_loop.store(new_conf.appearance.show_candidates, std::sync::atomic::Ordering::SeqCst);
+                        if let Some(w) = h.upgrade() {
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                         }
-                        GuiEvent::Exit => {
-                            let _ = w.window().hide();
-                        }
-                        _ => {}
                     }
+                    GuiEvent::Exit => {
+                        let _ = slint::quit_event_loop();
+                    }
+                    _ => {}
                 }
             });
         }
     });
 
+    let _ = status_bar.show();
     window.run().expect("Failed to run Slint event loop");
 }
