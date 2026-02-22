@@ -59,6 +59,7 @@ impl WebServer {
             .route("/api/dict/update", post(update_dict_entry))
             .route("/api/dict/add", post(add_dict_entry))
             .route("/static/*file", get(static_handler))
+            .route("/dicts/*file", get(dicts_handler))
             .fallback(index_handler)
             .with_state(state);
 
@@ -106,6 +107,18 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
             ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+    }
+}
+
+async fn dicts_handler(uri: Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches("/dicts/").trim_start_matches("/");
+    let full_path = std::path::Path::new("dicts").join(path);
+    
+    if let Ok(content) = std::fs::read(&full_path) {
+        let mime = mime_guess::from_path(&full_path).first_or_octet_stream();
+        ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content).into_response()
+    } else {
+        (StatusCode::NOT_FOUND, "Dictionary Not Found").into_response()
     }
 }
 

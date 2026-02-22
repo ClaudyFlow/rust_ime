@@ -170,7 +170,7 @@ impl Config {
                 show_candidates: true,
                 page_size: 5,
                 show_tone_hint: false,
-                aux_mode: AuxMode::English,
+                aux_mode: AuxMode::Stroke,
                 candidate_anchor: "bottom".to_string(),
                 candidate_layout: "horizontal".to_string(),
                 
