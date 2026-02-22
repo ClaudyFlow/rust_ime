@@ -97,3 +97,40 @@ async function loadFonts(selectIds) {
         }
     });
 }
+
+async function loadDictionaryViewer() {
+    const tableBody = document.querySelector('#charsTable tbody');
+    if (!tableBody) return;
+
+    try {
+        const response = await fetch('/api/dictionary/chars');
+        const data = await response.json();
+        
+        let html = '';
+        data.forEach(item => {
+            html += `<tr class="pinyin-group-${item.group}">
+                <td>${item.pinyin}</td>
+                <td class="char-cell">${item.char}</td>
+                <td><span class="aux-highlight">${item.aux}</span></td>
+                <td>${item.en}</td>
+            </tr>`;
+        });
+        
+        tableBody.innerHTML = html;
+        
+        if (window.jQuery && $.fn.DataTable) {
+            $('#charsTable').DataTable({
+                pageLength: 25,
+                language: {
+                    search: "快速过滤：",
+                    lengthMenu: "每页显示 _MENU_ 条",
+                    info: "第 _START_ 到 _END_ 条，共 _TOTAL_ 条",
+                    paginate: { first: "首页", last: "末页", next: "下一页", previous: "上一页" }
+                },
+                order: [[0, 'asc']]
+            });
+        }
+    } catch (e) {
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-5">数据加载失败: ' + e.message + '</td></tr>';
+    }
+}

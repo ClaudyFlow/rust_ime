@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>辅助码学习 - rust-ime</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="mb-4">
+            <a href="/" class="btn btn-outline-secondary btn-sm">← 返回控制中心</a>
+        </div>
+
+        <div class="card shadow-sm border-0 apple-card p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">🎓 单字辅助码对照表</h2>
+                <div class="text-muted small">
+                    数据实时同步自: dicts/chinese/chars/chars.json
+                </div>
+            </div>
+            
+            <div class="alert alert-info mb-4 border-0" style="background-color: #e3f2fd; color: #0d47a1;">
+                <strong>💡 学习技巧：</strong> 辅助码通常为“拼音 + 英文含义前3位”。例如：<code>ah[Mf]</code> 表示“啊”的笔画码是 Mf。在设置中开启相应模式即可使用。
+            </div>
+
+            <div class="table-responsive">
+                <table id="charsTable" class="table table-hover align-middle w-100">
+                    <thead class="table-light">
+                        <tr>
+                            <th>拼音</th>
+                            <th>汉字</th>
+                            <th>辅助码 (Pinyin+Ext)</th>
+                            <th>英文含义 / 笔画码</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                                <div class="mt-2">正在从词库提取海量数据，请稍候...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .apple-card { background: white; border-radius: 20px; }
+        .aux-highlight { color: #d93025; font-weight: bold; background-color: #fce8e6; padding: 2px 8px; border-radius: 6px; font-family: monospace; }
+        .char-cell { font-size: 1.8em; font-weight: bold; color: #1d1d1f; }
+        .pinyin-group-0 { background-color: #ffffff !important; }
+        .pinyin-group-1 { background-color: #f5f5f7 !important; }
+        .dataTables_wrapper .dataTables_filter input { border-radius: 10px; border: 1px solid #d2d2d7; padding: 4px 12px; }
+    </style>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script>
+        $(document).ready(function() {
+            loadDictionaryViewer();
+        });
+    </script>
+</body>
+</html>

@@ -54,6 +54,7 @@ impl WebServer {
             .route("/api/dicts/compile", post(compile_dicts_handler))
             .route("/api/dicts/reload", post(reload_dicts))
             .route("/api/dicts/toggle", post(toggle_dict))
+            .route("/api/dictionary/chars", get(get_chars_dict))
             .route("/api/dict/search", get(search_dict))
             .route("/api/dict/update", post(update_dict_entry))
             .route("/api/dict/add", post(add_dict_entry))
@@ -395,4 +396,58 @@ async fn add_dict_entry(Json(req): Json<AddEntryRequest>) -> StatusCode {
 
 async fn list_fonts() -> Json<Vec<crate::platform::fonts::FontInfo>> {
     Json(crate::platform::fonts::list_system_fonts())
+}
+
+#[derive(Serialize)]
+struct CharEntryView {
+    pinyin: String,
+    #[serde(rename = "char")]
+    character: String,
+    en: String,
+    aux: String,
+    group: u32,
+}
+
+async fn get_chars_dict() -> impl IntoResponse {
+    let path = std::path::Path::new("dicts/chinese/chars/chars.json");
+    let mut results = Vec::new();
+    
+    if let Ok(f) = std::fs::File::open(path) {
+        if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {
+            if let Some(obj) = json.as_object() {
+                let mut pinyin_sorted: Vec<_> = obj.keys().collect();
+                pinyin_sorted.sort();
+                
+                let mut group_toggle = 0;
+                let mut last_pinyin = String::new();
+                
+                for pinyin in pinyin_sorted {
+                    if pinyin != &last_pinyin && !last_pinyin.is_empty() {
+                        group_toggle = 1 - group_toggle;
+                    }
+                    last_pinyin = pinyin.clone();
+                    
+                    if let Some(entries) = obj.get(pinyin).and_then(|v| v.as_array()) {
+                        for entry in entries {
+                            let character = entry.get("char").and_then(|v| v.as_str()).unwrap_or("");
+                            let en = entry.get("en").and_then(|v| v.as_str()).unwrap_or("");
+                            let stroke = entry.get("stroke_aux").and_then(|v| v.as_str()).unwrap_or("");
+                            
+                            // 拼凑辅助码展示 (拼音 + 英文前缀)
+                            let aux = format!("{}{}", pinyin, en.chars().take(3).collect::<String>());
+                            
+                            results.push(CharEntryView {
+                                pinyin: pinyin.clone(),
+                                character: character.to_string(),
+                                en: format!("{} / 笔画: {}", en, stroke),
+                                aux,
+                                group: group_toggle,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Json(results).into_response()
 }
