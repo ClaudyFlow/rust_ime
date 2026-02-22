@@ -12,6 +12,7 @@ component CandidateItem inherits Rectangle {
     in property <int> index;
     in property <bool> show_english_aux;
     in property <bool> show_stroke_aux;
+    in property <bool> is_horizontal;
     
     in property <color> accent_color;
     in property <color> text_color;
@@ -22,43 +23,39 @@ component CandidateItem inherits Rectangle {
     background: selected ? accent_color : transparent;
     border-radius: 4px;
     
-    VerticalLayout {
+    // 内部布局根据外部是横还是纵来调整
+    layout := HorizontalLayout {
         padding-left: 8px; padding-right: 8px; 
-        padding-top: 2px; padding-bottom: 2px;
-        spacing: 0px;
-        alignment: center;
+        padding-top: 4px; padding-bottom: 4px;
+        spacing: 6px;
+        alignment: start;
         
-        // 第一行：序号 + 词条 + 笔画码
-        HorizontalLayout {
-            spacing: 4px;
-            alignment: start;
-            Text { 
-                text: (index + 1) + "."; 
-                color: selected ? highlight_text_color : aux_text_color; 
-                vertical-alignment: center; 
-                font-size: 16px; 
-            }
-            Text { 
-                text: text; 
-                color: selected ? highlight_text_color : text_color; 
-                vertical-alignment: center; 
-                font-size: 18px; 
-                font-weight: selected ? 600 : 400; 
-            }
-            if show_stroke_aux && stroke_aux != "" : Text {
-                text: "[" + stroke_aux + "]";
-                color: selected ? aux_highlight_color : aux_text_color;
-                font-size: 11px;
-                vertical-alignment: bottom;
-            }
+        Text { 
+            text: (index + 1) + "."; 
+            color: selected ? highlight_text_color : aux_text_color; 
+            vertical-alignment: center; 
+            font-size: 16px; 
+        }
+        Text { 
+            text: text; 
+            color: selected ? highlight_text_color : text_color; 
+            vertical-alignment: center; 
+            font-size: 18px; 
+            font-weight: selected ? 600 : 400; 
         }
         
-        // 第二行：英文含义（紧贴下方）
-        if show_english_aux && english_aux != "" : Text {
-            text: english_aux;
+        if show_stroke_aux && stroke_aux != "" : Text {
+            text: "[" + stroke_aux + "]";
             color: selected ? aux_highlight_color : aux_text_color;
-            font-size: 10px;
-            horizontal-alignment: left;
+            font-size: 11px;
+            vertical-alignment: center;
+        }
+
+        if show_english_aux && english_aux != "" : Text {
+            text: "(" + english_aux + ")";
+            color: selected ? aux_highlight_color : aux_text_color;
+            font-size: 12px;
+            vertical-alignment: center;
         }
     }
 }
@@ -77,6 +74,10 @@ export component CandidateWindow inherits Window {
     background: transparent;
     always-on-top: true;
     
+    // 自动宽高
+    width: main_rect.preferred-width;
+    height: main_rect.preferred-height;
+
     property <length> border_radius: 6px;
     property <color> bg_color: #ffffff;
     property <color> accent_color: #3498db;
@@ -85,7 +86,8 @@ export component CandidateWindow inherits Window {
     property <color> aux_text_color: #95a5a6;
     property <color> aux_highlight_color: #dcdde1;
 
-    if is_visible : Rectangle {
+    main_rect := Rectangle {
+        visible: is_visible;
         background: bg_color;
         border-radius: border_radius;
         border-width: 1px;
@@ -93,70 +95,62 @@ export component CandidateWindow inherits Window {
         drop-shadow-blur: 10px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 
-        if is_horizontal : HorizontalLayout {
-            padding: 4px;
-            padding-left: 12px;
-            padding-right: 12px;
-            spacing: 8px;
+        VerticalLayout {
+            padding: 8px;
+            spacing: 4px;
             alignment: start;
 
-            if pinyin != "" : VerticalLayout {
-                alignment: center;
-                Text {
-                    text: pinyin;
-                    color: #7f8c8d;
-                    font-size: 14px;
-                    font-italic: true;
-                }
-            }
-
-            for cand[i] in candidates : CandidateItem {
-                text: cand.text;
-                english_aux: cand.english_aux;
-                stroke_aux: cand.stroke_aux;
-                selected: i == selected_index;
-                index: i;
-                show_english_aux: show_english_aux;
-                show_stroke_aux: show_stroke_aux;
-                accent_color: accent_color;
-                text_color: text_color;
-                highlight_text_color: highlight_text_color;
-                aux_text_color: aux_text_color;
-                aux_highlight_color: aux_highlight_color;
-            }
-        }
-
-        if !is_horizontal : VerticalLayout {
-            padding: 4px;
-            spacing: 2px;
-            alignment: start;
-
+            // 第一行：拼音
             if pinyin != "" : HorizontalLayout {
                 padding-left: 8px;
-                padding-top: 4px;
-                padding-bottom: 4px;
+                padding-top: 2px;
+                padding-bottom: 2px;
                 Text {
                     text: pinyin;
-                    color: #7f8c8d;
+                    color: #3498db;
                     font-size: 14px;
-                    font-italic: true;
+                    font-weight: 600;
                 }
             }
 
-            for cand[i] in candidates : CandidateItem {
-                width: 100%;
-                text: cand.text;
-                english_aux: cand.english_aux;
-                stroke_aux: cand.stroke_aux;
-                selected: i == selected_index;
-                index: i;
-                show_english_aux: show_english_aux;
-                show_stroke_aux: show_stroke_aux;
-                accent_color: accent_color;
-                text_color: text_color;
-                highlight_text_color: highlight_text_color;
-                aux_text_color: aux_text_color;
-                aux_highlight_color: aux_highlight_color;
+            // 第二行：候选词（横向排列）或 垂直列表
+            if is_horizontal : HorizontalLayout {
+                spacing: 4px;
+                for cand[i] in candidates : CandidateItem {
+                    text: cand.text;
+                    english_aux: cand.english_aux;
+                    stroke_aux: cand.stroke_aux;
+                    selected: i == selected_index;
+                    index: i;
+                    is_horizontal: true;
+                    show_english_aux: show_english_aux;
+                    show_stroke_aux: show_stroke_aux;
+                    accent_color: accent_color;
+                    text_color: text_color;
+                    highlight_text_color: highlight_text_color;
+                    aux_text_color: aux_text_color;
+                    aux_highlight_color: aux_highlight_color;
+                }
+            }
+
+            if !is_horizontal : VerticalLayout {
+                spacing: 2px;
+                for cand[i] in candidates : CandidateItem {
+                    width: 100%;
+                    text: cand.text;
+                    english_aux: cand.english_aux;
+                    stroke_aux: cand.stroke_aux;
+                    selected: i == selected_index;
+                    index: i;
+                    is_horizontal: false;
+                    show_english_aux: show_english_aux;
+                    show_stroke_aux: show_stroke_aux;
+                    accent_color: accent_color;
+                    text_color: text_color;
+                    highlight_text_color: highlight_text_color;
+                    aux_text_color: aux_text_color;
+                    aux_highlight_color: aux_highlight_color;
+                }
             }
         }
     }
