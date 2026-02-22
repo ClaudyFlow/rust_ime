@@ -82,6 +82,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         if let Some(w) = h.upgrade() {
                             if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                 // 真正隐藏窗口，释放所有鼠标区域
+                                w.set_is_visible(false);
                                 let _ = w.window().hide();
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
@@ -118,6 +119,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(relative_selected);
+                                w.set_is_visible(true);
                                 
                                 // 显示窗口
                                 let _ = w.window().show();
