@@ -20,7 +20,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     let status_bar_handle = status_bar.as_weak();
 
     // 初始设置
-    window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
     window.set_show_english_aux(config.appearance.show_english_aux);
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
     
@@ -41,10 +40,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                 if hwnd.0 != 0 {
                     let mut ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
-                    // WS_EX_TOOLWINDOW: 隐藏任务栏图标
-                    // WS_EX_NOACTIVATE: 窗口不获取焦点
-                    // WS_EX_TOPMOST: 置顶
-                    // WS_EX_TRANSPARENT: 鼠标穿透
                     ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0;
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
@@ -129,7 +124,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     GuiEvent::ShowStatus(status) => {
                         if let Some(sb) = s.upgrade() {
                             sb.set_status_text(SharedString::from(status.clone()));
-                            sb.set_chinese_enabled(status == "中");
+                            sb.set_chinese_enabled(status == " 中");
 
                             // 闪现逻辑：先移到光标处
                             let (lx, ly) = {
@@ -185,7 +180,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     GuiEvent::ApplyConfig(new_conf) => {
                         show_candidates_for_loop.store(new_conf.appearance.show_candidates, std::sync::atomic::Ordering::SeqCst);
                         if let Some(w) = h.upgrade() {
-                            w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                         }
