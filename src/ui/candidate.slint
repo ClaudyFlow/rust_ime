@@ -18,7 +18,7 @@ export component CandidateWindow inherits Window {
     background: transparent;
     always-on-top: true;
     
-    property <length> border_radius: 6px;
+    property <length> border_radius: 4px;
     property <color> bg_color: #ffffff;
     property <color> accent_color: #3498db;
     property <color> text_color: #2c3e50;
@@ -26,16 +26,76 @@ export component CandidateWindow inherits Window {
     property <color> aux_text_color: #95a5a6;
     property <color> aux_highlight_color: #dcdde1;
 
-    // 修复布局影响：使用 Rectangle 包裹不同布局分支，并确保父容器 size 随内容变化
     if is_visible : Rectangle {
         background: bg_color;
         border-radius: border_radius;
         border-width: 1px;
         border-color: #dcdde1;
-        drop-shadow-blur: 10px;
+        drop-shadow-blur: 8px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 
-        VerticalLayout {
+        if is_horizontal : HorizontalLayout {
+            padding: 4px;
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 10px;
+            alignment: start;
+
+            if pinyin != "" : VerticalLayout {
+                alignment: center;
+                Text {
+                    text: pinyin;
+                    color: #7f8c8d;
+                    font-size: 14px;
+                    font-italic: true;
+                }
+            }
+
+            for cand[i] in candidates : Rectangle {
+                background: i == selected_index ? accent_color : transparent;
+                border-radius: 3px;
+                VerticalLayout {
+                    padding-left: 6px; padding-right: 6px; padding-top: 2px; padding-bottom: 2px;
+                    spacing: 0px;
+                    alignment: center;
+                    
+                    // 第一行：序号 + 词条 + 笔画提示 (放右边)
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+                        Text { 
+                            text: (i + 1) + "."; 
+                            color: i == selected_index ? highlight_text_color : #95a5a6; 
+                            vertical-alignment: center; 
+                            font-size: 16px; 
+                        }
+                        Text { 
+                            text: cand.text; 
+                            color: i == selected_index ? highlight_text_color : text_color; 
+                            vertical-alignment: center; 
+                            font-size: 18px; 
+                            font-weight: i == selected_index ? 600 : 400; 
+                        }
+                        if show_stroke_aux && cand.stroke_aux != "" : Text {
+                            text: "[" + cand.stroke_aux + "]";
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 11px;
+                            vertical-alignment: bottom;
+                        }
+                    }
+                    
+                    // 第二行：英文提示 (放下方)
+                    if show_english_aux && cand.english_aux != "" : Text {
+                        text: cand.english_aux;
+                        color: i == selected_index ? aux_highlight_color : aux_text_color;
+                        font-size: 10px;
+                        horizontal-alignment: left;
+                    }
+                }
+            }
+        }
+
+        if !is_horizontal : VerticalLayout {
             padding: 8px;
             spacing: 6px;
             alignment: start;
@@ -48,69 +108,30 @@ export component CandidateWindow inherits Window {
                 horizontal-alignment: left;
             }
 
-            // 彻底隔离横纵布局逻辑
-            if is_horizontal : HorizontalLayout {
-                spacing: 12px;
-                alignment: start;
-                for cand[i] in candidates : Rectangle {
-                    background: i == selected_index ? accent_color : transparent;
-                    border-radius: 4px;
+            for cand[i] in candidates : Rectangle {
+                background: i == selected_index ? accent_color : transparent;
+                border-radius: 4px;
+                HorizontalLayout {
+                    padding: 6px;
+                    spacing: 12px;
+                    alignment: start;
+                    Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; width: 24px; }
+                    Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                    
                     HorizontalLayout {
-                        padding-left: 8px; padding-right: 8px; padding-top: 4px; padding-bottom: 4px;
-                        spacing: 4px;
-                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
-                        
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 0px;
-                            Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
-                            
-                            HorizontalLayout {
-                                spacing: 4px;
-                                if show_english_aux && cand.english_aux != "" : Text {
-                                    text: cand.english_aux;
-                                    color: i == selected_index ? aux_highlight_color : aux_text_color;
-                                    font-size: 11px;
-                                }
-                                if show_stroke_aux && cand.stroke_aux != "" : Text {
-                                    text: cand.stroke_aux;
-                                    color: i == selected_index ? aux_highlight_color : aux_text_color;
-                                    font-size: 11px;
-                                }
-                            }
+                        spacing: 8px;
+                        alignment: end;
+                        if show_english_aux && cand.english_aux != "" : Text {
+                            text: cand.english_aux;
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 13px;
+                            vertical-alignment: center;
                         }
-                    }
-                }
-            }
-
-            if !is_horizontal : VerticalLayout {
-                spacing: 2px;
-                alignment: start;
-                for cand[i] in candidates : Rectangle {
-                    background: i == selected_index ? accent_color : transparent;
-                    border-radius: 4px;
-                    HorizontalLayout {
-                        padding: 6px;
-                        spacing: 12px;
-                        alignment: start;
-                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; width: 24px; }
-                        Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
-                        
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: end;
-                            if show_english_aux && cand.english_aux != "" : Text {
-                                text: cand.english_aux;
-                                color: i == selected_index ? aux_highlight_color : aux_text_color;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                            }
-                            if show_stroke_aux && cand.stroke_aux != "" : Text {
-                                text: cand.stroke_aux;
-                                color: i == selected_index ? aux_highlight_color : aux_text_color;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                            }
+                        if show_stroke_aux && cand.stroke_aux != "" : Text {
+                            text: cand.stroke_aux;
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 13px;
+                            vertical-alignment: center;
                         }
                     }
                 }

@@ -157,7 +157,7 @@ pub fn start_tray(
             RegisterClassW(&wc);
 
             let hwnd = CreateWindowExW(
-                Default::default(), window_class, PCWSTR(std::ptr::null()),
+                WS_EX_TOOLWINDOW, window_class, PCWSTR(std::ptr::null()),
                 WS_POPUP, 0, 0, 0, 0, None, None, instance, None
             );
 

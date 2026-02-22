@@ -36,20 +36,24 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                 let title = "RustImeCandidateWindow\0".encode_utf16().collect::<Vec<u16>>();
                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                 if hwnd.0 != 0 {
-                    let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                    let mut ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
                     // WS_EX_TOOLWINDOW: 隐藏任务栏图标
                     // WS_EX_NOACTIVATE: 窗口不获取焦点
                     // WS_EX_TOPMOST: 置顶
-                    // WS_EX_TRANSPARENT: 鼠标穿透 (可选，如果不再使用鼠标点击候选词)
-                    let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0) as isize);
+                    // WS_EX_TRANSPARENT: 鼠标穿透
+                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0;
+                    ex_style &= !WS_EX_APPWINDOW.0;
+                    let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
                 }
 
                 // 处理状态栏
                 let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
                 let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
                 if s_hwnd.0 != 0 {
-                    let ex_style = GetWindowLongPtrW(s_hwnd, GWL_EXSTYLE);
-                    let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, (ex_style as u32 | WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0) as isize);
+                    let mut ex_style = GetWindowLongPtrW(s_hwnd, GWL_EXSTYLE) as u32;
+                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0;
+                    ex_style &= !WS_EX_APPWINDOW.0;
+                    let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
                     
                     // 固定在右下角，并强制尺寸为 32x32，防止占满屏幕
                     let screen_width = GetSystemMetrics(SM_CXSCREEN);
