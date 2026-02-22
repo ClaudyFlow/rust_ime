@@ -506,6 +506,11 @@ impl Processor {
         let now = Instant::now();
         let is_press = val == 1;
 
+        // 特殊处理切换键：即使在英文模式下也要能切换回中文
+        if key == VirtualKey::Tab && is_press && self.buffer.is_empty() {
+            return self.toggle();
+        }
+
         if !self.chinese_enabled {
             return Action::PassThrough;
         }

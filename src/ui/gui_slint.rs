@@ -25,6 +25,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
     
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
+    
+    // 记录最近的光标位置，用于状态栏闪现
+    let last_pos = std::sync::Arc::new(std::sync::Mutex::new((0i32, 0i32)));
+    let last_pos_for_loop = last_pos.clone();
 
     // 1. 初始化窗口特殊的系统属性 (Windows)
     #[cfg(target_os = "windows")]
@@ -55,10 +59,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
                     
-                    // 固定在右下角，并强制尺寸为 32x32，防止占满屏幕
+                    // 固定在右下角，稍微上移一点（改为 -140），避开任务栏
                     let screen_width = GetSystemMetrics(SM_CXSCREEN);
                     let screen_height = GetSystemMetrics(SM_CYSCREEN);
-                    let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 80, screen_height - 80, 32, 32, SWP_NOACTIVATE);
+                    let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 100, screen_height - 140, 32, 32, SWP_NOACTIVATE);
                 }
             }
         });
@@ -70,6 +74,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
+            let last_pos_inner = last_pos_for_loop.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -123,9 +128,38 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         if let Some(sb) = s.upgrade() {
                             sb.set_status_text(SharedString::from(status.clone()));
                             sb.set_chinese_enabled(status == "中");
+
+                            // 闪现逻辑：先移到光标处
+                            let (lx, ly) = {
+                                let pos = last_pos_inner.lock().expect("Failed to lock last_pos");
+                                (pos.0, pos.1)
+                            };
+                            
+                            // 移到光标上方一点
+                            let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
+                            
+                            // 设置定时器，1.2秒后回到右下角
+                            slint::Timer::single_shot(std::time::Duration::from_millis(1200), move || {
+                                #[cfg(target_os = "windows")]
+                                unsafe {
+                                    let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
+                                    let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
+                                    if s_hwnd.0 != 0 {
+                                        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+                                        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+                                        // 回到右下角固定位置 (y轴调高到 -140)
+                                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, screen_width - 100, screen_height - 140, 32, 32, SWP_NOACTIVATE);
+                                    }
+                                }
+                            });
                         }
                     }
                     GuiEvent::MoveTo { x, y } => {
+                        // 更新最近的光标位置记录
+                        if let Ok(mut pos) = last_pos_inner.lock() {
+                            *pos = (x, y);
+                        }
+
                         if let Some(w) = h.upgrade() {
                             let mut final_x = x;
                             let mut final_y = y;
