@@ -3,23 +3,31 @@ Write-Host "Building release version..." -ForegroundColor Cyan
 cargo build --release
 
 # 2. Create release directory
-$Timestamp = Get-Date -Format "yyyyMMdd_HHmm"
-$ReleaseDir = "rust-ime-windows-$Timestamp"
-if (Test-Path $ReleaseDir) { Remove-Item -Recurse -Force $ReleaseDir }
+if (!(Test-Path "release")) { New-Item -ItemType Directory "release" }
+$ReleaseDir = "release/rust-ime-windows"
+if (Test-Path $ReleaseDir) { 
+    Write-Host "Cleaning old release folder..." -ForegroundColor Gray
+    Remove-Item -Recurse -Force $ReleaseDir 
+}
 New-Item -ItemType Directory $ReleaseDir
 
 # 3. Copy binaries
 Write-Host "Collecting files..." -ForegroundColor Green
-Copy-Item "target/release/rust-ime.exe" $ReleaseDir
-Copy-Item "target/release/rust_ime_tsf_v3.dll" $ReleaseDir
+if (Test-Path "target/release/rust-ime.exe") {
+    Copy-Item "target/release/rust-ime.exe" $ReleaseDir
+}
+if (Test-Path "target/release/rust_ime_tsf_v3.dll") {
+    Copy-Item "target/release/rust_ime_tsf_v3.dll" $ReleaseDir
+}
 
 # 4. Copy resource files
-if (Test-Path "dicts") { Copy-Item -Recurse "dicts" $ReleaseDir }
-if (Test-Path "static") { Copy-Item -Recurse "static" $ReleaseDir }
-if (Test-Path "fonts") { Copy-Item -Recurse "fonts" $ReleaseDir }
-if (Test-Path "sounds") { Copy-Item -Recurse "sounds" $ReleaseDir }
-if (Test-Path "data") { Copy-Item -Recurse "data" $ReleaseDir }
-if (Test-Path "picture") { Copy-Item -Recurse "picture" $ReleaseDir }
+$Resources = @("dicts", "static", "fonts", "sounds", "data", "picture")
+foreach ($Res in $Resources) {
+    if (Test-Path $Res) { 
+        Copy-Item -Recurse $Res $ReleaseDir 
+    }
+}
+
 if (Test-Path "config.json") { Copy-Item "config.json" $ReleaseDir }
 Copy-Item "INSTALL_GUIDE.md" $ReleaseDir
 Copy-Item "INSTALL_GUIDE_ZH.md" $ReleaseDir
@@ -75,11 +83,4 @@ pause
 $InstallBat | Out-File -FilePath "$ReleaseDir\install.bat" -Encoding ascii
 $UninstallBat | Out-File -FilePath "$ReleaseDir\uninstall.bat" -Encoding ascii
 
-# 6. Compress to ZIP
-if (!(Test-Path "release")) { New-Item -ItemType Directory "release" }
-$ZipFile = "release\$ReleaseDir.zip"
-if (Test-Path $ZipFile) { Remove-Item $ZipFile }
-Write-Host "Compressing..." -ForegroundColor Cyan
-Compress-Archive -Path "$ReleaseDir\*" -DestinationPath $ZipFile
-
-Write-Host "Packaging complete! Check directory: $ReleaseDir and archive: $ZipFile" -ForegroundColor Yellow
+Write-Host "Packaging complete! Files are available in: $ReleaseDir" -ForegroundColor Yellow
