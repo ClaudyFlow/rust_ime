@@ -79,13 +79,15 @@
             const dicts = await resp.json();
             const select = document.getElementById('dictSelect');
             
-            // 过滤出 chars 目录下的字典
-            const charDicts = dicts.filter(d => d.path.includes('chars'));
+            // 过滤出 chinese 目录下的所有字典
+            const chineseDicts = dicts.filter(d => d.path.includes('chinese'));
             
-            charDicts.forEach(d => {
+            chineseDicts.forEach(d => {
                 const opt = document.createElement('option');
                 opt.value = d.path;
-                opt.textContent = d.name.replace('.json', '');
+                // 显示更详细的路径名称，方便区分 chars 和 words
+                const label = d.path.includes('words') ? '词组: ' + d.name : '单字: ' + d.name;
+                opt.textContent = label.replace('.json', '');
                 if (d.path.includes('chars.json')) opt.selected = true;
                 select.appendChild(opt);
             });

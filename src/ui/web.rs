@@ -440,17 +440,26 @@ async fn get_chars_dict(axum::extract::Query(query): axum::extract::Query<DictVi
                             let en_meaning = entry.get("en").and_then(|v| v.as_str()).unwrap_or("");
                             let stroke_code = entry.get("stroke_aux").and_then(|v| v.as_str()).unwrap_or("");
                             
-                            // 英文辅助码：拼音 + 英文前3位
-                            let en_aux = format!("{}{}", pinyin, en_meaning.chars().take(3).collect::<String>());
-                            // 笔画辅助码：拼音 + 笔画码
-                            let stroke_aux = format!("{}{}", pinyin, stroke_code);
+                            // 英文辅助码：拼音 + 英文前3位 (如果en存在)
+                            let en_aux = if !en_meaning.is_empty() {
+                                format!("{}{}", pinyin, en_meaning.chars().take(3).collect::<String>())
+                            } else {
+                                pinyin.clone()
+                            };
+                            
+                            // 笔画辅助码：拼音 + 笔画码 (如果笔画存在)
+                            let stroke_aux = if !stroke_code.is_empty() {
+                                format!("{}{}", pinyin, stroke_code)
+                            } else {
+                                pinyin.clone()
+                            };
                             
                             results.push(CharEntryView {
                                 pinyin: pinyin.clone(),
                                 character: character.to_string(),
-                                en_meaning: en_meaning.to_string(),
+                                en_meaning: if en_meaning.is_empty() { "-".to_string() } else { en_meaning.to_string() },
                                 en_aux,
-                                stroke_aux,
+                                stroke_aux: if stroke_code.is_empty() { "-".to_string() } else { stroke_aux },
                                 group: group_toggle,
                             });
                         }
