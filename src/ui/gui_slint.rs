@@ -80,8 +80,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 let _ = w.window().hide();
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
+                                
+                                // 获取配置中的分页大小，或者默认为 5
+                                let page_size = 5; 
+                                let page = (selected / page_size) * page_size;
+                                let relative_selected = (selected % page_size) as i32;
+                                
                                 let mut data_vec = Vec::new();
-                                for (i, cand) in candidates.iter().take(5).enumerate() {
+                                // 只取当前页的候选词发送给 UI
+                                for i in page..(page + page_size).min(candidates.len()) {
+                                    let cand = &candidates[i];
                                     let hint = hints.get(i).cloned().unwrap_or_default();
                                     let mut english = String::new();
                                     let mut stroke = String::new();
@@ -102,8 +110,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                         stroke_aux: SharedString::from(stroke),
                                     });
                                 }
+                                
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
-                                w.set_selected_index(selected as i32);
+                                w.set_selected_index(relative_selected);
                                 
                                 // 显示窗口
                                 let _ = w.window().show();
