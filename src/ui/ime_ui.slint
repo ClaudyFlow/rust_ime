@@ -1,0 +1,171 @@
+export struct CandidateData {
+    text: string,
+    english_aux: string,
+    stroke_aux: string,
+}
+
+export component CandidateWindow inherits Window {
+    title: "RustImeCandidateWindow";
+    in property <string> pinyin;
+    in property <[CandidateData]> candidates;
+    in property <int> selected_index: 0;
+    in property <bool> is_visible: false;
+    in property <bool> is_horizontal: true;
+    in property <bool> show_english_aux: true;
+    in property <bool> show_stroke_aux: true;
+
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+    
+    property <length> border_radius: 4px;
+    property <color> bg_color: #ffffff;
+    property <color> accent_color: #3498db;
+    property <color> text_color: #2c3e50;
+    property <color> highlight_text_color: #ffffff;
+    property <color> aux_text_color: #95a5a6;
+    property <color> aux_highlight_color: #dcdde1;
+
+    if is_visible : Rectangle {
+        background: bg_color;
+        border-radius: border_radius;
+        border-width: 1px;
+        border-color: #dcdde1;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: rgba(0, 0, 0, 0.15);
+
+        if is_horizontal : HorizontalLayout {
+            padding: 4px;
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            alignment: start;
+
+            if pinyin != "" : VerticalLayout {
+                alignment: center;
+                Text {
+                    text: pinyin;
+                    color: #7f8c8d;
+                    font-size: 14px;
+                    font-italic: true;
+                }
+            }
+
+            for cand[i] in candidates : Rectangle {
+                background: i == selected_index ? accent_color : transparent;
+                border-radius: 3px;
+                VerticalLayout {
+                    padding-left: 6px; padding-right: 6px; padding-top: 2px; padding-bottom: 2px;
+                    spacing: 0px;
+                    alignment: center;
+                    
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
+                        Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                        if show_stroke_aux && cand.stroke_aux != "" : Text {
+                            text: "[" + cand.stroke_aux + "]";
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 11px;
+                            vertical-alignment: bottom;
+                        }
+                    }
+                    if show_english_aux && cand.english_aux != "" : Text {
+                        text: cand.english_aux;
+                        color: i == selected_index ? aux_highlight_color : aux_text_color;
+                        font-size: 10px;
+                        horizontal-alignment: left;
+                    }
+                }
+            }
+        }
+
+        if !is_horizontal : VerticalLayout {
+            padding: 8px;
+            spacing: 4px;
+            alignment: start;
+
+            if pinyin != "" : Text {
+                text: pinyin;
+                color: #7f8c8d;
+                font-size: 14px;
+                font-italic: true;
+                horizontal-alignment: left;
+            }
+
+            for cand[i] in candidates : Rectangle {
+                background: i == selected_index ? accent_color : transparent;
+                border-radius: 4px;
+                min-width: 160px;
+                HorizontalLayout {
+                    padding: 6px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 12px;
+                    alignment: start;
+                    Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; width: 24px; }
+                    Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                    
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+                        if show_english_aux && cand.english_aux != "" : Text {
+                            text: cand.english_aux;
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                        if show_stroke_aux && cand.stroke_aux != "" : Text {
+                            text: cand.stroke_aux;
+                            color: i == selected_index ? aux_highlight_color : aux_text_color;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component StatusBar inherits Window {
+    title: "RustImeStatusBar";
+    in property <string> status_text: "中";
+    in property <bool> chinese_enabled: true;
+
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+    
+    property <length> bar_width: 32px;
+    property <length> bar_height: 32px;
+
+    Rectangle {
+        width: bar_width;
+        height: bar_height;
+        background: chinese_enabled ? #3498db : #7f8c8d;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: #ffffff;
+        drop-shadow-blur: 4px;
+        drop-shadow-color: rgba(0, 0, 0, 0.2);
+
+        Text {
+            text: status_text;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 700;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+
+        touch := TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+
+        opacity: touch.has-hover ? 0.2 : 0.8;
+        animate opacity { duration: 200ms; }
+    }
+}
