@@ -2,17 +2,16 @@
 Write-Host "Building release version..." -ForegroundColor Cyan
 cargo build --release
 
-# 2. Create release directory
+# 2. Create release directory with Timestamp
+$Timestamp = Get-Date -Format "yyyyMMdd_HHmm"
 if (!(Test-Path "release")) { New-Item -ItemType Directory "release" }
-$ReleaseDir = "release/rust-ime-windows"
-if (Test-Path $ReleaseDir) { 
-    Write-Host "Cleaning old release folder..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force $ReleaseDir 
-}
+$ReleaseDir = "release/rust-ime-windows-$Timestamp"
+
+if (Test-Path $ReleaseDir) { Remove-Item -Recurse -Force $ReleaseDir }
 New-Item -ItemType Directory $ReleaseDir
 
 # 3. Copy binaries
-Write-Host "Collecting files..." -ForegroundColor Green
+Write-Host "Collecting files into $ReleaseDir..." -ForegroundColor Green
 if (Test-Path "target/release/rust-ime.exe") {
     Copy-Item "target/release/rust-ime.exe" $ReleaseDir
 }
