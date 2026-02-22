@@ -20,9 +20,11 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
                 
                 let trie_idx = format!("{}/trie.index", out_dir);
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
-                    println!("[Compiler] 检测到变动，正在重新编译方案: {}", dir_name);
+                    println!("[Compiler] 方案 [{}] 检测到变动 ({} 字节)，正在重新编译...", dir_name, src_path.len());
                     let is_english = dir_name.contains("english");
+                    let start = std::time::Instant::now();
                     compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
+                    println!("[Compiler] 方案 [{}] 编译完成，耗时 {:?}", dir_name, start.elapsed());
                 }
             }
         }

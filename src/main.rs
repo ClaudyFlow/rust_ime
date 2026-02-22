@@ -169,6 +169,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.len() > 1 {
         match args[1].as_str() {
+            "--compile-only" => {
+                println!("[Main] 正在强制编译词库...");
+                match engine::compiler::check_and_compile_all() {
+                    Ok(_) => println!("✅ 词库编译成功。"),
+                    Err(e) => eprintln!("❌ 编译失败: {}", e),
+                }
+                return Ok(());
+            }
             "--install" => {
                 setup_autostart()?;
                 println!("✅ 已设置开机自启。");
@@ -322,8 +330,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 0. 自动检查并增量编译词库
-    if let Err(e) = engine::compiler::check_and_compile_all() {
-        eprintln!("[Main] 词库自动编译失败: {}", e);
+    match engine::compiler::check_and_compile_all() {
+        Ok(_) => println!("[Main] 词库同步完成。"),
+        Err(e) => eprintln!("[Main] 词库自动编译失败: {}", e),
     }
 
     let mut current_config = load_config();
