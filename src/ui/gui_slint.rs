@@ -157,7 +157,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     GuiEvent::Exit => {
                         let _ = slint::quit_event_loop();
                     }
-                    _ => {}
                 }
             });
         }

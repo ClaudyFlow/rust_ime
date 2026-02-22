@@ -464,7 +464,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         p.apply_config(&new_conf);
                     }
                     
-                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf.clone()));
+                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(Box::new(new_conf.clone())));
                     
                     // 同步更新托盘菜单状态
                     tray_handle.update(|t| {

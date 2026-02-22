@@ -36,11 +36,8 @@ unsafe extern "system" fn DllMain(
     call_reason: u32,
     _reserved: *mut std::ffi::c_void,
 ) -> bool {
-    match call_reason {
-        DLL_PROCESS_ATTACH => {
-            DLL_INSTANCE = dll_module;
-        }
-        _ => {}
+    if call_reason == DLL_PROCESS_ATTACH {
+        DLL_INSTANCE = dll_module;
     }
     true
 }
@@ -48,6 +45,8 @@ unsafe extern "system" fn DllMain(
 #[cfg(windows)]
 #[no_mangle]
 #[allow(non_snake_case)]
+/// # Safety
+/// This function is called by Windows to get the class object for the IME.
 pub unsafe extern "system" fn DllGetClassObject(
     rclsid: *const GUID,
     riid: *const GUID,
@@ -69,6 +68,8 @@ pub unsafe extern "system" fn DllGetClassObject(
 #[cfg(windows)]
 #[no_mangle]
 #[allow(non_snake_case)]
+/// # Safety
+/// This function is called by Windows/regsvr32 to register the COM server.
 pub unsafe extern "system" fn DllRegisterServer() -> HRESULT {
     registry::register_server(DLL_INSTANCE, &IME_ID, "Rust IME", None)
         .map_or_else(|e| e.code(), |_| S_OK)
@@ -77,6 +78,8 @@ pub unsafe extern "system" fn DllRegisterServer() -> HRESULT {
 #[cfg(windows)]
 #[no_mangle]
 #[allow(non_snake_case)]
+/// # Safety
+/// This function is called by Windows/regsvr32 to unregister the COM server.
 pub unsafe extern "system" fn DllUnregisterServer() -> HRESULT {
     registry::unregister_server(&IME_ID)
         .map_or_else(|e| e.code(), |_| S_OK)

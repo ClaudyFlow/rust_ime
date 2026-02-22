@@ -21,17 +21,3 @@ type-complexity-threshold = 250
 # Allow certain clippy lints
 allow-expect-in-tests = true
 allow-unwrap-in-tests = true
-
-# Specific checks for your project
-[warns]
-# Check for suspicious code patterns
-suspicious = "warn"
-
-# Check for performance issues
-perf = "warn"
-
-# Check for style issues
-style = "warn"
-
-# Check for complexity
-complexity = "warn"

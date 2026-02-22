@@ -62,12 +62,12 @@ impl TextService {
         // 性能优化：在按键按下时尝试获取坐标
         // 范围：A-Z, Backspace, Shift, CapsLock, 以及常见的标点符号键（如反引号 0xC0）
         if msg_type == 1 && (
-            (key_code >= 0x41 && key_code <= 0x5A) || // A-Z
+            (0x41..=0x5A).contains(&key_code) || // A-Z
             key_code == 0x08 || // Backspace
             key_code == 0x10 || // Shift
             key_code == 0x14 || // CapsLock
-            (key_code >= 0xBA && key_code <= 0xC0) || // 标点符号 (;, =, ,, -, ., /, `)
-            (key_code >= 0xDB && key_code <= 0xDE)    // 标点符号 ([, \, ], ')
+            (0xBA..=0xC0).contains(&key_code) || // 标点符号 (;, =, ,, -, ., /, `)
+            (0xDB..=0xDE).contains(&key_code)    // 标点符号 ([, \, ], ')
         ) {
             if let Some(ctx) = context {
                 let (tx, ty) = self.get_text_ext(ctx);
@@ -152,7 +152,7 @@ impl ITfTextInputProcessor_Impl for TextService {
     fn Activate(&self, thread_mgr: Option<&ITfThreadMgr>, client_id: u32) -> Result<()> {
         self.client_id.store(client_id, Ordering::SeqCst);
         if let Some(mgr) = thread_mgr {
-            let mut lock = self.thread_mgr.write().unwrap();
+            let mut lock = self.thread_mgr.write().expect("Failed to lock thread_mgr for write");
             *lock = Some(mgr.clone());
             unsafe {
                 let keystroke_mgr: ITfKeystrokeMgr = mgr.cast()?;
@@ -169,7 +169,7 @@ impl ITfTextInputProcessor_Impl for TextService {
         let _ = self.send_key_to_server(1, 0x1B, 0, None);
         
         let mgr_opt = {
-            let mut lock = self.thread_mgr.write().unwrap();
+            let mut lock = self.thread_mgr.write().expect("Failed to lock thread_mgr for write in Deactivate");
             lock.take()
         };
 
@@ -269,12 +269,10 @@ impl ITfEditSession_Impl for EditSession {
                         style: selection[0].style,
                     }]);
                 }
-            } else {
-                if !text_w.is_empty() {
-                    let source_res: Result<ITfInsertAtSelection> = self.context.cast();
-                    if let Ok(source) = source_res {
-                        let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
-                    }
+            } else if !text_w.is_empty() {
+                let source_res: Result<ITfInsertAtSelection> = self.context.cast();
+                if let Ok(source) = source_res {
+                    let _ = source.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text_w);
                 }
             }
         }

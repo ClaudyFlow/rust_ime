@@ -116,7 +116,7 @@ unsafe fn set_reg_key(root: HKEY, path: &str, name: Option<&str>, value: &str) -
     )?;
 
     let val_w = to_pcwstr(value);
-    let name_w = name.map(|n| to_pcwstr(n));
+    let name_w = name.map(to_pcwstr);
     let name_ptr = match &name_w {
         Some(nw) => nw.as_ptr(),
         None => std::ptr::null(),

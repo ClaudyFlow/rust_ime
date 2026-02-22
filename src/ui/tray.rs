@@ -175,7 +175,7 @@ pub fn start_tray(
                 LoadIconW(None, IDI_APPLICATION).unwrap_or_default()
             };
 
-            let mut nid = NOTIFYICONDATAW {
+            let nid = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
                 hWnd: hwnd,
                 uID: TRAY_ICON_ID,

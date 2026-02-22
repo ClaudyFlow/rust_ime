@@ -18,7 +18,7 @@ pub enum GuiEvent {
         commit_mode: String,
     },
     MoveTo { x: i32, y: i32 },
-    ApplyConfig(Config),
+    ApplyConfig(Box<Config>),
         ShowStatus(String), // 新增：显示 "中" 或 "英"
         Exit,
     }
