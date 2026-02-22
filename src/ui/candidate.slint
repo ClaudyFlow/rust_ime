@@ -34,8 +34,9 @@ export component CandidateWindow inherits Window {
         drop-shadow-blur: 8px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 
+        // --- 分支一：纯横向长条布局 (极致垂直压缩) ---
         if is_horizontal : HorizontalLayout {
-            padding: 4px;
+            padding: 2px;
             padding-left: 10px;
             padding-right: 10px;
             spacing: 12px;
@@ -55,15 +56,27 @@ export component CandidateWindow inherits Window {
                 background: i == selected_index ? accent_color : transparent;
                 border-radius: 3px;
                 VerticalLayout {
-                    padding-left: 6px; padding-right: 6px; padding-top: 2px; padding-bottom: 2px;
-                    spacing: 0px;
+                    padding-left: 6px; padding-right: 6px; 
+                    padding-top: 1px; padding-bottom: 1px;
+                    spacing: -2px; // 负间距，让英文提示紧贴词条，压缩高度
                     alignment: center;
                     
                     HorizontalLayout {
                         spacing: 4px;
                         alignment: start;
-                        Text { text: (i + 1) + "."; color: i == selected_index ? highlight_text_color : #95a5a6; vertical-alignment: center; font-size: 16px; }
-                        Text { text: cand.text; color: i == selected_index ? highlight_text_color : text_color; vertical-alignment: center; font-size: 18px; font-weight: i == selected_index ? 600 : 400; }
+                        Text { 
+                            text: (i + 1) + "."; 
+                            color: i == selected_index ? highlight_text_color : #95a5a6; 
+                            vertical-alignment: center; 
+                            font-size: 16px; 
+                        }
+                        Text { 
+                            text: cand.text; 
+                            color: i == selected_index ? highlight_text_color : text_color; 
+                            vertical-alignment: center; 
+                            font-size: 18px; 
+                            font-weight: i == selected_index ? 600 : 400; 
+                        }
                         if show_stroke_aux && cand.stroke_aux != "" : Text {
                             text: "[" + cand.stroke_aux + "]";
                             color: i == selected_index ? aux_highlight_color : aux_text_color;
@@ -81,6 +94,7 @@ export component CandidateWindow inherits Window {
             }
         }
 
+        // --- 分支二：纯纵向列表布局 ---
         if !is_horizontal : VerticalLayout {
             padding: 8px;
             spacing: 4px;
