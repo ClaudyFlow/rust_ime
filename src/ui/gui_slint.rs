@@ -22,8 +22,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     // 初始设置
     window.set_show_english_aux(config.appearance.show_english_aux);
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
+    window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
     
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
+    let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
     
     // 记录最近的光标位置，用于状态栏闪现
     let last_pos = std::sync::Arc::new(std::sync::Mutex::new((0i32, 0i32)));
@@ -69,6 +71,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
+            let page_size_for_loop = page_size_atomic.clone();
             let last_pos_inner = last_pos_for_loop.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
@@ -82,8 +85,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             } else {
                                 w.set_pinyin(SharedString::from(pinyin));
                                 
-                                // 获取配置中的分页大小，或者默认为 5
-                                let page_size = 5; 
+                                // 获取配置中的分页大小
+                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
                                 let page = (selected / page_size) * page_size;
                                 let relative_selected = (selected % page_size) as i32;
                                 
@@ -179,9 +182,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     }
                     GuiEvent::ApplyConfig(new_conf) => {
                         show_candidates_for_loop.store(new_conf.appearance.show_candidates, std::sync::atomic::Ordering::SeqCst);
+                        page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
+                            w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                         }
                     }
                     GuiEvent::Exit => {

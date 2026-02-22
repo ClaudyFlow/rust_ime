@@ -4,13 +4,72 @@ export struct CandidateData {
     stroke_aux: string,
 }
 
+component CandidateItem inherits Rectangle {
+    in property <string> text;
+    in property <string> english_aux;
+    in property <string> stroke_aux;
+    in property <bool> selected;
+    in property <int> index;
+    in property <bool> show_english_aux;
+    in property <bool> show_stroke_aux;
+    
+    in property <color> accent_color;
+    in property <color> text_color;
+    in property <color> highlight_text_color;
+    in property <color> aux_text_color;
+    in property <color> aux_highlight_color;
+
+    background: selected ? accent_color : transparent;
+    border-radius: 4px;
+    
+    VerticalLayout {
+        padding-left: 8px; padding-right: 8px; 
+        padding-top: 2px; padding-bottom: 2px;
+        spacing: 0px;
+        alignment: center;
+        
+        // 第一行：序号 + 词条 + 笔画码
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+            Text { 
+                text: (index + 1) + "."; 
+                color: selected ? highlight_text_color : aux_text_color; 
+                vertical-alignment: center; 
+                font-size: 16px; 
+            }
+            Text { 
+                text: text; 
+                color: selected ? highlight_text_color : text_color; 
+                vertical-alignment: center; 
+                font-size: 18px; 
+                font-weight: selected ? 600 : 400; 
+            }
+            if show_stroke_aux && stroke_aux != "" : Text {
+                text: "[" + stroke_aux + "]";
+                color: selected ? aux_highlight_color : aux_text_color;
+                font-size: 11px;
+                vertical-alignment: bottom;
+            }
+        }
+        
+        // 第二行：英文含义（紧贴下方）
+        if show_english_aux && english_aux != "" : Text {
+            text: english_aux;
+            color: selected ? aux_highlight_color : aux_text_color;
+            font-size: 10px;
+            horizontal-alignment: left;
+        }
+    }
+}
+
 export component CandidateWindow inherits Window {
     title: "RustImeCandidateWindow";
     in property <string> pinyin;
     in property <[CandidateData]> candidates;
     in property <int> selected_index: 0;
     in property <bool> is_visible: false;
-    // 强制横向，不再提供切换属性，确保布局引擎不分心
+    in property <bool> is_horizontal: true;
     in property <bool> show_english_aux: true;
     in property <bool> show_stroke_aux: true;
 
@@ -26,7 +85,6 @@ export component CandidateWindow inherits Window {
     property <color> aux_text_color: #95a5a6;
     property <color> aux_highlight_color: #dcdde1;
 
-    // 单一入口：纯横向渲染树
     if is_visible : Rectangle {
         background: bg_color;
         border-radius: border_radius;
@@ -35,15 +93,13 @@ export component CandidateWindow inherits Window {
         drop-shadow-blur: 10px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 
-        // 核心布局：仅此一层，杜绝嵌套干扰
-        HorizontalLayout {
+        if is_horizontal : HorizontalLayout {
             padding: 4px;
             padding-left: 12px;
             padding-right: 12px;
-            spacing: 12px;
+            spacing: 8px;
             alignment: start;
 
-            // 拼音输入串：垂直居中
             if pinyin != "" : VerticalLayout {
                 alignment: center;
                 Text {
@@ -54,50 +110,53 @@ export component CandidateWindow inherits Window {
                 }
             }
 
-            // 候选词列表：横向展开
-            for cand[i] in candidates : Rectangle {
-                background: i == selected_index ? accent_color : transparent;
-                border-radius: 4px;
-                
-                VerticalLayout {
-                    padding-left: 8px; padding-right: 8px; 
-                    padding-top: 2px; padding-bottom: 2px;
-                    spacing: -2px; // 压缩词条与英文提示的间距
-                    alignment: center;
-                    
-                    // 第一行：序号 + 词条 + 笔画码
-                    HorizontalLayout {
-                        spacing: 4px;
-                        alignment: start;
-                        Text { 
-                            text: (i + 1) + "."; 
-                            color: i == selected_index ? highlight_text_color : #95a5a6; 
-                            vertical-alignment: center; 
-                            font-size: 16px; 
-                        }
-                        Text { 
-                            text: cand.text; 
-                            color: i == selected_index ? highlight_text_color : text_color; 
-                            vertical-alignment: center; 
-                            font-size: 18px; 
-                            font-weight: i == selected_index ? 600 : 400; 
-                        }
-                        if show_stroke_aux && cand.stroke_aux != "" : Text {
-                            text: "[" + cand.stroke_aux + "]";
-                            color: i == selected_index ? aux_highlight_color : aux_text_color;
-                            font-size: 11px;
-                            vertical-alignment: bottom;
-                        }
-                    }
-                    
-                    // 第二行：英文含义（紧贴下方）
-                    if show_english_aux && cand.english_aux != "" : Text {
-                        text: cand.english_aux;
-                        color: i == selected_index ? aux_highlight_color : aux_text_color;
-                        font-size: 10px;
-                        horizontal-alignment: left;
-                    }
+            for cand[i] in candidates : CandidateItem {
+                text: cand.text;
+                english_aux: cand.english_aux;
+                stroke_aux: cand.stroke_aux;
+                selected: i == selected_index;
+                index: i;
+                show_english_aux: show_english_aux;
+                show_stroke_aux: show_stroke_aux;
+                accent_color: accent_color;
+                text_color: text_color;
+                highlight_text_color: highlight_text_color;
+                aux_text_color: aux_text_color;
+                aux_highlight_color: aux_highlight_color;
+            }
+        }
+
+        if !is_horizontal : VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+            alignment: start;
+
+            if pinyin != "" : HorizontalLayout {
+                padding-left: 8px;
+                padding-top: 4px;
+                padding-bottom: 4px;
+                Text {
+                    text: pinyin;
+                    color: #7f8c8d;
+                    font-size: 14px;
+                    font-italic: true;
                 }
+            }
+
+            for cand[i] in candidates : CandidateItem {
+                width: 100%;
+                text: cand.text;
+                english_aux: cand.english_aux;
+                stroke_aux: cand.stroke_aux;
+                selected: i == selected_index;
+                index: i;
+                show_english_aux: show_english_aux;
+                show_stroke_aux: show_stroke_aux;
+                accent_color: accent_color;
+                text_color: text_color;
+                highlight_text_color: highlight_text_color;
+                aux_text_color: aux_text_color;
+                aux_highlight_color: aux_highlight_color;
             }
         }
     }
