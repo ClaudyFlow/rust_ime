@@ -45,14 +45,14 @@ component CandidateItem inherits Rectangle {
         }
         
         if show_stroke_aux && stroke_aux != "" : Text {
-            text: "[" + stroke_aux + "]";
+            text: stroke_aux;
             color: selected ? aux_highlight_color : aux_text_color;
-            font-size: 11px;
+            font-size: 12px;
             vertical-alignment: center;
         }
 
         if show_english_aux && english_aux != "" : Text {
-            text: "(" + english_aux + ")";
+            text: english_aux;
             color: selected ? aux_highlight_color : aux_text_color;
             font-size: 12px;
             vertical-alignment: center;
