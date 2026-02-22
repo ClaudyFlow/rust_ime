@@ -10,20 +10,26 @@
 </head>
 <body>
     <div class="container-fluid py-4">
-        <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
             <a href="/" class="btn btn-outline-secondary btn-sm">← 返回控制中心</a>
+            <div class="d-flex align-items-center gap-3">
+                <label for="dictSelect" class="form-label mb-0 fw-bold">选择词库：</label>
+                <select id="dictSelect" class="form-select form-select-sm" style="width: auto; min-width: 200px;">
+                    <!-- 动态填充 -->
+                </select>
+            </div>
         </div>
 
         <div class="card shadow-sm border-0 apple-card p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="mb-0">🎓 单字辅助码对照表</h2>
-                <div class="text-muted small">
-                    数据实时同步自: dicts/chinese/chars/chars.json
-                </div>
+                <h2 class="mb-0">🎓 辅助码对照表</h2>
+                <div id="fileInfo" class="text-muted small">加载中...</div>
             </div>
             
             <div class="alert alert-info mb-4 border-0" style="background-color: #e3f2fd; color: #0d47a1;">
-                <strong>💡 学习技巧：</strong> 辅助码通常为“拼音 + 英文含义前3位”。例如：<code>ah[Mf]</code> 表示“啊”的笔画码是 Mf。在设置中开启相应模式即可使用。
+                <strong>💡 学习技巧：</strong> 
+                <span class="ms-2">英文辅助码 = <code>拼音 + 英文前3位</code></span>
+                <span class="ms-3">笔画辅助码 = <code>拼音 + 笔画码</code></span>
             </div>
 
             <div class="table-responsive">
@@ -32,17 +38,18 @@
                         <tr>
                             <th>拼音</th>
                             <th>汉字</th>
-                            <th>辅助码 (Pinyin+Ext)</th>
-                            <th>英文含义 / 笔画码</th>
+                            <th>英文辅助码</th>
+                            <th>笔画辅助码</th>
+                            <th>英文含义</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td colspan="4" class="text-center py-5">
+                            <td colspan="5" class="text-center py-5">
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">加载中...</span>
                                 </div>
-                                <div class="mt-2">正在从词库提取海量数据，请稍候...</div>
+                                <div class="mt-2">正在从词库提取数据...</div>
                             </td>
                         </tr>
                     </tbody>
@@ -53,7 +60,8 @@
 
     <style>
         .apple-card { background: white; border-radius: 20px; }
-        .aux-highlight { color: #d93025; font-weight: bold; background-color: #fce8e6; padding: 2px 8px; border-radius: 6px; font-family: monospace; }
+        .aux-highlight-en { color: #d93025; font-weight: bold; background-color: #fce8e6; padding: 2px 8px; border-radius: 6px; font-family: monospace; }
+        .aux-highlight-stroke { color: #0d6efd; font-weight: bold; background-color: #e7f1ff; padding: 2px 8px; border-radius: 6px; font-family: monospace; }
         .char-cell { font-size: 1.8em; font-weight: bold; color: #1d1d1f; }
         .pinyin-group-0 { background-color: #ffffff !important; }
         .pinyin-group-1 { background-color: #f5f5f7 !important; }
@@ -65,8 +73,30 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script src="/static/js/settings.js"></script>
     <script>
-        $(document).ready(function() {
-            loadDictionaryViewer();
+        $(document).ready(async function() {
+            // 1. 获取所有可选字典
+            const resp = await fetch('/api/dicts');
+            const dicts = await resp.json();
+            const select = document.getElementById('dictSelect');
+            
+            // 过滤出 chars 目录下的字典
+            const charDicts = dicts.filter(d => d.path.includes('chars'));
+            
+            charDicts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.path;
+                opt.textContent = d.name.replace('.json', '');
+                if (d.path.includes('chars.json')) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            // 2. 初始化显示
+            loadDictionaryViewer(select.value);
+
+            // 3. 切换事件
+            select.onchange = () => {
+                loadDictionaryViewer(select.value);
+            };
         });
     </script>
 </body>

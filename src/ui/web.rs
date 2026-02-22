@@ -403,13 +403,20 @@ struct CharEntryView {
     pinyin: String,
     #[serde(rename = "char")]
     character: String,
-    en: String,
-    aux: String,
+    en_meaning: String,
+    en_aux: String,
+    stroke_aux: String,
     group: u32,
 }
 
-async fn get_chars_dict() -> impl IntoResponse {
-    let path = std::path::Path::new("dicts/chinese/chars/chars.json");
+#[derive(serde::Deserialize)]
+struct DictViewQuery {
+    file: Option<String>,
+}
+
+async fn get_chars_dict(axum::extract::Query(query): axum::extract::Query<DictViewQuery>) -> impl IntoResponse {
+    let filename = query.file.unwrap_or_else(|| "dicts/chinese/chars/chars.json".to_string());
+    let path = std::path::Path::new(&filename);
     let mut results = Vec::new();
     
     if let Ok(f) = std::fs::File::open(path) {
@@ -430,17 +437,20 @@ async fn get_chars_dict() -> impl IntoResponse {
                     if let Some(entries) = obj.get(pinyin).and_then(|v| v.as_array()) {
                         for entry in entries {
                             let character = entry.get("char").and_then(|v| v.as_str()).unwrap_or("");
-                            let en = entry.get("en").and_then(|v| v.as_str()).unwrap_or("");
-                            let stroke = entry.get("stroke_aux").and_then(|v| v.as_str()).unwrap_or("");
+                            let en_meaning = entry.get("en").and_then(|v| v.as_str()).unwrap_or("");
+                            let stroke_code = entry.get("stroke_aux").and_then(|v| v.as_str()).unwrap_or("");
                             
-                            // 拼凑辅助码展示 (拼音 + 英文前缀)
-                            let aux = format!("{}{}", pinyin, en.chars().take(3).collect::<String>());
+                            // 英文辅助码：拼音 + 英文前3位
+                            let en_aux = format!("{}{}", pinyin, en_meaning.chars().take(3).collect::<String>());
+                            // 笔画辅助码：拼音 + 笔画码
+                            let stroke_aux = format!("{}{}", pinyin, stroke_code);
                             
                             results.push(CharEntryView {
                                 pinyin: pinyin.clone(),
                                 character: character.to_string(),
-                                en: format!("{} / 笔画: {}", en, stroke),
-                                aux,
+                                en_meaning: en_meaning.to_string(),
+                                en_aux,
+                                stroke_aux,
                                 group: group_toggle,
                             });
                         }

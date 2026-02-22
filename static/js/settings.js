@@ -98,12 +98,21 @@ async function loadFonts(selectIds) {
     });
 }
 
-async function loadDictionaryViewer() {
+async function loadDictionaryViewer(filePath) {
     const tableBody = document.querySelector('#charsTable tbody');
     if (!tableBody) return;
 
+    // 清空现有 DataTable
+    if ($.fn.DataTable.isDataTable('#charsTable')) {
+        $('#charsTable').DataTable().destroy();
+    }
+
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
+    document.getElementById('fileInfo').innerText = '正在读取: ' + filePath;
+
     try {
-        const response = await fetch('/api/dictionary/chars');
+        const url = filePath ? `/api/dictionary/chars?file=${encodeURIComponent(filePath)}` : '/api/dictionary/chars';
+        const response = await fetch(url);
         const data = await response.json();
         
         let html = '';
@@ -111,8 +120,9 @@ async function loadDictionaryViewer() {
             html += `<tr class="pinyin-group-${item.group}">
                 <td>${item.pinyin}</td>
                 <td class="char-cell">${item.char}</td>
-                <td><span class="aux-highlight">${item.aux}</span></td>
-                <td>${item.en}</td>
+                <td><span class="aux-highlight-en">${item.en_aux}</span></td>
+                <td><span class="aux-highlight-stroke">${item.stroke_aux}</span></td>
+                <td>${item.en_meaning}</td>
             </tr>`;
         });
         
@@ -131,6 +141,6 @@ async function loadDictionaryViewer() {
             });
         }
     } catch (e) {
-        tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-5">数据加载失败: ' + e.message + '</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-5">数据加载失败: ' + e.message + '</td></tr>';
     }
 }
