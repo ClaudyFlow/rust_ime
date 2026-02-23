@@ -81,7 +81,8 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
 #[cfg(target_os = "windows")]
 fn get_system_cursor_pos() -> Option<(i32, i32)> {
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::Win32::UI::WindowsAndMessaging::{GetGUIThreadInfo, GetForegroundWindow, GUITHREADINFO, GetCaretPos};
+        use windows::Win32::UI::Input::KeyboardAndMouse::GetFocus;
         use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::*;
         
@@ -93,9 +94,20 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
                 x: info.rcCaret.left,
                 y: info.rcCaret.bottom,
             };
-            let _ = ClientToScreen(info.hwndCaret, &mut pt);
-            if pt.x != 0 || pt.y != 0 {
-                return Some((pt.x, pt.y));
+            
+            // 如果 hwndCaret 为空，尝试使用当前线程的 focus 窗口或前台窗口
+            let hwnd = if info.hwndCaret.0 != 0 {
+                info.hwndCaret
+            } else {
+                let focus = GetFocus();
+                if focus.0 != 0 { focus } else { GetForegroundWindow() }
+            };
+            
+            if hwnd.0 != 0 {
+                let _ = ClientToScreen(hwnd, &mut pt);
+                if pt.x != 0 || pt.y != 0 {
+                    return Some((pt.x, pt.y));
+                }
             }
         }
 

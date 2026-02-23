@@ -119,6 +119,33 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
                                 
+                                // 在显示前，尝试同步一次位置，防止在某些应用中位置丢失
+                                let (lx, ly) = {
+                                    let pos = last_pos_inner.lock().expect("Failed to lock last_pos");
+                                    (pos.0, pos.1)
+                                };
+                                if lx != 0 || ly != 0 {
+                                    let mut final_x = lx;
+                                    let mut final_y = ly;
+                                    
+                                    // 边界检查 (Slint 默认不处理越界)
+                                    #[cfg(target_os = "windows")]
+                                    unsafe {
+                                        let win_size = w.window().size();
+                                        let width = win_size.width as i32;
+                                        let height = win_size.height as i32;
+                                        let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x: lx, y: ly }, MONITOR_DEFAULTTONEAREST);
+                                        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+                                        if GetMonitorInfoW(monitor, &mut mi).as_bool() {
+                                            if final_x + width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - width - 10; }
+                                            if final_y + height > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - height - 10; }
+                                            if final_x < mi.rcMonitor.left { final_x = mi.rcMonitor.left + 5; }
+                                            if final_y < mi.rcMonitor.top { final_y = mi.rcMonitor.top + 5; }
+                                        }
+                                    }
+                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
+                                }
+
                                 // 显示窗口
                                 let _ = w.window().show();
                             }
@@ -155,9 +182,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         }
                     }
                     GuiEvent::MoveTo { x, y } => {
-                        // 更新最近的光标位置记录
-                        if let Ok(mut pos) = last_pos_inner.lock() {
-                            *pos = (x, y);
+                        // 更新最近的光标位置记录 (仅在坐标非零时更新，防止某些应用返回 0,0 导致跳变)
+                        if x != 0 || y != 0 {
+                            if let Ok(mut pos) = last_pos_inner.lock() {
+                                *pos = (x, y);
+                            }
                         }
 
                         if let Some(w) = h.upgrade() {

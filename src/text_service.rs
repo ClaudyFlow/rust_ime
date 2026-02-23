@@ -60,15 +60,17 @@ impl TextService {
         let mut y = 0i32;
 
         // 性能优化：在按键按下时尝试获取坐标
-        // 范围：A-Z, Backspace, Shift, CapsLock, 以及常见的标点符号键（如反引号 0xC0）
+        // 范围：A-Z, Space, Enter, Backspace, Shift, CapsLock, 以及常见的标点符号键
         if msg_type == 1 && (
             (0x41..=0x5A).contains(&key_code) || // A-Z
+            key_code == 0x20 || // Space
+            key_code == 0x0D || // Enter
             key_code == 0x08 || // Backspace
-            key_code == 0x09 || // Tab (新增：确保切换中英时能获取坐标)
+            key_code == 0x09 || // Tab
             key_code == 0x10 || // Shift
             key_code == 0x14 || // CapsLock
-            (0xBA..=0xC0).contains(&key_code) || // 标点符号 (;, =, ,, -, ., /, `)
-            (0xDB..=0xDE).contains(&key_code)    // 标点符号 ([, \, ], ')
+            (0xBA..=0xC0).contains(&key_code) || // 标点符号
+            (0xDB..=0xDE).contains(&key_code)    // 标点符号
         ) {
             if let Some(ctx) = context {
                 let (tx, ty) = self.get_text_ext(ctx);
