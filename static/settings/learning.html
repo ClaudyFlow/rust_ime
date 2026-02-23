@@ -98,6 +98,11 @@
 
         <div class="learning-container">
             <div class="config-section">
+                <h3>练习设置</h3>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                    <input type="checkbox" id="showPinyinToggle" style="width: 20px; height: 20px;">
+                    <label for="showPinyinToggle">展示拼音提示</label>
+                </div>
                 <h3>选择练习词典</h3>
                 <select id="dictSelect" class="dictionary-select">
                     <option value="chinese/chars/chars.json">通用汉字词典 (chars.json)</option>
@@ -112,6 +117,7 @@
                 <div class="target-word" id="targetWord">...</div>
                 
                 <div class="hint-area">
+                    <div class="hint-badge" id="pinyinHintBadge">拼音: <span id="pinyinHint">-</span></div>
                     <div class="hint-badge">笔画码: <span id="strokeHint">-</span></div>
                     <div class="hint-badge">英文辅助: <span id="englishHint">-</span></div>
                 </div>
@@ -143,6 +149,13 @@
         let stats = { count: 0, correct: 0 };
 
         async function startPractice() {
+            // 获取配置
+            try {
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                document.getElementById('showPinyinToggle').checked = config.appearance.show_pinyin_hint;
+            } catch (e) { console.error("Config load failed", e); }
+
             const dictPath = document.getElementById('dictSelect').value;
             const dictName = dictPath.split('/').pop();
             document.getElementById('dictNameStat').innerText = dictName;
@@ -215,12 +228,34 @@
 
             document.getElementById('targetWord').innerText = target;
             document.getElementById('practiceInput').value = '';
+            document.getElementById('pinyinHint').innerText = pinyin;
             document.getElementById('strokeHint').innerText = stroke;
             document.getElementById('englishHint').innerText = english;
             
+            // 根据开关决定是否隐藏
+            const showPinyin = document.getElementById('showPinyinToggle').checked;
+            document.getElementById('pinyinHintBadge').style.display = showPinyin ? 'block' : 'none';
+
             // 绑定当前词条到 input 元素
             document.getElementById('practiceInput').dataset.target = target;
         }
+
+        // 监听开关变化并保存配置
+        document.getElementById('showPinyinToggle').addEventListener('change', async (e) => {
+            const show = e.target.checked;
+            document.getElementById('pinyinHintBadge').style.display = show ? 'block' : 'none';
+            
+            try {
+                const configRes = await fetch('/api/config');
+                let config = await configRes.json();
+                config.appearance.show_pinyin_hint = show;
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+            } catch (e) { console.error("Config save failed", e); }
+        });
 
         document.getElementById('practiceInput').addEventListener('input', (e) => {
             const input = e.target.value.trim();

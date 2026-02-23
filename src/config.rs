@@ -60,6 +60,7 @@ pub struct Appearance {
     pub preview_mode: String,
     pub show_english_aux: bool,
     pub show_stroke_aux: bool,
+    pub show_pinyin_hint: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -211,6 +212,7 @@ impl Config {
                 preview_mode: "pinyin".to_string(),
                 show_english_aux: true,
                 show_stroke_aux: true,
+                show_pinyin_hint: true,
             },
             input: Input {
                 autostart: false,

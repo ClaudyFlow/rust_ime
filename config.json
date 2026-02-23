@@ -55,7 +55,10 @@
       "color": "#0969da",
       "alpha": 0.7
     },
-    "preview_mode": "pinyin"
+    "preview_mode": "pinyin",
+    "show_english_aux": true,
+    "show_stroke_aux": true,
+    "show_pinyin_hint": true
   },
   "input": {
     "autostart": false,
