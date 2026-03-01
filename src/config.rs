@@ -184,6 +184,7 @@ impl Config {
                     Profile { name: "chinese".to_string(), path: "data/chinese/trie".to_string() },
                     Profile { name: "english".to_string(), path: "data/english/trie".to_string() },
                     Profile { name: "japanese".to_string(), path: "data/japanese/trie".to_string() },
+                    Profile { name: "emoji".to_string(), path: "data/emoji/trie".to_string() },
                 ],
             },
             appearance: Appearance {
@@ -296,7 +297,7 @@ impl Config {
                 prefix_matching_limit: 20,
                 enable_abbreviation_matching: true,
                 filter_proper_nouns_by_case: true,
-                active_profiles: vec!["chinese".to_string()],
+                active_profiles: vec!["chinese".to_string(), "emoji".to_string()],
                 profile_keys: vec![],
                 page_flipping_keys: vec!["arrow".to_string(), "minus_equal".to_string(), "comma_dot".to_string()],
                 swap_arrow_keys: false,

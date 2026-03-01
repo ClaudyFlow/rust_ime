@@ -1,0 +1,508 @@
+{
+  "xiao": [
+    {
+      "char": "😄",
+      "trad": "😄",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "😆",
+      "trad": "😆",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "😅",
+      "trad": "😅",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "😂",
+      "trad": "😂",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    },
+    {
+      "char": "🤣",
+      "trad": "🤣",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 960
+    },
+    {
+      "char": "😊",
+      "trad": "😊",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 950
+    },
+    {
+      "char": "😇",
+      "trad": "😇",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 940
+    }
+  ],
+  "ku": [
+    {
+      "char": "😭",
+      "trad": "😭",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "😢",
+      "trad": "😢",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "☹️",
+      "trad": "☹️",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "😩",
+      "trad": "😩",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    },
+    {
+      "char": "😫",
+      "trad": "😫",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 960
+    }
+  ],
+  "nu": [
+    {
+      "char": "😡",
+      "trad": "😡",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "😠",
+      "trad": "😠",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "🤬",
+      "trad": "🤬",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "😤",
+      "trad": "😤",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    }
+  ],
+  "xin": [
+    {
+      "char": "❤️",
+      "trad": "❤️",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🧡",
+      "trad": "🧡",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "💛",
+      "trad": "💛",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "💚",
+      "trad": "💚",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    },
+    {
+      "char": "💙",
+      "trad": "💙",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 960
+    },
+    {
+      "char": "💜",
+      "trad": "💜",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 950
+    },
+    {
+      "char": "🖤",
+      "trad": "🖤",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 940
+    },
+    {
+      "char": "💕",
+      "trad": "💕",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 930
+    },
+    {
+      "char": "💞",
+      "trad": "💞",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 920
+    }
+  ],
+  "zan": [
+    {
+      "char": "👍",
+      "trad": "👍",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "👏",
+      "trad": "👏",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "🙌",
+      "trad": "🙌",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "💪",
+      "trad": "💪",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    }
+  ],
+  "huo": [
+    {
+      "char": "🔥",
+      "trad": "🔥",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🌋",
+      "trad": "🌋",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "shui": [
+    {
+      "char": "💧",
+      "trad": "💧",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "💦",
+      "trad": "💦",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "🌊",
+      "trad": "🌊",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "🛀",
+      "trad": "🛀",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    }
+  ],
+  "taiyang": [
+    {
+      "char": "☀️",
+      "trad": "☀️",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🌞",
+      "trad": "🌞",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "yue亮": [
+    {
+      "char": "🌙",
+      "trad": "🌙",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🌙",
+      "trad": "🌙",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "🌛",
+      "trad": "🌛",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "🌜",
+      "trad": "🌜",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    }
+  ],
+  "ok": [
+    {
+      "char": "👌",
+      "trad": "👌",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "v": [
+    {
+      "char": "✌️",
+      "trad": "✌️",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "doge": [
+    {
+      "char": "🐶",
+      "trad": "🐶",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🐕",
+      "trad": "🐕",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "mao": [
+    {
+      "char": "🐱",
+      "trad": "🐱",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🐈",
+      "trad": "🐈",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "meigui": [
+    {
+      "char": "🌹",
+      "trad": "🌹",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "liwu": [
+    {
+      "char": "🎁",
+      "trad": "🎁",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shengri": [
+    {
+      "char": "🎂",
+      "trad": "🎂",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🎈",
+      "trad": "🎈",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "ij": [
+    {
+      "char": "📱",
+      "trad": "📱",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "💻",
+      "trad": "💻",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "💻",
+      "trad": "💻",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    }
+  ],
+  "diannao": [
+    {
+      "char": "💻",
+      "trad": "💻",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🖥️",
+      "trad": "🖥️",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "shouji": [
+    {
+      "char": "📱",
+      "trad": "📱",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qian": [
+    {
+      "char": "💰",
+      "trad": "💰",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "💵",
+      "trad": "💵",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    },
+    {
+      "char": "💴",
+      "trad": "💴",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 980
+    },
+    {
+      "char": "💶",
+      "trad": "💶",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 970
+    },
+    {
+      "char": "💷",
+      "trad": "💷",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 960
+    }
+  ],
+  "kaixin": [
+    {
+      "char": "🥳",
+      "trad": "🥳",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "😄",
+      "trad": "😄",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ],
+  "se": [
+    {
+      "char": "😍",
+      "trad": "😍",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🤩",
+      "trad": "🤩",
+      "en": "Emoji",
+      "category": "emoji",
+      "weight": 990
+    }
+  ]
+}
