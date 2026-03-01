@@ -117,6 +117,7 @@ pub struct Processor {
     pub double_pinyin_scheme: crate::config::DoublePinyinScheme,
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: crate::config::FuzzyPinyinConfig,
+    pub enable_traditional: bool,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -253,6 +254,7 @@ impl Processor {
                 z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
                 an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
             },
+            enable_traditional: false,
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -271,6 +273,7 @@ impl Processor {
         self.double_pinyin_scheme = conf.input.double_pinyin_scheme.clone();
         self.enable_fuzzy_pinyin = conf.input.enable_fuzzy_pinyin;
         self.fuzzy_config = conf.input.fuzzy_config.clone();
+        self.enable_traditional = conf.input.enable_traditional;
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -1129,7 +1132,7 @@ impl Processor {
         }
 
         // 我们尝试两种检索策略：全量检索 (raw) 和 智能切分检索 (smart)
-        let mut final_matches: Vec<(String, String, String, String, u32, bool)> = Vec::new();
+        let mut final_matches: Vec<(String, String, String, String, String, u32, bool)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
         // 策略 1: 原始检索逻辑 (保持对空格、辅助码的支持)
@@ -1143,20 +1146,20 @@ impl Processor {
                 if let Some(d) = self.tries.get(profile) {
                     for py in &pinyin_variants {
                         if let Some(m) = d.get_all_exact(py) {
-                            for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, true)); }
+                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, true)); }
                         }
                         if self.enable_prefix_matching && !py.is_empty() {
                             // 如果输入较长，限制 bfs 搜索的数量，以免淹没简拼结果
                             let limit = if part.aux_code.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
                             let m = d.search_bfs(py, limit);
-                            for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, false)); }
+                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, false)); }
                         }
                     }
                 }
             }
-            matches.sort_by(|a, b| b.5.cmp(&a.5).then_with(|| b.4.cmp(&a.4)));
-            if let Some((w, _, _, _, _, _)) = matches.get(part.specified_idx.unwrap_or(1).saturating_sub(1)) {
-                greedy_sentence.push_str(w);
+            matches.sort_by(|a, b| b.6.cmp(&a.6).then_with(|| b.5.cmp(&a.5)));
+            if let Some((w, tr, _, _, _, _, _)) = matches.get(part.specified_idx.unwrap_or(1).saturating_sub(1)) {
+                greedy_sentence.push_str(if self.enable_traditional { tr } else { w });
             } else {
                 greedy_sentence.push_str(&part.raw);
             }
@@ -1166,7 +1169,7 @@ impl Processor {
         for m in last_matches_raw {
             if let Some(ref aux) = raw_parsed.last().and_then(|p| p.aux_code.as_ref()) {
                 let aux_lower = aux.to_lowercase();
-                if !m.3.to_lowercase().starts_with(&aux_lower) {
+                if !m.4.to_lowercase().starts_with(&aux_lower) {
                     continue;
                 }
             }
@@ -1182,9 +1185,9 @@ impl Processor {
                         let mut modified_segments = smart_segments.clone();
                         modified_segments[0] = v.clone();
                         let m = d.search_abbreviation(&modified_segments, &self.syllables, 50);
-                        for (w, t, e, s, weight) in m {
+                        for (w, tr, t, e, s, weight) in m {
                             // 将简拼匹配视为准精确匹配 (true)，以提高其在最终列表中的排序
-                            if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, true)); }
+                            if seen.insert(w.clone()) { final_matches.push((w, tr, t, e, s, weight, true)); }
                         }
                     }
                 }
@@ -1194,7 +1197,7 @@ impl Processor {
         // 3. 排序与结果填充
         final_matches.sort_by(|a, b| {
             // 排序规则：精确匹配 > 权重 > 长度
-            b.5.cmp(&a.5).then_with(|| b.4.cmp(&a.4)).then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
+            b.6.cmp(&a.6).then_with(|| b.5.cmp(&a.5)).then_with(|| a.0.chars().count().cmp(&b.0.chars().count()))
         });
 
         self.joined_sentence = if self.buffer.ends_with(' ') { format!("{} ", greedy_sentence) } else { greedy_sentence };
@@ -1205,8 +1208,8 @@ impl Processor {
         self.candidate_hints.clear();
         self.has_dict_match = !final_matches.is_empty();
 
-        for (cand, tone, en, stroke_aux, _, _) in final_matches {
-            self.candidates.push(cand);
+        for (cand, trad, tone, en, stroke_aux, _, _) in final_matches {
+            self.candidates.push(if self.enable_traditional { trad } else { cand });
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
             

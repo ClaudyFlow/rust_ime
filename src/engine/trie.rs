@@ -28,7 +28,7 @@ impl Trie {
         Ok(Self { index, data: data_data })
     }
 
-    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String, String, String, u32)>> {
+    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String, String, String, String, u32)>> {
         let offset = self.index.get(pinyin)? as usize;
         Some(self.read_block(offset))
     }
@@ -50,7 +50,7 @@ impl Trie {
         false
     }
 
-    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String, String, String, u32)> {
+    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
         let mut results = Vec::new();
         let matcher = fst::automaton::Str::new(prefix).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
@@ -58,7 +58,7 @@ impl Trie {
         while let Some((_, offset)) = stream.next() {
             let pairs = self.read_block(offset as usize);
             for pair in pairs {
-                if !results.iter().any(|(w, _, _, _, _)| w == &pair.0) {
+                if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
                     results.push(pair);
                     if results.len() >= limit { return results; }
                 }
@@ -67,7 +67,7 @@ impl Trie {
         results
     }
 
-    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<(String, String, String, String, u32)> {
+    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
         if segments.is_empty() { return Vec::new(); }
         let mut results = Vec::new();
         
@@ -81,7 +81,7 @@ impl Trie {
             if self.matches_segments(&key, segments, syllables) {
                 let pairs = self.read_block(offset as usize);
                 for pair in pairs {
-                    if !results.iter().any(|(w, _, _, _, _)| w == &pair.0) {
+                    if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
                         results.push(pair);
                         if results.len() >= limit { return results; }
                     }
@@ -115,13 +115,6 @@ impl Trie {
                 }
             }
             if !found_match {
-                // 特殊处理：如果片段本身不是任何已知完整音节的前缀，
-                // 也要允许它尝试作为当前 key 开头的匹配（针对某些不规范切分）
-                if current_key.starts_with(seg) {
-                   // 尝试跳过该片段对应的逻辑音节长度（简化处理：跳过 seg 长度并寻找下一个音节起始）
-                   // 但为了稳妥，这里我们坚持音节对齐
-                   return false;
-                }
                 return false;
             }
         }
@@ -129,7 +122,7 @@ impl Trie {
     }
 
     #[allow(dead_code)]
-    pub fn get_random_entry(&self) -> Option<(String, String, String, String, u32)> {
+    pub fn get_random_entry(&self) -> Option<(String, String, String, String, String, u32)> {
         let len = self.index.len();
         if len == 0 { return None; }
         
@@ -149,7 +142,7 @@ impl Trie {
         None
     }
 
-    fn read_block(&self, offset: usize) -> Vec<(String, String, String, String, u32)> {
+    fn read_block(&self, offset: usize) -> Vec<(String, String, String, String, String, u32)> {
         let data = self.data.as_ref();
         if offset + 4 > data.len() { return Vec::new(); }
         
@@ -164,6 +157,13 @@ impl Trie {
             if cursor + w_len > data.len() { break; }
             let word = String::from_utf8_lossy(&data[cursor..cursor+w_len]).to_string();
             cursor += w_len;
+
+            if cursor + 2 > data.len() { break; }
+            let tr_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
+            cursor += 2;
+            if cursor + tr_len > data.len() { break; }
+            let trad = String::from_utf8_lossy(&data[cursor..cursor+tr_len]).to_string();
+            cursor += tr_len;
             
             if cursor + 2 > data.len() { break; }
             let t_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
@@ -190,7 +190,7 @@ impl Trie {
             let weight = u32::from_le_bytes(data[cursor..cursor+4].try_into().unwrap_or([0; 4]));
             cursor += 4;
             
-            results.push((word, tone, en, stroke_aux, weight));
+            results.push((word, trad, tone, en, stroke_aux, weight));
         }
         results
     }

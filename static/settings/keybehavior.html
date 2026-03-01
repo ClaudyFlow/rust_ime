@@ -31,6 +31,10 @@
                 <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
             </div>
             <div class="setting-item">
+                <div class="info"><div class="title">繁体模式</div><div class="desc">开启后输出繁体中文</div></div>
+                <label class="switch"><input type="checkbox" id="enable_traditional"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
                 <div class="info"><div class="title">启用个人词库</div><div class="desc">记录选词频率，实现自学习排序</div></div>
                 <label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label>
             </div>
@@ -108,6 +112,7 @@
             bindInput('enable_prefix_matching', 'input');
             bindInput('enable_abbreviation_matching', 'input');
             bindInput('enable_anti_typo', 'input');
+            bindInput('enable_traditional', 'input');
             bindInput('enable_user_dict', 'input');
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');

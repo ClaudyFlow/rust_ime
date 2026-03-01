@@ -113,6 +113,7 @@ pub struct Input {
     pub double_pinyin_scheme: DoublePinyinScheme,
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: FuzzyPinyinConfig,
+    pub enable_traditional: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -324,6 +325,7 @@ impl Config {
                     z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
                     an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
                 },
+                enable_traditional: false,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
