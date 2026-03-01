@@ -883,20 +883,20 @@ impl Processor {
                 if shift_pressed {
                     if let Some(hint) = self.candidate_hints.get(self.selected) {
                         if !hint.is_empty() {
-                            return self.commit_candidate(hint.clone());
+                            return self.commit_candidate(hint.clone(), 99);
                         }
                     }
                 }
-                if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
-                if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone()); }
+                if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
+                if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone(), 99); }
                 self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
             }
             VirtualKey::Enter => {
                 self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
                 self.last_lookup_pinyin.clear(); // 清空检索记录，确保不触发学习
-                if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out); }
-                if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { return self.commit_candidate(word.clone()); } }
-                if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone()) } else { let out = self.buffer.clone(); self.commit_candidate(out) }
+                if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out, 99); }
+                if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
+                if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone(), 99) } else { let out = self.buffer.clone(); self.commit_candidate(out, 99) }
             }
             VirtualKey::Esc | VirtualKey::Delete => { 
                 self.commit_history.clear(); // 取消输入，清空历史
@@ -945,7 +945,7 @@ impl Processor {
                 let digit = key_to_digit(key).unwrap_or(0);
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
                     let abs_idx = self.page + digit - 1;
-                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone()); }
+                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
                 }
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
                 if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
@@ -1027,13 +1027,15 @@ impl Processor {
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
 
-    fn commit_candidate(&mut self, mut cand: String) -> Action {
+    fn commit_candidate(&mut self, mut cand: String, index: usize) -> Action {
         let now = Instant::now();
         let py = self.last_lookup_pinyin.clone();
 
         if self.enable_user_dict && !py.is_empty() {
-            // 1. 记录单个词的频率
-            self.record_usage(&py, &cand);
+            // 1. 记录单个词的频率 (如果开启了首词固定，且选中的是第一个，则不调频)
+            if !self.enable_fixed_first_candidate || index > 0 {
+                self.record_usage(&py, &cand);
+            }
 
             // 2. 尝试与历史记录合并组词
             // 如果距离上次上屏超过 3 秒，清空历史
@@ -1111,7 +1113,7 @@ impl Processor {
                 self.candidate_hints = filtered_hints;
                 if self.candidates.len() == 1 {
                     let word = self.candidates[0].clone();
-                    return Some(self.commit_candidate(word));
+                    return Some(self.commit_candidate(word, 0));
                 }
             } else {
                 self.candidates.clear();
@@ -1266,7 +1268,7 @@ impl Processor {
                 self.candidate_hints = fh;
                 if self.candidates.len() == 1 {
                     let word = self.candidates[0].clone();
-                    return Some(self.commit_candidate(word));
+                    return Some(self.commit_candidate(word, 0));
                 }
             }
         }
@@ -1318,7 +1320,7 @@ impl Processor {
         for p in &self.active_profiles {
             if let Some(d) = self.tries.get(p) { if d.has_longer_match(raw_input) { total_longer += 1; break; } }
         }
-        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone())); }
+        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone(), 0)); }
         None
     }
 
@@ -1474,6 +1476,12 @@ mod tests {
                             initials: std::collections::HashMap::new(),
                             rimes: std::collections::HashMap::new(),
                         },
+                        enable_fuzzy_pinyin: false,
+                        fuzzy_config: crate::config::FuzzyPinyinConfig {
+                            z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
+                            an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
+                        },
+                        enable_traditional: false,
                         user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
                         commit_history: Vec::new(), last_commit_time: Instant::now(),
                         user_dict_tx: None,

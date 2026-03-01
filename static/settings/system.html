@@ -34,6 +34,13 @@
             </div>
             <div class="setting-item">
                 <div class="info">
+                    <div class="title">首词固定</div>
+                    <div class="desc">词库首位候选词位置固定，不参与自动调频。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_fixed_first_candidate"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info">
                     <div class="title">上屏模式</div>
                     <div class="desc">词模式：空格直接上屏；句模式：支持连续输入。</div>
                 </div>
@@ -102,6 +109,7 @@
             `).join('');
 
             bindInput('enable_traditional', 'input');
+            bindInput('enable_fixed_first_candidate', 'input');
             bindInput('commit_mode', 'input');
             bindInput('page_size', 'input');
             bindInput('autostart', 'input');
