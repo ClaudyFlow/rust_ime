@@ -235,7 +235,7 @@ impl Config {
                 show_pinyin_hint: true,
             },
             input: Input {
-                autostart: false,
+                autostart: true,
                 commit_mode: "single".to_string(),
                 default_profile: "chinese".to_string(),
                 paste_method: "shift_insert".to_string(),

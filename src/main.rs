@@ -336,6 +336,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut current_config = load_config();
+    
+    // 强制同步自启状态到系统
+    if current_config.input.autostart {
+        let _ = setup_autostart();
+    }
+
     let mut profiles_changed = false;
     if let Ok(entries) = std::fs::read_dir("dicts") {
         for entry in entries.flatten() {

@@ -377,3 +377,61 @@ input:checked + .slider:before {
 .kb-key-main { font-size: 16px; font-weight: 700; }
 .kb-key-sub { font-size: 10px; color: var(--apple-secondary); overflow: hidden; white-space: nowrap; max-width: 45px; text-align: center; }
 .kb-edit-box { display: none; background: var(--apple-card); border-radius: 15px; padding: 20px; margin-top: 20px; border: 1px solid var(--apple-border); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+
+.checkbox-container {
+    display: block;
+    position: relative;
+    padding-left: 28px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    user-select: none;
+    color: #586069;
+}
+
+.checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    height: 18px;
+    width: 18px;
+    background-color: #eee;
+    border-radius: 4px;
+    transition: 0.2s;
+}
+
+.checkbox-container:hover input ~ .checkmark {
+    background-color: #ccc;
+}
+
+.checkbox-container input:checked ~ .checkmark {
+    background-color: #0969da;
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-container .checkmark:after {
+    left: 6px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
