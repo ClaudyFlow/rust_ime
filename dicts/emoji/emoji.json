@@ -3,435 +3,1558 @@
     {
       "char": "😄",
       "trad": "😄",
-      "en": "Emoji",
+      "en": "笑",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "weixiao": [
     {
-      "char": "😆",
-      "trad": "😆",
-      "en": "Emoji",
+      "char": "😄",
+      "trad": "😄",
+      "en": "微笑",
       "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "😅",
-      "trad": "😅",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "😂",
-      "trad": "😂",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
-    },
-    {
-      "char": "🤣",
-      "trad": "🤣",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 960
+      "weight": 1000
     },
     {
       "char": "😊",
       "trad": "😊",
-      "en": "Emoji",
+      "en": "微笑",
       "category": "emoji",
-      "weight": 950
-    },
-    {
-      "char": "😇",
-      "trad": "😇",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 940
+      "weight": 1000
     }
   ],
-  "ku": [
+  "kaixin": [
     {
-      "char": "😭",
-      "trad": "😭",
-      "en": "Emoji",
+      "char": "😄",
+      "trad": "😄",
+      "en": "开心",
       "category": "emoji",
       "weight": 1000
     },
     {
-      "char": "😢",
-      "trad": "😢",
-      "en": "Emoji",
+      "char": "🥳",
+      "trad": "🥳",
+      "en": "开心",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
+    }
+  ],
+  "haha": [
+    {
+      "char": "😄",
+      "trad": "😄",
+      "en": "哈哈",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiaoku": [
+    {
+      "char": "🤣",
+      "trad": "🤣",
+      "en": "笑哭",
+      "category": "emoji",
+      "weight": 1000
     },
     {
-      "char": "☹️",
-      "trad": "☹️",
-      "en": "Emoji",
+      "char": "😂",
+      "trad": "😂",
+      "en": "笑哭",
       "category": "emoji",
-      "weight": 980
+      "weight": 1000
+    }
+  ],
+  "geili": [
+    {
+      "char": "🤣",
+      "trad": "🤣",
+      "en": "给力",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiaosi": [
+    {
+      "char": "😂",
+      "trad": "😂",
+      "en": "笑死",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xingfu": [
+    {
+      "char": "😊",
+      "trad": "😊",
+      "en": "幸福",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "se": [
+    {
+      "char": "😍",
+      "trad": "😍",
+      "en": "色",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xihuan": [
+    {
+      "char": "😍",
+      "trad": "😍",
+      "en": "喜欢",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "aixinyan": [
+    {
+      "char": "😍",
+      "trad": "😍",
+      "en": "爱心眼",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qinqin": [
+    {
+      "char": "😘",
+      "trad": "😘",
+      "en": "亲亲",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "memeda": [
+    {
+      "char": "😘",
+      "trad": "😘",
+      "en": "么么哒",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "daku": [
+    {
+      "char": "😭",
+      "trad": "😭",
+      "en": "大哭",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "liulei": [
+    {
+      "char": "😭",
+      "trad": "😭",
+      "en": "流泪",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shangxin": [
+    {
+      "char": "😭",
+      "trad": "😭",
+      "en": "伤心",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "ku": [
+    {
+      "char": "苦",
+      "trad": "苦",
+      "en": "苦",
+      "category": "emoji",
+      "weight": 1000
     },
     {
-      "char": "😩",
-      "trad": "😩",
-      "en": "Emoji",
+      "char": "😎",
+      "trad": "😎",
+      "en": "酷",
       "category": "emoji",
-      "weight": 970
-    },
+      "weight": 1000
+    }
+  ],
+  "nanshou": [
     {
-      "char": "😫",
-      "trad": "😫",
-      "en": "Emoji",
+      "char": "苦",
+      "trad": "苦",
+      "en": "难受",
       "category": "emoji",
-      "weight": 960
+      "weight": 1000
+    }
+  ],
+  "kule": [
+    {
+      "char": "苦",
+      "trad": "苦",
+      "en": "枯了",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "jingkong": [
+    {
+      "char": "😱",
+      "trad": "😱",
+      "en": "惊恐",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiasi": [
+    {
+      "char": "😱",
+      "trad": "😱",
+      "en": "吓死",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shengqi": [
+    {
+      "char": "😡",
+      "trad": "😡",
+      "en": "生气",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "fahuo": [
+    {
+      "char": "😡",
+      "trad": "😡",
+      "en": "发火",
+      "category": "emoji",
+      "weight": 1000
     }
   ],
   "nu": [
     {
       "char": "😡",
       "trad": "😡",
-      "en": "Emoji",
+      "en": "怒",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "😠",
-      "trad": "😠",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "🤬",
-      "trad": "🤬",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "😤",
-      "trad": "😤",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
     }
   ],
-  "xin": [
+  "xu": [
     {
-      "char": "❤️",
-      "trad": "❤️",
-      "en": "Emoji",
+      "char": "🤫",
+      "trad": "🤫",
+      "en": "嘘",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "🧡",
-      "trad": "🧡",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "💛",
-      "trad": "💛",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "💚",
-      "trad": "💚",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
-    },
-    {
-      "char": "💙",
-      "trad": "💙",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 960
-    },
-    {
-      "char": "💜",
-      "trad": "💜",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 950
-    },
-    {
-      "char": "🖤",
-      "trad": "🖤",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 940
-    },
-    {
-      "char": "💕",
-      "trad": "💕",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 930
-    },
-    {
-      "char": "💞",
-      "trad": "💞",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 920
     }
   ],
-  "zan": [
+  "anjing": [
     {
-      "char": "👍",
-      "trad": "👍",
-      "en": "Emoji",
+      "char": "🤫",
+      "trad": "🤫",
+      "en": "安静",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "sikao": [
     {
-      "char": "👏",
-      "trad": "👏",
-      "en": "Emoji",
+      "char": "🤔",
+      "trad": "🤔",
+      "en": "思考",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
+    }
+  ],
+  "xiangyixiang": [
+    {
+      "char": "🤔",
+      "trad": "🤔",
+      "en": "想一想",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qingzhu": [
+    {
+      "char": "🥳",
+      "trad": "🥳",
+      "en": "庆祝",
+      "category": "emoji",
+      "weight": 1000
     },
     {
       "char": "🙌",
       "trad": "🙌",
-      "en": "Emoji",
+      "en": "庆祝",
       "category": "emoji",
-      "weight": 980
+      "weight": 1000
+    }
+  ],
+  "mojing": [
+    {
+      "char": "😎",
+      "trad": "😎",
+      "en": "墨镜",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "tianshi": [
+    {
+      "char": "😇",
+      "trad": "😇",
+      "en": "天使",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shanliang": [
+    {
+      "char": "😇",
+      "trad": "😇",
+      "en": "善良",
+      "category": "emoji",
+      "weight": 1000
     },
     {
-      "char": "💪",
-      "trad": "💪",
-      "en": "Emoji",
+      "char": "✨",
+      "trad": "✨",
+      "en": "闪亮",
       "category": "emoji",
-      "weight": 970
+      "weight": 1000
+    }
+  ],
+  "xiaochou": [
+    {
+      "char": "🤡",
+      "trad": "🤡",
+      "en": "小丑",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dabian": [
+    {
+      "char": "💩",
+      "trad": "💩",
+      "en": "大便",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "bianbian": [
+    {
+      "char": "💩",
+      "trad": "💩",
+      "en": "便便",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "gui": [
+    {
+      "char": "👻",
+      "trad": "👻",
+      "en": "鬼",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "youling": [
+    {
+      "char": "👻",
+      "trad": "👻",
+      "en": "幽灵",
+      "category": "emoji",
+      "weight": 1000
     }
   ],
   "huo": [
     {
       "char": "🔥",
       "trad": "🔥",
-      "en": "Emoji",
+      "en": "火",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "remen": [
+    {
+      "char": "🔥",
+      "trad": "🔥",
+      "en": "热门",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "huore": [
+    {
+      "char": "🔥",
+      "trad": "🔥",
+      "en": "火热",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xingxing": [
+    {
+      "char": "✨",
+      "trad": "✨",
+      "en": "星星",
       "category": "emoji",
       "weight": 1000
     },
     {
-      "char": "🌋",
-      "trad": "🌋",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    }
-  ],
-  "shui": [
-    {
-      "char": "💧",
-      "trad": "💧",
-      "en": "Emoji",
+      "char": "⭐",
+      "trad": "⭐",
+      "en": "星星",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "💦",
-      "trad": "💦",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "🌊",
-      "trad": "🌊",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "🛀",
-      "trad": "🛀",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
     }
   ],
-  "taiyang": [
+  "wujiaoxing": [
     {
-      "char": "☀️",
-      "trad": "☀️",
-      "en": "Emoji",
+      "char": "⭐",
+      "trad": "⭐",
+      "en": "五角星",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "🌞",
-      "trad": "🌞",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
     }
   ],
-  "yue亮": [
+  "yibaifen": [
     {
-      "char": "🌙",
-      "trad": "🌙",
-      "en": "Emoji",
+      "char": "💯",
+      "trad": "💯",
+      "en": "一百分",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "🌙",
-      "trad": "🌙",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "🌛",
-      "trad": "🌛",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "🌜",
-      "trad": "🌜",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
     }
   ],
-  "ok": [
+  "manfen": [
+    {
+      "char": "💯",
+      "trad": "💯",
+      "en": "满分",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zan": [
+    {
+      "char": "👍",
+      "trad": "👍",
+      "en": "赞",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dianzan": [
+    {
+      "char": "👍",
+      "trad": "👍",
+      "en": "点赞",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hao": [
+    {
+      "char": "👍",
+      "trad": "👍",
+      "en": "好",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "bang": [
+    {
+      "char": "👍",
+      "trad": "👍",
+      "en": "棒",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "cha": [
+    {
+      "char": "👎",
+      "trad": "👎",
+      "en": "差",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "buxing": [
+    {
+      "char": "👎",
+      "trad": "👎",
+      "en": "不行",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "laji": [
+    {
+      "char": "👎",
+      "trad": "👎",
+      "en": "垃圾",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "haode": [
     {
       "char": "👌",
       "trad": "👌",
-      "en": "Emoji",
+      "en": "好的",
       "category": "emoji",
       "weight": 1000
     }
   ],
-  "v": [
+  "OK": [
+    {
+      "char": "👌",
+      "trad": "👌",
+      "en": "OK",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "ye": [
     {
       "char": "✌️",
       "trad": "✌️",
-      "en": "Emoji",
+      "en": "耶",
       "category": "emoji",
       "weight": 1000
     }
   ],
-  "doge": [
+  "shengli": [
     {
-      "char": "🐶",
-      "trad": "🐶",
-      "en": "Emoji",
+      "char": "✌️",
+      "trad": "✌️",
+      "en": "胜利",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "haoyun": [
+    {
+      "char": "🤞",
+      "trad": "🤞",
+      "en": "好运",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "bixin": [
+    {
+      "char": "🫰",
+      "trad": "🫰",
+      "en": "比心",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "aixin": [
+    {
+      "char": "🫰",
+      "trad": "🫰",
+      "en": "爱心",
       "category": "emoji",
       "weight": 1000
     },
     {
-      "char": "🐕",
-      "trad": "🐕",
-      "en": "Emoji",
+      "char": "❤️",
+      "trad": "❤️",
+      "en": "爱心",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
+    }
+  ],
+  "baituo": [
+    {
+      "char": "🙏",
+      "trad": "🙏",
+      "en": "拜托",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qidao": [
+    {
+      "char": "🙏",
+      "trad": "🙏",
+      "en": "祈祷",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiexie": [
+    {
+      "char": "🙏",
+      "trad": "🙏",
+      "en": "谢谢",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "guzhang": [
+    {
+      "char": "👏",
+      "trad": "👏",
+      "en": "鼓掌",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "paishou": [
+    {
+      "char": "👏",
+      "trad": "👏",
+      "en": "拍手",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "wansui": [
+    {
+      "char": "🙌",
+      "trad": "🙌",
+      "en": "万岁",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "jiayou": [
+    {
+      "char": "💪",
+      "trad": "💪",
+      "en": "加油",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "liliang": [
+    {
+      "char": "💪",
+      "trad": "💪",
+      "en": "力量",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qiang": [
+    {
+      "char": "💪",
+      "trad": "💪",
+      "en": "强",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "🔫",
+      "trad": "🔫",
+      "en": "枪",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "woshou": [
+    {
+      "char": "🤝",
+      "trad": "🤝",
+      "en": "握手",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hezuo": [
+    {
+      "char": "🤝",
+      "trad": "🤝",
+      "en": "合作",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xin": [
+    {
+      "char": "❤️",
+      "trad": "❤️",
+      "en": "心",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "✉️",
+      "trad": "✉️",
+      "en": "信",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hongxin": [
+    {
+      "char": "❤️",
+      "trad": "❤️",
+      "en": "红心",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xinsui": [
+    {
+      "char": "💔",
+      "trad": "💔",
+      "en": "心碎",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "gou": [
+    {
+      "char": "🐶",
+      "trad": "🐶",
+      "en": "狗",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "gougou": [
+    {
+      "char": "🐶",
+      "trad": "🐶",
+      "en": "狗狗",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "wangwang": [
+    {
+      "char": "🐶",
+      "trad": "🐶",
+      "en": "汪汪",
+      "category": "emoji",
+      "weight": 1000
     }
   ],
   "mao": [
     {
       "char": "🐱",
       "trad": "🐱",
-      "en": "Emoji",
+      "en": "猫",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "maomi": [
     {
-      "char": "🐈",
-      "trad": "🐈",
-      "en": "Emoji",
+      "char": "🐱",
+      "trad": "🐱",
+      "en": "猫咪",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
+    }
+  ],
+  "miaomiao": [
+    {
+      "char": "🐱",
+      "trad": "🐱",
+      "en": "喵喵",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "haozi": [
+    {
+      "char": "🐭",
+      "trad": "🐭",
+      "en": "耗子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "laoshu": [
+    {
+      "char": "🐭",
+      "trad": "🐭",
+      "en": "老鼠",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "cangshu": [
+    {
+      "char": "🐹",
+      "trad": "🐹",
+      "en": "仓鼠",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "tuzi": [
+    {
+      "char": "🐰",
+      "trad": "🐰",
+      "en": "兔子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "tu": [
+    {
+      "char": "🐰",
+      "trad": "🐰",
+      "en": "兔",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "huli": [
+    {
+      "char": "🦊",
+      "trad": "🦊",
+      "en": "狐狸",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiong": [
+    {
+      "char": "🐻",
+      "trad": "🐻",
+      "en": "熊",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiongmao": [
+    {
+      "char": "🐼",
+      "trad": "🐼",
+      "en": "熊猫",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "kaola": [
+    {
+      "char": "🐨",
+      "trad": "🐨",
+      "en": "考拉",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "laohu": [
+    {
+      "char": "🐯",
+      "trad": "🐯",
+      "en": "老虎",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hu": [
+    {
+      "char": "🐯",
+      "trad": "🐯",
+      "en": "虎",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shizi": [
+    {
+      "char": "🦁",
+      "trad": "🦁",
+      "en": "狮子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "niu": [
+    {
+      "char": "🐮",
+      "trad": "🐮",
+      "en": "牛",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zhu": [
+    {
+      "char": "🐷",
+      "trad": "🐷",
+      "en": "猪",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qingwa": [
+    {
+      "char": "🐸",
+      "trad": "🐸",
+      "en": "青蛙",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "houzi": [
+    {
+      "char": "🐵",
+      "trad": "🐵",
+      "en": "猴子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "ji": [
+    {
+      "char": "🐔",
+      "trad": "🐔",
+      "en": "鸡",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qie": [
+    {
+      "char": "🐧",
+      "trad": "🐧",
+      "en": "企鹅",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "niao": [
+    {
+      "char": "🐦",
+      "trad": "🐦",
+      "en": "鸟",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiaoji": [
+    {
+      "char": "🐤",
+      "trad": "🐤",
+      "en": "小鸡",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dujiaoshou": [
+    {
+      "char": "🦄",
+      "trad": "🦄",
+      "en": "独角兽",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "mifeng": [
+    {
+      "char": "🐝",
+      "trad": "🐝",
+      "en": "蜜蜂",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hudie": [
+    {
+      "char": "🦋",
+      "trad": "🦋",
+      "en": "蝴蝶",
+      "category": "emoji",
+      "weight": 1000
     }
   ],
   "meigui": [
     {
       "char": "🌹",
       "trad": "🌹",
-      "en": "Emoji",
+      "en": "玫瑰",
       "category": "emoji",
       "weight": 1000
     }
   ],
-  "liwu": [
+  "hua": [
     {
-      "char": "🎁",
-      "trad": "🎁",
-      "en": "Emoji",
+      "char": "🌹",
+      "trad": "🌹",
+      "en": "花",
       "category": "emoji",
       "weight": 1000
     }
   ],
-  "shengri": [
+  "xiangrikui": [
+    {
+      "char": "🌻",
+      "trad": "🌻",
+      "en": "向日葵",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shu": [
+    {
+      "char": "🌲",
+      "trad": "🌲",
+      "en": "树",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "📚",
+      "trad": "📚",
+      "en": "书",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "senlin": [
+    {
+      "char": "🌲",
+      "trad": "🌲",
+      "en": "森林",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "mogu": [
+    {
+      "char": "🍄",
+      "trad": "🍄",
+      "en": "蘑菇",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "pingguo": [
+    {
+      "char": "🍎",
+      "trad": "🍎",
+      "en": "苹果",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hongpingguo": [
+    {
+      "char": "🍎",
+      "trad": "🍎",
+      "en": "红苹果",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qingpingguo": [
+    {
+      "char": "🍏",
+      "trad": "🍏",
+      "en": "青苹果",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiangjiao": [
+    {
+      "char": "🍌",
+      "trad": "🍌",
+      "en": "香蕉",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xigua": [
+    {
+      "char": "🍉",
+      "trad": "🍉",
+      "en": "西瓜",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "caomei": [
+    {
+      "char": "🍓",
+      "trad": "🍓",
+      "en": "草莓",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yingtao": [
+    {
+      "char": "🍒",
+      "trad": "🍒",
+      "en": "樱桃",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "taozi": [
+    {
+      "char": "🍑",
+      "trad": "🍑",
+      "en": "桃子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "boluo": [
+    {
+      "char": "🍍",
+      "trad": "🍍",
+      "en": "菠萝",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "putao": [
+    {
+      "char": "🍇",
+      "trad": "🍇",
+      "en": "葡萄",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "juzi": [
+    {
+      "char": "🍊",
+      "trad": "🍊",
+      "en": "橘子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "ningmeng": [
+    {
+      "char": "🍋",
+      "trad": "🍋",
+      "en": "柠檬",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "mihoutao": [
+    {
+      "char": "🥝",
+      "trad": "🥝",
+      "en": "猕猴桃",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xihongshi": [
+    {
+      "char": "🍅",
+      "trad": "🍅",
+      "en": "西红柿",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "fanqie": [
+    {
+      "char": "🍅",
+      "trad": "🍅",
+      "en": "番茄",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yumi": [
+    {
+      "char": "🌽",
+      "trad": "🌽",
+      "en": "玉米",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "rou": [
+    {
+      "char": "🥩",
+      "trad": "🥩",
+      "en": "肉",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "niupai": [
+    {
+      "char": "🥩",
+      "trad": "🥩",
+      "en": "牛排",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hanbao": [
+    {
+      "char": "🍔",
+      "trad": "🍔",
+      "en": "汉堡",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shutiao": [
+    {
+      "char": "🍟",
+      "trad": "🍟",
+      "en": "薯条",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "pisa": [
+    {
+      "char": "🍕",
+      "trad": "🍕",
+      "en": "披萨",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "biandang": [
+    {
+      "char": "🍱",
+      "trad": "🍱",
+      "en": "便当",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "lamian": [
+    {
+      "char": "🍜",
+      "trad": "🍜",
+      "en": "拉面",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "miantiao": [
+    {
+      "char": "🍜",
+      "trad": "🍜",
+      "en": "面条",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "huoguo": [
+    {
+      "char": "🍲",
+      "trad": "🍲",
+      "en": "火锅",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shousi": [
+    {
+      "char": "🍣",
+      "trad": "🍣",
+      "en": "寿司",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "jiaozi": [
+    {
+      "char": "🥟",
+      "trad": "🥟",
+      "en": "饺子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "bingqilin": [
+    {
+      "char": "🍦",
+      "trad": "🍦",
+      "en": "冰淇淋",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dangao": [
     {
       "char": "🎂",
       "trad": "🎂",
-      "en": "Emoji",
+      "en": "蛋糕",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "🎈",
-      "trad": "🎈",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
     }
   ],
-  "ij": [
+  "shengridangao": [
     {
-      "char": "📱",
-      "trad": "📱",
-      "en": "Emoji",
+      "char": "🎂",
+      "trad": "🎂",
+      "en": "生日蛋糕",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "bangbangtang": [
     {
-      "char": "💻",
-      "trad": "💻",
-      "en": "Emoji",
+      "char": "🍭",
+      "trad": "🍭",
+      "en": "棒棒糖",
       "category": "emoji",
-      "weight": 990
-    },
+      "weight": 1000
+    }
+  ],
+  "qiaokeli": [
     {
-      "char": "💻",
-      "trad": "💻",
-      "en": "Emoji",
+      "char": "🍫",
+      "trad": "🍫",
+      "en": "巧克力",
       "category": "emoji",
-      "weight": 980
+      "weight": 1000
+    }
+  ],
+  "pijiu": [
+    {
+      "char": "🍺",
+      "trad": "🍺",
+      "en": "啤酒",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "ganbei": [
+    {
+      "char": "🍻",
+      "trad": "🍻",
+      "en": "干杯",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "hongjiu": [
+    {
+      "char": "🍷",
+      "trad": "🍷",
+      "en": "红酒",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "kafei": [
+    {
+      "char": "☕",
+      "trad": "☕",
+      "en": "咖啡",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "kele": [
+    {
+      "char": "🥤",
+      "trad": "🥤",
+      "en": "可乐",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yinliao": [
+    {
+      "char": "🥤",
+      "trad": "🥤",
+      "en": "饮料",
+      "category": "emoji",
+      "weight": 1000
     }
   ],
   "diannao": [
     {
       "char": "💻",
       "trad": "💻",
-      "en": "Emoji",
+      "en": "电脑",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "bijiben": [
     {
-      "char": "🖥️",
-      "trad": "🖥️",
-      "en": "Emoji",
+      "char": "💻",
+      "trad": "💻",
+      "en": "笔记本",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
     }
   ],
   "shouji": [
     {
       "char": "📱",
       "trad": "📱",
-      "en": "Emoji",
+      "en": "手机",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dianhua": [
+    {
+      "char": "📱",
+      "trad": "📱",
+      "en": "电话",
+      "category": "emoji",
+      "weight": 1000
+    },
+    {
+      "char": "☎️",
+      "trad": "☎️",
+      "en": "电话",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shoubiao": [
+    {
+      "char": "⌚",
+      "trad": "⌚",
+      "en": "手表",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiangji": [
+    {
+      "char": "📷",
+      "trad": "📷",
+      "en": "相机",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "paizhao": [
+    {
+      "char": "📷",
+      "trad": "📷",
+      "en": "拍照",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "youxi": [
+    {
+      "char": "🎮",
+      "trad": "🎮",
+      "en": "游戏",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "youxiji": [
+    {
+      "char": "🎮",
+      "trad": "🎮",
+      "en": "游戏机",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qiche": [
+    {
+      "char": "🚗",
+      "trad": "🚗",
+      "en": "汽车",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "kaihuo": [
+    {
+      "char": "🚗",
+      "trad": "🚗",
+      "en": "开火",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zixingche": [
+    {
+      "char": "🚲",
+      "trad": "🚲",
+      "en": "自行车",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "huojian": [
+    {
+      "char": "🚀",
+      "trad": "🚀",
+      "en": "火箭",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "fashe": [
+    {
+      "char": "🚀",
+      "trad": "🚀",
+      "en": "发射",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "feiji": [
+    {
+      "char": "✈️",
+      "trad": "✈️",
+      "en": "飞机",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "fangzi": [
+    {
+      "char": "🏠",
+      "trad": "🏠",
+      "en": "房子",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "jia": [
+    {
+      "char": "🏠",
+      "trad": "🏠",
+      "en": "家",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yiyuan": [
+    {
+      "char": "🏥",
+      "trad": "🏥",
+      "en": "医院",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xuexiao": [
+    {
+      "char": "🏫",
+      "trad": "🏫",
+      "en": "学校",
       "category": "emoji",
       "weight": 1000
     }
@@ -440,69 +1563,216 @@
     {
       "char": "💰",
       "trad": "💰",
-      "en": "Emoji",
+      "en": "钱",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "💵",
-      "trad": "💵",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
-    },
-    {
-      "char": "💴",
-      "trad": "💴",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 980
-    },
-    {
-      "char": "💶",
-      "trad": "💶",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 970
-    },
-    {
-      "char": "💷",
-      "trad": "💷",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 960
     }
   ],
-  "kaixin": [
+  "facai": [
     {
-      "char": "🥳",
-      "trad": "🥳",
-      "en": "Emoji",
+      "char": "💰",
+      "trad": "💰",
+      "en": "发财",
       "category": "emoji",
       "weight": 1000
-    },
-    {
-      "char": "😄",
-      "trad": "😄",
-      "en": "Emoji",
-      "category": "emoji",
-      "weight": 990
     }
   ],
-  "se": [
+  "hongbao": [
     {
-      "char": "😍",
-      "trad": "😍",
-      "en": "Emoji",
+      "char": "💰",
+      "trad": "💰",
+      "en": "红包",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "zuanshi": [
     {
-      "char": "🤩",
-      "trad": "🤩",
-      "en": "Emoji",
+      "char": "💎",
+      "trad": "💎",
+      "en": "钻石",
       "category": "emoji",
-      "weight": 990
+      "weight": 1000
+    }
+  ],
+  "baoshi": [
+    {
+      "char": "💎",
+      "trad": "💎",
+      "en": "宝石",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "liwu": [
+    {
+      "char": "🎁",
+      "trad": "🎁",
+      "en": "礼物",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "songli": [
+    {
+      "char": "🎁",
+      "trad": "🎁",
+      "en": "送礼",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qiqiu": [
+    {
+      "char": "🎈",
+      "trad": "🎈",
+      "en": "气球",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "youjian": [
+    {
+      "char": "✉️",
+      "trad": "✉️",
+      "en": "邮件",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dushu": [
+    {
+      "char": "📚",
+      "trad": "📚",
+      "en": "读书",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zhuyi": [
+    {
+      "char": "💡",
+      "trad": "💡",
+      "en": "主意",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dengpao": [
+    {
+      "char": "💡",
+      "trad": "💡",
+      "en": "灯泡",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "dianchi": [
+    {
+      "char": "🔋",
+      "trad": "🔋",
+      "en": "电池",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zhadan": [
+    {
+      "char": "💣",
+      "trad": "💣",
+      "en": "炸弹",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "zuqiu": [
+    {
+      "char": "⚽",
+      "trad": "⚽",
+      "en": "足球",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "lanqiu": [
+    {
+      "char": "🏀",
+      "trad": "🏀",
+      "en": "篮球",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "caihong": [
+    {
+      "char": "🌈",
+      "trad": "🌈",
+      "en": "彩虹",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "taiyang": [
+    {
+      "char": "☀️",
+      "trad": "☀️",
+      "en": "太阳",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "qingtian": [
+    {
+      "char": "☀️",
+      "trad": "☀️",
+      "en": "晴天",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yueliang": [
+    {
+      "char": "🌙",
+      "trad": "🌙",
+      "en": "月亮",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiayu": [
+    {
+      "char": "☔",
+      "trad": "☔",
+      "en": "下雨",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "yu": [
+    {
+      "char": "☔",
+      "trad": "☔",
+      "en": "雨",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xiaxue": [
+    {
+      "char": "❄️",
+      "trad": "❄️",
+      "en": "下雪",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "xue": [
+    {
+      "char": "❄️",
+      "trad": "❄️",
+      "en": "雪",
+      "category": "emoji",
+      "weight": 1000
     }
   ]
 }
