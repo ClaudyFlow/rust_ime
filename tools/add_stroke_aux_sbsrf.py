@@ -35,32 +35,11 @@ def load_sbsrf_data():
                 
                 # 获取前两笔
                 s1 = SB_MAP.get(code[0])
-                s2 = SB_MAP.get(code[1]) if len(code) >= 2 else None
-                
-                # 获取末两笔
-                if len(code) >= 4:
-                    s3 = SB_MAP.get(code[-2])
-                    s4 = SB_MAP.get(code[-1])
-                elif len(code) == 3:
-                    s3 = SB_MAP.get(code[-1])
-                    s4 = None
-                else:
-                    s3 = None
-                    s4 = None
+                s2 = SB_MAP.get(code[1]) if len(code) >= 2 else 1
                 
                 aux = ""
                 if s1:
-                    if s2:
-                        aux += MATRIX[s1][s2]
-                    else:
-                        # 只有一笔，补横（或者也可以只用s1所在的某个默认键，这里补s1+横）
-                        aux += MATRIX[s1][1]
-                
-                if s3:
-                    if s4:
-                        aux += MATRIX[s3][s4]
-                    else:
-                        aux += MATRIX[s3][1]
+                    aux += MATRIX[s1][s2]
                 
                 if aux:
                     char_map[char] = aux.capitalize()
