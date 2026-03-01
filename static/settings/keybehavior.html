@@ -23,7 +23,7 @@
                 <label class="switch"><input type="checkbox" id="enable_prefix_matching"><span class="slider"></span></label>
             </div>
             <div class="setting-item">
-                <div class="info"><div class="title">开启简拼匹配</div><div class="desc">支持输入声母进行匹配</div></div>
+                <div class="info"><div class="title">开启简拼匹配</div><div class="desc">支持输入声母进行匹配 (如 zshang -> 早上)</div></div>
                 <label class="switch"><input type="checkbox" id="enable_abbreviation_matching"><span class="slider"></span></label>
             </div>
             <div class="setting-item">
@@ -31,37 +31,8 @@
                 <label class="switch"><input type="checkbox" id="enable_anti_typo"><span class="slider"></span></label>
             </div>
             <div class="setting-item">
-                <div class="info"><div class="title">繁体模式</div><div class="desc">开启后输出繁体中文</div></div>
-                <label class="switch"><input type="checkbox" id="enable_traditional"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
                 <div class="info"><div class="title">启用个人词库</div><div class="desc">记录选词频率，实现自学习排序</div></div>
                 <label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label>
-            </div>
-        </div>
-
-        <h2>模糊音设置</h2>
-        <div class="card">
-            <div class="setting-item">
-                <div class="info"><div class="title">开启模糊音</div><div class="desc">容忍声母或韵母的模糊匹配</div></div>
-                <label class="switch"><input type="checkbox" id="enable_fuzzy_pinyin"><span class="slider"></span></label>
-            </div>
-            
-            <div id="fuzzy-options" style="display: none; padding-top: 10px; border-top: 1px solid #eee; margin-top: 10px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <label class="checkbox-container">z ↔ zh <input type="checkbox" id="fuzzy_z_zh"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">c ↔ ch <input type="checkbox" id="fuzzy_c_ch"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">s ↔ sh <input type="checkbox" id="fuzzy_s_sh"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">n ↔ l <input type="checkbox" id="fuzzy_n_l"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">r ↔ l <input type="checkbox" id="fuzzy_r_l"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">f ↔ h <input type="checkbox" id="fuzzy_f_h"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">an ↔ ang <input type="checkbox" id="fuzzy_an_ang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">en ↔ eng <input type="checkbox" id="fuzzy_en_eng"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">in ↔ ing <input type="checkbox" id="fuzzy_in_ing"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">ian ↔ iang <input type="checkbox" id="fuzzy_ian_iang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">uan ↔ uang <input type="checkbox" id="fuzzy_uan_uang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">u ↔ v <input type="checkbox" id="fuzzy_u_v"><span class="checkmark"></span></label>
-                </div>
             </div>
         </div>
 
@@ -99,12 +70,6 @@
 
     <script src="/static/js/settings.js"></script>
     <script>
-        const KB_LAYOUT = [
-            ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
-            ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
-            ['z', 'x', 'c', 'v', 'b', 'n', 'm']
-        ];
-
         async function init() {
             await loadConfig();
             
@@ -112,27 +77,9 @@
             bindInput('enable_prefix_matching', 'input');
             bindInput('enable_abbreviation_matching', 'input');
             bindInput('enable_anti_typo', 'input');
-            bindInput('enable_traditional', 'input');
             bindInput('enable_user_dict', 'input');
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');
-
-            // 模糊音绑定
-            const fuzzySwitch = document.getElementById('enable_fuzzy_pinyin');
-            const fuzzyOptions = document.getElementById('fuzzy-options');
-            fuzzySwitch.checked = config.input.enable_fuzzy_pinyin;
-            fuzzyOptions.style.display = fuzzySwitch.checked ? 'block' : 'none';
-            fuzzySwitch.onchange = () => {
-                config.input.enable_fuzzy_pinyin = fuzzySwitch.checked;
-                fuzzyOptions.style.display = fuzzySwitch.checked ? 'block' : 'none';
-            };
-
-            const fuzzyKeys = ['z_zh', 'c_ch', 's_sh', 'n_l', 'r_l', 'f_h', 'an_ang', 'en_eng', 'in_ing', 'ian_iang', 'uan_uang', 'u_v'];
-            fuzzyKeys.forEach(k => {
-                const el = document.getElementById(`fuzzy_${k}`);
-                el.checked = config.input.fuzzy_config[k];
-                el.onchange = () => { config.input.fuzzy_config[k] = el.checked; };
-            });
 
             bindPaging('flip-arrow', 'arrow');
             bindPaging('flip-minus-equal', 'minus_equal');
@@ -149,53 +96,6 @@
                 } else {
                     config.input.page_flipping_keys = config.input.page_flipping_keys.filter(k => k !== value);
                 }
-            };
-        }
-
-        function renderKeyboard(containerId, configKey) {
-            const container = document.getElementById(containerId);
-            const mappings = config.input[configKey] || [];
-            
-            container.innerHTML = KB_LAYOUT.map(row => `
-                <div class="keyboard-row">
-                    ${row.map(key => {
-                        const entry = mappings.find(m => m.trigger_key === key);
-                        const mapping = entry ? entry.insert_text : "";
-                        return `
-                            <div class="kb-key ${mapping ? 'active' : ''}" onclick="editKey('${containerId}', '${configKey}', '${key}')">
-                                <div class="kb-key-main">${key.toUpperCase()}</div>
-                                <div class="kb-key-sub">${mapping}</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `).join('');
-        }
-
-        function editKey(containerId, configKey, key) {
-            const isLongPress = containerId === 'kb-longpress';
-            const editBoxId = isLongPress ? 'edit-longpress' : 'edit-doubletap';
-            const titleId = isLongPress ? 'lp-edit-title' : 'dt-edit-title';
-            const inputId = isLongPress ? 'lp-edit-input' : 'dt-edit-input';
-            
-            const editBox = document.getElementById(editBoxId);
-            const title = document.getElementById(titleId);
-            const input = document.getElementById(inputId);
-            
-            document.querySelectorAll('.kb-edit-box').forEach(el => el.style.display = 'none');
-            editBox.style.display = 'block';
-            title.innerText = `编辑按键: ${key.toUpperCase()}`;
-            
-            const mappings = config.input[configKey];
-            const entry = mappings.find(m => m.trigger_key === key);
-            input.value = entry ? entry.insert_text : "";
-            
-            input.oninput = () => {
-                const val = input.value;
-                const idx = mappings.findIndex(m => m.trigger_key === key);
-                if (val === "") { if (idx !== -1) mappings.splice(idx, 1); }
-                else { if (idx !== -1) mappings[idx].insert_text = val; else mappings.push({ trigger_key: key, insert_text: val }); }
-                renderKeyboard(containerId, configKey);
             };
         }
 
