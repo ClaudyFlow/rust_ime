@@ -38,7 +38,8 @@ pub enum FilterMode {
 
 struct ParsedPart {
     pinyin: String,
-    aux_code: Option<String>,
+    stroke_aux: Option<String>,
+    english_aux: Option<String>,
     specified_idx: Option<usize>,
     raw: String,
 }
@@ -142,32 +143,43 @@ impl Processor {
         let mut result = Vec::new();
 
         for part in parts {
-            let split_pos = part.char_indices().find(|(i, c)| {
-                c.is_ascii_digit() || (*i > 0 && c.is_ascii_uppercase())
-            }).map(|(i, _)| i);
-            
-            let (pinyin, aux, idx) = if let Some(pos) = split_pos {
-                let (p, suffix) = part.split_at(pos);
-                let digit_start = suffix.find(|c: char| c.is_ascii_digit());
-                
-                let (a, d) = if let Some(ds) = digit_start {
-                    let (alpha, digits) = suffix.split_at(ds);
-                    let aux_str = if alpha.is_empty() { None } else { Some(alpha.to_string()) };
-                    let end_of_digits = digits.find(|c: char| !c.is_ascii_digit()).unwrap_or(digits.len());
-                    let idx_val = digits[..end_of_digits].parse::<usize>().ok();
-                    (aux_str, idx_val)
-                } else {
-                    (Some(suffix.to_string()), None)
-                };
-                (p.to_string(), a, d)
-            } else {
-                (part.to_string(), None, None)
-            };
+            let mut pinyin = String::new();
+            let mut stroke_aux = None;
+            let mut english_aux = None;
+            let mut specified_idx = None;
+
+            // Find pinyin end: first ';', digit, or uppercase (if not at start)
+            let pinyin_end = part.char_indices().find(|(i, c)| {
+                *c == ';' || c.is_ascii_digit() || (*i > 0 && c.is_ascii_uppercase())
+            }).map(|(i, _)| i).unwrap_or(part.len());
+
+            pinyin = part[..pinyin_end].to_string();
+            let mut rest = &part[pinyin_end..];
+
+            if rest.starts_with(';') {
+                rest = &rest[1..]; // skip ';'
+                let stroke_end = rest.find(|c: char| c.is_ascii_digit() || c.is_ascii_uppercase()).unwrap_or(rest.len());
+                let s = &rest[..stroke_end];
+                if !s.is_empty() { stroke_aux = Some(s.to_string()); }
+                rest = &rest[stroke_end..];
+            }
+
+            if !rest.is_empty() && rest.chars().next().map_or(false, |c| c.is_ascii_uppercase()) {
+                let english_end = rest.find(|c: char| c.is_ascii_digit()).unwrap_or(rest.len());
+                let e = &rest[..english_end];
+                if !e.is_empty() { english_aux = Some(e.to_string()); }
+                rest = &rest[english_end..];
+            }
+
+            if !rest.is_empty() && rest.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                specified_idx = rest.parse().ok();
+            }
 
             result.push(ParsedPart {
                 pinyin,
-                aux_code: aux,
-                specified_idx: idx,
+                stroke_aux,
+                english_aux,
+                specified_idx,
                 raw: part.to_string(),
             });
         }
@@ -805,6 +817,12 @@ impl Processor {
         let flip_cd = styles.contains(&"comma_dot".to_string());
         let flip_arrow = styles.contains(&"arrow".to_string());
 
+        if key == VirtualKey::Semicolon && !shift_pressed {
+            self.buffer.push(';');
+            if let Some(act) = self.lookup() { return act; }
+            return self.update_phantom_action();
+        }
+
         match key {
             VirtualKey::Backspace => {
                 if self.filter_mode != FilterMode::None {
@@ -1156,7 +1174,7 @@ impl Processor {
                         }
                         if self.enable_prefix_matching && !py.is_empty() {
                             // 如果输入较长，限制 bfs 搜索的数量，以免淹没简拼结果
-                            let limit = if part.aux_code.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
+                            let limit = if part.stroke_aux.is_some() || part.english_aux.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
                             let m = d.search_bfs(py, limit);
                             for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, false)); }
                         }
@@ -1173,12 +1191,32 @@ impl Processor {
         }
 
         for m in last_matches_raw {
-            if let Some(ref aux) = raw_parsed.last().and_then(|p| p.aux_code.as_ref()) {
+            let last_part = raw_parsed.last();
+            
+            // Filter by stroke_aux
+            if let Some(ref aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
                 let aux_lower = aux.to_lowercase();
                 if !m.4.to_lowercase().starts_with(&aux_lower) {
                     continue;
                 }
             }
+            
+            // Filter by english_aux
+            if let Some(ref aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
+                let aux_lower = aux.to_lowercase();
+                let en_parts: Vec<&str> = m.3.split(',').map(|s| s.trim()).collect();
+                let mut matched = false;
+                for p in en_parts {
+                    if p.to_lowercase().starts_with(&aux_lower) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if !matched {
+                    continue;
+                }
+            }
+
             if seen.insert(m.0.clone()) { final_matches.push(m); }
         }
 
