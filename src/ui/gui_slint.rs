@@ -182,11 +182,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         }
                     }
                     GuiEvent::MoveTo { x, y } => {
-                        // 更新最近的光标位置记录 (仅在坐标非零时更新，防止某些应用返回 0,0 导致跳变)
-                        if x != 0 || y != 0 {
-                            if let Ok(mut pos) = last_pos_inner.lock() {
-                                *pos = (x, y);
-                            }
+                        // 如果坐标为 (0,0)，通常是获取失败，忽略此移动请求以防闪烁
+                        if x == 0 && y == 0 {
+                            return;
+                        }
+
+                        // 更新最近的光标位置记录
+                        if let Ok(mut pos) = last_pos_inner.lock() {
+                            *pos = (x, y);
                         }
 
                         if let Some(w) = h.upgrade() {

@@ -59,10 +59,10 @@ impl TextService {
         let mut x = 0i32;
         let mut y = 0i32;
 
-        // 性能优化：在按键按下时尝试获取坐标
-        // 范围：A-Z, Space, Enter, Backspace, Shift, CapsLock, 以及常见的标点符号键
+        // 范围：A-Z, 0-9, Space, Enter, Backspace, Shift, CapsLock, 以及常见的标点符号键
         if msg_type == 1 && (
             (0x41..=0x5A).contains(&key_code) || // A-Z
+            (0x30..=0x39).contains(&key_code) || // 0-9
             key_code == 0x20 || // Space
             key_code == 0x0D || // Enter
             key_code == 0x08 || // Backspace
