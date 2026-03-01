@@ -67,6 +67,67 @@ impl Trie {
         results
     }
 
+    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<(String, String, String, String, u32)> {
+        if segments.is_empty() { return Vec::new(); }
+        let mut results = Vec::new();
+        
+        // 使用第一个片段作为 FST 检索的前缀，减少搜索范围
+        let first_seg = &segments[0];
+        let matcher = fst::automaton::Str::new(first_seg).starts_with();
+        let mut stream = self.index.search(matcher).into_stream();
+
+        while let Some((key_bytes, offset)) = stream.next() {
+            let key = String::from_utf8_lossy(key_bytes);
+            if self.matches_segments(&key, segments, syllables) {
+                let pairs = self.read_block(offset as usize);
+                for pair in pairs {
+                    if !results.iter().any(|(w, _, _, _, _)| w == &pair.0) {
+                        results.push(pair);
+                        if results.len() >= limit { return results; }
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    fn matches_segments(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
+        let mut current_key = key;
+        for (i, seg) in segments.iter().enumerate() {
+            if current_key.is_empty() { return false; }
+            
+            if i == segments.len() - 1 {
+                return current_key.starts_with(seg);
+            }
+
+            // 尝试将当前片段匹配为当前音节的前缀
+            let mut found_match = false;
+            for len in (1..=6).rev() {
+                if len <= current_key.len() {
+                    let syl = &current_key[..len];
+                    if syllables.contains(syl) {
+                        if syl.starts_with(seg) {
+                            current_key = &current_key[len..];
+                            found_match = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if !found_match {
+                // 特殊处理：如果片段本身不是任何已知完整音节的前缀，
+                // 也要允许它尝试作为当前 key 开头的匹配（针对某些不规范切分）
+                if current_key.starts_with(seg) {
+                   // 尝试跳过该片段对应的逻辑音节长度（简化处理：跳过 seg 长度并寻找下一个音节起始）
+                   // 但为了稳妥，这里我们坚持音节对齐
+                   return false;
+                }
+                return false;
+            }
+        }
+        true
+    }
+
     #[allow(dead_code)]
     pub fn get_random_entry(&self) -> Option<(String, String, String, String, u32)> {
         let len = self.index.len();

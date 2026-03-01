@@ -1174,16 +1174,16 @@ impl Processor {
 
         // 策略 2: 如果开启了简拼且当前是连续字母输入，尝试智能切分检索
         if self.enable_abbreviation_matching && !smart_segments.is_empty() && smart_segments.len() > 1 {
-            // 合并所有切分音节作为拼音键（例如 mtian -> m + tian）
-            let combined_py = smart_segments.join("");
+            let first_seg_variants = self.get_fuzzy_variants(&smart_segments[0]);
             for profile in &self.active_profiles {
                 if let Some(d) = self.tries.get(profile) {
-                    // 检索那些简拼符合 smart_segments 的词
-                    // 目前 Trie 存储的是全拼，所以我们通过 search_bfs 搜 combined_py 的前缀
-                    // 这能搜到 "mtian" 开头的词，如果词库里有简拼词条
-                    let m = d.search_bfs(&combined_py, 20);
-                    for (w, t, e, s, weight) in m {
-                        if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, false)); }
+                    for v in &first_seg_variants {
+                        let mut modified_segments = smart_segments.clone();
+                        modified_segments[0] = v.clone();
+                        let m = d.search_abbreviation(&modified_segments, &self.syllables, 20);
+                        for (w, t, e, s, weight) in m {
+                            if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, false)); }
+                        }
                     }
                 }
             }
