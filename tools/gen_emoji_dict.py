@@ -66,12 +66,12 @@ EXACT_DATA = {
     "🍉": ("Watermelon", "西瓜"),
     "🍓": ("Strawberry", "草莓"),
     "🍒": ("Cherries", "樱桃"),
-    "🍑": ("Peach", "桃子"),
+    " peach": ("Peach", "桃子"),
     "🍍": ("Pineapple", "菠萝"),
     "🍇": ("Grapes", "葡萄"),
     "🍊": ("Tangerine", "橘子"),
     "🍋": ("Lemon", "柠檬"),
-    "🥝": ("Kiwi Fruit", "猕猴桃"),
+    " kiwi": ("Kiwi Fruit", "猕猴桃"),
     "🍅": ("Tomato", "西红柿,番茄"),
     "🌽": ("Ear of Corn", "玉米"),
     "🥩": ("Cut of Meat", "肉,牛排"),
@@ -81,8 +81,8 @@ EXACT_DATA = {
     "🍱": ("Bento Box", "便当"),
     "🍜": ("Steaming Bowl", "拉面,面条"),
     "🍲": ("Pot of Food", "火锅"),
-    "🍣": ("Sushi", "寿司"),
-    "🥟": ("Dumpling", "饺子"),
+    " sushi": ("Sushi", "寿司"),
+    " dumpling": ("Dumpling", "饺子"),
     "🍦": ("Soft Serve", "冰淇淋"),
     "🎂": ("Birthday Cake", "蛋糕,生日蛋糕"),
     "🍭": ("Lollipop", "棒棒糖"),
@@ -123,7 +123,7 @@ EXACT_DATA = {
 }
 
 def generate_emoji_dict():
-    output_dir = "dicts/emoji"
+    output_dir = "dicts/chinese/words"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
@@ -132,28 +132,26 @@ def generate_emoji_dict():
     for emoji, (en_desc, zh_keywords) in EXACT_DATA.items():
         kw_list = zh_keywords.split(',')
         for kw in kw_list:
-            # 转换为全拼作为索引键
             pys = lazy_pinyin(kw)
             if pys:
                 py = "".join(pys)
                 if py not in final_dict:
                     final_dict[py] = []
                 
-                # 检查是否已存在
                 if not any(e["char"] == emoji for e in final_dict[py]):
                     final_dict[py].append({
                         "char": emoji,
                         "trad": emoji,
-                        "en": en_desc,  # 存放英文描述
+                        "en": en_desc,
                         "category": "emoji",
-                        "weight": 1000
+                        "weight": 500 # 略低于普通词组
                     })
 
     output_file = os.path.join(output_dir, "emoji.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(final_dict, f, ensure_ascii=False, indent=2)
     
-    print(f"Emoji dictionary updated at {output_file} with English descriptions.")
+    print(f"Emoji dictionary integrated into Chinese words at {output_file}.")
 
 if __name__ == "__main__":
     generate_emoji_dict()
