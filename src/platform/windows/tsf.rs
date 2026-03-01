@@ -391,6 +391,7 @@ unsafe fn handle_client(
             0x08 => Some(crate::engine::keys::VirtualKey::Backspace),
             0x0D => Some(crate::engine::keys::VirtualKey::Enter),
             0x1B => Some(crate::engine::keys::VirtualKey::Esc),
+            0x14 => Some(crate::engine::keys::VirtualKey::CapsLock),
             0x09 => Some(crate::engine::keys::VirtualKey::Tab),
             0x25 => Some(crate::engine::keys::VirtualKey::Left),
             0x26 => Some(crate::engine::keys::VirtualKey::Up),
@@ -445,12 +446,13 @@ unsafe fn handle_client(
             } else {
                 let p = processor.lock().unwrap();
                 let is_letter = key_code >= 0x41 && key_code <= 0x5A;
+                let is_special_intercept = key_code == 0x14; // CapsLock
                 let is_punctuation = match key_code {
                     0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true,
                     0x30..=0x39 if shift => true,
                     _ => false,
                 };
-                if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punctuation) { response.push(2); } else { response.push(0); }
+                if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punctuation || is_special_intercept) { response.push(2); } else { response.push(0); }
             }
             let mut bytes_written = 0;
             let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
