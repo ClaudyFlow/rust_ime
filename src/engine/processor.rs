@@ -1146,7 +1146,8 @@ impl Processor {
                             for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, true)); }
                         }
                         if self.enable_prefix_matching && !py.is_empty() {
-                            let limit = if part.aux_code.is_some() { 50 } else { 20 };
+                            // 如果输入较长，限制 bfs 搜索的数量，以免淹没简拼结果
+                            let limit = if part.aux_code.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
                             let m = d.search_bfs(py, limit);
                             for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, false)); }
                         }
@@ -1180,9 +1181,10 @@ impl Processor {
                     for v in &first_seg_variants {
                         let mut modified_segments = smart_segments.clone();
                         modified_segments[0] = v.clone();
-                        let m = d.search_abbreviation(&modified_segments, &self.syllables, 20);
+                        let m = d.search_abbreviation(&modified_segments, &self.syllables, 50);
                         for (w, t, e, s, weight) in m {
-                            if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, false)); }
+                            // 将简拼匹配视为准精确匹配 (true)，以提高其在最终列表中的排序
+                            if seen.insert(w.clone()) { final_matches.push((w, t, e, s, weight, true)); }
                         }
                     }
                 }
