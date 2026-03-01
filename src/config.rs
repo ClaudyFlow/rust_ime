@@ -205,25 +205,25 @@ impl Config {
                 row_spacing: 8.0,
 
                 pinyin_text: TextStyle {
-                    font_family: "Microsoft YaHei".to_string(),
+                    font_family: "".to_string(),
                     font_size: 18,
                     color: "#586069".to_string(),
                     alpha: 1.0,
                 },
                 candidate_text: TextStyle {
-                    font_family: "Microsoft YaHei".to_string(),
+                    font_family: "".to_string(),
                     font_size: 18,
                     color: "#24292e".to_string(),
                     alpha: 1.0,
                 },
                 hint_text: TextStyle {
-                    font_family: "Arial".to_string(),
+                    font_family: "".to_string(),
                     font_size: 14,
                     color: "#6e7781".to_string(),
                     alpha: 0.8,
                 },
                 comment_text: TextStyle {
-                    font_family: "Segoe UI Emoji".to_string(),
+                    font_family: "".to_string(),
                     font_size: 12,
                     color: "#0969da".to_string(),
                     alpha: 0.7,
