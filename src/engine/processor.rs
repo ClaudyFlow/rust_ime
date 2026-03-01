@@ -639,7 +639,11 @@ impl Processor {
             if is_press {
                 if self.buffer.is_empty() {
                     self.switch_mode = !self.switch_mode;
-                    return if self.switch_mode { Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) } else { Action::Notify("快捷切换".into(), "已退出".into()) };
+                    return if self.switch_mode { 
+                        Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) 
+                    } else { 
+                        Action::Notify("快捷切换".into(), "已退出".into()) 
+                    };
                 } else {
                     self.nav_mode = !self.nav_mode;
                     if self.nav_mode {

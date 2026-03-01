@@ -441,6 +441,12 @@ unsafe fn handle_client(
                         }
                         response.push(2);
                     }
+                    Action::Notify(summary, body) => {
+                        if let Some(ref tx) = gui_tx {
+                            let _ = tx.send(crate::ui::GuiEvent::ShowStatus(format!("{}: {}", summary, body)));
+                        }
+                        response.push(2); // 拦截按键，防止切换大写
+                    }
                     _ => { response.push(0); }
                 }
             } else {
