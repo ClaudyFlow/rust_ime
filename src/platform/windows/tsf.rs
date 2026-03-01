@@ -341,12 +341,12 @@ unsafe fn handle_client(
             continue;
         }
 
-        // 3. 特殊辅助按键拦截 (Caps / Page Filter)
-        if (key_code == 0x14 || key_code == 0x10) && !ctrl && !alt {
+        // 3. 特殊辅助按键拦截 (Shift Global Filter)
+        if key_code == 0x10 && !ctrl && !alt {
             let mut p = processor.lock().unwrap();
             if p.chinese_enabled && !p.buffer.is_empty() {
                 if msg_type == 1 {
-                    if key_code == 0x14 { p.start_page_filter(); } else { p.start_global_filter(); }
+                    p.start_global_filter();
                     drop(p);
                     update_gui_impl(&gui_tx, &processor);
                 }

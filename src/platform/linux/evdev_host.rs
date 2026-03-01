@@ -130,33 +130,18 @@ impl InputMethodHost for EvdevHost {
                         continue;
                     }
 
-                    // 拦截 CapsLock 和 Shift 触发筛选
-                    if (key == Key::KEY_CAPSLOCK || key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
+                    // 拦截 Shift 触发全局筛选
+                    if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
                         if val == 1 {
                             let mut p = self.processor.lock().unwrap();
                             if p.chinese_enabled && p.state != crate::engine::processor::ImeState::Direct {
-                                if key == Key::KEY_CAPSLOCK {
-                                    println!("[Host] Triggering Page Filter");
-                                    p.start_page_filter();
-                                } else {
-                                    println!("[Host] Triggering Global Filter");
-                                    p.start_global_filter();
-                                }
+                                println!("[Host] Triggering Global Filter");
+                                p.start_global_filter();
                                 drop(p);
                                 self.update_gui();
                                 continue; 
                             }
                         }
-                    }
-
-                    if key == Key::KEY_CAPSLOCK && !has_mod {
-                        if val == 1 {
-                            if held_keys.contains(&Key::KEY_TAB) {
-                                self.tab_held_and_not_used = false;
-                                if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.tap(Key::KEY_CAPSLOCK); }
-                            }
-                        }
-                        continue;
                     }
 
                     if val == 1 {

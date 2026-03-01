@@ -552,7 +552,7 @@ impl Processor {
             return Action::Consume;
         }
 
-        if key == VirtualKey::Grave {
+        if key == VirtualKey::CapsLock {
             if is_press {
                 if self.buffer.is_empty() {
                     self.switch_mode = !self.switch_mode;
@@ -570,6 +570,10 @@ impl Processor {
                 }
             }
             return Action::Consume;
+        }
+
+        if key == VirtualKey::Grave {
+            return Action::PassThrough;
         }
 
         if self.switch_mode {
