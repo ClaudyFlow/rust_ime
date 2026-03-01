@@ -71,8 +71,25 @@ function linkColor(id, section, property) {
     const picker = document.getElementById(id + '_picker');
     if (!txt || !picker) return;
 
+    const toHex = (color) => {
+        if (!color) return "#000000";
+        if (color.startsWith('#')) return color.substring(0, 7);
+        if (color.startsWith('rgba') || color.startsWith('rgb')) {
+            const m = color.match(/\d+/g);
+            if (m && m.length >= 3) {
+                return "#" + m.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+            }
+        }
+        return "#000000";
+    };
+
+    // 初始化同步
+    if (txt.value) {
+        picker.value = toHex(txt.value);
+    }
+
     txt.oninput = () => {
-        picker.value = txt.value;
+        picker.value = toHex(txt.value);
         if (section && property) config[section][property] = txt.value;
         else if (section) config[section][id] = txt.value;
     };
