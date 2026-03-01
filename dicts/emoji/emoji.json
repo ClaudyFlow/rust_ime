@@ -3,7 +3,7 @@
     {
       "char": "😄",
       "trad": "😄",
-      "en": "笑",
+      "en": "Grinning Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -12,14 +12,14 @@
     {
       "char": "😄",
       "trad": "😄",
-      "en": "微笑",
+      "en": "Grinning Face",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "😊",
       "trad": "😊",
-      "en": "微笑",
+      "en": "Smiling Face with Smiling Eyes",
       "category": "emoji",
       "weight": 1000
     }
@@ -28,14 +28,14 @@
     {
       "char": "😄",
       "trad": "😄",
-      "en": "开心",
+      "en": "Grinning Face",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "🥳",
       "trad": "🥳",
-      "en": "开心",
+      "en": "Partying Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -44,7 +44,7 @@
     {
       "char": "😄",
       "trad": "😄",
-      "en": "哈哈",
+      "en": "Grinning Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -53,14 +53,14 @@
     {
       "char": "🤣",
       "trad": "🤣",
-      "en": "笑哭",
+      "en": "Rolling on the Floor Laughing",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "😂",
       "trad": "😂",
-      "en": "笑哭",
+      "en": "Face with Tears of Joy",
       "category": "emoji",
       "weight": 1000
     }
@@ -69,7 +69,7 @@
     {
       "char": "🤣",
       "trad": "🤣",
-      "en": "给力",
+      "en": "Rolling on the Floor Laughing",
       "category": "emoji",
       "weight": 1000
     }
@@ -78,7 +78,7 @@
     {
       "char": "😂",
       "trad": "😂",
-      "en": "笑死",
+      "en": "Face with Tears of Joy",
       "category": "emoji",
       "weight": 1000
     }
@@ -87,7 +87,7 @@
     {
       "char": "😊",
       "trad": "😊",
-      "en": "幸福",
+      "en": "Smiling Face with Smiling Eyes",
       "category": "emoji",
       "weight": 1000
     }
@@ -96,7 +96,7 @@
     {
       "char": "😍",
       "trad": "😍",
-      "en": "色",
+      "en": "Smiling Face with Heart-Eyes",
       "category": "emoji",
       "weight": 1000
     }
@@ -105,7 +105,7 @@
     {
       "char": "😍",
       "trad": "😍",
-      "en": "喜欢",
+      "en": "Smiling Face with Heart-Eyes",
       "category": "emoji",
       "weight": 1000
     }
@@ -114,7 +114,7 @@
     {
       "char": "😍",
       "trad": "😍",
-      "en": "爱心眼",
+      "en": "Smiling Face with Heart-Eyes",
       "category": "emoji",
       "weight": 1000
     }
@@ -123,7 +123,7 @@
     {
       "char": "😘",
       "trad": "😘",
-      "en": "亲亲",
+      "en": "Face Blowing a Kiss",
       "category": "emoji",
       "weight": 1000
     }
@@ -132,7 +132,7 @@
     {
       "char": "😘",
       "trad": "😘",
-      "en": "么么哒",
+      "en": "Face Blowing a Kiss",
       "category": "emoji",
       "weight": 1000
     }
@@ -141,7 +141,7 @@
     {
       "char": "😭",
       "trad": "😭",
-      "en": "大哭",
+      "en": "Loudly Crying Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -150,7 +150,7 @@
     {
       "char": "😭",
       "trad": "😭",
-      "en": "流泪",
+      "en": "Loudly Crying Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -159,41 +159,7 @@
     {
       "char": "😭",
       "trad": "😭",
-      "en": "伤心",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "ku": [
-    {
-      "char": "苦",
-      "trad": "苦",
-      "en": "苦",
-      "category": "emoji",
-      "weight": 1000
-    },
-    {
-      "char": "😎",
-      "trad": "😎",
-      "en": "酷",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "nanshou": [
-    {
-      "char": "苦",
-      "trad": "苦",
-      "en": "难受",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "kule": [
-    {
-      "char": "苦",
-      "trad": "苦",
-      "en": "枯了",
+      "en": "Loudly Crying Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -202,7 +168,7 @@
     {
       "char": "😱",
       "trad": "😱",
-      "en": "惊恐",
+      "en": "Face Screaming in Fear",
       "category": "emoji",
       "weight": 1000
     }
@@ -211,7 +177,7 @@
     {
       "char": "😱",
       "trad": "😱",
-      "en": "吓死",
+      "en": "Face Screaming in Fear",
       "category": "emoji",
       "weight": 1000
     }
@@ -220,7 +186,7 @@
     {
       "char": "😡",
       "trad": "😡",
-      "en": "生气",
+      "en": "Pouting Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -229,7 +195,7 @@
     {
       "char": "😡",
       "trad": "😡",
-      "en": "发火",
+      "en": "Pouting Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -238,7 +204,7 @@
     {
       "char": "😡",
       "trad": "😡",
-      "en": "怒",
+      "en": "Pouting Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -247,7 +213,7 @@
     {
       "char": "🤫",
       "trad": "🤫",
-      "en": "嘘",
+      "en": "Shushing Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -256,7 +222,7 @@
     {
       "char": "🤫",
       "trad": "🤫",
-      "en": "安静",
+      "en": "Shushing Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -265,7 +231,7 @@
     {
       "char": "🤔",
       "trad": "🤔",
-      "en": "思考",
+      "en": "Thinking Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -274,7 +240,7 @@
     {
       "char": "🤔",
       "trad": "🤔",
-      "en": "想一想",
+      "en": "Thinking Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -283,14 +249,16 @@
     {
       "char": "🥳",
       "trad": "🥳",
-      "en": "庆祝",
+      "en": "Partying Face",
       "category": "emoji",
       "weight": 1000
-    },
+    }
+  ],
+  "ku": [
     {
-      "char": "🙌",
-      "trad": "🙌",
-      "en": "庆祝",
+      "char": "😎",
+      "trad": "😎",
+      "en": "Smiling Face with Sunglasses",
       "category": "emoji",
       "weight": 1000
     }
@@ -299,7 +267,7 @@
     {
       "char": "😎",
       "trad": "😎",
-      "en": "墨镜",
+      "en": "Smiling Face with Sunglasses",
       "category": "emoji",
       "weight": 1000
     }
@@ -308,7 +276,7 @@
     {
       "char": "😇",
       "trad": "😇",
-      "en": "天使",
+      "en": "Smiling Face with Halo",
       "category": "emoji",
       "weight": 1000
     }
@@ -317,14 +285,14 @@
     {
       "char": "😇",
       "trad": "😇",
-      "en": "善良",
+      "en": "Smiling Face with Halo",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "✨",
       "trad": "✨",
-      "en": "闪亮",
+      "en": "Sparkles",
       "category": "emoji",
       "weight": 1000
     }
@@ -333,7 +301,7 @@
     {
       "char": "🤡",
       "trad": "🤡",
-      "en": "小丑",
+      "en": "Clown Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -342,7 +310,7 @@
     {
       "char": "💩",
       "trad": "💩",
-      "en": "大便",
+      "en": "Pile of Poo",
       "category": "emoji",
       "weight": 1000
     }
@@ -351,7 +319,7 @@
     {
       "char": "💩",
       "trad": "💩",
-      "en": "便便",
+      "en": "Pile of Poo",
       "category": "emoji",
       "weight": 1000
     }
@@ -360,7 +328,7 @@
     {
       "char": "👻",
       "trad": "👻",
-      "en": "鬼",
+      "en": "Ghost",
       "category": "emoji",
       "weight": 1000
     }
@@ -369,7 +337,7 @@
     {
       "char": "👻",
       "trad": "👻",
-      "en": "幽灵",
+      "en": "Ghost",
       "category": "emoji",
       "weight": 1000
     }
@@ -378,7 +346,7 @@
     {
       "char": "🔥",
       "trad": "🔥",
-      "en": "火",
+      "en": "Fire",
       "category": "emoji",
       "weight": 1000
     }
@@ -387,7 +355,7 @@
     {
       "char": "🔥",
       "trad": "🔥",
-      "en": "热门",
+      "en": "Fire",
       "category": "emoji",
       "weight": 1000
     }
@@ -396,7 +364,7 @@
     {
       "char": "🔥",
       "trad": "🔥",
-      "en": "火热",
+      "en": "Fire",
       "category": "emoji",
       "weight": 1000
     }
@@ -405,14 +373,14 @@
     {
       "char": "✨",
       "trad": "✨",
-      "en": "星星",
+      "en": "Sparkles",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "⭐",
       "trad": "⭐",
-      "en": "星星",
+      "en": "Star",
       "category": "emoji",
       "weight": 1000
     }
@@ -421,7 +389,7 @@
     {
       "char": "⭐",
       "trad": "⭐",
-      "en": "五角星",
+      "en": "Star",
       "category": "emoji",
       "weight": 1000
     }
@@ -430,7 +398,7 @@
     {
       "char": "💯",
       "trad": "💯",
-      "en": "一百分",
+      "en": "Hundred Points",
       "category": "emoji",
       "weight": 1000
     }
@@ -439,7 +407,7 @@
     {
       "char": "💯",
       "trad": "💯",
-      "en": "满分",
+      "en": "Hundred Points",
       "category": "emoji",
       "weight": 1000
     }
@@ -448,7 +416,7 @@
     {
       "char": "👍",
       "trad": "👍",
-      "en": "赞",
+      "en": "Thumbs Up",
       "category": "emoji",
       "weight": 1000
     }
@@ -457,7 +425,7 @@
     {
       "char": "👍",
       "trad": "👍",
-      "en": "点赞",
+      "en": "Thumbs Up",
       "category": "emoji",
       "weight": 1000
     }
@@ -466,7 +434,7 @@
     {
       "char": "👍",
       "trad": "👍",
-      "en": "好",
+      "en": "Thumbs Up",
       "category": "emoji",
       "weight": 1000
     }
@@ -475,7 +443,7 @@
     {
       "char": "👍",
       "trad": "👍",
-      "en": "棒",
+      "en": "Thumbs Up",
       "category": "emoji",
       "weight": 1000
     }
@@ -484,7 +452,7 @@
     {
       "char": "👎",
       "trad": "👎",
-      "en": "差",
+      "en": "Thumbs Down",
       "category": "emoji",
       "weight": 1000
     }
@@ -493,7 +461,7 @@
     {
       "char": "👎",
       "trad": "👎",
-      "en": "不行",
+      "en": "Thumbs Down",
       "category": "emoji",
       "weight": 1000
     }
@@ -502,7 +470,7 @@
     {
       "char": "👎",
       "trad": "👎",
-      "en": "垃圾",
+      "en": "Thumbs Down",
       "category": "emoji",
       "weight": 1000
     }
@@ -511,7 +479,7 @@
     {
       "char": "👌",
       "trad": "👌",
-      "en": "好的",
+      "en": "OK Hand",
       "category": "emoji",
       "weight": 1000
     }
@@ -520,7 +488,7 @@
     {
       "char": "👌",
       "trad": "👌",
-      "en": "OK",
+      "en": "OK Hand",
       "category": "emoji",
       "weight": 1000
     }
@@ -529,7 +497,7 @@
     {
       "char": "✌️",
       "trad": "✌️",
-      "en": "耶",
+      "en": "Victory Hand",
       "category": "emoji",
       "weight": 1000
     }
@@ -538,7 +506,7 @@
     {
       "char": "✌️",
       "trad": "✌️",
-      "en": "胜利",
+      "en": "Victory Hand",
       "category": "emoji",
       "weight": 1000
     }
@@ -547,7 +515,7 @@
     {
       "char": "🤞",
       "trad": "🤞",
-      "en": "好运",
+      "en": "Crossed Fingers",
       "category": "emoji",
       "weight": 1000
     }
@@ -556,7 +524,7 @@
     {
       "char": "🫰",
       "trad": "🫰",
-      "en": "比心",
+      "en": "Hand with Index Finger and Thumb Crossed",
       "category": "emoji",
       "weight": 1000
     }
@@ -565,14 +533,14 @@
     {
       "char": "🫰",
       "trad": "🫰",
-      "en": "爱心",
+      "en": "Hand with Index Finger and Thumb Crossed",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "❤️",
       "trad": "❤️",
-      "en": "爱心",
+      "en": "Red Heart",
       "category": "emoji",
       "weight": 1000
     }
@@ -581,7 +549,7 @@
     {
       "char": "🙏",
       "trad": "🙏",
-      "en": "拜托",
+      "en": "Folded Hands",
       "category": "emoji",
       "weight": 1000
     }
@@ -590,7 +558,7 @@
     {
       "char": "🙏",
       "trad": "🙏",
-      "en": "祈祷",
+      "en": "Folded Hands",
       "category": "emoji",
       "weight": 1000
     }
@@ -599,7 +567,7 @@
     {
       "char": "🙏",
       "trad": "🙏",
-      "en": "谢谢",
+      "en": "Folded Hands",
       "category": "emoji",
       "weight": 1000
     }
@@ -608,7 +576,7 @@
     {
       "char": "👏",
       "trad": "👏",
-      "en": "鼓掌",
+      "en": "Clapping Hands",
       "category": "emoji",
       "weight": 1000
     }
@@ -617,16 +585,7 @@
     {
       "char": "👏",
       "trad": "👏",
-      "en": "拍手",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "wansui": [
-    {
-      "char": "🙌",
-      "trad": "🙌",
-      "en": "万岁",
+      "en": "Clapping Hands",
       "category": "emoji",
       "weight": 1000
     }
@@ -635,7 +594,7 @@
     {
       "char": "💪",
       "trad": "💪",
-      "en": "加油",
+      "en": "Flexed Biceps",
       "category": "emoji",
       "weight": 1000
     }
@@ -644,7 +603,7 @@
     {
       "char": "💪",
       "trad": "💪",
-      "en": "力量",
+      "en": "Flexed Biceps",
       "category": "emoji",
       "weight": 1000
     }
@@ -653,14 +612,14 @@
     {
       "char": "💪",
       "trad": "💪",
-      "en": "强",
+      "en": "Flexed Biceps",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "🔫",
       "trad": "🔫",
-      "en": "枪",
+      "en": "Pistol",
       "category": "emoji",
       "weight": 1000
     }
@@ -669,7 +628,7 @@
     {
       "char": "🤝",
       "trad": "🤝",
-      "en": "握手",
+      "en": "Handshake",
       "category": "emoji",
       "weight": 1000
     }
@@ -678,7 +637,7 @@
     {
       "char": "🤝",
       "trad": "🤝",
-      "en": "合作",
+      "en": "Handshake",
       "category": "emoji",
       "weight": 1000
     }
@@ -687,14 +646,14 @@
     {
       "char": "❤️",
       "trad": "❤️",
-      "en": "心",
+      "en": "Red Heart",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "✉️",
       "trad": "✉️",
-      "en": "信",
+      "en": "Envelope",
       "category": "emoji",
       "weight": 1000
     }
@@ -703,7 +662,7 @@
     {
       "char": "❤️",
       "trad": "❤️",
-      "en": "红心",
+      "en": "Red Heart",
       "category": "emoji",
       "weight": 1000
     }
@@ -712,7 +671,7 @@
     {
       "char": "💔",
       "trad": "💔",
-      "en": "心碎",
+      "en": "Broken Heart",
       "category": "emoji",
       "weight": 1000
     }
@@ -721,7 +680,7 @@
     {
       "char": "🐶",
       "trad": "🐶",
-      "en": "狗",
+      "en": "Dog Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -730,7 +689,7 @@
     {
       "char": "🐶",
       "trad": "🐶",
-      "en": "狗狗",
+      "en": "Dog Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -739,7 +698,7 @@
     {
       "char": "🐶",
       "trad": "🐶",
-      "en": "汪汪",
+      "en": "Dog Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -748,7 +707,7 @@
     {
       "char": "🐱",
       "trad": "🐱",
-      "en": "猫",
+      "en": "Cat Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -757,7 +716,7 @@
     {
       "char": "🐱",
       "trad": "🐱",
-      "en": "猫咪",
+      "en": "Cat Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -766,7 +725,7 @@
     {
       "char": "🐱",
       "trad": "🐱",
-      "en": "喵喵",
+      "en": "Cat Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -775,7 +734,7 @@
     {
       "char": "🐭",
       "trad": "🐭",
-      "en": "耗子",
+      "en": "Mouse Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -784,7 +743,7 @@
     {
       "char": "🐭",
       "trad": "🐭",
-      "en": "老鼠",
+      "en": "Mouse Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -793,7 +752,7 @@
     {
       "char": "🐹",
       "trad": "🐹",
-      "en": "仓鼠",
+      "en": "Hamster Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -802,7 +761,7 @@
     {
       "char": "🐰",
       "trad": "🐰",
-      "en": "兔子",
+      "en": "Rabbit Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -811,7 +770,7 @@
     {
       "char": "🐰",
       "trad": "🐰",
-      "en": "兔",
+      "en": "Rabbit Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -820,7 +779,7 @@
     {
       "char": "🦊",
       "trad": "🦊",
-      "en": "狐狸",
+      "en": "Fox Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -829,7 +788,7 @@
     {
       "char": "🐻",
       "trad": "🐻",
-      "en": "熊",
+      "en": "Bear Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -838,16 +797,7 @@
     {
       "char": "🐼",
       "trad": "🐼",
-      "en": "熊猫",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "kaola": [
-    {
-      "char": "🐨",
-      "trad": "🐨",
-      "en": "考拉",
+      "en": "Panda Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -856,7 +806,7 @@
     {
       "char": "🐯",
       "trad": "🐯",
-      "en": "老虎",
+      "en": "Tiger Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -865,7 +815,7 @@
     {
       "char": "🐯",
       "trad": "🐯",
-      "en": "虎",
+      "en": "Tiger Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -874,7 +824,7 @@
     {
       "char": "🦁",
       "trad": "🦁",
-      "en": "狮子",
+      "en": "Lion Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -883,7 +833,7 @@
     {
       "char": "🐮",
       "trad": "🐮",
-      "en": "牛",
+      "en": "Cow Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -892,7 +842,7 @@
     {
       "char": "🐷",
       "trad": "🐷",
-      "en": "猪",
+      "en": "Pig Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -901,7 +851,7 @@
     {
       "char": "🐸",
       "trad": "🐸",
-      "en": "青蛙",
+      "en": "Frog Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -910,7 +860,7 @@
     {
       "char": "🐵",
       "trad": "🐵",
-      "en": "猴子",
+      "en": "Monkey Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -919,16 +869,16 @@
     {
       "char": "🐔",
       "trad": "🐔",
-      "en": "鸡",
+      "en": "Chicken",
       "category": "emoji",
       "weight": 1000
     }
   ],
-  "qie": [
+  "qiqie": [
     {
       "char": "🐧",
       "trad": "🐧",
-      "en": "企鹅",
+      "en": "Penguin",
       "category": "emoji",
       "weight": 1000
     }
@@ -937,7 +887,7 @@
     {
       "char": "🐦",
       "trad": "🐦",
-      "en": "鸟",
+      "en": "Bird",
       "category": "emoji",
       "weight": 1000
     }
@@ -946,7 +896,7 @@
     {
       "char": "🐤",
       "trad": "🐤",
-      "en": "小鸡",
+      "en": "Baby Chick",
       "category": "emoji",
       "weight": 1000
     }
@@ -955,7 +905,7 @@
     {
       "char": "🦄",
       "trad": "🦄",
-      "en": "独角兽",
+      "en": "Unicorn Face",
       "category": "emoji",
       "weight": 1000
     }
@@ -964,7 +914,7 @@
     {
       "char": "🐝",
       "trad": "🐝",
-      "en": "蜜蜂",
+      "en": "Honeybee",
       "category": "emoji",
       "weight": 1000
     }
@@ -973,7 +923,7 @@
     {
       "char": "🦋",
       "trad": "🦋",
-      "en": "蝴蝶",
+      "en": "Butterfly",
       "category": "emoji",
       "weight": 1000
     }
@@ -982,7 +932,7 @@
     {
       "char": "🌹",
       "trad": "🌹",
-      "en": "玫瑰",
+      "en": "Rose",
       "category": "emoji",
       "weight": 1000
     }
@@ -991,7 +941,7 @@
     {
       "char": "🌹",
       "trad": "🌹",
-      "en": "花",
+      "en": "Rose",
       "category": "emoji",
       "weight": 1000
     }
@@ -1000,41 +950,7 @@
     {
       "char": "🌻",
       "trad": "🌻",
-      "en": "向日葵",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "shu": [
-    {
-      "char": "🌲",
-      "trad": "🌲",
-      "en": "树",
-      "category": "emoji",
-      "weight": 1000
-    },
-    {
-      "char": "📚",
-      "trad": "📚",
-      "en": "书",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "senlin": [
-    {
-      "char": "🌲",
-      "trad": "🌲",
-      "en": "森林",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "mogu": [
-    {
-      "char": "🍄",
-      "trad": "🍄",
-      "en": "蘑菇",
+      "en": "Sunflower",
       "category": "emoji",
       "weight": 1000
     }
@@ -1043,7 +959,7 @@
     {
       "char": "🍎",
       "trad": "🍎",
-      "en": "苹果",
+      "en": "Red Apple",
       "category": "emoji",
       "weight": 1000
     }
@@ -1052,7 +968,7 @@
     {
       "char": "🍎",
       "trad": "🍎",
-      "en": "红苹果",
+      "en": "Red Apple",
       "category": "emoji",
       "weight": 1000
     }
@@ -1061,7 +977,7 @@
     {
       "char": "🍏",
       "trad": "🍏",
-      "en": "青苹果",
+      "en": "Green Apple",
       "category": "emoji",
       "weight": 1000
     }
@@ -1070,7 +986,7 @@
     {
       "char": "🍌",
       "trad": "🍌",
-      "en": "香蕉",
+      "en": "Banana",
       "category": "emoji",
       "weight": 1000
     }
@@ -1079,7 +995,7 @@
     {
       "char": "🍉",
       "trad": "🍉",
-      "en": "西瓜",
+      "en": "Watermelon",
       "category": "emoji",
       "weight": 1000
     }
@@ -1088,7 +1004,7 @@
     {
       "char": "🍓",
       "trad": "🍓",
-      "en": "草莓",
+      "en": "Strawberry",
       "category": "emoji",
       "weight": 1000
     }
@@ -1097,7 +1013,7 @@
     {
       "char": "🍒",
       "trad": "🍒",
-      "en": "樱桃",
+      "en": "Cherries",
       "category": "emoji",
       "weight": 1000
     }
@@ -1106,7 +1022,7 @@
     {
       "char": "🍑",
       "trad": "🍑",
-      "en": "桃子",
+      "en": "Peach",
       "category": "emoji",
       "weight": 1000
     }
@@ -1115,7 +1031,7 @@
     {
       "char": "🍍",
       "trad": "🍍",
-      "en": "菠萝",
+      "en": "Pineapple",
       "category": "emoji",
       "weight": 1000
     }
@@ -1124,7 +1040,7 @@
     {
       "char": "🍇",
       "trad": "🍇",
-      "en": "葡萄",
+      "en": "Grapes",
       "category": "emoji",
       "weight": 1000
     }
@@ -1133,7 +1049,7 @@
     {
       "char": "🍊",
       "trad": "🍊",
-      "en": "橘子",
+      "en": "Tangerine",
       "category": "emoji",
       "weight": 1000
     }
@@ -1142,7 +1058,7 @@
     {
       "char": "🍋",
       "trad": "🍋",
-      "en": "柠檬",
+      "en": "Lemon",
       "category": "emoji",
       "weight": 1000
     }
@@ -1151,7 +1067,7 @@
     {
       "char": "🥝",
       "trad": "🥝",
-      "en": "猕猴桃",
+      "en": "Kiwi Fruit",
       "category": "emoji",
       "weight": 1000
     }
@@ -1160,7 +1076,7 @@
     {
       "char": "🍅",
       "trad": "🍅",
-      "en": "西红柿",
+      "en": "Tomato",
       "category": "emoji",
       "weight": 1000
     }
@@ -1169,7 +1085,7 @@
     {
       "char": "🍅",
       "trad": "🍅",
-      "en": "番茄",
+      "en": "Tomato",
       "category": "emoji",
       "weight": 1000
     }
@@ -1178,7 +1094,7 @@
     {
       "char": "🌽",
       "trad": "🌽",
-      "en": "玉米",
+      "en": "Ear of Corn",
       "category": "emoji",
       "weight": 1000
     }
@@ -1187,7 +1103,7 @@
     {
       "char": "🥩",
       "trad": "🥩",
-      "en": "肉",
+      "en": "Cut of Meat",
       "category": "emoji",
       "weight": 1000
     }
@@ -1196,7 +1112,7 @@
     {
       "char": "🥩",
       "trad": "🥩",
-      "en": "牛排",
+      "en": "Cut of Meat",
       "category": "emoji",
       "weight": 1000
     }
@@ -1205,7 +1121,7 @@
     {
       "char": "🍔",
       "trad": "🍔",
-      "en": "汉堡",
+      "en": "Hamburger",
       "category": "emoji",
       "weight": 1000
     }
@@ -1214,7 +1130,7 @@
     {
       "char": "🍟",
       "trad": "🍟",
-      "en": "薯条",
+      "en": "French Fries",
       "category": "emoji",
       "weight": 1000
     }
@@ -1223,7 +1139,7 @@
     {
       "char": "🍕",
       "trad": "🍕",
-      "en": "披萨",
+      "en": "Pizza",
       "category": "emoji",
       "weight": 1000
     }
@@ -1232,7 +1148,7 @@
     {
       "char": "🍱",
       "trad": "🍱",
-      "en": "便当",
+      "en": "Bento Box",
       "category": "emoji",
       "weight": 1000
     }
@@ -1241,7 +1157,7 @@
     {
       "char": "🍜",
       "trad": "🍜",
-      "en": "拉面",
+      "en": "Steaming Bowl",
       "category": "emoji",
       "weight": 1000
     }
@@ -1250,7 +1166,7 @@
     {
       "char": "🍜",
       "trad": "🍜",
-      "en": "面条",
+      "en": "Steaming Bowl",
       "category": "emoji",
       "weight": 1000
     }
@@ -1259,7 +1175,7 @@
     {
       "char": "🍲",
       "trad": "🍲",
-      "en": "火锅",
+      "en": "Pot of Food",
       "category": "emoji",
       "weight": 1000
     }
@@ -1268,7 +1184,7 @@
     {
       "char": "🍣",
       "trad": "🍣",
-      "en": "寿司",
+      "en": "Sushi",
       "category": "emoji",
       "weight": 1000
     }
@@ -1277,7 +1193,7 @@
     {
       "char": "🥟",
       "trad": "🥟",
-      "en": "饺子",
+      "en": "Dumpling",
       "category": "emoji",
       "weight": 1000
     }
@@ -1286,7 +1202,7 @@
     {
       "char": "🍦",
       "trad": "🍦",
-      "en": "冰淇淋",
+      "en": "Soft Serve",
       "category": "emoji",
       "weight": 1000
     }
@@ -1295,7 +1211,7 @@
     {
       "char": "🎂",
       "trad": "🎂",
-      "en": "蛋糕",
+      "en": "Birthday Cake",
       "category": "emoji",
       "weight": 1000
     }
@@ -1304,7 +1220,7 @@
     {
       "char": "🎂",
       "trad": "🎂",
-      "en": "生日蛋糕",
+      "en": "Birthday Cake",
       "category": "emoji",
       "weight": 1000
     }
@@ -1313,7 +1229,7 @@
     {
       "char": "🍭",
       "trad": "🍭",
-      "en": "棒棒糖",
+      "en": "Lollipop",
       "category": "emoji",
       "weight": 1000
     }
@@ -1322,7 +1238,7 @@
     {
       "char": "🍫",
       "trad": "🍫",
-      "en": "巧克力",
+      "en": "Chocolate Bar",
       "category": "emoji",
       "weight": 1000
     }
@@ -1331,7 +1247,7 @@
     {
       "char": "🍺",
       "trad": "🍺",
-      "en": "啤酒",
+      "en": "Beer Mug",
       "category": "emoji",
       "weight": 1000
     }
@@ -1340,7 +1256,7 @@
     {
       "char": "🍻",
       "trad": "🍻",
-      "en": "干杯",
+      "en": "Clinking Beer Mugs",
       "category": "emoji",
       "weight": 1000
     }
@@ -1349,7 +1265,7 @@
     {
       "char": "🍷",
       "trad": "🍷",
-      "en": "红酒",
+      "en": "Wine Glass",
       "category": "emoji",
       "weight": 1000
     }
@@ -1358,7 +1274,7 @@
     {
       "char": "☕",
       "trad": "☕",
-      "en": "咖啡",
+      "en": "Hot Beverage",
       "category": "emoji",
       "weight": 1000
     }
@@ -1367,7 +1283,7 @@
     {
       "char": "🥤",
       "trad": "🥤",
-      "en": "可乐",
+      "en": "Cup with Straw",
       "category": "emoji",
       "weight": 1000
     }
@@ -1376,7 +1292,7 @@
     {
       "char": "🥤",
       "trad": "🥤",
-      "en": "饮料",
+      "en": "Cup with Straw",
       "category": "emoji",
       "weight": 1000
     }
@@ -1385,7 +1301,7 @@
     {
       "char": "💻",
       "trad": "💻",
-      "en": "电脑",
+      "en": "Laptop Computer",
       "category": "emoji",
       "weight": 1000
     }
@@ -1394,7 +1310,7 @@
     {
       "char": "💻",
       "trad": "💻",
-      "en": "笔记本",
+      "en": "Laptop Computer",
       "category": "emoji",
       "weight": 1000
     }
@@ -1403,7 +1319,7 @@
     {
       "char": "📱",
       "trad": "📱",
-      "en": "手机",
+      "en": "Mobile Phone",
       "category": "emoji",
       "weight": 1000
     }
@@ -1412,14 +1328,14 @@
     {
       "char": "📱",
       "trad": "📱",
-      "en": "电话",
+      "en": "Mobile Phone",
       "category": "emoji",
       "weight": 1000
     },
     {
       "char": "☎️",
       "trad": "☎️",
-      "en": "电话",
+      "en": "Telephone",
       "category": "emoji",
       "weight": 1000
     }
@@ -1428,7 +1344,7 @@
     {
       "char": "⌚",
       "trad": "⌚",
-      "en": "手表",
+      "en": "Watch",
       "category": "emoji",
       "weight": 1000
     }
@@ -1437,7 +1353,7 @@
     {
       "char": "📷",
       "trad": "📷",
-      "en": "相机",
+      "en": "Camera",
       "category": "emoji",
       "weight": 1000
     }
@@ -1446,7 +1362,7 @@
     {
       "char": "📷",
       "trad": "📷",
-      "en": "拍照",
+      "en": "Camera",
       "category": "emoji",
       "weight": 1000
     }
@@ -1455,7 +1371,7 @@
     {
       "char": "🎮",
       "trad": "🎮",
-      "en": "游戏",
+      "en": "Video Game",
       "category": "emoji",
       "weight": 1000
     }
@@ -1464,7 +1380,7 @@
     {
       "char": "🎮",
       "trad": "🎮",
-      "en": "游戏机",
+      "en": "Video Game",
       "category": "emoji",
       "weight": 1000
     }
@@ -1473,7 +1389,7 @@
     {
       "char": "🚗",
       "trad": "🚗",
-      "en": "汽车",
+      "en": "Automobile",
       "category": "emoji",
       "weight": 1000
     }
@@ -1482,7 +1398,7 @@
     {
       "char": "🚗",
       "trad": "🚗",
-      "en": "开火",
+      "en": "Automobile",
       "category": "emoji",
       "weight": 1000
     }
@@ -1491,7 +1407,7 @@
     {
       "char": "🚲",
       "trad": "🚲",
-      "en": "自行车",
+      "en": "Bicycle",
       "category": "emoji",
       "weight": 1000
     }
@@ -1500,7 +1416,7 @@
     {
       "char": "🚀",
       "trad": "🚀",
-      "en": "火箭",
+      "en": "Rocket",
       "category": "emoji",
       "weight": 1000
     }
@@ -1509,7 +1425,7 @@
     {
       "char": "🚀",
       "trad": "🚀",
-      "en": "发射",
+      "en": "Rocket",
       "category": "emoji",
       "weight": 1000
     }
@@ -1518,7 +1434,7 @@
     {
       "char": "✈️",
       "trad": "✈️",
-      "en": "飞机",
+      "en": "Airplane",
       "category": "emoji",
       "weight": 1000
     }
@@ -1527,7 +1443,7 @@
     {
       "char": "🏠",
       "trad": "🏠",
-      "en": "房子",
+      "en": "House",
       "category": "emoji",
       "weight": 1000
     }
@@ -1536,25 +1452,7 @@
     {
       "char": "🏠",
       "trad": "🏠",
-      "en": "家",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "yiyuan": [
-    {
-      "char": "🏥",
-      "trad": "🏥",
-      "en": "医院",
-      "category": "emoji",
-      "weight": 1000
-    }
-  ],
-  "xuexiao": [
-    {
-      "char": "🏫",
-      "trad": "🏫",
-      "en": "学校",
+      "en": "House",
       "category": "emoji",
       "weight": 1000
     }
@@ -1563,7 +1461,7 @@
     {
       "char": "💰",
       "trad": "💰",
-      "en": "钱",
+      "en": "Money Bag",
       "category": "emoji",
       "weight": 1000
     }
@@ -1572,7 +1470,7 @@
     {
       "char": "💰",
       "trad": "💰",
-      "en": "发财",
+      "en": "Money Bag",
       "category": "emoji",
       "weight": 1000
     }
@@ -1581,7 +1479,7 @@
     {
       "char": "💰",
       "trad": "💰",
-      "en": "红包",
+      "en": "Money Bag",
       "category": "emoji",
       "weight": 1000
     }
@@ -1590,7 +1488,7 @@
     {
       "char": "💎",
       "trad": "💎",
-      "en": "钻石",
+      "en": "Gem Stone",
       "category": "emoji",
       "weight": 1000
     }
@@ -1599,7 +1497,7 @@
     {
       "char": "💎",
       "trad": "💎",
-      "en": "宝石",
+      "en": "Gem Stone",
       "category": "emoji",
       "weight": 1000
     }
@@ -1608,7 +1506,7 @@
     {
       "char": "🎁",
       "trad": "🎁",
-      "en": "礼物",
+      "en": "Wrapped Gift",
       "category": "emoji",
       "weight": 1000
     }
@@ -1617,7 +1515,7 @@
     {
       "char": "🎁",
       "trad": "🎁",
-      "en": "送礼",
+      "en": "Wrapped Gift",
       "category": "emoji",
       "weight": 1000
     }
@@ -1626,7 +1524,7 @@
     {
       "char": "🎈",
       "trad": "🎈",
-      "en": "气球",
+      "en": "Balloon",
       "category": "emoji",
       "weight": 1000
     }
@@ -1635,7 +1533,16 @@
     {
       "char": "✉️",
       "trad": "✉️",
-      "en": "邮件",
+      "en": "Envelope",
+      "category": "emoji",
+      "weight": 1000
+    }
+  ],
+  "shu": [
+    {
+      "char": "📚",
+      "trad": "📚",
+      "en": "Books",
       "category": "emoji",
       "weight": 1000
     }
@@ -1644,7 +1551,7 @@
     {
       "char": "📚",
       "trad": "📚",
-      "en": "读书",
+      "en": "Books",
       "category": "emoji",
       "weight": 1000
     }
@@ -1653,7 +1560,7 @@
     {
       "char": "💡",
       "trad": "💡",
-      "en": "主意",
+      "en": "Light Bulb",
       "category": "emoji",
       "weight": 1000
     }
@@ -1662,7 +1569,7 @@
     {
       "char": "💡",
       "trad": "💡",
-      "en": "灯泡",
+      "en": "Light Bulb",
       "category": "emoji",
       "weight": 1000
     }
@@ -1671,7 +1578,7 @@
     {
       "char": "🔋",
       "trad": "🔋",
-      "en": "电池",
+      "en": "Battery",
       "category": "emoji",
       "weight": 1000
     }
@@ -1680,7 +1587,7 @@
     {
       "char": "💣",
       "trad": "💣",
-      "en": "炸弹",
+      "en": "Bomb",
       "category": "emoji",
       "weight": 1000
     }
@@ -1689,7 +1596,7 @@
     {
       "char": "⚽",
       "trad": "⚽",
-      "en": "足球",
+      "en": "Soccer Ball",
       "category": "emoji",
       "weight": 1000
     }
@@ -1698,7 +1605,7 @@
     {
       "char": "🏀",
       "trad": "🏀",
-      "en": "篮球",
+      "en": "Basketball",
       "category": "emoji",
       "weight": 1000
     }
@@ -1707,7 +1614,7 @@
     {
       "char": "🌈",
       "trad": "🌈",
-      "en": "彩虹",
+      "en": "Rainbow",
       "category": "emoji",
       "weight": 1000
     }
@@ -1716,7 +1623,7 @@
     {
       "char": "☀️",
       "trad": "☀️",
-      "en": "太阳",
+      "en": "Sun",
       "category": "emoji",
       "weight": 1000
     }
@@ -1725,7 +1632,7 @@
     {
       "char": "☀️",
       "trad": "☀️",
-      "en": "晴天",
+      "en": "Sun",
       "category": "emoji",
       "weight": 1000
     }
@@ -1734,7 +1641,7 @@
     {
       "char": "🌙",
       "trad": "🌙",
-      "en": "月亮",
+      "en": "Crescent Moon",
       "category": "emoji",
       "weight": 1000
     }
@@ -1743,7 +1650,7 @@
     {
       "char": "☔",
       "trad": "☔",
-      "en": "下雨",
+      "en": "Umbrella with Rain Drops",
       "category": "emoji",
       "weight": 1000
     }
@@ -1752,7 +1659,7 @@
     {
       "char": "☔",
       "trad": "☔",
-      "en": "雨",
+      "en": "Umbrella with Rain Drops",
       "category": "emoji",
       "weight": 1000
     }
@@ -1761,7 +1668,7 @@
     {
       "char": "❄️",
       "trad": "❄️",
-      "en": "下雪",
+      "en": "Snowflake",
       "category": "emoji",
       "weight": 1000
     }
@@ -1770,7 +1677,7 @@
     {
       "char": "❄️",
       "trad": "❄️",
-      "en": "雪",
+      "en": "Snowflake",
       "category": "emoji",
       "weight": 1000
     }
