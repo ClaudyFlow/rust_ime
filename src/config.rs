@@ -297,7 +297,12 @@ impl Config {
                 enable_abbreviation_matching: true,
                 filter_proper_nouns_by_case: true,
                 active_profiles: vec!["chinese".to_string()],
-                profile_keys: vec![],
+                profile_keys: vec![
+                    ProfileKey { key: "c".into(), profile: "chinese".into() },
+                    ProfileKey { key: "e".into(), profile: "english".into() },
+                    ProfileKey { key: "j".into(), profile: "japanese".into() },
+                    ProfileKey { key: "m".into(), profile: "chinese,english,japanese".into() },
+                ],
                 page_flipping_keys: vec!["arrow".to_string(), "minus_equal".to_string(), "comma_dot".to_string()],
                 swap_arrow_keys: false,
                 enable_error_sound: true,
