@@ -298,12 +298,9 @@ unsafe fn handle_client(
         }
 
         // 2. 核心切换热键优先匹配 (使用传入的 config)
-        let (is_lang_toggle, is_dp_toggle) = {
+        let is_lang_toggle = {
             let c = config.read().unwrap(); 
-            let lang_match = is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift) ||
-                             is_hk_match(&c.hotkeys.switch_language_alt.key, key_code, ctrl, alt, shift);
-            let dp_match = is_hk_match(&c.hotkeys.toggle_double_pinyin.key, key_code, ctrl, alt, shift);
-            (lang_match, dp_match)
+            is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift)
         };
         
         if is_lang_toggle {
@@ -316,24 +313,6 @@ unsafe fn handle_client(
                 let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
                 if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() })); }
                 update_gui_impl(&gui_tx, &processor);
-            }
-            let response = vec![2u8]; // Consume
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-            continue;
-        }
-
-        if is_dp_toggle {
-            if msg_type == 1 {
-                let (enabled, _) = {
-                    let mut p = processor.lock().unwrap();
-                    p.enable_double_pinyin = !p.enable_double_pinyin;
-                    (p.enable_double_pinyin, p.get_current_profile_display())
-                };
-                let mut c = config.write().unwrap();
-                c.input.enable_double_pinyin = enabled;
-                let _ = crate::save_config(&c);
-                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "双拼: 开".into() } else { "双拼: 关".into() })); }
             }
             let response = vec![2u8]; // Consume
             let mut bytes_written = 0;

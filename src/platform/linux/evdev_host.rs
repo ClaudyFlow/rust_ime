@@ -145,12 +145,12 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     if val == 1 {
-                        let (toggle_main, toggle_alt, switch_prof, cycle_preview, cycle_paste, toggle_trad, toggle_commit, toggle_dp) = {
+                        let toggle_main = {
                             let conf = self.config.read().unwrap();
-                            (parse_key(&conf.hotkeys.switch_language.key), parse_key(&conf.hotkeys.switch_language_alt.key), parse_key(&conf.hotkeys.switch_dictionary.key), parse_key(&conf.hotkeys.cycle_preview_mode.key), parse_key(&conf.hotkeys.cycle_paste_method.key), parse_key(&conf.hotkeys.toggle_traditional_gui.key), parse_key(&conf.hotkeys.switch_commit_mode.key), parse_key(&conf.hotkeys.toggle_double_pinyin.key))
+                            parse_key(&conf.hotkeys.switch_language.key)
                         };
                         
-                        if is_combo(&held_keys, &toggle_main) || is_combo(&held_keys, &toggle_alt) {
+                        if is_combo(&held_keys, &toggle_main) {
                             let mut p = self.processor.lock().unwrap(); p.toggle();
                             let enabled = p.chinese_enabled;
                             let profile = p.get_current_profile_display();
@@ -162,57 +162,6 @@ impl InputMethodHost for EvdevHost {
                             });
 
                             self.update_gui(); continue;
-                        }
-
-                        if is_combo(&held_keys, &switch_prof) {
-                            let mut p = self.processor.lock().unwrap(); let profile = p.next_profile();
-                            let enabled = p.chinese_enabled;
-                            let profile_copy = profile.clone();
-                            if let Ok(mut w) = self.config.write() { w.input.active_profiles = vec![profile]; let _ = crate::save_config(&w); }
-                            drop(p);
-
-                            let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
-                                chinese_enabled: enabled, 
-                                active_profile: profile_copy 
-                            });
-
-                            self.update_gui(); continue;
-                        }
-
-                        if is_combo(&held_keys, &cycle_preview) {
-                            let mut p = self.processor.lock().unwrap();
-                            p.phantom_mode = match p.phantom_mode { crate::engine::processor::PhantomMode::None => crate::engine::processor::PhantomMode::Pinyin, _ => crate::engine::processor::PhantomMode::None };
-                            drop(p); continue;
-                        }
-
-                        if is_combo(&held_keys, &cycle_paste) {
-                            let _ = if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.cycle_paste_mode() } else { "失败".into() };
-                            continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_trad) {
-                            let mut p = self.processor.lock().unwrap(); p.show_candidates = !p.show_candidates;
-                            continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_commit) {
-                            let (mode, _) = {
-                                let mut p = self.processor.lock().unwrap();
-                                p.commit_mode = if p.commit_mode == "single" { "double".into() } else { "single".into() };
-                                (p.commit_mode.clone(), p.get_current_profile_display())
-                            };
-                            if let Ok(mut w) = self.config.write() { w.input.commit_mode = mode.clone(); let _ = crate::save_config(&w); }
-                            continue;
-                        }
-
-                        if is_combo(&held_keys, &toggle_dp) {
-                            let (enabled, _) = {
-                                let mut p = self.processor.lock().unwrap();
-                                p.enable_double_pinyin = !p.enable_double_pinyin;
-                                (p.enable_double_pinyin, p.get_current_profile_display())
-                            };
-                            if let Ok(mut w) = self.config.write() { w.input.enable_double_pinyin = enabled; let _ = crate::save_config(&w); }
-                            continue;
                         }
                     }
 
