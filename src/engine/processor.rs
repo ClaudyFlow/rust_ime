@@ -415,7 +415,7 @@ impl Processor {
     }
 
     fn get_fuzzy_variants(&self, pinyin: &str) -> Vec<String> {
-        let mut variants = vec![pinyin.to_string()];
+        let variants = vec![pinyin.to_string()];
         if !self.enable_fuzzy_pinyin {
             return variants;
         }
@@ -1351,16 +1351,6 @@ impl Processor {
     pub fn start_global_filter(&mut self) {
         if self.state == ImeState::Direct { return; }
         self.filter_mode = FilterMode::Global;
-        self.aux_filter.clear();
-    }
-
-    pub fn start_page_filter(&mut self) {
-        if self.state == ImeState::Direct || self.candidates.is_empty() { return; }
-        let start = self.page;
-        let end = (start + self.page_size).min(self.candidates.len());
-        self.page_snapshot.clear();
-        for i in start..end { self.page_snapshot.push((self.candidates[i].clone(), self.candidate_hints[i].clone())); }
-        self.filter_mode = FilterMode::Page;
         self.aux_filter.clear();
     }
 
