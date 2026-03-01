@@ -27,7 +27,7 @@
       "tone": "ai/ài",
       "weight": 232,
       "stroke_aux": "Gw",
-      "trad": "瑷"
+      "trad": "璦"
     },
     {
       "char": "锿",
@@ -36,7 +36,7 @@
       "tone": "ai/āi",
       "weight": 39,
       "stroke_aux": "Td",
-      "trad": "锿"
+      "trad": "鎄"
     },
     {
       "char": "佁",
@@ -197,7 +197,7 @@
       "tone": "ba/bā",
       "weight": 40,
       "stroke_aux": "Qb",
-      "trad": "鲃"
+      "trad": "䰾"
     },
     {
       "char": "萆",
@@ -224,7 +224,7 @@
       "tone": "ba/bà",
       "weight": 14,
       "stroke_aux": "Qn",
-      "trad": "鲌"
+      "trad": "鮊"
     },
     {
       "char": "哱",
@@ -405,7 +405,7 @@
       "tone": "bei/bēi",
       "weight": 22,
       "stroke_aux": "Rk",
-      "trad": "鹎"
+      "trad": "鵯"
     },
     {
       "char": "哱",
@@ -537,7 +537,7 @@
       "tone": "bi/bì",
       "weight": 144,
       "stroke_aux": "Mm",
-      "trad": "赑"
+      "trad": "贔"
     },
     {
       "char": "仳",
@@ -654,7 +654,7 @@
       "tone": "bi/bī",
       "weight": 16,
       "stroke_aux": "Qn",
-      "trad": "鲾"
+      "trad": "鰏"
     },
     {
       "char": "诐",
@@ -663,7 +663,7 @@
       "tone": "bi/bì",
       "weight": 14,
       "stroke_aux": "Pm",
-      "trad": "诐"
+      "trad": "詖"
     },
     {
       "char": "邲",
@@ -820,7 +820,7 @@
       "tone": "biao/biāo",
       "weight": 2,
       "stroke_aux": "Xa",
-      "trad": "骉"
+      "trad": "驫"
     },
     {
       "char": "瀌",
@@ -954,7 +954,7 @@
       "tone": "bo/bó",
       "weight": 54,
       "stroke_aux": "Tg",
-      "trad": "镈"
+      "trad": "鎛"
     },
     {
       "char": "砵",
@@ -972,7 +972,7 @@
       "tone": "bo/bó",
       "weight": 14,
       "stroke_aux": "Qn",
-      "trad": "鲌"
+      "trad": "鮊"
     },
     {
       "char": "嶓",
@@ -1053,7 +1053,7 @@
       "tone": "bo/bó",
       "weight": 0,
       "stroke_aux": "Pq",
-      "trad": "袯"
+      "trad": "襏"
     },
     {
       "char": "欂",
@@ -1113,7 +1113,7 @@
       "tone": "cang/cāng",
       "weight": 18,
       "stroke_aux": "Wv",
-      "trad": "鸧"
+      "trad": "鶬"
     }
   ],
   "cao": [
@@ -1260,7 +1260,7 @@
       "tone": "chan/chǎn",
       "weight": 1196,
       "stroke_aux": "Ig",
-      "trad": "冁"
+      "trad": "囅"
     },
     {
       "char": "蒇",
@@ -1269,7 +1269,7 @@
       "tone": "chan/chǎn",
       "weight": 81,
       "stroke_aux": "Fv",
-      "trad": "蒇"
+      "trad": "蕆"
     },
     {
       "char": "韂",
@@ -1296,7 +1296,7 @@
       "tone": "chan/chǎn",
       "weight": 35,
       "stroke_aux": "Gu",
-      "trad": "刬"
+      "trad": "剗"
     },
     {
       "char": "浐",
@@ -1305,7 +1305,7 @@
       "tone": "chan/chǎn",
       "weight": 34,
       "stroke_aux": "Oe",
-      "trad": "浐"
+      "trad": "滻"
     },
     {
       "char": "襜",
@@ -1341,7 +1341,7 @@
       "tone": "chan/chǎn",
       "weight": 6,
       "stroke_aux": "Mn",
-      "trad": "啴"
+      "trad": "嘽"
     },
     {
       "char": "梴",
@@ -1388,7 +1388,7 @@
       "tone": "chang/chàng",
       "weight": 28,
       "stroke_aux": "Ge",
-      "trad": "玚"
+      "trad": "瑒"
     },
     {
       "char": "鲿",
@@ -1397,7 +1397,7 @@
       "tone": "chang/cháng",
       "weight": 3,
       "stroke_aux": "Ql",
-      "trad": "鲿"
+      "trad": "鱨"
     }
   ],
   "chao": [
@@ -1446,7 +1446,7 @@
       "tone": "chen/chèn",
       "weight": 155,
       "stroke_aux": "Fg",
-      "trad": "榇"
+      "trad": "櫬"
     },
     {
       "char": "疢",
@@ -1484,7 +1484,7 @@
       "tone": "cheng/chéng",
       "weight": 1123,
       "stroke_aux": "Tq",
-      "trad": "铖"
+      "trad": "鋮"
     },
     {
       "char": "澂",
@@ -1520,7 +1520,7 @@
       "tone": "cheng/chēng",
       "weight": 30,
       "stroke_aux": "Ff",
-      "trad": "赪"
+      "trad": "赬"
     },
     {
       "char": "偁",
@@ -1796,7 +1796,7 @@
       "tone": "chou/chóu",
       "weight": 1,
       "stroke_aux": "Mg",
-      "trad": "帱"
+      "trad": "幬"
     },
     {
       "char": "婤",
@@ -2151,7 +2151,7 @@
       "tone": "cui/cuī",
       "weight": 12,
       "stroke_aux": "Xn",
-      "trad": "缞"
+      "trad": "縗"
     }
   ],
   "cun": [
@@ -2173,7 +2173,7 @@
       "tone": "cuo/cuó",
       "weight": 214,
       "stroke_aux": "Hy",
-      "trad": "鹾"
+      "trad": "鹺"
     },
     {
       "char": "脞",
@@ -2218,7 +2218,7 @@
       "tone": "cuo/cuó",
       "weight": 12,
       "stroke_aux": "Th",
-      "trad": "酂"
+      "trad": "酇"
     },
     {
       "char": "莝",
@@ -2247,7 +2247,7 @@
       "tone": "da/dá",
       "weight": 21140,
       "stroke_aux": "Mp",
-      "trad": "咼"
+      "trad": "噠"
     },
     {
       "char": "阘",
@@ -2256,7 +2256,7 @@
       "tone": "da/dá",
       "weight": 48,
       "stroke_aux": "Ua",
-      "trad": "阘"
+      "trad": "闒"
     },
     {
       "char": "垯",
@@ -2265,7 +2265,7 @@
       "tone": "da/da",
       "weight": 33,
       "stroke_aux": "Fc",
-      "trad": "垯"
+      "trad": "墶"
     },
     {
       "char": "溚",
@@ -2292,7 +2292,7 @@
       "tone": "da/dá",
       "weight": 4,
       "stroke_aux": "Fp",
-      "trad": "荙"
+      "trad": "薘"
     },
     {
       "char": "鿎",
@@ -2301,7 +2301,7 @@
       "tone": "da/dá",
       "weight": 0,
       "stroke_aux": "Do",
-      "trad": "鿎"
+      "trad": "䃮"
     }
   ],
   "dai": [
@@ -2321,7 +2321,7 @@
       "tone": "dai/dài",
       "weight": 373,
       "stroke_aux": "Xu",
-      "trad": "绐"
+      "trad": "紿"
     },
     {
       "char": "叇",
@@ -2330,7 +2330,7 @@
       "tone": "dai/dài",
       "weight": 327,
       "stroke_aux": "Gn",
-      "trad": "叇"
+      "trad": "靆"
     },
     {
       "char": "轪",
@@ -2339,7 +2339,7 @@
       "tone": "dai/dài",
       "weight": 39,
       "stroke_aux": "Aw",
-      "trad": "轪"
+      "trad": "軑"
     },
     {
       "char": "垈",
@@ -2368,7 +2368,7 @@
       "tone": "dan/dān",
       "weight": 36,
       "stroke_aux": "Yr",
-      "trad": "瘅"
+      "trad": "癉"
     },
     {
       "char": "襜",
@@ -2415,7 +2415,7 @@
       "tone": "dang/dāng",
       "weight": 8,
       "stroke_aux": "Tq",
-      "trad": "筜"
+      "trad": "簹"
     }
   ],
   "dao": [
@@ -2435,7 +2435,7 @@
       "tone": "dao/dāo",
       "weight": 23,
       "stroke_aux": "Qe",
-      "trad": "鱽"
+      "trad": "魛"
     },
     {
       "char": "舠",
@@ -2453,7 +2453,7 @@
       "tone": "dao/dào",
       "weight": 1,
       "stroke_aux": "Mg",
-      "trad": "帱"
+      "trad": "幬"
     }
   ],
   "den": [
@@ -2513,7 +2513,7 @@
       "tone": "di/dí",
       "weight": 148,
       "stroke_aux": "Fy",
-      "trad": "觌"
+      "trad": "覿"
     },
     {
       "char": "禘",
@@ -2661,7 +2661,7 @@
       "tone": "diao/diào",
       "weight": 36,
       "stroke_aux": "Tb",
-      "trad": "铞"
+      "trad": "銱"
     },
     {
       "char": "窎",
@@ -2670,7 +2670,7 @@
       "tone": "diao/diào",
       "weight": 12,
       "stroke_aux": "Oc",
-      "trad": "窎"
+      "trad": "窵"
     },
     {
       "char": "汈",
@@ -2735,7 +2735,7 @@
       "tone": "die/dié",
       "weight": 16,
       "stroke_aux": "Xc",
-      "trad": "绖"
+      "trad": "絰"
     },
     {
       "char": "楪",
@@ -2775,7 +2775,7 @@
       "tone": "diu/diū",
       "weight": 2,
       "stroke_aux": "Tc",
-      "trad": "铥"
+      "trad": "銩"
     }
   ],
   "dong": [
@@ -2795,7 +2795,7 @@
       "tone": "dong/dōng",
       "weight": 43,
       "stroke_aux": "Mk",
-      "trad": "岽"
+      "trad": "崬"
     }
   ],
   "dou": [
@@ -2815,7 +2815,7 @@
       "tone": "dou/dǒu",
       "weight": 3,
       "stroke_aux": "Ty",
-      "trad": "钭"
+      "trad": "鈄"
     },
     {
       "char": "剅",
@@ -2915,7 +2915,7 @@
       "tone": "duo/duò",
       "weight": 37,
       "stroke_aux": "Qb",
-      "trad": "饳"
+      "trad": "飿"
     },
     {
       "char": "亸",
@@ -2924,7 +2924,7 @@
       "tone": "duo/duǒ",
       "weight": 31,
       "stroke_aux": "Ys",
-      "trad": "亸"
+      "trad": "嚲"
     },
     {
       "char": "剟",
@@ -3054,7 +3054,7 @@
       "tone": "er/ér",
       "weight": 4,
       "stroke_aux": "Qm",
-      "trad": "鲕"
+      "trad": "鮞"
     },
     {
       "char": "咡",
@@ -3083,7 +3083,7 @@
       "tone": "fa/pō",
       "weight": 0,
       "stroke_aux": "Fv",
-      "trad": "酦"
+      "trad": "醱"
     }
   ],
   "fan": [
@@ -3197,7 +3197,7 @@
       "tone": "fei/fèi",
       "weight": 15,
       "stroke_aux": "Tv",
-      "trad": "镄"
+      "trad": "鐨"
     },
     {
       "char": "剕",
@@ -3244,7 +3244,7 @@
       "tone": "fen/fén",
       "weight": 1,
       "stroke_aux": "Dj",
-      "trad": "豮"
+      "trad": "豶"
     },
     {
       "char": "坋",
@@ -3273,7 +3273,7 @@
       "tone": "feng/fèng",
       "weight": 7,
       "stroke_aux": "Mf",
-      "trad": "赗"
+      "trad": "賵"
     },
     {
       "char": "浲",
@@ -3349,7 +3349,7 @@
       "tone": "fu/fú",
       "weight": 101,
       "stroke_aux": "Xv",
-      "trad": "绋"
+      "trad": "紼"
     },
     {
       "char": "鄜",
@@ -3403,7 +3403,7 @@
       "tone": "fu/fú",
       "weight": 6,
       "stroke_aux": "Gd",
-      "trad": "韨"
+      "trad": "韍"
     },
     {
       "char": "玞",
@@ -3459,7 +3459,7 @@
       "tone": "ga/gá",
       "weight": 20,
       "stroke_aux": "Tx",
-      "trad": "钆"
+      "trad": "釓"
     }
   ],
   "gai": [
@@ -3526,7 +3526,7 @@
       "tone": "gan/gǎn",
       "weight": 3,
       "stroke_aux": "Qt",
-      "trad": "鳡"
+      "trad": "鱤"
     },
     {
       "char": "浛",
@@ -3662,7 +3662,7 @@
       "tone": "geng/gèng",
       "weight": 2,
       "stroke_aux": "Mu",
-      "trad": "暅"
+      "trad": "𣈶"
     },
     {
       "char": "鹒",
@@ -3671,7 +3671,7 @@
       "tone": "geng/gēng",
       "weight": 1,
       "stroke_aux": "Yi",
-      "trad": "鹒"
+      "trad": "鶊"
     }
   ],
   "gong": [
@@ -3682,7 +3682,7 @@
       "tone": "gong/gòng",
       "weight": 15,
       "stroke_aux": "Mv",
-      "trad": "唝"
+      "trad": "嗊"
     },
     {
       "char": "硔",
@@ -3776,7 +3776,7 @@
       "tone": "gu/gǔ",
       "weight": 36,
       "stroke_aux": "Qx",
-      "trad": "馉"
+      "trad": "餶"
     },
     {
       "char": "牿",
@@ -3888,7 +3888,7 @@
       "tone": "guan/guǎn",
       "weight": 3,
       "stroke_aux": "Qs",
-      "trad": "鳤"
+      "trad": "䲘"
     }
   ],
   "guang": [
@@ -4009,7 +4009,7 @@
       "tone": "gui/guī",
       "weight": 2,
       "stroke_aux": "Gq",
-      "trad": "鬶"
+      "trad": "鬹"
     },
     {
       "char": "筀",
@@ -4038,7 +4038,7 @@
       "tone": "guo/guō",
       "weight": 142,
       "stroke_aux": "Mo",
-      "trad": "喚"
+      "trad": "咼"
     },
     {
       "char": "崞",
@@ -4056,7 +4056,7 @@
       "tone": "guo/guó",
       "weight": 50,
       "stroke_aux": "Qh",
-      "trad": "腘"
+      "trad": "膕"
     },
     {
       "char": "馘",
@@ -4280,7 +4280,7 @@
       "tone": "he/hé",
       "weight": 380,
       "stroke_aux": "Ht",
-      "trad": "龁"
+      "trad": "齕"
     },
     {
       "char": "熇",
@@ -4298,7 +4298,7 @@
       "tone": "he/hé",
       "weight": 33,
       "stroke_aux": "Mq",
-      "trad": "鹖"
+      "trad": "鶡"
     },
     {
       "char": "翯",
@@ -4347,7 +4347,7 @@
       "tone": "hong/hóng",
       "weight": 689,
       "stroke_aux": "Ff",
-      "trad": "荭"
+      "trad": "葒"
     },
     {
       "char": "纮",
@@ -4356,7 +4356,7 @@
       "tone": "hong/hóng",
       "weight": 468,
       "stroke_aux": "Xc",
-      "trad": "纮"
+      "trad": "紘"
     },
     {
       "char": "翃",
@@ -4374,7 +4374,7 @@
       "tone": "hong/hóng",
       "weight": 71,
       "stroke_aux": "On",
-      "trad": "黉"
+      "trad": "黌"
     },
     {
       "char": "洚",
@@ -4392,7 +4392,7 @@
       "tone": "hong/hǒng",
       "weight": 15,
       "stroke_aux": "Mv",
-      "trad": "唝"
+      "trad": "嗊"
     },
     {
       "char": "浲",
@@ -4457,7 +4457,7 @@
       "tone": "hou/hóu",
       "weight": 45,
       "stroke_aux": "In",
-      "trad": "糇"
+      "trad": "餱"
     },
     {
       "char": "郈",
@@ -4475,7 +4475,7 @@
       "tone": "hou/hòu",
       "weight": 1,
       "stroke_aux": "Qe",
-      "trad": "鲘"
+      "trad": "鮜"
     }
   ],
   "hu": [
@@ -4531,7 +4531,7 @@
       "tone": "hu/hù",
       "weight": 35,
       "stroke_aux": "Qg",
-      "trad": "鹱"
+      "trad": "鸌"
     },
     {
       "char": "濩",
@@ -4585,7 +4585,7 @@
       "tone": "hu/hù",
       "weight": 4,
       "stroke_aux": "Qk",
-      "trad": "鳠"
+      "trad": "鱯"
     },
     {
       "char": "轷",
@@ -4594,7 +4594,7 @@
       "tone": "hu/hū",
       "weight": 2,
       "stroke_aux": "At",
-      "trad": "轷"
+      "trad": "軤"
     },
     {
       "char": "嫭",
@@ -4632,7 +4632,7 @@
       "tone": "hua/huà",
       "weight": 1640,
       "stroke_aux": "Vh",
-      "trad": "婳"
+      "trad": "嫿"
     },
     {
       "char": "砉",
@@ -4697,7 +4697,7 @@
       "tone": "huan/huán",
       "weight": 55,
       "stroke_aux": "Ti",
-      "trad": "锾"
+      "trad": "鍰"
     },
     {
       "char": "镮",
@@ -4706,7 +4706,7 @@
       "tone": "huan/huán",
       "weight": 25,
       "stroke_aux": "Th",
-      "trad": "镮"
+      "trad": "鐶"
     },
     {
       "char": "澴",
@@ -4789,7 +4789,7 @@
       "tone": "huang/huáng",
       "weight": 10,
       "stroke_aux": "Tg",
-      "trad": "锽"
+      "trad": "鍠"
     },
     {
       "char": "艎",
@@ -4827,7 +4827,7 @@
       "tone": "hui/huī",
       "weight": 19478,
       "stroke_aux": "Mn",
-      "trad": "晖"
+      "trad": "暉"
     },
     {
       "char": "袆",
@@ -4836,7 +4836,7 @@
       "tone": "hui/huī",
       "weight": 417,
       "stroke_aux": "Pa",
-      "trad": "袆"
+      "trad": "褘"
     },
     {
       "char": "翙",
@@ -4845,7 +4845,7 @@
       "tone": "hui/huì",
       "weight": 106,
       "stroke_aux": "Mc",
-      "trad": "翙"
+      "trad": "翽"
     },
     {
       "char": "廆",
@@ -4957,7 +4957,7 @@
       "tone": "huo/huǒ",
       "weight": 65,
       "stroke_aux": "Te",
-      "trad": "钬"
+      "trad": "鈥"
     },
     {
       "char": "锪",
@@ -4966,7 +4966,7 @@
       "tone": "huo/huō",
       "weight": 38,
       "stroke_aux": "Te",
-      "trad": "锪"
+      "trad": "鍃"
     },
     {
       "char": "劐",
@@ -5031,7 +5031,7 @@
       "tone": "ji/jí",
       "weight": 266,
       "stroke_aux": "Ym",
-      "trad": "鹡"
+      "trad": "鶺"
     },
     {
       "char": "伋",
@@ -5166,7 +5166,7 @@
       "tone": "ji/jǐ",
       "weight": 1,
       "stroke_aux": "Qa",
-      "trad": "鱾"
+      "trad": "魢"
     },
     {
       "char": "枅",
@@ -5213,7 +5213,7 @@
       "tone": "jia/jiǎ",
       "weight": 1176,
       "stroke_aux": "Fm",
-      "trad": "槚"
+      "trad": "檟"
     },
     {
       "char": "嘏",
@@ -5332,7 +5332,7 @@
       "tone": "jian/jiān",
       "weight": 428,
       "stroke_aux": "Gw",
-      "trad": "戋"
+      "trad": "戔"
     },
     {
       "char": "鹣",
@@ -5341,7 +5341,7 @@
       "tone": "jian/jiān",
       "weight": 181,
       "stroke_aux": "Ig",
-      "trad": "鹣"
+      "trad": "鶼"
     },
     {
       "char": "趼",
@@ -5359,7 +5359,7 @@
       "tone": "jian/jiǎn",
       "weight": 33,
       "stroke_aux": "Pm",
-      "trad": "谫"
+      "trad": "譾"
     },
     {
       "char": "靬",
@@ -5395,7 +5395,7 @@
       "tone": "jian/jiān",
       "weight": 6,
       "stroke_aux": "Qa",
-      "trad": "鳒"
+      "trad": "鰜"
     },
     {
       "char": "篯",
@@ -5404,7 +5404,7 @@
       "tone": "jian/jiān",
       "weight": 4,
       "stroke_aux": "Tg",
-      "trad": "篯"
+      "trad": "籛"
     }
   ],
   "jiang": [
@@ -5433,7 +5433,7 @@
       "tone": "jiang/jiāng",
       "weight": 5,
       "stroke_aux": "Qk",
-      "trad": "鳉"
+      "trad": "鱂"
     },
     {
       "char": "弶",
@@ -5608,7 +5608,7 @@
       "tone": "jie/jié",
       "weight": 35,
       "stroke_aux": "Qf",
-      "trad": "鲒"
+      "trad": "鮚"
     },
     {
       "char": "褯",
@@ -5673,7 +5673,7 @@
       "tone": "jin/jǐn",
       "weight": 307,
       "stroke_aux": "Bw",
-      "trad": "卺"
+      "trad": "巹"
     },
     {
       "char": "瑨",
@@ -5700,7 +5700,7 @@
       "tone": "jin/jìn",
       "weight": 46,
       "stroke_aux": "Gr",
-      "trad": "琎"
+      "trad": "璡"
     },
     {
       "char": "赆",
@@ -5709,7 +5709,7 @@
       "tone": "jin/jìn",
       "weight": 41,
       "stroke_aux": "Mn",
-      "trad": "赆"
+      "trad": "贐"
     },
     {
       "char": "溍",
@@ -5774,7 +5774,7 @@
       "tone": "jing/jìng",
       "weight": 2733,
       "stroke_aux": "Cs",
-      "trad": "迳"
+      "trad": "逕"
     },
     {
       "char": "獍",
@@ -5915,7 +5915,7 @@
       "tone": "ju/jù",
       "weight": 1496,
       "stroke_aux": "Tn",
-      "trad": "钜"
+      "trad": "鉅"
     },
     {
       "char": "筥",
@@ -5933,7 +5933,7 @@
       "tone": "ju/jù",
       "weight": 83,
       "stroke_aux": "Ot",
-      "trad": "窭"
+      "trad": "窶"
     },
     {
       "char": "鄹",
@@ -6290,7 +6290,7 @@
       "tone": "jun/jūn",
       "weight": 1,
       "stroke_aux": "Qg",
-      "trad": "鲪"
+      "trad": "鮶"
     }
   ],
   "ka": [
@@ -6312,7 +6312,7 @@
       "tone": "kai/kǎi",
       "weight": 45,
       "stroke_aux": "Fm",
-      "trad": "垲"
+      "trad": "塏"
     },
     {
       "char": "锎",
@@ -6321,7 +6321,7 @@
       "tone": "kai/kāi",
       "weight": 28,
       "stroke_aux": "Tn",
-      "trad": "锎"
+      "trad": "鐦"
     },
     {
       "char": "炌",
@@ -6415,7 +6415,7 @@
       "tone": "kang/kàng",
       "weight": 120,
       "stroke_aux": "Tx",
-      "trad": "钪"
+      "trad": "鈧"
     },
     {
       "char": "闶",
@@ -6424,7 +6424,7 @@
       "tone": "kang/kāng",
       "weight": 116,
       "stroke_aux": "Ud",
-      "trad": "闶"
+      "trad": "閌"
     }
   ],
   "kao": [
@@ -6513,7 +6513,7 @@
       "tone": "keng/kēng",
       "weight": 25,
       "stroke_aux": "Df",
-      "trad": "硁"
+      "trad": "硜"
     },
     {
       "char": "硍",
@@ -6631,7 +6631,7 @@
       "tone": "kuai/kuài",
       "weight": 77,
       "stroke_aux": "Wc",
-      "trad": "郐"
+      "trad": "鄶"
     },
     {
       "char": "鲙",
@@ -6640,7 +6640,7 @@
       "tone": "kuai/kuài",
       "weight": 16,
       "stroke_aux": "Qy",
-      "trad": "鲙"
+      "trad": "鱠"
     }
   ],
   "kuang": [
@@ -6651,7 +6651,7 @@
       "tone": "kuang/kuàng",
       "weight": 99,
       "stroke_aux": "Xe",
-      "trad": "纩"
+      "trad": "纊"
     },
     {
       "char": "洭",
@@ -6671,7 +6671,7 @@
       "tone": "kui/kuì",
       "weight": 159,
       "stroke_aux": "Ff",
-      "trad": "蒉"
+      "trad": "蕢"
     },
     {
       "char": "觖",
@@ -6698,7 +6698,7 @@
       "tone": "kui/kuí",
       "weight": 29,
       "stroke_aux": "Xe",
-      "trad": "骙"
+      "trad": "騤"
     },
     {
       "char": "煃",
@@ -6745,7 +6745,7 @@
       "tone": "kun/kǔn",
       "weight": 74,
       "stroke_aux": "Fj",
-      "trad": "壸"
+      "trad": "壼"
     },
     {
       "char": "鹍",
@@ -6754,7 +6754,7 @@
       "tone": "kun/kūn",
       "weight": 37,
       "stroke_aux": "Mv",
-      "trad": "鹍"
+      "trad": "鵾"
     },
     {
       "char": "裈",
@@ -6763,7 +6763,7 @@
       "tone": "kun/kūn",
       "weight": 27,
       "stroke_aux": "Pa",
-      "trad": "裈"
+      "trad": "褌"
     },
     {
       "char": "婫",
@@ -6823,7 +6823,7 @@
       "tone": "lai/lái",
       "weight": 64,
       "stroke_aux": "Ri",
-      "trad": "俫"
+      "trad": "倈"
     },
     {
       "char": "梾",
@@ -6832,7 +6832,7 @@
       "tone": "lai/lái",
       "weight": 9,
       "stroke_aux": "Fi",
-      "trad": "梾"
+      "trad": "棶"
     }
   ],
   "lan": [
@@ -6843,7 +6843,7 @@
       "tone": "lan/lǎn",
       "weight": 1326,
       "stroke_aux": "Of",
-      "trad": "懔"
+      "trad": "懍"
     },
     {
       "char": "襕",
@@ -6852,7 +6852,7 @@
       "tone": "lan/lán",
       "weight": 71,
       "stroke_aux": "Pm",
-      "trad": "襕"
+      "trad": "襴"
     },
     {
       "char": "暕",
@@ -6991,7 +6991,7 @@
       "tone": "lao/láo",
       "weight": 2,
       "stroke_aux": "Tl",
-      "trad": "铹"
+      "trad": "鐒"
     },
     {
       "char": "橑",
@@ -7107,7 +7107,7 @@
       "tone": "li/lì",
       "weight": 223,
       "stroke_aux": "Fe",
-      "trad": "坜"
+      "trad": "壢"
     },
     {
       "char": "轹",
@@ -7116,7 +7116,7 @@
       "tone": "li/lì",
       "weight": 72,
       "stroke_aux": "Ab",
-      "trad": "轹"
+      "trad": "轢"
     },
     {
       "char": "浬",
@@ -7199,7 +7199,7 @@
       "tone": "lian/liǎn",
       "weight": 318,
       "stroke_aux": "Py",
-      "trad": "裣"
+      "trad": "襝"
     },
     {
       "char": "瞵",
@@ -7217,7 +7217,7 @@
       "tone": "lian/liǎn",
       "weight": 22,
       "stroke_aux": "Fo",
-      "trad": "蔹"
+      "trad": "蘞"
     },
     {
       "char": "瑓",
@@ -7255,7 +7255,7 @@
       "tone": "liang/liáng",
       "weight": 92,
       "stroke_aux": "Af",
-      "trad": "辌"
+      "trad": "輬"
     },
     {
       "char": "墚",
@@ -7387,7 +7387,7 @@
       "tone": "lin/lǐn",
       "weight": 1326,
       "stroke_aux": "Of",
-      "trad": "懔"
+      "trad": "懍"
     },
     {
       "char": "潾",
@@ -7443,7 +7443,7 @@
       "tone": "ling/líng",
       "weight": 239,
       "stroke_aux": "Wi",
-      "trad": "鸰"
+      "trad": "鴒"
     },
     {
       "char": "柃",
@@ -7508,7 +7508,7 @@
       "tone": "liu/liǔ",
       "weight": 242,
       "stroke_aux": "Ti",
-      "trad": "锍"
+      "trad": "鋶"
     },
     {
       "char": "鹨",
@@ -7517,7 +7517,7 @@
       "tone": "liu/liù",
       "weight": 64,
       "stroke_aux": "Ci",
-      "trad": "鹨"
+      "trad": "鷚"
     },
     {
       "char": "飗",
@@ -7526,7 +7526,7 @@
       "tone": "liu/liú",
       "weight": 14,
       "stroke_aux": "Qc",
-      "trad": "飗"
+      "trad": "飀"
     },
     {
       "char": "漻",
@@ -7571,7 +7571,7 @@
       "tone": "liu/liú",
       "weight": 4,
       "stroke_aux": "Qf",
-      "trad": "鹠"
+      "trad": "鶹"
     },
     {
       "char": "疁",
@@ -7600,7 +7600,7 @@
       "tone": "long/lóng",
       "weight": 118,
       "stroke_aux": "Mw",
-      "trad": "昽"
+      "trad": "曨"
     },
     {
       "char": "漋",
@@ -7620,7 +7620,7 @@
       "tone": "lou/lóu",
       "weight": 3,
       "stroke_aux": "Ow",
-      "trad": "溇"
+      "trad": "漊"
     },
     {
       "char": "剅",
@@ -7694,7 +7694,7 @@
       "tone": "lu/lǔ",
       "weight": 9,
       "stroke_aux": "Tm",
-      "trad": "镥"
+      "trad": "鑥"
     },
     {
       "char": "琭",
@@ -7730,7 +7730,7 @@
       "tone": "lu/lǔ",
       "weight": 0,
       "stroke_aux": "Og",
-      "trad": "澛"
+      "trad": "瀂"
     }
   ],
   "luan": [
@@ -7761,7 +7761,7 @@
       "tone": "luo/luó",
       "weight": 642,
       "stroke_aux": "Qv",
-      "trad": "脶"
+      "trad": "腡"
     },
     {
       "char": "倮",
@@ -7817,7 +7817,7 @@
       "tone": "lv/lǚ",
       "weight": 72,
       "stroke_aux": "Tm",
-      "trad": "稆"
+      "trad": "穭"
     },
     {
       "char": "葎",
@@ -7855,7 +7855,7 @@
       "tone": "lve/lüè",
       "weight": 58,
       "stroke_aux": "Tt",
-      "trad": "锊"
+      "trad": "鋝"
     },
     {
       "char": "圙",
@@ -7875,7 +7875,7 @@
       "tone": "ma/mà",
       "weight": 70,
       "stroke_aux": "Fg",
-      "trad": "杩"
+      "trad": "榪"
     },
     {
       "char": "孖",
@@ -7893,7 +7893,7 @@
       "tone": "ma/mà",
       "weight": 4,
       "stroke_aux": "Px",
-      "trad": "祃"
+      "trad": "禡"
     }
   ],
   "mai": [
@@ -7904,7 +7904,7 @@
       "tone": "mai/mài",
       "weight": 2,
       "stroke_aux": "Td",
-      "trad": "鿏"
+      "trad": "䥑"
     }
   ],
   "man": [
@@ -8020,7 +8020,7 @@
       "tone": "mei/méi",
       "weight": 19,
       "stroke_aux": "Td",
-      "trad": "镅"
+      "trad": "鎇"
     },
     {
       "char": "渼",
@@ -8067,7 +8067,7 @@
       "tone": "men/mén",
       "weight": 33,
       "stroke_aux": "Tx",
-      "trad": "钔"
+      "trad": "鍆"
     },
     {
       "char": "亹",
@@ -8132,7 +8132,7 @@
       "tone": "meng/méng",
       "weight": 9,
       "stroke_aux": "Fq",
-      "trad": "鹲"
+      "trad": "鸏"
     }
   ],
   "mi": [
@@ -8143,7 +8143,7 @@
       "tone": "mi/mǐ",
       "weight": 1723,
       "stroke_aux": "Hg",
-      "trad": "芈"
+      "trad": "羋"
     },
     {
       "char": "蘼",
@@ -8311,7 +8311,7 @@
       "tone": "min/mǐn",
       "weight": 13,
       "stroke_aux": "Ti",
-      "trad": "鳘"
+      "trad": "鰵"
     },
     {
       "char": "苠",
@@ -8360,7 +8360,7 @@
       "tone": "mo/mò",
       "weight": 117,
       "stroke_aux": "Tn",
-      "trad": "镆"
+      "trad": "鏌"
     },
     {
       "char": "鄚",
@@ -8409,7 +8409,7 @@
       "tone": "na/ná",
       "weight": 24,
       "stroke_aux": "Tn",
-      "trad": "镎"
+      "trad": "鎿"
     },
     {
       "char": "乸",
@@ -8507,7 +8507,7 @@
       "tone": "nao/nǎo",
       "weight": 148,
       "stroke_aux": "Fp",
-      "trad": "垴"
+      "trad": "堖"
     },
     {
       "char": "臑",
@@ -8612,7 +8612,7 @@
       "tone": "nie/niè",
       "weight": 54,
       "stroke_aux": "Bg",
-      "trad": "陧"
+      "trad": "隉"
     },
     {
       "char": "菍",
@@ -8650,7 +8650,7 @@
       "tone": "ning/níng",
       "weight": 33,
       "stroke_aux": "Fj",
-      "trad": "苧"
+      "trad": "薴"
     },
     {
       "char": "聍",
@@ -8659,7 +8659,7 @@
       "tone": "ning/níng",
       "weight": 30,
       "stroke_aux": "Fo",
-      "trad": "聍"
+      "trad": "聹"
     }
   ],
   "niu": [
@@ -8752,7 +8752,7 @@
       "tone": "nuo/nuò",
       "weight": 109,
       "stroke_aux": "Td",
-      "trad": "锘"
+      "trad": "鍩"
     },
     {
       "char": "堧",
@@ -8888,7 +8888,7 @@
       "tone": "pang/páng",
       "weight": 4,
       "stroke_aux": "Qs",
-      "trad": "鳑"
+      "trad": "鰟"
     }
   ],
   "pao": [
@@ -8919,7 +8919,7 @@
       "tone": "pei/péi",
       "weight": 42,
       "stroke_aux": "Tf",
-      "trad": "锫"
+      "trad": "錇"
     },
     {
       "char": "棓",
@@ -9132,7 +9132,7 @@
       "tone": "pi/pí",
       "weight": 4,
       "stroke_aux": "Qr",
-      "trad": "鲏"
+      "trad": "鮍"
     },
     {
       "char": "椑",
@@ -9295,7 +9295,7 @@
       "tone": "po/pǒ",
       "weight": 38,
       "stroke_aux": "Ta",
-      "trad": "钷"
+      "trad": "鉕"
     },
     {
       "char": "哱",
@@ -9340,7 +9340,7 @@
       "tone": "po/pò",
       "weight": 0,
       "stroke_aux": "Fv",
-      "trad": "酦"
+      "trad": "醱"
     }
   ],
   "pou": [
@@ -9398,7 +9398,7 @@
       "tone": "pu/pǔ",
       "weight": 11,
       "stroke_aux": "Tf",
-      "trad": "镨"
+      "trad": "鐠"
     },
     {
       "char": "镤",
@@ -9407,7 +9407,7 @@
       "tone": "pu/pú",
       "weight": 6,
       "stroke_aux": "Tl",
-      "trad": "镤"
+      "trad": "鏷"
     },
     {
       "char": "蒱",
@@ -9562,7 +9562,7 @@
       "tone": "qi/qí",
       "weight": 3,
       "stroke_aux": "Qh",
-      "trad": "鲯"
+      "trad": "鯕"
     },
     {
       "char": "愭",
@@ -9737,7 +9737,7 @@
       "tone": "qian/qiàn",
       "weight": 1,
       "stroke_aux": "Rq",
-      "trad": "伣"
+      "trad": "俔"
     },
     {
       "char": "墘",
@@ -9766,7 +9766,7 @@
       "tone": "qiang/qiāng",
       "weight": 58,
       "stroke_aux": "Gx",
-      "trad": "玱"
+      "trad": "瑲"
     },
     {
       "char": "锖",
@@ -9775,7 +9775,7 @@
       "tone": "qiang/qiāng",
       "weight": 35,
       "stroke_aux": "Th",
-      "trad": "锖"
+      "trad": "錆"
     },
     {
       "char": "矼",
@@ -9813,7 +9813,7 @@
       "tone": "qiao/qiáo",
       "weight": 17,
       "stroke_aux": "Dd",
-      "trad": "硚"
+      "trad": "礄"
     },
     {
       "char": "鄗",
@@ -9862,7 +9862,7 @@
       "tone": "qin/qǐn",
       "weight": 74,
       "stroke_aux": "Tg",
-      "trad": "锓"
+      "trad": "鋟"
     },
     {
       "char": "廑",
@@ -9889,7 +9889,7 @@
       "tone": "qin/qīn",
       "weight": 8,
       "stroke_aux": "Mg",
-      "trad": "嵚"
+      "trad": "嶔"
     },
     {
       "char": "梣",
@@ -9918,7 +9918,7 @@
       "tone": "qing/qīng",
       "weight": 106,
       "stroke_aux": "Qg",
-      "trad": "鲭"
+      "trad": "鯖"
     },
     {
       "char": "碃",
@@ -9936,7 +9936,7 @@
       "tone": "qing/qǐng",
       "weight": 15,
       "stroke_aux": "Yn",
-      "trad": "庼"
+      "trad": "廎"
     },
     {
       "char": "勍",
@@ -10003,7 +10003,7 @@
       "tone": "qiu/qiū",
       "weight": 30,
       "stroke_aux": "Tq",
-      "trad": "鹙"
+      "trad": "鶖"
     },
     {
       "char": "鼽",
@@ -10041,7 +10041,7 @@
       "tone": "qu/qū",
       "weight": 147,
       "stroke_aux": "Pb",
-      "trad": "诎"
+      "trad": "詘"
     },
     {
       "char": "蠼",
@@ -10077,7 +10077,7 @@
       "tone": "qu/qū",
       "weight": 25,
       "stroke_aux": "Gi",
-      "trad": "麹"
+      "trad": "麴"
     },
     {
       "char": "胠",
@@ -10178,7 +10178,7 @@
       "tone": "quan/quán",
       "weight": 8,
       "stroke_aux": "Qn",
-      "trad": "鳈"
+      "trad": "鰁"
     },
     {
       "char": "辁",
@@ -10187,7 +10187,7 @@
       "tone": "quan/quán",
       "weight": 6,
       "stroke_aux": "Ay",
-      "trad": "辁"
+      "trad": "輇"
     },
     {
       "char": "婘",
@@ -10314,7 +10314,7 @@
       "tone": "rao/ráo",
       "weight": 132,
       "stroke_aux": "Ft",
-      "trad": "荛"
+      "trad": "蕘"
     }
   ],
   "ren": [
@@ -10325,7 +10325,7 @@
       "tone": "ren/rèn",
       "weight": 3,
       "stroke_aux": "Po",
-      "trad": "讱"
+      "trad": "訒"
     },
     {
       "char": "菍",
@@ -10345,7 +10345,7 @@
       "tone": "ri/rì",
       "weight": 5,
       "stroke_aux": "Xg",
-      "trad": "驲"
+      "trad": "馹"
     }
   ],
   "rong": [
@@ -10356,7 +10356,7 @@
       "tone": "rong/róng",
       "weight": 535,
       "stroke_aux": "Ti",
-      "trad": "镕"
+      "trad": "鎔"
     },
     {
       "char": "瑢",
@@ -10376,7 +10376,7 @@
       "tone": "ru/rú",
       "weight": 86,
       "stroke_aux": "Sr",
-      "trad": "颥"
+      "trad": "顬"
     },
     {
       "char": "嬬",
@@ -10530,7 +10530,7 @@
       "tone": "san/sān",
       "weight": 64,
       "stroke_aux": "Ci",
-      "trad": "毵"
+      "trad": "毿"
     },
     {
       "char": "潵",
@@ -10612,7 +10612,7 @@
       "tone": "shai/shāi",
       "weight": 70,
       "stroke_aux": "Fm",
-      "trad": "酾"
+      "trad": "釃"
     }
   ],
   "shan": [
@@ -10641,7 +10641,7 @@
       "tone": "shan/shān",
       "weight": 24,
       "stroke_aux": "Te",
-      "trad": "钐"
+      "trad": "釤"
     },
     {
       "char": "掞",
@@ -10719,7 +10719,7 @@
       "tone": "she/shè",
       "weight": 74,
       "stroke_aux": "Oa",
-      "trad": "滠"
+      "trad": "灄"
     },
     {
       "char": "奓",
@@ -10820,7 +10820,7 @@
       "tone": "shen/shēn",
       "weight": 2,
       "stroke_aux": "Qy",
-      "trad": "鲹"
+      "trad": "鰺"
     },
     {
       "char": "屾",
@@ -10887,7 +10887,7 @@
       "tone": "shi/shī",
       "weight": 70,
       "stroke_aux": "Fm",
-      "trad": "酾"
+      "trad": "釃"
     },
     {
       "char": "畤",
@@ -10932,7 +10932,7 @@
       "tone": "shi/shī",
       "weight": 4,
       "stroke_aux": "Qv",
-      "trad": "鲺"
+      "trad": "鯴"
     },
     {
       "char": "鼫",
@@ -10959,7 +10959,7 @@
       "tone": "shi/shī",
       "weight": 2,
       "stroke_aux": "Nc",
-      "trad": "鸤"
+      "trad": "鳲"
     },
     {
       "char": "浉",
@@ -10968,7 +10968,7 @@
       "tone": "shi/shī",
       "weight": 1,
       "stroke_aux": "Ot",
-      "trad": "浉"
+      "trad": "溮"
     },
     {
       "char": "襫",
@@ -11093,7 +11093,7 @@
       "tone": "shuang/shuāng",
       "weight": 54,
       "stroke_aux": "Sw",
-      "trad": "鹴"
+      "trad": "鸘"
     },
     {
       "char": "骦",
@@ -11102,7 +11102,7 @@
       "tone": "shuang/shuāng",
       "weight": 45,
       "stroke_aux": "Xs",
-      "trad": "骦"
+      "trad": "驦"
     },
     {
       "char": "礵",
@@ -11171,7 +11171,7 @@
       "tone": "si/sī",
       "weight": 14,
       "stroke_aux": "Qm",
-      "trad": "飔"
+      "trad": "颸"
     },
     {
       "char": "凘",
@@ -11247,7 +11247,7 @@
       "tone": "sou/sōu",
       "weight": 56,
       "stroke_aux": "Ta",
-      "trad": "锼"
+      "trad": "鎪"
     },
     {
       "char": "廋",
@@ -11294,7 +11294,7 @@
       "tone": "su/sù",
       "weight": 55,
       "stroke_aux": "Xg",
-      "trad": "骕"
+      "trad": "驌"
     },
     {
       "char": "甦",
@@ -11312,7 +11312,7 @@
       "tone": "su/sù",
       "weight": 22,
       "stroke_aux": "Nr",
-      "trad": "鹔"
+      "trad": "鷫"
     },
     {
       "char": "傃",
@@ -11439,7 +11439,7 @@
       "tone": "ta/tà",
       "weight": 48,
       "stroke_aux": "Ua",
-      "trad": "阘"
+      "trad": "闒"
     },
     {
       "char": "溚",
@@ -11466,7 +11466,7 @@
       "tone": "ta/tǎ",
       "weight": 0,
       "stroke_aux": "Do",
-      "trad": "鿎"
+      "trad": "䃮"
     }
   ],
   "tai": [
@@ -11515,7 +11515,7 @@
       "tone": "tan/tán",
       "weight": 39,
       "stroke_aux": "Tw",
-      "trad": "锬"
+      "trad": "錟"
     },
     {
       "char": "璮",
@@ -11551,7 +11551,7 @@
       "tone": "tan/tān",
       "weight": 6,
       "stroke_aux": "Mn",
-      "trad": "啴"
+      "trad": "嘽"
     },
     {
       "char": "榃",
@@ -11589,7 +11589,7 @@
       "tone": "tang/tǎng",
       "weight": 23,
       "stroke_aux": "Tp",
-      "trad": "镋"
+      "trad": "钂"
     },
     {
       "char": "铴",
@@ -11598,7 +11598,7 @@
       "tone": "tang/tāng",
       "weight": 5,
       "stroke_aux": "Ta",
-      "trad": "铴"
+      "trad": "鐋"
     },
     {
       "char": "埫",
@@ -11627,7 +11627,7 @@
       "tone": "tao/táo",
       "weight": 371,
       "stroke_aux": "Ft",
-      "trad": "梼"
+      "trad": "檮"
     },
     {
       "char": "绹",
@@ -11636,7 +11636,7 @@
       "tone": "tao/táo",
       "weight": 181,
       "stroke_aux": "Xt",
-      "trad": "绹"
+      "trad": "綯"
     },
     {
       "char": "弢",
@@ -11683,7 +11683,7 @@
       "tone": "te/tè",
       "weight": 53,
       "stroke_aux": "Tp",
-      "trad": "铽"
+      "trad": "鋱"
     }
   ],
   "teng": [
@@ -11889,7 +11889,7 @@
       "tone": "tiao/tiáo",
       "weight": 106,
       "stroke_aux": "Hv",
-      "trad": "龆"
+      "trad": "齠"
     },
     {
       "char": "鲦",
@@ -11898,7 +11898,7 @@
       "tone": "tiao/tiáo",
       "weight": 86,
       "stroke_aux": "Qc",
-      "trad": "鲦"
+      "trad": "鰷"
     },
     {
       "char": "朓",
@@ -11954,7 +11954,7 @@
       "tone": "ting/tǐng",
       "weight": 9,
       "stroke_aux": "Td",
-      "trad": "颋"
+      "trad": "頲"
     },
     {
       "char": "桯",
@@ -12055,7 +12055,7 @@
       "tone": "tong/tóng",
       "weight": 3,
       "stroke_aux": "Qf",
-      "trad": "鲖"
+      "trad": "鮦"
     },
     {
       "char": "峂",
@@ -12084,7 +12084,7 @@
       "tone": "tou/tǒu",
       "weight": 3,
       "stroke_aux": "Ty",
-      "trad": "钭"
+      "trad": "鈄"
     }
   ],
   "tu": [
@@ -12247,7 +12247,7 @@
       "tone": "tuo/tuò",
       "weight": 34,
       "stroke_aux": "Ta",
-      "trad": "箨"
+      "trad": "籜"
     },
     {
       "char": "萚",
@@ -12256,7 +12256,7 @@
       "tone": "tuo/tuò",
       "weight": 1,
       "stroke_aux": "Fc",
-      "trad": "萚"
+      "trad": "蘀"
     },
     {
       "char": "圫",
@@ -12294,7 +12294,7 @@
       "tone": "wa/wà",
       "weight": 22,
       "stroke_aux": "Qm",
-      "trad": "腽"
+      "trad": "膃"
     },
     {
       "char": "坬",
@@ -12435,7 +12435,7 @@
       "tone": "wei/wēi",
       "weight": 8,
       "stroke_aux": "Qf",
-      "trad": "鳂"
+      "trad": "鰃"
     },
     {
       "char": "鳚",
@@ -12444,7 +12444,7 @@
       "tone": "wei/wèi",
       "weight": 7,
       "stroke_aux": "Qd",
-      "trad": "鳚"
+      "trad": "䲁"
     },
     {
       "char": "硊",
@@ -12498,7 +12498,7 @@
       "tone": "wei/wéi",
       "weight": 2,
       "stroke_aux": "Dn",
-      "trad": "硙"
+      "trad": "磑"
     },
     {
       "char": "沇",
@@ -12581,7 +12581,7 @@
       "tone": "wen/wén",
       "weight": 91,
       "stroke_aux": "Uw",
-      "trad": "阌"
+      "trad": "閿"
     },
     {
       "char": "辒",
@@ -12590,7 +12590,7 @@
       "tone": "wen/wēn",
       "weight": 62,
       "stroke_aux": "Ag",
-      "trad": "辒"
+      "trad": "轀"
     },
     {
       "char": "煴",
@@ -12599,7 +12599,7 @@
       "tone": "wen/yùn",
       "weight": 18,
       "stroke_aux": "Ib",
-      "trad": "煴"
+      "trad": "熅"
     },
     {
       "char": "榅",
@@ -12608,7 +12608,7 @@
       "tone": "wen/wēn",
       "weight": 9,
       "stroke_aux": "Fb",
-      "trad": "榅"
+      "trad": "榲"
     },
     {
       "char": "蕰",
@@ -12617,7 +12617,7 @@
       "tone": "wen/wēn",
       "weight": 9,
       "stroke_aux": "Fg",
-      "trad": "蕰"
+      "trad": "薀"
     },
     {
       "char": "鳁",
@@ -12626,7 +12626,7 @@
       "tone": "wen/wēn",
       "weight": 2,
       "stroke_aux": "Qg",
-      "trad": "鳁"
+      "trad": "鰮"
     }
   ],
   "weng": [
@@ -12646,7 +12646,7 @@
       "tone": "weng/wēng",
       "weight": 32,
       "stroke_aux": "Wa",
-      "trad": "鹟"
+      "trad": "鶲"
     }
   ],
   "wo": [
@@ -12722,7 +12722,7 @@
       "tone": "wu/wú",
       "weight": 5,
       "stroke_aux": "Fq",
-      "trad": "鹀"
+      "trad": "鵐"
     },
     {
       "char": "郚",
@@ -12787,7 +12787,7 @@
       "tone": "xi/xì",
       "weight": 588,
       "stroke_aux": "Nw",
-      "trad": "屃"
+      "trad": "屓"
     },
     {
       "char": "傒",
@@ -12931,7 +12931,7 @@
       "tone": "xi/xì",
       "weight": 11,
       "stroke_aux": "Xu",
-      "trad": "绤"
+      "trad": "綌"
     },
     {
       "char": "枲",
@@ -13021,7 +13021,7 @@
       "tone": "xi/xī",
       "weight": 0,
       "stroke_aux": "Qd",
-      "trad": "饻"
+      "trad": "餏"
     },
     {
       "char": "熻",
@@ -13039,7 +13039,7 @@
       "tone": "xi/xí",
       "weight": 0,
       "stroke_aux": "Qa",
-      "trad": "鳛"
+      "trad": "鰼"
     }
   ],
   "xia": [
@@ -13097,7 +13097,7 @@
       "tone": "xian/xiǎn",
       "weight": 234,
       "stroke_aux": "Qk",
-      "trad": "狝"
+      "trad": "獮"
     },
     {
       "char": "玹",
@@ -13133,7 +13133,7 @@
       "tone": "xian/xiān",
       "weight": 45,
       "stroke_aux": "Fs",
-      "trad": "莶"
+      "trad": "薟"
     },
     {
       "char": "锬",
@@ -13142,7 +13142,7 @@
       "tone": "xian/xiān",
       "weight": 39,
       "stroke_aux": "Tw",
-      "trad": "锬"
+      "trad": "錟"
     },
     {
       "char": "盷",
@@ -13160,7 +13160,7 @@
       "tone": "xian/xiǎn",
       "weight": 15,
       "stroke_aux": "Ms",
-      "trad": "崄"
+      "trad": "嶮"
     },
     {
       "char": "缐",
@@ -13169,7 +13169,7 @@
       "tone": "xian/xiàn",
       "weight": 14,
       "stroke_aux": "Xg",
-      "trad": "缐"
+      "trad": "線"
     },
     {
       "char": "硍",
@@ -13335,7 +13335,7 @@
       "tone": "xiao/xiāo",
       "weight": 2,
       "stroke_aux": "Mg",
-      "trad": "蟏"
+      "trad": "蠨"
     },
     {
       "char": "涍",
@@ -13371,7 +13371,7 @@
       "tone": "xiao/xiào",
       "weight": 0,
       "stroke_aux": "Ox",
-      "trad": "敩"
+      "trad": "斆"
     },
     {
       "char": "滧",
@@ -13476,7 +13476,7 @@
       "tone": "xing/xīng",
       "weight": 115,
       "stroke_aux": "Xi",
-      "trad": "骍"
+      "trad": "騂"
     },
     {
       "char": "钘",
@@ -13485,7 +13485,7 @@
       "tone": "xing/xíng",
       "weight": 59,
       "stroke_aux": "Td",
-      "trad": "钘"
+      "trad": "鈃"
     },
     {
       "char": "瑆",
@@ -13512,7 +13512,7 @@
       "tone": "xing/xíng",
       "weight": 14,
       "stroke_aux": "Tr",
-      "trad": "铏"
+      "trad": "鉶"
     },
     {
       "char": "煋",
@@ -13541,7 +13541,7 @@
       "tone": "xiong/xiōng",
       "weight": 8,
       "stroke_aux": "Pb",
-      "trad": "讻"
+      "trad": "訩"
     },
     {
       "char": "夐",
@@ -13559,7 +13559,7 @@
       "tone": "xiong/xiòng",
       "weight": 3,
       "stroke_aux": "Pm",
-      "trad": "诇"
+      "trad": "詗"
     }
   ],
   "xiu": [
@@ -13579,7 +13579,7 @@
       "tone": "xiu/xiū",
       "weight": 24,
       "stroke_aux": "Ri",
-      "trad": "鸺"
+      "trad": "鵂"
     },
     {
       "char": "珛",
@@ -13608,7 +13608,7 @@
       "tone": "xu/xū",
       "weight": 64,
       "stroke_aux": "Ph",
-      "trad": "谞"
+      "trad": "諝"
     },
     {
       "char": "糈",
@@ -13862,7 +13862,7 @@
       "tone": "xuan/xuǎn",
       "weight": 2,
       "stroke_aux": "Mu",
-      "trad": "暅"
+      "trad": "𣈶"
     },
     {
       "char": "暶",
@@ -13900,7 +13900,7 @@
       "tone": "xue/xué",
       "weight": 0,
       "stroke_aux": "Ox",
-      "trad": "敩"
+      "trad": "斆"
     },
     {
       "char": "峃",
@@ -13909,7 +13909,7 @@
       "tone": "xue/xué",
       "weight": 0,
       "stroke_aux": "Ob",
-      "trad": "峃"
+      "trad": "嶨"
     }
   ],
   "xun": [
@@ -13985,7 +13985,7 @@
       "tone": "ya/yā",
       "weight": 2171,
       "stroke_aux": "Fi",
-      "trad": "桠"
+      "trad": "椏"
     },
     {
       "char": "猰",
@@ -14032,7 +14032,7 @@
       "tone": "yan/yán",
       "weight": 4234,
       "stroke_aux": "Ug",
-      "trad": "闫"
+      "trad": "閆"
     },
     {
       "char": "厣",
@@ -14041,7 +14041,7 @@
       "tone": "yan/yǎn",
       "weight": 332,
       "stroke_aux": "Du",
-      "trad": "厣"
+      "trad": "厴"
     },
     {
       "char": "弇",
@@ -14068,7 +14068,7 @@
       "tone": "yan/yǎn",
       "weight": 61,
       "stroke_aux": "Dm",
-      "trad": "黡"
+      "trad": "黶"
     },
     {
       "char": "趼",
@@ -14185,7 +14185,7 @@
       "tone": "yan/yàn",
       "weight": 0,
       "stroke_aux": "Mx",
-      "trad": "觃"
+      "trad": "覎"
     },
     {
       "char": "墕",
@@ -14232,7 +14232,7 @@
       "tone": "yang/yáng",
       "weight": 742,
       "stroke_aux": "Qv",
-      "trad": "飏"
+      "trad": "颺"
     },
     {
       "char": "羕",
@@ -14268,7 +14268,7 @@
       "tone": "yang/yáng",
       "weight": 28,
       "stroke_aux": "Ge",
-      "trad": "玚"
+      "trad": "瑒"
     },
     {
       "char": "咉",
@@ -14286,7 +14286,7 @@
       "tone": "yang/yáng",
       "weight": 9,
       "stroke_aux": "Te",
-      "trad": "钖"
+      "trad": "鍚"
     }
   ],
   "yao": [
@@ -14297,7 +14297,7 @@
       "tone": "yao/yáo",
       "weight": 477,
       "stroke_aux": "Ar",
-      "trad": "轺"
+      "trad": "軺"
     },
     {
       "char": "崾",
@@ -14389,7 +14389,7 @@
       "tone": "ye/yè",
       "weight": 5540,
       "stroke_aux": "Mk",
-      "trad": "晔"
+      "trad": "曄"
     },
     {
       "char": "铘",
@@ -14398,7 +14398,7 @@
       "tone": "ye/yé",
       "weight": 248,
       "stroke_aux": "Tk",
-      "trad": "铘"
+      "trad": "鋣"
     },
     {
       "char": "倻",
@@ -14416,7 +14416,7 @@
       "tone": "ye/yè",
       "weight": 6,
       "stroke_aux": "Qh",
-      "trad": "馌"
+      "trad": "饁"
     },
     {
       "char": "焆",
@@ -14454,7 +14454,7 @@
       "tone": "yi/yì",
       "weight": 700,
       "stroke_aux": "Tm",
-      "trad": "镱"
+      "trad": "鐿"
     },
     {
       "char": "欹",
@@ -14499,7 +14499,7 @@
       "tone": "yi/yì",
       "weight": 96,
       "stroke_aux": "Ys",
-      "trad": "瘗"
+      "trad": "瘞"
     },
     {
       "char": "燚",
@@ -14553,7 +14553,7 @@
       "tone": "yi/yǐ",
       "weight": 28,
       "stroke_aux": "Ew",
-      "trad": "舣"
+      "trad": "艤"
     },
     {
       "char": "杙",
@@ -14571,7 +14571,7 @@
       "tone": "yi/yì",
       "weight": 22,
       "stroke_aux": "Im",
-      "trad": "鹢"
+      "trad": "鷁"
     },
     {
       "char": "宧",
@@ -14670,7 +14670,7 @@
       "tone": "yi/yì",
       "weight": 5,
       "stroke_aux": "Fv",
-      "trad": "勚"
+      "trad": "勩"
     },
     {
       "char": "叕",
@@ -14688,7 +14688,7 @@
       "tone": "yi/yì",
       "weight": 2,
       "stroke_aux": "Fq",
-      "trad": "鹝"
+      "trad": "鷊"
     },
     {
       "char": "枍",
@@ -14735,7 +14735,7 @@
       "tone": "yin/yīn",
       "weight": 11,
       "stroke_aux": "Xw",
-      "trad": "骃"
+      "trad": "駰"
     },
     {
       "char": "硍",
@@ -14753,7 +14753,7 @@
       "tone": "yin/yìn",
       "weight": 6,
       "stroke_aux": "Sk",
-      "trad": "慭"
+      "trad": "憖"
     },
     {
       "char": "珢",
@@ -14771,7 +14771,7 @@
       "tone": "yin/yín",
       "weight": 3,
       "stroke_aux": "He",
-      "trad": "龂"
+      "trad": "齗"
     },
     {
       "char": "蟫",
@@ -14818,7 +14818,7 @@
       "tone": "ying/yíng",
       "weight": 361,
       "stroke_aux": "Ox",
-      "trad": "潆"
+      "trad": "瀠"
     },
     {
       "char": "锳",
@@ -14827,7 +14827,7 @@
       "tone": "ying/yīng",
       "weight": 101,
       "stroke_aux": "Td",
-      "trad": "锳"
+      "trad": "鍈"
     },
     {
       "char": "泂",
@@ -14845,7 +14845,7 @@
       "tone": "ying/yíng",
       "weight": 11,
       "stroke_aux": "On",
-      "trad": "溁"
+      "trad": "濚"
     },
     {
       "char": "桯",
@@ -14910,7 +14910,7 @@
       "tone": "yong/yǒng",
       "weight": 6,
       "stroke_aux": "Qu",
-      "trad": "鲬"
+      "trad": "鯒"
     },
     {
       "char": "栐",
@@ -15011,7 +15011,7 @@
       "tone": "you/yǒu",
       "weight": 5,
       "stroke_aux": "Tm",
-      "trad": "铕"
+      "trad": "銪"
     },
     {
       "char": "鲉",
@@ -15020,7 +15020,7 @@
       "tone": "you/yóu",
       "weight": 3,
       "stroke_aux": "Qf",
-      "trad": "鲉"
+      "trad": "鮋"
     },
     {
       "char": "戭",
@@ -15157,7 +15157,7 @@
       "tone": "yu/yù",
       "weight": 16,
       "stroke_aux": "Fb",
-      "trad": "蓣"
+      "trad": "蕷"
     },
     {
       "char": "潏",
@@ -15359,7 +15359,7 @@
       "tone": "yue/yuē",
       "weight": 244,
       "stroke_aux": "Nl",
-      "trad": "彟"
+      "trad": "彠"
     },
     {
       "char": "瀹",
@@ -15424,7 +15424,7 @@
       "tone": "yun/yún",
       "weight": 100,
       "stroke_aux": "Oc",
-      "trad": "沄"
+      "trad": "澐"
     },
     {
       "char": "妘",
@@ -15442,7 +15442,7 @@
       "tone": "yun/yūn",
       "weight": 37,
       "stroke_aux": "Xb",
-      "trad": "缊"
+      "trad": "縕"
     },
     {
       "char": "煴",
@@ -15451,7 +15451,7 @@
       "tone": "yun/yūn",
       "weight": 18,
       "stroke_aux": "Ib",
-      "trad": "煴"
+      "trad": "熅"
     },
     {
       "char": "榅",
@@ -15460,7 +15460,7 @@
       "tone": "yun/yùn",
       "weight": 9,
       "stroke_aux": "Fb",
-      "trad": "榅"
+      "trad": "榲"
     },
     {
       "char": "蕰",
@@ -15469,7 +15469,7 @@
       "tone": "yun/yùn",
       "weight": 9,
       "stroke_aux": "Fg",
-      "trad": "蕰"
+      "trad": "薀"
     },
     {
       "char": "筼",
@@ -15478,7 +15478,7 @@
       "tone": "yun/yún",
       "weight": 7,
       "stroke_aux": "Tm",
-      "trad": "筼"
+      "trad": "篔"
     },
     {
       "char": "涢",
@@ -15487,7 +15487,7 @@
       "tone": "yun/yún",
       "weight": 5,
       "stroke_aux": "Ow",
-      "trad": "涢"
+      "trad": "溳"
     },
     {
       "char": "馧",
@@ -15527,7 +15527,7 @@
       "tone": "zan/zàn",
       "weight": 12,
       "stroke_aux": "Th",
-      "trad": "酂"
+      "trad": "酇"
     },
     {
       "char": "寁",
@@ -15547,7 +15547,7 @@
       "tone": "zang/zǎng",
       "weight": 37,
       "stroke_aux": "Xg",
-      "trad": "驵"
+      "trad": "駔"
     }
   ],
   "zao": [
@@ -15578,7 +15578,7 @@
       "tone": "zei/zéi",
       "weight": 10,
       "stroke_aux": "Qv",
-      "trad": "鲗"
+      "trad": "鰂"
     }
   ],
   "zeng": [
@@ -15627,7 +15627,7 @@
       "tone": "zha/zhǎ",
       "weight": 158,
       "stroke_aux": "Qh",
-      "trad": "鲊"
+      "trad": "鮓"
     },
     {
       "char": "哳",
@@ -15708,7 +15708,7 @@
       "tone": "zha/zhǎ",
       "weight": 0,
       "stroke_aux": "Ib",
-      "trad": "鲝"
+      "trad": "鮺"
     },
     {
       "char": "齇",
@@ -15757,7 +15757,7 @@
       "tone": "zhan/zhǎn",
       "weight": 45,
       "stroke_aux": "Qh",
-      "trad": "飐"
+      "trad": "颭"
     },
     {
       "char": "鹯",
@@ -15766,7 +15766,7 @@
       "tone": "zhan/zhān",
       "weight": 41,
       "stroke_aux": "Ym",
-      "trad": "鹯"
+      "trad": "鸇"
     },
     {
       "char": "偡",
@@ -15802,7 +15802,7 @@
       "tone": "zhan/zhān",
       "weight": 5,
       "stroke_aux": "Qf",
-      "trad": "鳣"
+      "trad": "鱣"
     },
     {
       "char": "嶦",
@@ -15898,7 +15898,7 @@
       "tone": "zhe/zhé",
       "weight": 72,
       "stroke_aux": "Dy",
-      "trad": "詟"
+      "trad": "讋"
     }
   ],
   "zhen": [
@@ -15936,7 +15936,7 @@
       "tone": "zhen/zhēn",
       "weight": 168,
       "stroke_aux": "Ov",
-      "trad": "浈"
+      "trad": "湞"
     },
     {
       "char": "瑧",
@@ -15999,7 +15999,7 @@
       "tone": "zhen/zhèn",
       "weight": 0,
       "stroke_aux": "Xb",
-      "trad": "纼"
+      "trad": "紖"
     },
     {
       "char": "昣",
@@ -16019,7 +16019,7 @@
       "tone": "zheng/zhēng",
       "weight": 106,
       "stroke_aux": "Qg",
-      "trad": "鲭"
+      "trad": "鯖"
     },
     {
       "char": "烝",
@@ -16102,7 +16102,7 @@
       "tone": "zhi/zhí",
       "weight": 142,
       "stroke_aux": "Fx",
-      "trad": "絷"
+      "trad": "縶"
     },
     {
       "char": "轵",
@@ -16111,7 +16111,7 @@
       "tone": "zhi/zhǐ",
       "weight": 113,
       "stroke_aux": "Ad",
-      "trad": "轵"
+      "trad": "軹"
     },
     {
       "char": "黹",
@@ -16192,7 +16192,7 @@
       "tone": "zhi/zhì",
       "weight": 18,
       "stroke_aux": "Tc",
-      "trad": "铚"
+      "trad": "銍"
     },
     {
       "char": "锧",
@@ -16201,7 +16201,7 @@
       "tone": "zhi/zhì",
       "weight": 12,
       "stroke_aux": "Tt",
-      "trad": "锧"
+      "trad": "鑕"
     },
     {
       "char": "擿",
@@ -16311,7 +16311,7 @@
       "tone": "zhong/zhōng",
       "weight": 2435,
       "stroke_aux": "Tf",
-      "trad": "锺"
+      "trad": "鍾"
     },
     {
       "char": "舯",
@@ -16385,7 +16385,7 @@
       "tone": "zhou/zhōu",
       "weight": 23,
       "stroke_aux": "Aq",
-      "trad": "辀"
+      "trad": "輈"
     },
     {
       "char": "赒",
@@ -16394,7 +16394,7 @@
       "tone": "zhou/zhōu",
       "weight": 9,
       "stroke_aux": "Mf",
-      "trad": "赒"
+      "trad": "賙"
     },
     {
       "char": "鸼",
@@ -16403,7 +16403,7 @@
       "tone": "zhou/zhōu",
       "weight": 3,
       "stroke_aux": "Ep",
-      "trad": "鸼"
+      "trad": "鵃"
     },
     {
       "char": "婤",
@@ -16441,7 +16441,7 @@
       "tone": "zhu/zhù",
       "weight": 66,
       "stroke_aux": "Xg",
-      "trad": "纻"
+      "trad": "紵"
     },
     {
       "char": "橥",
@@ -16450,7 +16450,7 @@
       "tone": "zhu/zhū",
       "weight": 47,
       "stroke_aux": "Qd",
-      "trad": "橥"
+      "trad": "櫫"
     },
     {
       "char": "苧",
@@ -16459,7 +16459,7 @@
       "tone": "zhu/zhù",
       "weight": 33,
       "stroke_aux": "Fj",
-      "trad": "苧"
+      "trad": "薴"
     },
     {
       "char": "砫",
@@ -16689,7 +16689,7 @@
       "tone": "zi/zī",
       "weight": 367,
       "stroke_aux": "Hb",
-      "trad": "赀"
+      "trad": "貲"
     },
     {
       "char": "觜",
@@ -16734,7 +16734,7 @@
       "tone": "zi/zī",
       "weight": 22,
       "stroke_aux": "Ta",
-      "trad": "镃"
+      "trad": "鎡"
     },
     {
       "char": "耔",
@@ -16819,7 +16819,7 @@
       "tone": "zou/zōu",
       "weight": 256,
       "stroke_aux": "Xn",
-      "trad": "驺"
+      "trad": "騶"
     },
     {
       "char": "鄹",
@@ -16837,7 +16837,7 @@
       "tone": "zou/zōu",
       "weight": 9,
       "stroke_aux": "Qh",
-      "trad": "鲰"
+      "trad": "鯫"
     }
   ],
   "zu": [
