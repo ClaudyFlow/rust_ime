@@ -111,6 +111,24 @@ pub struct Input {
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
     pub double_pinyin_scheme: DoublePinyinScheme,
+    pub enable_fuzzy_pinyin: bool,
+    pub fuzzy_config: FuzzyPinyinConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct FuzzyPinyinConfig {
+    pub z_zh: bool,
+    pub c_ch: bool,
+    pub s_sh: bool,
+    pub n_l: bool,
+    pub r_l: bool,
+    pub f_h: bool,
+    pub an_ang: bool,
+    pub en_eng: bool,
+    pub in_ing: bool,
+    pub ian_iang: bool,
+    pub uan_uang: bool,
+    pub u_v: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -300,6 +318,11 @@ impl Config {
                         ("d", "ai"), ("j", "an"), ("t", "ue"), ("c", "ao"), ("s", "ong"),
                         ("z", "ou"), ("y", "un"), ("w", "ei"), ("l", "iang")
                     ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                },
+                enable_fuzzy_pinyin: false,
+                fuzzy_config: FuzzyPinyinConfig {
+                    z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
+                    an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
                 },
             },
             hotkeys: Hotkeys {

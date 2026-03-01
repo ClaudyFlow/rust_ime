@@ -115,6 +115,8 @@ pub struct Processor {
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
     pub double_pinyin_scheme: crate::config::DoublePinyinScheme,
+    pub enable_fuzzy_pinyin: bool,
+    pub fuzzy_config: crate::config::FuzzyPinyinConfig,
     pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
@@ -246,6 +248,11 @@ impl Processor {
                 initials: [("v","zh"), ("u","sh"), ("i","ch")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(),
                 rimes: [("q","iu"), ("w","ei"), ("r","uan")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(), // 简略初始化，实际会被 apply_config 覆盖
             },
+            enable_fuzzy_pinyin: false,
+            fuzzy_config: crate::config::FuzzyPinyinConfig {
+                z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
+                an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
+            },
             user_dict: HashMap::new(),
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
@@ -262,6 +269,8 @@ impl Processor {
         self.enable_smart_backspace = conf.input.enable_smart_backspace;
         self.enable_double_pinyin = conf.input.enable_double_pinyin;
         self.double_pinyin_scheme = conf.input.double_pinyin_scheme.clone();
+        self.enable_fuzzy_pinyin = conf.input.enable_fuzzy_pinyin;
+        self.fuzzy_config = conf.input.fuzzy_config.clone();
         // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.is_empty() {
             self.load_user_dict();
@@ -403,6 +412,77 @@ impl Processor {
             }
         }
         0
+    }
+
+    fn get_fuzzy_variants(&self, pinyin: &str) -> Vec<String> {
+        let mut variants = vec![pinyin.to_string()];
+        if !self.enable_fuzzy_pinyin {
+            return variants;
+        }
+
+        let cfg = &self.fuzzy_config;
+        let mut new_variants = std::collections::HashSet::new();
+        new_variants.insert(pinyin.to_string());
+
+        // 声母转换
+        let initial_list: Vec<String> = new_variants.iter().cloned().collect();
+        for v in initial_list {
+            if cfg.z_zh {
+                if v.starts_with("zh") { new_variants.insert(v.replacen("zh", "z", 1)); }
+                else if v.starts_with("z") { new_variants.insert(v.replacen("z", "zh", 1)); }
+            }
+            if cfg.c_ch {
+                if v.starts_with("ch") { new_variants.insert(v.replacen("ch", "c", 1)); }
+                else if v.starts_with("c") { new_variants.insert(v.replacen("c", "ch", 1)); }
+            }
+            if cfg.s_sh {
+                if v.starts_with("sh") { new_variants.insert(v.replacen("sh", "s", 1)); }
+                else if v.starts_with("s") { new_variants.insert(v.replacen("s", "sh", 1)); }
+            }
+            if cfg.n_l {
+                if v.starts_with('n') { new_variants.insert(v.replacen('n', "l", 1)); }
+                else if v.starts_with('l') { new_variants.insert(v.replacen('l', "n", 1)); }
+            }
+            if cfg.r_l {
+                if v.starts_with('r') { new_variants.insert(v.replacen('r', "l", 1)); }
+                else if v.starts_with('l') { new_variants.insert(v.replacen('l', "r", 1)); }
+            }
+            if cfg.f_h {
+                if v.starts_with('f') { new_variants.insert(v.replacen('f', "h", 1)); }
+                else if v.starts_with('h') { new_variants.insert(v.replacen('h', "f", 1)); }
+            }
+        }
+
+        // 韵母转换
+        let current_list: Vec<String> = new_variants.iter().cloned().collect();
+        for v in current_list {
+            if cfg.an_ang {
+                if v.ends_with("ang") { new_variants.insert(v.replace("ang", "an")); }
+                else if v.ends_with("an") { new_variants.insert(v.replace("an", "ang")); }
+            }
+            if cfg.en_eng {
+                if v.ends_with("eng") { new_variants.insert(v.replace("eng", "en")); }
+                else if v.ends_with("en") { new_variants.insert(v.replace("en", "eng")); }
+            }
+            if cfg.in_ing {
+                if v.ends_with("ing") { new_variants.insert(v.replace("ing", "in")); }
+                else if v.ends_with("in") { new_variants.insert(v.replace("in", "ing")); }
+            }
+            if cfg.ian_iang {
+                if v.ends_with("iang") { new_variants.insert(v.replace("iang", "ian")); }
+                else if v.ends_with("ian") { new_variants.insert(v.replace("ian", "iang")); }
+            }
+            if cfg.uan_uang {
+                if v.ends_with("uang") { new_variants.insert(v.replace("uang", "uan")); }
+                else if v.ends_with("uan") { new_variants.insert(v.replace("uan", "uang")); }
+            }
+            if cfg.u_v {
+                if v.contains('u') { new_variants.insert(v.replace('u', "v")); }
+                else if v.contains('v') { new_variants.insert(v.replace('v', "u")); }
+            }
+        }
+
+        new_variants.into_iter().collect()
     }
 
     /// 将输入的连续字母切分为音节或简拼
@@ -1057,15 +1137,19 @@ impl Processor {
         let mut last_matches_raw = Vec::new();
         for (i, part) in raw_parsed.iter().enumerate() {
             let mut matches = Vec::new();
+            let pinyin_variants = self.get_fuzzy_variants(&part.pinyin);
+
             for profile in &self.active_profiles {
                 if let Some(d) = self.tries.get(profile) {
-                    if let Some(m) = d.get_all_exact(&part.pinyin) {
-                        for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, true)); }
-                    }
-                    if self.enable_prefix_matching && !part.pinyin.is_empty() {
-                        let limit = if part.aux_code.is_some() { 50 } else { 20 };
-                        let m = d.search_bfs(&part.pinyin, limit);
-                        for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, false)); }
+                    for py in &pinyin_variants {
+                        if let Some(m) = d.get_all_exact(py) {
+                            for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, true)); }
+                        }
+                        if self.enable_prefix_matching && !py.is_empty() {
+                            let limit = if part.aux_code.is_some() { 50 } else { 20 };
+                            let m = d.search_bfs(py, limit);
+                            for (w, t, e, s, weight) in m { matches.push((w, t, e, s, weight, false)); }
+                        }
                     }
                 }
             }
