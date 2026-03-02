@@ -11875,6 +11875,15 @@
     }
   ],
   "hang": [
+      {
+      "category": "level-1",
+      "char": "行",
+      "en": "Walk",
+      "tone": "háng/xíng/xìng",
+      "weight": 2756706,
+      "stroke_aux": "Eh",
+      "trad": "行"
+    },
     {
       "category": "level-1",
       "char": "航",
