@@ -19,6 +19,9 @@ component CandidateItem inherits Rectangle {
     in property <color> highlight_text_color;
     in property <color> aux_text_color;
     in property <color> aux_highlight_color;
+    
+    in property <length> font_size: 18px;
+    in property <string> font_family: "";
 
     background: selected ? accent_color : transparent;
     border-radius: 4px;
@@ -34,27 +37,31 @@ component CandidateItem inherits Rectangle {
             text: (index + 1) + "."; 
             color: selected ? highlight_text_color : aux_text_color; 
             vertical-alignment: center; 
-            font-size: 16px; 
+            font-size: font_size * 0.8;
+            font-family: font_family;
         }
         Text { 
             text: text; 
             color: selected ? highlight_text_color : text_color; 
             vertical-alignment: center; 
-            font-size: 18px; 
+            font-size: font_size;
+            font-family: font_family;
             font-weight: selected ? 600 : 400; 
         }
         
         if show_stroke_aux && stroke_aux != "" : Text {
             text: stroke_aux;
             color: selected ? aux_highlight_color : aux_text_color;
-            font-size: 12px;
+            font-size: font_size * 0.7;
+            font-family: font_family;
             vertical-alignment: center;
         }
 
         if show_english_aux && english_aux != "" : Text {
             text: english_aux;
             color: selected ? aux_highlight_color : aux_text_color;
-            font-size: 12px;
+            font-size: font_size * 0.7;
+            font-family: font_family;
             vertical-alignment: center;
         }
     }
@@ -69,6 +76,11 @@ export component CandidateWindow inherits Window {
     in property <bool> is_horizontal: true;
     in property <bool> show_english_aux: true;
     in property <bool> show_stroke_aux: true;
+    
+    in property <length> pinyin_font_size: 14px;
+    in property <string> pinyin_font_family: "";
+    in property <length> candidate_font_size: 18px;
+    in property <string> candidate_font_family: "";
 
     no-frame: true;
     background: transparent;
@@ -109,7 +121,8 @@ export component CandidateWindow inherits Window {
                 Text {
                     text: pinyin;
                     color: #3498db;
-                    font-size: 14px;
+                    font-size: pinyin_font_size;
+                    font-family: pinyin_font_family;
                     font-weight: 600;
                 }
             }
@@ -131,6 +144,8 @@ export component CandidateWindow inherits Window {
                     highlight_text_color: highlight_text_color;
                     aux_text_color: aux_text_color;
                     aux_highlight_color: aux_highlight_color;
+                    font_size: candidate_font_size;
+                    font_family: candidate_font_family;
                 }
             }
 
@@ -151,6 +166,8 @@ export component CandidateWindow inherits Window {
                     highlight_text_color: highlight_text_color;
                     aux_text_color: aux_text_color;
                     aux_highlight_color: aux_highlight_color;
+                    font_size: candidate_font_size;
+                    font_family: candidate_font_family;
                 }
             }
         }

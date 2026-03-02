@@ -246,6 +246,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
                             w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color)); // 通常高亮文字和背景色反差
                             
+                            // 字体与字号同步
+                            w.set_pinyin_font_size(new_conf.appearance.pinyin_text.font_size as f32);
+                            w.set_pinyin_font_family(SharedString::from(new_conf.appearance.pinyin_text.font_family.clone()));
+                            w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
+                            w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
+                            
                             // 如果页面大小变了且窗口正在显示，尝试刷新显示
                             if old_page_size != new_page_size && w.get_is_visible() {
                                 // main.rs 已补发 Update 事件
