@@ -1201,7 +1201,24 @@ impl Processor {
 
         for m in last_matches_raw {
             let last_part = raw_parsed.last();
-            // ... (filter by aux) ...
+            
+            // Filter by stroke_aux
+            if let Some(ref aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
+                let aux_lower = aux.to_lowercase();
+                if !m.4.to_lowercase().starts_with(&aux_lower) { continue; }
+            }
+            
+            // Filter by english_aux
+            if let Some(ref aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
+                let aux_lower = aux.to_lowercase();
+                let en_parts: Vec<&str> = m.3.split(',').map(|s| s.trim()).collect();
+                let mut matched = false;
+                for p in en_parts {
+                    if p.to_lowercase().starts_with(&aux_lower) { matched = true; break; }
+                }
+                if !matched { continue; }
+            }
+
             if seen.insert(m.0.clone()) { final_matches.push(m); }
         }
 
@@ -1235,7 +1252,6 @@ impl Processor {
         }
 
         // 3. 排序与结果填充
-        let input_len = raw_parsed.iter().map(|p| p.pinyin.len()).sum::<usize>().max(1);
         let input_syllables = if smart_segments.is_empty() { raw_parsed.len() } else { smart_segments.len() };
 
         final_matches.sort_by(|a, b| {
@@ -1245,17 +1261,21 @@ impl Processor {
                 let weight = m.5 as i64;
                 let char_count = m.0.chars().count() as i64;
                 
-                // 基础分：级别权重极大
+                // 基础分：级别权重极大 (Level 3=30M, Level 2=20M, Level 1=10M)
                 let mut score = level * 10_000_000;
                 
+                // 特殊奖励：如果简拼正好匹配到相应字数的词 (如 zm -> 怎么)
+                if level == 2 && char_count == input_syllables as i64 {
+                    score += 10_000_000; // 直接晋升一级，与 Level 3 持平
+                }
+
                 // 词频贡献
                 score += weight;
 
-                // 长度惩罚：如果候选词字数远超输入音节数，大幅减分
-                // 对于 Exact Match (Level 3)，惩罚较小；对于 Abbrev (Level 2)，惩罚较大
+                // 长度惩罚
                 if level == 2 {
                     let len_diff = (char_count - input_syllables as i64).max(0);
-                    score -= len_diff * 5000; 
+                    score -= len_diff * 10000; // 加强惩罚力度
                 } else if level == 3 {
                     let len_diff = (char_count - input_syllables as i64).max(0);
                     score -= len_diff * 1000;
