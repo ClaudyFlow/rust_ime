@@ -1239,7 +1239,7 @@ impl Processor {
                     
                     for profile in &self.active_profiles {
                         if let Some(d) = self.tries.get(profile) {
-                            let m = d.search_abbreviation(&modified_segments, &self.syllables, 100);
+                            let m = d.search_abbreviation(&modified_segments, &self.syllables, 500);
                             for (w, tr, t, e, s, weight) in m {
                                 if seen.insert(w.clone()) { 
                                     final_matches.push((w, tr, t, e, s, weight, 2)); // Level 2 for Abbrev
