@@ -424,13 +424,17 @@ unsafe fn handle_client(
                         response.push(2);
                     }
                     Action::Notify(summary, _body) => {
-                        let active = {
+                        let (active, profile) = {
                             let p = processor.lock().unwrap();
-                            p.chinese_enabled
+                            (p.chinese_enabled, p.get_current_profile_display())
                         };
                         if let Some(ref tx) = gui_tx {
                             let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active));
                         }
+                        let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                            chinese_enabled: active, 
+                            active_profile: profile 
+                        });
                         response.push(2); 
                     }
                     _ => { response.push(0); }
