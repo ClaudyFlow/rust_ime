@@ -393,9 +393,10 @@ unsafe fn handle_client(
 
         if let Some(key) = key {
             let mut response = Vec::new();
-            if msg_type == 1 {
+            if msg_type == 1 || msg_type == 3 {
                 let mut p = processor.lock().unwrap();
-                let action = p.handle_key(key, 1, shift);
+                let val = if msg_type == 1 { 1 } else { 0 };
+                let action = p.handle_key(key, val, shift);
                 drop(p);
                 update_gui_impl(&gui_tx, &processor);
 
@@ -417,6 +418,7 @@ unsafe fn handle_client(
                         let sound_path = root.join("sounds/beep.wav");
                         if sound_path.exists() {
                             let path_w = windows::core::HSTRING::from(sound_path.to_string_lossy().as_ref());
+                            let _ = windows::core::PCWSTR(path_w.as_ptr()); // Just to keep path alive if needed
                             let _ = PlaySoundW(windows::core::PCWSTR(path_w.as_ptr()), None, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
                         }
                         response.push(2);
@@ -434,6 +436,7 @@ unsafe fn handle_client(
                     _ => { response.push(0); }
                 }
             } else {
+                // TestKeyDown (2) 或 TestKeyUp (4)
                 let p = processor.lock().unwrap();
                 let is_letter = key_code >= 0x41 && key_code <= 0x5A;
                 let is_special_intercept = key_code == 0x14; // CapsLock

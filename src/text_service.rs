@@ -226,8 +226,31 @@ impl ITfKeyEventSink_Impl for TextService {
         Ok(FALSE)
     }
 
-    fn OnTestKeyUp(&self, _context: Option<&ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> { Ok(FALSE) }
-    fn OnKeyUp(&self, _context: Option<&ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> { Ok(FALSE) }
+    fn OnTestKeyUp(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        let key_code = wparam.0 as u32;
+        let mut modifiers = 0u8;
+        unsafe {
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 1; }
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
+        }
+        let (action, _, _) = self.send_key_to_server(4, key_code, modifiers, context);
+        if action != 0 { return Ok(TRUE); }
+        Ok(FALSE)
+    }
+
+    fn OnKeyUp(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        let key_code = wparam.0 as u32;
+        let mut modifiers = 0u8;
+        unsafe {
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 1; }
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 2; }
+            if (windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(VK_MENU.0 as i32) as u16 & 0x8000) != 0 { modifiers |= 4; }
+        }
+        let (action, _, _) = self.send_key_to_server(3, key_code, modifiers, context);
+        if action != 0 { return Ok(TRUE); }
+        Ok(FALSE)
+    }
     fn OnPreservedKey(&self, _context: Option<&ITfContext>, _guid: *const GUID) -> Result<BOOL> { Ok(FALSE) }
 }
 
