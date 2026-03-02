@@ -477,6 +477,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let mut p = processor_clone.lock().unwrap();
                         p.tries = new_tries;
                         p.apply_config(&new_conf);
+                        
+                        // 强制触发一次查找以刷新内部状态（如果正在输入）
+                        if !p.buffer.is_empty() {
+                            p.lookup();
+                        }
+                        
+                        // 发送当前状态到 GUI 以立即更新显示（如分页大小）
+                        let _ = gui_tx_tray.send(GuiEvent::Update {
+                            pinyin: p.buffer.clone(),
+                            candidates: p.candidates.clone(),
+                            hints: p.candidate_hints.clone(),
+                            selected: p.selected,
+                            cursor_pos: p.cursor_pos,
+                            sentence: p.joined_sentence.clone(),
+                            commit_mode: p.commit_mode.clone(),
+                        });
                     }
                     
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(Box::new(new_conf.clone())));

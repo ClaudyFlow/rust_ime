@@ -213,12 +213,22 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         }
                     }
                     GuiEvent::ApplyConfig(new_conf) => {
+                        let old_page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                        let new_page_size = new_conf.appearance.page_size;
+                        
                         show_candidates_for_loop.store(new_conf.appearance.show_candidates, std::sync::atomic::Ordering::SeqCst);
-                        page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
+                        page_size_for_loop.store(new_page_size, std::sync::atomic::Ordering::SeqCst);
+                        
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
+                            
+                            // 如果页面大小变了且窗口正在显示，尝试刷新显示
+                            if old_page_size != new_page_size && w.get_is_visible() {
+                                // 这里我们需要当前的候选词数据，但 ApplyConfig 事件没带
+                                // 所以我们在 main.rs 中已经额外补发了一个 Update 事件
+                            }
                         }
                     }
                     GuiEvent::Exit => {
