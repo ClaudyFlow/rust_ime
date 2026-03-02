@@ -46,7 +46,7 @@ component CandidateItem inherits Rectangle {
             vertical-alignment: center; 
             font-size: font_size;
             font-family: font_family;
-            font-weight: selected ? 600 : 400; 
+            font-weight: 600; 
         }
         
         if show_stroke_aux && stroke_aux != "" : Text {
@@ -120,7 +120,7 @@ export component CandidateWindow inherits Window {
                 padding-bottom: 2px;
                 Text {
                     text: pinyin;
-                    color: #3498db;
+                    color: accent_color;
                     font-size: pinyin_font_size;
                     font-family: pinyin_font_family;
                     font-weight: 600;

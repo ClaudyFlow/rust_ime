@@ -24,6 +24,34 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
     window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
     
+    // 颜色与样式初始化
+    let parse_color = |s: &str| -> slint::Color {
+        if s.starts_with('#') {
+            if s.len() == 7 { // #RRGGBB
+                let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
+                let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
+                let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
+                slint::Color::from_rgb_u8(r, g, b)
+            } else {
+                slint::Color::from_rgb_u8(255, 255, 255)
+            }
+        } else {
+            slint::Color::from_rgb_u8(255, 255, 255)
+        }
+    };
+
+    window.set_bg_color(parse_color(&config.appearance.window_bg_color));
+    window.set_accent_color(parse_color(&config.appearance.window_highlight_color));
+    window.set_border_color(parse_color(&config.appearance.window_border_color));
+    window.set_text_color(parse_color(&config.appearance.candidate_text.color));
+    window.set_highlight_text_color(parse_color(&config.appearance.window_bg_color));
+    
+    window.set_pinyin_font_size(config.appearance.pinyin_text.font_size as f32);
+    window.set_pinyin_font_family(SharedString::from(config.appearance.pinyin_text.font_family.clone()));
+    window.set_candidate_font_size(config.appearance.candidate_text.font_size as f32);
+    window.set_candidate_font_family(SharedString::from(config.appearance.candidate_text.font_family.clone()));
+
+    
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
     
@@ -149,8 +177,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
                                 }
 
-                                // 显示窗口
-                                let _ = w.window().show();
+                                // 只有当窗口原本不可见时才调用 show()，减少重绘引起的重影
+                                if !w.window().is_visible() {
+                                    let _ = w.window().show();
+                                }
                             }
                         }
                     }
