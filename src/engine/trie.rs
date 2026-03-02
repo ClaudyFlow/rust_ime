@@ -108,8 +108,8 @@ impl Trie {
         for len in 1..=6.min(key.len()) {
             let syl = &key[..len];
             if syllables.contains(syl) {
-                // 如果这个音节以当前 segment 开头
-                if syl.starts_with(seg) || seg.starts_with(syl) {
+                // 在简拼模式下，输入的片段必须是这个音节的前缀
+                if syl.starts_with(seg) {
                     // 递归匹配剩余部分
                     if self.recursive_match(&key[len..], remaining_segs, syllables) {
                         return true;
