@@ -1261,12 +1261,12 @@ impl Processor {
                 let weight = m.5 as i64;
                 let char_count = m.0.chars().count() as i64;
                 
-                // 基础分：级别权重极大 (Level 3=30M, Level 2=20M, Level 1=10M)
-                let mut score = level * 10_000_000;
+                // 基础分：级别权重极大 (Level 3=40M, Level 2=20M, Level 1=10M)
+                let mut score = if level == 3 { 40_000_000 } else { level * 10_000_000 };
                 
                 // 特殊奖励：如果简拼正好匹配到相应字数的词 (如 zm -> 怎么)
                 if level == 2 && char_count == input_syllables as i64 {
-                    score += 10_000_000; // 直接晋升一级，与 Level 3 持平
+                    score += 10_000_000; // 提升至 30M，但依然低于 Level 3 的 40M
                 }
 
                 // 词频贡献
