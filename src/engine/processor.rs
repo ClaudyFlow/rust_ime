@@ -710,9 +710,15 @@ impl Processor {
                         if !profiles.is_empty() {
                             self.active_profiles = profiles;
                             let display = self.get_current_profile_display();
+                            let short_display = match display.to_lowercase().as_str() {
+                                "chinese" => "中",
+                                "english" => "英",
+                                "japanese" => "日",
+                                _ => if display.len() > 1 { &display[..1] } else { &display }
+                            };
                             let _ = self.lookup();
                             self.switch_mode = false;
-                            return Action::Notify("输入方案".into(), format!("已切换至: {}", display));
+                            return Action::Notify(short_display.into(), format!("方案: {}", display));
                         }
                     }
                 }
