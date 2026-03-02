@@ -130,6 +130,7 @@ pub struct FuzzyPinyinConfig {
     pub ian_iang: bool,
     pub uan_uang: bool,
     pub u_v: bool,
+    pub custom_mappings: Vec<(String, String)>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -278,6 +279,7 @@ impl Config {
                 fuzzy_config: FuzzyPinyinConfig {
                     z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
                     an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
+                    custom_mappings: vec![],
                 },
                 enable_traditional: false,
             },

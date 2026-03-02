@@ -497,6 +497,17 @@ impl Processor {
             }
         }
 
+        // 自定义映射处理
+        let current_list: Vec<String> = new_variants.iter().cloned().collect();
+        for v in current_list {
+            for (from, to) in &cfg.custom_mappings {
+                if v.contains(from) {
+                    new_variants.insert(v.replace(from, to));
+                }
+                // 如果是双向映射的需求，用户可以在自定义中添加两条规则
+            }
+        }
+
         new_variants.into_iter().collect()
     }
 
