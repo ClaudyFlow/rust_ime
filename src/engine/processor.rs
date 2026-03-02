@@ -714,6 +714,7 @@ impl Processor {
                                 "chinese" => "中",
                                 "english" => "英",
                                 "japanese" => "日",
+                                "mixed" => "混",
                                 _ => if display.len() > 1 { &display[..1] } else { &display }
                             };
                             let _ = self.lookup();

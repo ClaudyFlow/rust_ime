@@ -157,7 +157,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     GuiEvent::ShowStatus(status) => {
                         if let Some(sb) = s.upgrade() {
                             sb.set_status_text(SharedString::from(status.clone()));
-                            sb.set_chinese_enabled(status.contains('中'));
+                            sb.set_chinese_enabled(status.contains('中') || status.contains('混'));
 
                             // 闪现逻辑：先移到光标处
                             let (lx, ly) = {
