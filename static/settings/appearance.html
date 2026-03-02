@@ -2,14 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>视觉与样式 - rust-ime</title>
+    <title>候选栏设置 - rust-ime</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <header>
             <a href="/static/index.html" class="back-link">← 返回主页</a>
-            <h1>视觉与样式</h1>
+            <h1>候选栏设置</h1>
         </header>
 
         <div class="card">
@@ -18,6 +18,10 @@
                 <div class="setting-item">
                     <div class="info"><div class="title">显示候选窗口</div><div class="desc">控制拼写时是否出现选词框</div></div>
                     <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
+                    <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数 (1-10)。</div></div>
+                    <input type="number" id="page_size" min="1" max="10" step="1" style="width: 80px;">
                 </div>
                 <div class="setting-item">
                     <div class="info"><div class="title">辅助码模式</div><div class="desc">选择候选词旁显示的提示类型</div></div>
@@ -137,6 +141,17 @@
             bindInput('window_bg_color', 'appearance');
             bindInput('window_border_color', 'appearance');
             bindInput('window_highlight_color', 'appearance');
+
+            // 绑定候选词数量 (page_size)
+            const pageSizeInput = document.getElementById('page_size');
+            pageSizeInput.value = config.appearance.page_size || 5;
+            pageSizeInput.onchange = () => {
+                let val = parseInt(pageSizeInput.value);
+                if (isNaN(val) || val < 1) val = 1;
+                if (val > 10) val = 10;
+                pageSizeInput.value = val;
+                config.appearance.page_size = val;
+            };
 
             // 绑定 Pinyin 样式
             const p = config.appearance.pinyin_text;
