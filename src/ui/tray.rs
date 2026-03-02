@@ -187,7 +187,11 @@ pub fn start_tray(
 
             let _tip_str = "Rust IME";
             
-            Shell_NotifyIconW(NIM_ADD, &nid);
+            if Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
+                println!("[Tray] 系统托盘初始化成功。");
+            } else {
+                eprintln!("[Tray] 系统托盘初始化失败。");
+            }
             let _ = tx.send(hwnd);
 
             let mut msg = MSG::default();
