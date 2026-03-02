@@ -265,6 +265,7 @@ impl Processor {
             fuzzy_config: crate::config::FuzzyPinyinConfig {
                 z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
                 an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
+                custom_mappings: vec![],
             },
             enable_traditional: false,
             user_dict: HashMap::new(),
