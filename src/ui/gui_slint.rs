@@ -58,7 +58,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     
                     // 获取工作区（排除任务栏）
                     let mut work_area = windows::Win32::Foundation::RECT::default();
-                    if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).as_bool() {
+                    if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
                         let x = work_area.right - 40; // 留出一点边距
                         let y = work_area.bottom - 40;
                         let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 32, 32, SWP_NOACTIVATE);
@@ -176,7 +176,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
                                     if s_hwnd.0 != 0 {
                                         let mut work_area = windows::Win32::Foundation::RECT::default();
-                                        if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).as_bool() {
+                                        if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
                                             let x = work_area.right - 40;
                                             let y = work_area.bottom - 40;
                                             let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 32, 32, SWP_NOACTIVATE);
