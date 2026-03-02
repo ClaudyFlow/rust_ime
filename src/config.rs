@@ -266,7 +266,7 @@ impl Config {
                 enable_caps_selection: true,
                 enable_number_selection: true,
                 enable_user_dict: true,
-                enable_fixed_first_candidate: true,
+                enable_fixed_first_candidate: false,
                 enable_smart_backspace: false,
                 enable_double_pinyin: false,
                 double_pinyin_scheme: DoublePinyinScheme {
