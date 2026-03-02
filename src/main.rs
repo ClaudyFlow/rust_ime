@@ -427,15 +427,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(event) = tray_rx.recv() {
             match event {
                 ui::tray::TrayEvent::ToggleIme => {
-                    let (_profile, enabled) = {
+                    let (short, enabled) = {
                         let mut p = processor_clone.lock().unwrap();
-                        let _action = p.toggle(); // 获取但不处理（托盘点击较少发生）
-                        (p.get_current_profile_display(), p.chinese_enabled)
+                        let _action = p.toggle(); 
+                        (p.get_short_display(), p.chinese_enabled)
                     };
-                    let status_text = if enabled { "中" } else { "英" };
                     tray_handle.update(|t| t.chinese_enabled = enabled);
                     
-                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(status_text.into(), enabled));
+                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
                     let _ = gui_tx_tray.send(GuiEvent::Update { 
                         pinyin: "".into(), 
                         candidates: vec![], 

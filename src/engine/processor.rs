@@ -562,15 +562,30 @@ impl Processor {
         segments
     }
 
+    pub fn get_short_display(&self) -> String {
+        let display = self.get_current_profile_display();
+        match display.to_lowercase().as_str() {
+            "chinese" => "中".to_string(),
+            "english" => "英".to_string(),
+            "japanese" => "日".to_string(),
+            "mixed" => "混".to_string(),
+            _ => {
+                let mut chars = display.chars();
+                chars.next().map(|c| c.to_string()).unwrap_or_else(|| " ".to_string())
+            }
+        }
+    }
+
     pub fn toggle(&mut self) -> Action {
         self.chinese_enabled = !self.chinese_enabled;
         let enabled = self.chinese_enabled;
+        let short = self.get_short_display();
         self.reset();
         
         if enabled {
-            Action::Notify("中".into(), "中文模式".into())
+            Action::Notify(short, "模式已开启".into())
         } else {
-            Action::Notify("英".into(), "英文模式".into())
+            Action::Notify("英".into(), "英文直通模式".into())
         }
     }
 

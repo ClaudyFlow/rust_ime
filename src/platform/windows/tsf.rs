@@ -308,10 +308,11 @@ unsafe fn handle_client(
                 let mut p = processor.lock().unwrap();
                 p.toggle();
                 let enabled = p.chinese_enabled;
+                let short = p.get_short_display();
                 let profile = p.get_current_profile_display();
                 drop(p);
                 let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
-                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { "中".into() } else { "英".into() }, enabled)); }
+                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { short } else { "英".into() }, enabled)); }
                 update_gui_impl(&gui_tx, &processor);
             }
             let response = vec![2u8]; // Consume
