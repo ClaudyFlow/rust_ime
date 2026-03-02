@@ -50,10 +50,6 @@
                 </select>
             </div>
             <div class="setting-item">
-                <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数。</div></div>
-                <input type="number" id="page_size">
-            </div>
-            <div class="setting-item">
                 <div class="info">
                     <div class="title">开机自启</div>
                     <div class="desc">在系统启动时自动运行 rust-ime。</div>
@@ -86,7 +82,6 @@
             bindInput('enable_traditional', 'input');
             bindInput('enable_fixed_first_candidate', 'input');
             bindInput('commit_mode', 'input');
-            bindInput('page_size', 'input');
             bindInput('autostart', 'input');
         }
 

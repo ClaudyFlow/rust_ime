@@ -549,9 +549,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         t.active_profile = active_profile;
                     });
                 }
+                ui::tray::TrayEvent::ClearUserDict => {
+                    let mut p = processor_clone.lock().unwrap();
+                    p.user_dict.clear();
+                    println!("[Main] User dictionary cleared in memory.");
+                }
                 ui::tray::TrayEvent::Restart => {
                     let args: Vec<String> = std::env::args().collect();
-                    let _ = std::process::Command::new(&args[0]).args(&args[1..]).spawn();
+                    #[cfg(target_os = "windows")]
+                    {
+                        // 在 Windows 上，直接 spawn 会因为旧进程尚未退出（互斥锁未释放）而导致新进程启动失败
+                        // 我们使用 cmd /c 延迟 1 秒后再启动新进程，确保旧进程已彻底退出并释放 Global\\RustImeUniqueMutex
+                        let mut full_cmd = format!("timeout /t 1 /nobreak > nul & start \"\" \"{}\"", args[0]);
+                        for arg in args.iter().skip(1) {
+                            full_cmd.push_str(&format!(" \"{}\"", arg));
+                        }
+                        let _ = std::process::Command::new("cmd")
+                            .arg("/c")
+                            .arg(full_cmd)
+                            .spawn();
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let _ = std::process::Command::new(&args[0]).args(&args[1..]).spawn();
+                    }
                     std::process::exit(0);
                 }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),

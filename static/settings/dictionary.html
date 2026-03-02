@@ -25,6 +25,24 @@
 
         <div id="dicts-container"></div>
 
+        <h2 style="margin-top:60px;">用户词典 (个人学习)</h2>
+        <div class="card">
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">开启用户词典</div>
+                    <div class="desc">记录您的输入习惯，自动调整词频并将常用词排在前面。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">清空用户词典</div>
+                    <div class="desc">删除所有已记录的用户词汇和词频数据。此操作不可恢复。</div>
+                </div>
+                <button class="btn btn-danger" onclick="clearUserDict()">立即清空</button>
+            </div>
+        </div>
+
         <h2 style="margin-top:60px;">词典编辑器</h2>
         <div class="card">
             <h3>添加新词条</h3>
@@ -49,6 +67,18 @@
     <script>
         async function init() {
             await loadConfig();
+            
+            // 绑定用户词典开关
+            bindInput('enable_user_dict', 'input');
+            const eud = document.getElementById('enable_user_dict');
+            if(eud) {
+                const oldOnchange = eud.onchange;
+                eud.onchange = async () => {
+                    if(oldOnchange) oldOnchange();
+                    await saveConfig();
+                };
+            }
+
             const d_r = await fetch('/api/dicts'); 
             const dicts = await d_r.json();
             renderDictsList(dicts);
@@ -59,6 +89,17 @@
                 ats.innerHTML = jsonDicts.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
                 const defaultIdx = jsonDicts.findIndex(d => d.path.includes('chinese/words'));
                 if (defaultIdx !== -1) ats.selectedIndex = defaultIdx;
+            }
+        }
+
+        async function clearUserDict() {
+            if (confirm("确定要清空所有用户词库数据吗？此操作无法撤销。")) {
+                const res = await fetch('/api/dict/clear_user', { method: 'POST' });
+                if (res.ok) {
+                    showToast("用户词典已清空");
+                } else {
+                    alert("清空失败，请检查后端日志。");
+                }
             }
         }
 

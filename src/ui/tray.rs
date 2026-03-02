@@ -15,6 +15,7 @@ pub enum TrayEvent {
     Exit,
     ReloadConfig,
     SyncStatus { chinese_enabled: bool, active_profile: String },
+    ClearUserDict,
 }
 
 #[cfg(target_os = "linux")]

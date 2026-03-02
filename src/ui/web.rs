@@ -58,6 +58,7 @@ impl WebServer {
             .route("/api/dict/search", get(search_dict))
             .route("/api/dict/update", post(update_dict_entry))
             .route("/api/dict/add", post(add_dict_entry))
+            .route("/api/dict/clear_user", post(clear_user_dict))
             .route("/static/*file", get(static_handler))
             .route("/dicts/*file", get(dicts_handler))
             .fallback(index_handler)
@@ -422,6 +423,19 @@ async fn add_dict_entry(Json(req): Json<AddEntryRequest>) -> StatusCode {
     }
 
     StatusCode::INTERNAL_SERVER_ERROR
+}
+
+async fn clear_user_dict(State((_, _, tray_tx)): State<WebState>) -> StatusCode {
+    let path = std::path::Path::new("data/user_dict.json");
+    if path.exists() {
+        if let Err(e) = std::fs::remove_file(path) {
+            eprintln!("[Web] Failed to delete user_dict.json: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
+    }
+    // 通知主线程清空内存中的用户词典
+    let _ = tray_tx.send(crate::ui::tray::TrayEvent::ClearUserDict);
+    StatusCode::OK
 }
 
 async fn list_fonts() -> Json<Vec<crate::platform::fonts::FontInfo>> {
