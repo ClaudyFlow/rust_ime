@@ -92,33 +92,38 @@ impl Trie {
     }
 
     fn matches_segments(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
-        let mut current_key = key;
-        for (i, seg) in segments.iter().enumerate() {
-            if current_key.is_empty() { return false; }
-            
-            if i == segments.len() - 1 {
-                return current_key.starts_with(seg);
-            }
+        if segments.is_empty() { return false; }
+        self.recursive_match(key, segments, syllables)
+    }
 
-            // 尝试将当前片段匹配为当前音节的前缀
-            let mut found_match = false;
-            for len in (1..=6).rev() {
-                if len <= current_key.len() {
-                    let syl = &current_key[..len];
-                    if syllables.contains(syl) {
-                        if syl.starts_with(seg) {
-                            current_key = &current_key[len..];
-                            found_match = true;
-                            break;
-                        }
+    fn recursive_match(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
+        if segments.is_empty() {
+            return true; // 所有片段都匹配完了
+        }
+
+        let seg = &segments[0];
+        let remaining_segs = &segments[1..];
+
+        // 尝试从当前 key 的起始位置切分出一个合法音节
+        for len in 1..=6.min(key.len()) {
+            let syl = &key[..len];
+            if syllables.contains(syl) {
+                // 如果这个音节以当前 segment 开头
+                if syl.starts_with(seg) || seg.starts_with(syl) {
+                    // 递归匹配剩余部分
+                    if self.recursive_match(&key[len..], remaining_segs, syllables) {
+                        return true;
                     }
                 }
             }
-            if !found_match {
-                return false;
-            }
         }
-        true
+        
+        // 特殊处理最后一个 segment 可能是音节的一部分
+        if segments.len() == 1 && key.starts_with(seg) {
+            return true;
+        }
+
+        false
     }
 
     #[allow(dead_code)]

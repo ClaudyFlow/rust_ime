@@ -1221,15 +1221,28 @@ impl Processor {
         // 策略 2: 如果开启了简拼且当前是连续字母输入，尝试智能切分检索
         if self.enable_abbreviation_matching && !smart_segments.is_empty() && smart_segments.len() > 1 {
             let first_seg_variants = self.get_fuzzy_variants(&smart_segments[0]);
-            for profile in &self.active_profiles {
-                if let Some(d) = self.tries.get(profile) {
-                    for v in &first_seg_variants {
-                        let mut modified_segments = smart_segments.clone();
-                        modified_segments[0] = v.clone();
-                        let m = d.search_abbreviation(&modified_segments, &self.syllables, 50);
-                        for (w, tr, t, e, s, weight) in m {
-                            // 将简拼匹配视为准精确匹配 (true)，以提高其在最终列表中的排序
-                            if seen.insert(w.clone()) { final_matches.push((w, tr, t, e, s, weight, true)); }
+            let second_seg_variants = if smart_segments.len() > 1 { 
+                self.get_fuzzy_variants(&smart_segments[1]) 
+            } else { 
+                vec![String::new()] 
+            };
+
+            for v1 in &first_seg_variants {
+                for v2 in &second_seg_variants {
+                    let mut modified_segments = smart_segments.clone();
+                    modified_segments[0] = v1.clone();
+                    if modified_segments.len() > 1 {
+                        modified_segments[1] = v2.clone();
+                    }
+                    
+                    for profile in &self.active_profiles {
+                        if let Some(d) = self.tries.get(profile) {
+                            let m = d.search_abbreviation(&modified_segments, &self.syllables, 100);
+                            for (w, tr, t, e, s, weight) in m {
+                                if seen.insert(w.clone()) { 
+                                    final_matches.push((w, tr, t, e, s, weight, true)); 
+                                }
+                            }
                         }
                     }
                 }
