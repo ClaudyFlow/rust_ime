@@ -57,16 +57,15 @@ pub unsafe fn register_server(dll_instance: HINSTANCE, clsid: &GUID, description
     profiles.Register(clsid)?;
     
     let desc_w = to_pcwstr(description);
-    let icon_w = to_pcwstr("Rust IME Icon");
+    let dll_path_w = to_pcwstr(&dll_path);
     profiles.AddLanguageProfile(
-        clsid, 
-        0x0804, 
-        &crate::LANG_PROFILE_ID, 
-        &desc_w, 
-        &icon_w,
+        clsid,
+        0x0804,
+        &crate::LANG_PROFILE_ID,
+        &desc_w,
+        &dll_path_w,
         0
     )?;
-
     // 启用语言配置文件
     profiles.EnableLanguageProfile(clsid, 0x0804, &crate::LANG_PROFILE_ID, true)?;
 

@@ -446,11 +446,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     });
                 }
                 ui::tray::TrayEvent::NextProfile => {
-                    let profile = {
+                    let (profile, short, enabled) = {
                         let mut p = processor_clone.lock().unwrap();
-                        p.next_profile()
+                        let profile = p.next_profile();
+                        (profile, p.get_short_display(), p.chinese_enabled)
                     };
                     tray_handle.update(|t| t.active_profile = profile);
+                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
                 }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = load_config();

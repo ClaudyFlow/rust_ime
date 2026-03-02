@@ -39,6 +39,7 @@ impl Tray for ImeTray {
             "chinese" => "中文",
             "english" => "英文",
             "japanese" => "日文",
+            "mixed" => "中日英混",
             other => other,
         };
 
@@ -249,6 +250,7 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
                 "chinese" => "中文",
                 "english" => "英文",
                 "japanese" => "日文",
+                "mixed" => "中日英混",
                 other => other,
             };
             let profile_label = format!("切换方案: {}", profile_zh);

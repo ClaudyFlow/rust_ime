@@ -4,10 +4,10 @@
 
 这是一个专为 Linux 设计的高性能、现代化拼音输入法引擎。采用 Rust 编写，深度适配 Wayland/COSMIC 桌面环境，致力于为程序员、极客和文字工作者提供极致的“零干扰”盲打体验。
 
-![界面展示](picture/ni_without_style.png)
-![界面展示](picture/niP.png)
-![界面展示](picture/gn.png)
-![界面展示](picture/gnG.png)
+![界面展示](readmepicture/ni_without_style.png)
+![界面展示](readmepicture/niP.png)
+![界面展示](readmepicture/gn.png)
+![界面展示](readmepicture/gnG.png)
 
 ---
 
