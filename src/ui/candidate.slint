@@ -81,6 +81,7 @@ export component CandidateWindow inherits Window {
     property <length> border_radius: 6px;
     property <color> bg_color: #ffffff;
     property <color> accent_color: #3498db;
+    property <color> border_color: #dcdde1;
     property <color> text_color: #2c3e50;
     property <color> highlight_text_color: #ffffff;
     property <color> aux_text_color: #95a5a6;
@@ -91,7 +92,7 @@ export component CandidateWindow inherits Window {
         background: bg_color;
         border-radius: border_radius;
         border-width: 1px;
-        border-color: #dcdde1;
+        border-color: border_color;
         drop-shadow-blur: 10px;
         drop-shadow-color: rgba(0, 0, 0, 0.15);
 

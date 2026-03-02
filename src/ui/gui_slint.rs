@@ -224,10 +224,31 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                             
+                            // 颜色与样式同步
+                            let parse_color = |s: &str| -> slint::Color {
+                                if s.starts_with('#') {
+                                    if s.len() == 7 { // #RRGGBB
+                                        let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
+                                        let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
+                                        let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
+                                        slint::Color::from_rgb_u8(r, g, b)
+                                    } else {
+                                        slint::Color::from_rgb_u8(255, 255, 255)
+                                    }
+                                } else {
+                                    slint::Color::from_rgb_u8(255, 255, 255)
+                                }
+                            };
+
+                            w.set_bg_color(parse_color(&new_conf.appearance.window_bg_color));
+                            w.set_accent_color(parse_color(&new_conf.appearance.window_highlight_color));
+                            w.set_border_color(parse_color(&new_conf.appearance.window_border_color));
+                            w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
+                            w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color)); // 通常高亮文字和背景色反差
+                            
                             // 如果页面大小变了且窗口正在显示，尝试刷新显示
                             if old_page_size != new_page_size && w.get_is_visible() {
-                                // 这里我们需要当前的候选词数据，但 ApplyConfig 事件没带
-                                // 所以我们在 main.rs 中已经额外补发了一个 Update 事件
+                                // main.rs 已补发 Update 事件
                             }
                         }
                     }
