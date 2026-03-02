@@ -1180,7 +1180,34 @@ impl Processor {
 
         // 2. 准备切分方案
         // A. 原始切分（基于空格/大写/数字）
-        let raw_parsed = self.parse_buffer();
+        let mut raw_parsed = self.parse_buffer();
+
+        // --- 增强逻辑：无分隔符笔画过滤支持 ---
+        if self.aux_mode == AuxMode::Stroke && !self.buffer.contains(';') && !self.buffer.contains(' ') && !self.buffer.is_empty() {
+            // 尝试将 buffer 分为 [pinyin] + [stroke_tail]
+            // stroke_tail 最长通常为 2 位
+            for tail_len in 1..=2 {
+                if self.buffer.len() <= tail_len { break; }
+                let (prefix, tail) = self.buffer.split_at(self.buffer.len() - tail_len);
+                if tail.chars().all(|c| c.is_ascii_lowercase()) {
+                    // 检查 prefix 是否是完整的拼音序列
+                    let segments = self.segment_buffer(prefix);
+                    let reconstituted = segments.join("");
+                    if reconstituted == prefix {
+                        // 命中了！我们临时修改 raw_parsed 的最后一部分
+                        if let Some(last) = raw_parsed.last_mut() {
+                            if last.pinyin == self.buffer {
+                                last.pinyin = prefix.to_string();
+                                last.stroke_aux = Some(tail.to_string());
+                                // println!("[Seamless] Split {} into {} + {}", self.buffer, prefix, tail);
+                            }
+                        }
+                        break; 
+                    }
+                }
+            }
+        }
+
         // B. 智能切分（针对 mtian 这种无分隔符的）
         let mut smart_segments = Vec::new();
         if !self.buffer.contains(' ') && !self.buffer.contains('\'') {
