@@ -19,7 +19,7 @@ pub enum GuiEvent {
     },
     MoveTo { x: i32, y: i32 },
     ApplyConfig(Box<Config>),
-        ShowStatus(String), // 新增：显示 "中" 或 "英"
-        Exit,
-    }
+    ShowStatus(String, bool), // 显示文字, 是否激活
+    Exit,
+}
     

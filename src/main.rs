@@ -473,17 +473,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
 
-                    {
+                    let enabled = {
                         let mut p = processor_clone.lock().unwrap();
                         p.tries = new_tries;
                         p.apply_config(&new_conf);
                         
                         // 强制触发一次查找以刷新内部状态（如果正在输入）
-                        if !p.buffer.is_empty() {
-                            p.lookup();
-                        }
+                        if !p.buffer.is_empty() { p.lookup(); }
                         
-                        // 发送当前状态到 GUI 以立即更新显示（如分页大小）
+                        // 发送当前状态到 GUI 以立即更新显示
                         let _ = gui_tx_tray.send(GuiEvent::Update {
                             pinyin: p.buffer.clone(),
                             candidates: p.candidates.clone(),
@@ -493,8 +491,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             sentence: p.joined_sentence.clone(),
                             commit_mode: p.commit_mode.clone(),
                         });
-                    }
+                        p.chinese_enabled
+                    };
                     
+                    let display = {
+                        let p = processor_clone.lock().unwrap();
+                        p.get_current_profile_display()
+                    };
+                    
+                    let short_display = match display.to_lowercase().as_str() {
+                        "chinese" => "中", "english" => "英", "japanese" => "日", "mixed" => "混",
+                        _ => if display.len() > 1 { &display[..1] } else { &display }
+                    };
+
+                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short_display.into(), enabled));
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(Box::new(new_conf.clone())));
                     
                     // 同步更新托盘菜单状态

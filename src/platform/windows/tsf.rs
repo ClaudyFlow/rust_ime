@@ -420,11 +420,15 @@ unsafe fn handle_client(
                         }
                         response.push(2);
                     }
-                    Action::Notify(summary, body) => {
+                    Action::Notify(summary, _body) => {
+                        let active = {
+                            let p = processor.lock().unwrap();
+                            p.chinese_enabled
+                        };
                         if let Some(ref tx) = gui_tx {
-                            let _ = tx.send(crate::ui::GuiEvent::ShowStatus(format!("{}: {}", summary, body)));
+                            let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active));
                         }
-                        response.push(2); // 拦截按键，防止切换大写
+                        response.push(2); 
                     }
                     _ => { response.push(0); }
                 }
