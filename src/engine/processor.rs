@@ -143,7 +143,6 @@ impl Processor {
         let mut result = Vec::new();
 
         for part in parts {
-            let mut pinyin = String::new();
             let mut stroke_aux = None;
             let mut english_aux = None;
             let mut specified_idx = None;
@@ -153,7 +152,7 @@ impl Processor {
                 *c == ';' || c.is_ascii_digit() || (*i > 0 && c.is_ascii_uppercase())
             }).map(|(i, _)| i).unwrap_or(part.len());
 
-            pinyin = part[..pinyin_end].to_string();
+            let pinyin = part[..pinyin_end].to_string();
             let mut rest = &part[pinyin_end..];
 
             if rest.starts_with(';') {
@@ -1083,7 +1082,7 @@ impl Processor {
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
 
-    fn commit_candidate(&mut self, mut cand: String, index: usize) -> Action {
+    fn commit_candidate(&mut self, mut cand: String, _index: usize) -> Action {
         let now = Instant::now();
         let py = self.last_lookup_pinyin.clone();
 
