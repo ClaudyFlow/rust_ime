@@ -11,7 +11,7 @@
             margin: 0 auto;
         }
 
-        /* 顶部配置卡片 */
+        /* 配置卡片 */
         .config-card {
             background: var(--apple-card);
             padding: 24px;
@@ -36,7 +36,7 @@
             border-radius: 12px;
         }
 
-        /* 主练习区域 */
+        /* 练习区域 */
         .practice-card {
             background: white;
             border-radius: 32px;
@@ -44,23 +44,6 @@
             text-align: center;
             box-shadow: 0 20px 60px rgba(0,0,0,0.05);
             border: 1px solid var(--apple-border);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .target-word-container {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
-        .target-word-container:hover {
-            transform: scale(1.05);
-        }
-
-        .target-word-container:active {
-            transform: scale(0.95);
         }
 
         .target-word {
@@ -69,15 +52,6 @@
             color: var(--apple-text);
             margin: 0;
             line-height: 1.2;
-        }
-
-        .speaker-icon {
-            position: absolute;
-            top: -10px;
-            right: -30px;
-            font-size: 24px;
-            color: var(--apple-accent);
-            opacity: 0.6;
         }
 
         .hint-area {
@@ -121,7 +95,6 @@
             box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
         }
 
-        /* 统计栏 */
         .stats-bar {
             display: flex;
             justify-content: space-around;
@@ -130,36 +103,28 @@
             border-top: 1px solid #eee;
         }
 
-        .stat-item {
-            text-align: center;
-        }
+        .stat-item { text-align: center; }
+        .stat-label { font-size: 12px; color: var(--apple-secondary); text-transform: uppercase; margin-bottom: 4px; }
+        .stat-value { font-size: 28px; font-weight: 700; color: var(--apple-text); }
 
-        .stat-label {
-            font-size: 12px;
-            color: var(--apple-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-        }
-
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--apple-text);
-        }
-
-        /* 成功动画 */
         @keyframes success-pop {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); color: #34c759; }
             100% { transform: scale(1); }
         }
-        .success-anim {
-            animation: success-pop 0.4s ease-out;
+        .success-anim { animation: success-pop 0.4s ease-out; }
+        
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 100; font-size: 20px; font-weight: 600;
         }
     </style>
 </head>
 <body>
+    <div id="loadingOverlay" class="loading-overlay" style="display:none;">正在加载词典...</div>
+
     <div class="container">
         <header class="header">
             <a href="/static/index.html" class="back-link">← 返回</a>
@@ -170,7 +135,7 @@
             <div class="config-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h3 style="margin:0">练习配置</h3>
-                    <select id="dictSelect" class="dictionary-select" style="width: 200px; padding: 8px; border-radius: 8px;">
+                    <select id="dictSelect" class="dictionary-select" style="width: 220px; padding: 8px; border-radius: 8px;">
                         <option value="chinese/chars/chars.json">常用汉字 (chars.json)</option>
                         <option value="chinese/words/words.json">通用词组 (words.json)</option>
                         <option value="chinese/chars/level2.json">二级汉字</option>
@@ -191,10 +156,6 @@
                         <span class="desc">显示英文辅助</span>
                         <label class="switch"><input type="checkbox" id="showEnglishToggle"><span class="slider"></span></label>
                     </div>
-                    <div class="switch-item">
-                        <span class="desc">自动发音</span>
-                        <label class="switch"><input type="checkbox" id="autoPronounceToggle"><span class="slider"></span></label>
-                    </div>
                 </div>
 
                 <button onclick="startPractice()" class="btn" style="margin-top: 24px; width: 100%;">开始 / 重置练习</button>
@@ -202,10 +163,7 @@
 
             <div id="practiceArea" style="display: none;">
                 <div class="practice-card">
-                    <div class="target-word-container" onclick="pronounceCurrent()">
-                        <div class="target-word" id="targetWord">...</div>
-                        <div class="speaker-icon">🔊</div>
-                    </div>
+                    <div class="target-word" id="targetWord">...</div>
                     
                     <div class="hint-area">
                         <div class="hint-badge" id="pinyinHintBadge">拼音: <b id="pinyinHint">-</b></div>
@@ -213,7 +171,7 @@
                         <div class="hint-badge" id="englishHintBadge">英文: <b id="englishHint">-</b></div>
                     </div>
 
-                    <input type="text" id="practiceInput" class="practice-input" placeholder="输入并提交词条..." autocomplete="off">
+                    <input type="text" id="practiceInput" class="practice-input" placeholder="输入并提交此词条..." autocomplete="off">
 
                     <div class="stats-bar">
                         <div class="stat-item">
@@ -234,106 +192,104 @@
         </div>
     </div>
 
-    <script src="/static/js/settings.js"></script>
     <script>
         let currentDict = {};
         let keys = [];
-        let currentIndex = -1;
         let stats = { count: 0, correct: 0 };
-        let config = null;
+        let config = { appearance: { show_pinyin_hint: true, show_learning_stroke_hint: true, show_learning_english_hint: true } };
 
         async function init() {
-            // 获取配置
             try {
+                console.log("[Learning] 正在加载全局配置...");
                 const response = await fetch('/api/config');
-                config = await response.json();
-                
-                // 绑定开关
-                const mapping = {
-                    'showPinyinToggle': 'show_pinyin_hint',
-                    'showStrokeToggle': 'show_learning_stroke_hint',
-                    'showEnglishToggle': 'show_learning_english_hint',
-                    'autoPronounceToggle': 'auto_pronounce'
-                };
-
-                for (let [id, key] of Object.entries(mapping)) {
-                    const el = document.getElementById(id);
-                    el.checked = !!config.appearance[key];
-                    el.onchange = async () => {
-                        config.appearance[key] = el.checked;
-                        updateHintVisibility();
-                        await saveConfig();
-                    };
+                if (response.ok) {
+                    const loadedConfig = await response.json();
+                    // 深度合并配置，防止旧版本缺字段
+                    if (loadedConfig.appearance) {
+                        Object.assign(config.appearance, loadedConfig.appearance);
+                    }
                 }
-            } catch (e) { console.error("Config load failed", e); }
+            } catch (e) { console.warn("[Learning] 配置加载失败，将使用默认值", e); }
+
+            // 绑定开关
+            const mapping = {
+                'showPinyinToggle': 'show_pinyin_hint',
+                'showStrokeToggle': 'show_learning_stroke_hint',
+                'showEnglishToggle': 'show_learning_english_hint'
+            };
+
+            for (let [id, key] of Object.entries(mapping)) {
+                const el = document.getElementById(id);
+                el.checked = !!config.appearance[key];
+                el.onchange = async () => {
+                    config.appearance[key] = el.checked;
+                    updateHintVisibility();
+                    await saveConfig();
+                };
+            }
+            updateHintVisibility();
         }
 
         async function saveConfig() {
-            await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
-            });
+            try {
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+            } catch (e) { console.error("保存失败", e); }
         }
 
         function updateHintVisibility() {
-            if (!config) return;
             document.getElementById('pinyinHintBadge').style.display = config.appearance.show_pinyin_hint ? 'block' : 'none';
             document.getElementById('strokeHintBadge').style.display = config.appearance.show_learning_stroke_hint ? 'block' : 'none';
             document.getElementById('englishHintBadge').style.display = config.appearance.show_learning_english_hint ? 'block' : 'none';
         }
 
         async function startPractice() {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            
             const dictPath = document.getElementById('dictSelect').value;
-            const dictName = dictPath.split('/').pop();
-            document.getElementById('dictNameStat').innerText = dictName;
+            document.getElementById('dictNameStat').innerText = dictPath.split('/').pop();
             
             try {
                 const url = '/dicts/' + dictPath;
+                console.log("[Learning] 请求词典:", url);
                 const response = await fetch(url);
-                if (!response.ok) throw new Error("Server error " + response.status);
+                if (!response.ok) throw new Error("HTTP " + response.status);
                 
                 currentDict = await response.json();
                 keys = Object.keys(currentDict);
                 
-                if (keys.length === 0) { alert("词典内容为空！"); return; }
+                if (keys.length === 0) throw new Error("词典内容为空");
 
                 document.getElementById('practiceArea').style.display = 'block';
                 stats = { count: 0, correct: 0 };
                 updateStats();
                 nextWord();
-                updateHintVisibility();
                 
                 document.getElementById('practiceInput').focus();
             } catch (e) {
-                alert("加载词典失败: " + e.message);
+                console.error("[Learning] 开始练习失败:", e);
+                alert("无法开始练习: " + e.message + "\n请检查词典文件路径。");
+            } finally {
+                overlay.style.display = 'none';
             }
         }
 
         function nextWord() {
-            currentIndex = Math.floor(Math.random() * keys.length);
-            const pinyin = keys[currentIndex];
+            if (keys.length === 0) return;
+            const pinyin = keys[Math.floor(Math.random() * keys.length)];
             const data = currentDict[pinyin];
             
-            let target = pinyin;
-            let stroke = "无";
-            let english = "无";
+            let target = pinyin, stroke = "无", english = "无";
 
             if (Array.isArray(data) && data.length > 0) {
                 const entry = data[Math.floor(Math.random() * data.length)];
                 target = entry.char || pinyin;
                 stroke = entry.stroke_aux || "无";
                 english = entry.en || "无";
-            } else if (Array.isArray(data)) {
-                const hint = data[2] || "";
-                if (hint.includes('/')) {
-                    const parts = hint.split('/');
-                    english = parts[0]; stroke = parts[1];
-                } else if (hint.match(/^[a-zA-Z]+$/)) {
-                    english = hint;
-                } else {
-                    stroke = hint;
-                }
             } else if (typeof data === 'string') {
                 target = pinyin;
                 stroke = data.includes('/') ? data.split('/')[1] : data;
@@ -345,22 +301,6 @@
             document.getElementById('strokeHint').innerText = stroke;
             document.getElementById('englishHint').innerText = english;
             document.getElementById('practiceInput').dataset.target = target;
-
-            // 自动发音
-            if (config && config.appearance.auto_pronounce) {
-                pronounce(target);
-            }
-        }
-
-        function pronounce(text) {
-            if (!text) return;
-            const audio = new Audio(`https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&le=zh`);
-            audio.play().catch(e => console.log("Audio play blocked", e));
-        }
-
-        function pronounceCurrent() {
-            const target = document.getElementById('targetWord').innerText;
-            pronounce(target);
         }
 
         document.getElementById('practiceInput').addEventListener('input', (e) => {
@@ -368,12 +308,10 @@
             const target = e.target.dataset.target;
             
             if (input === target) {
-                stats.count++;
-                stats.correct++;
+                stats.count++; stats.correct++;
                 updateStats();
                 
-                // 成功动画
-                const card = document.querySelector('.target-word');
+                const card = document.getElementById('targetWord');
                 card.classList.add('success-anim');
                 e.target.style.borderColor = '#34c759';
                 

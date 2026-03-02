@@ -112,12 +112,29 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 
 async fn dicts_handler(uri: Uri) -> impl IntoResponse {
     let path = uri.path().trim_start_matches("/dicts/").trim_start_matches("/");
-    let full_path = std::path::Path::new("dicts").join(path);
+    
+    // 寻找词典目录的逻辑：优先当前目录，否则相对于可执行文件查找
+    let mut base_path = std::path::PathBuf::from("dicts");
+    if !base_path.exists() {
+        if let Ok(mut exe_path) = std::env::current_exe() {
+            exe_path.pop();
+            let mut p = exe_path.clone();
+            // 向上查找最多三层，匹配 IDE 开发环境
+            for _ in 0..3 {
+                let check_p = p.join("dicts");
+                if check_p.exists() { base_path = check_p; break; }
+                p.pop();
+            }
+        }
+    }
+
+    let full_path = base_path.join(path);
     
     if let Ok(content) = std::fs::read(&full_path) {
         let mime = mime_guess::from_path(&full_path).first_or_octet_stream();
         ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content).into_response()
     } else {
+        eprintln!("[Web] Dictionary file not found: {:?}", full_path);
         (StatusCode::NOT_FOUND, "Dictionary Not Found").into_response()
     }
 }
