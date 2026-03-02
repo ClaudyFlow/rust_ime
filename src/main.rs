@@ -435,7 +435,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let status_text = if enabled { "中" } else { "英" };
                     tray_handle.update(|t| t.chinese_enabled = enabled);
                     
-                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(status_text.into()));
+                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(status_text.into(), enabled));
                     let _ = gui_tx_tray.send(GuiEvent::Update { 
                         pinyin: "".into(), 
                         candidates: vec![], 
