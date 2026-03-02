@@ -1207,7 +1207,13 @@ impl Processor {
 
         // 策略 2: 简拼检索
         if self.enable_abbreviation_matching && !smart_segments.is_empty() && smart_segments.len() > 1 {
-            // ... (Fuzzy variants for segments) ...
+            let first_seg_variants = self.get_fuzzy_variants(&smart_segments[0]);
+            let second_seg_variants = if smart_segments.len() > 1 { 
+                self.get_fuzzy_variants(&smart_segments[1]) 
+            } else { 
+                vec![String::new()] 
+            };
+
             for v1 in &first_seg_variants {
                 for v2 in &second_seg_variants {
                     let mut modified_segments = smart_segments.clone();
