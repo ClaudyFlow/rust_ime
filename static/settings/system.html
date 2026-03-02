@@ -61,31 +61,6 @@
                 <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
             </div>
         </div>
-
-        <h2>模糊音设置</h2>
-        <div class="card">
-            <div class="setting-item">
-                <div class="info"><div class="title">开启模糊音</div><div class="desc">容忍声母或韵母的模糊匹配</div></div>
-                <label class="switch"><input type="checkbox" id="enable_fuzzy_pinyin"><span class="slider"></span></label>
-            </div>
-            
-            <div id="fuzzy-options" style="display: none; padding-top: 10px; border-top: 1px solid #eee; margin-top: 10px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                    <label class="checkbox-container">z ↔ zh <input type="checkbox" id="fuzzy_z_zh"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">c ↔ ch <input type="checkbox" id="fuzzy_c_ch"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">s ↔ sh <input type="checkbox" id="fuzzy_s_sh"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">n ↔ l <input type="checkbox" id="fuzzy_n_l"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">r ↔ l <input type="checkbox" id="fuzzy_r_l"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">f ↔ h <input type="checkbox" id="fuzzy_f_h"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">an ↔ ang <input type="checkbox" id="fuzzy_an_ang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">en ↔ eng <input type="checkbox" id="fuzzy_en_eng"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">in ↔ ing <input type="checkbox" id="fuzzy_in_ing"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">ian ↔ iang <input type="checkbox" id="fuzzy_ian_iang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">uan ↔ uang <input type="checkbox" id="fuzzy_uan_uang"><span class="checkmark"></span></label>
-                    <label class="checkbox-container">u ↔ v <input type="checkbox" id="fuzzy_u_v"><span class="checkmark"></span></label>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="sticky-footer">
@@ -113,23 +88,6 @@
             bindInput('commit_mode', 'input');
             bindInput('page_size', 'input');
             bindInput('autostart', 'input');
-
-            // 模糊音绑定
-            const fuzzySwitch = document.getElementById('enable_fuzzy_pinyin');
-            const fuzzyOptions = document.getElementById('fuzzy-options');
-            fuzzySwitch.checked = config.input.enable_fuzzy_pinyin;
-            fuzzyOptions.style.display = fuzzySwitch.checked ? 'block' : 'none';
-            fuzzySwitch.onchange = () => {
-                config.input.enable_fuzzy_pinyin = fuzzySwitch.checked;
-                fuzzyOptions.style.display = fuzzySwitch.checked ? 'block' : 'none';
-            };
-
-            const fuzzyKeys = ['z_zh', 'c_ch', 's_sh', 'n_l', 'r_l', 'f_h', 'an_ang', 'en_eng', 'in_ing', 'ian_iang', 'uan_uang', 'u_v'];
-            fuzzyKeys.forEach(k => {
-                const el = document.getElementById(`fuzzy_${k}`);
-                el.checked = config.input.fuzzy_config[k];
-                el.onchange = () => { config.input.fuzzy_config[k] = el.checked; };
-            });
         }
 
         function toggleProfile(name, el) {
