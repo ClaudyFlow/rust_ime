@@ -1054,10 +1054,8 @@ impl Processor {
         let py = self.last_lookup_pinyin.clone();
 
         if self.enable_user_dict && !py.is_empty() {
-            // 1. 记录单个词的频率 (如果开启了首词固定，且选中的是第一个，则不调频)
-            if !self.enable_fixed_first_candidate || index > 0 {
-                self.record_usage(&py, &cand);
-            }
+            // 1. 记录单个词的频率
+            self.record_usage(&py, &cand);
 
             // 2. 尝试与历史记录合并组词
             // 如果距离上次上屏超过 3 秒，清空历史
