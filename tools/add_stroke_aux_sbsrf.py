@@ -89,7 +89,8 @@ if __name__ == "__main__":
     files = [
         "dicts/chinese/chars/chars.json",
         "dicts/chinese/chars/level2.json",
-        "dicts/chinese/chars/level3.json"
+        "dicts/chinese/chars/level3.json",
+        "dicts/chinese/chars/rime_mint_chars.json"
     ]
     for f in files:
         process_file(f, stroke_map)
