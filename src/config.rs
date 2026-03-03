@@ -35,6 +35,7 @@ pub enum AuxMode {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Appearance {
     pub show_candidates: bool,
+    pub show_status_bar: bool,
     pub page_size: usize,
     pub show_tone_hint: bool,
     pub aux_mode: AuxMode,
@@ -186,6 +187,7 @@ impl Config {
             },
             appearance: Appearance {
                 show_candidates: true,
+                show_status_bar: true,
                 page_size: 5,
                 show_tone_hint: false,
                 aux_mode: AuxMode::English,

@@ -290,6 +290,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
+
+                            // 状态栏动态显示
+                            if let Some(sb) = s.upgrade() {
+                                if new_conf.appearance.show_status_bar {
+                                    let _ = sb.show();
+                                } else {
+                                    let _ = sb.hide();
+                                }
+                            }
                             
                             // 如果页面大小变了且窗口正在显示，尝试刷新显示
                             if old_page_size != new_page_size && w.get_is_visible() {
@@ -305,7 +314,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
         }
     });
 
-    status_bar.show().expect("Failed to show StatusBar");
+    if config.appearance.show_status_bar {
+        status_bar.show().expect("Failed to show StatusBar");
+    }
     // window 初始不调用 show，由 Update 事件驱动
     slint::run_event_loop().expect("Failed to run Slint event loop");
 }

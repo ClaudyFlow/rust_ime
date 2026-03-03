@@ -18,6 +18,7 @@
   },
   "appearance": {
     "show_candidates": true,
+    "show_status_bar": true,
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,

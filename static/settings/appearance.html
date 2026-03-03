@@ -20,6 +20,10 @@
                     <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
+                    <div class="info"><div class="title">显示状态显示栏</div><div class="desc">控制输入状态（中/英）浮窗的显示</div></div>
+                    <label class="switch"><input type="checkbox" id="show_status_bar"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
                     <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数 (1-10)。</div></div>
                     <input type="number" id="page_size" min="1" max="10" step="1" style="width: 80px;">
                 </div>
@@ -146,6 +150,7 @@
             
             // 绑定基础设置
             bindInput('show_candidates', 'appearance');
+            bindInput('show_status_bar', 'appearance');
             bindInput('aux_mode', 'appearance');
             bindInput('candidate_anchor', 'appearance');
             bindInput('candidate_layout', 'appearance');
