@@ -62,6 +62,7 @@ pub struct Processor {
     pub joined_sentence: String,
     
     pub show_candidates: bool,
+    pub show_english_translation: bool,
     pub show_modern_candidates: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
@@ -208,7 +209,10 @@ impl Processor {
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
             joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false,
+            show_candidates: true,
+            show_english_translation: true,
+            show_modern_candidates: false,
+
             phantom_mode,
             phantom_text: String::new(),
             preview_selected_candidate: false,
@@ -291,6 +295,7 @@ impl Processor {
             self.load_user_dict();
         }
         self.show_candidates = conf.appearance.show_candidates;
+        self.show_english_translation = conf.appearance.show_english_translation;
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
@@ -1366,9 +1371,18 @@ impl Processor {
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
             
+            // 英文翻译显示支持：如果开启了开关且数据不为空
+            if self.show_english_translation && !en.is_empty() {
+                if !h.is_empty() { h.push(' '); }
+                h.push_str(&en);
+            }
+
             match self.aux_mode {
                 AuxMode::English => {
-                    if !en.is_empty() {
+                    // 如果 show_english_translation 没开，或者 en 为空，这里可能还想根据 aux_mode 再次确认显示 (通常 en 就是翻译)
+                    // 但为了避免重复，如果上面已经显示了，这里就不重复加了。
+                    // 这里的 en 在拼音模式下是辅码，在英文模式下是翻译。
+                    if !self.show_english_translation && !en.is_empty() {
                         if !h.is_empty() { h.push(' '); }
                         h.push_str(&en);
                     }
