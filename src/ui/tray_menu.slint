@@ -63,15 +63,12 @@ export component TrayMenu inherits Window {
 
     menu-container := Rectangle {
         background: #ffffff;
-        border-radius: 10px;
+        border-radius: 8px;
         border-width: 1px;
-        border-color: #d0d7de;
-        drop-shadow-blur: 15px;
-        drop-shadow-color: rgba(0, 0, 0, 0.1);
-        drop-shadow-offset-y: 4px;
+        border-color: #c0c7ce; // 稍微加深边框，代替阴影的边界感
 
         VerticalLayout {
-            padding: 8px;
+            padding: 6px;
             spacing: 2px;
 
             TrayMenuItem {

@@ -298,13 +298,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             let mut final_y = y;
                             let win_width = 200; 
                             
+                            let mut win_height = tm.window().size().height as i32;
+                            if win_height <= 0 { win_height = 260; } 
+
                             #[cfg(target_os = "windows")]
                             unsafe {
                                 let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x, y }, MONITOR_DEFAULTTONEAREST);
                                 let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
                                 if GetMonitorInfoW(monitor, &mut mi).as_bool() {
                                     if final_x + win_width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_width - 10; }
-                                    let win_height = tm.window().size().height as i32;
                                     final_y = y - win_height;
                                     if final_y < mi.rcMonitor.top { final_y = y; }
                                 }
@@ -313,6 +315,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
                             let _ = tm.window().show();
                             tm.invoke_request_focus();
+                            
+                            // 再次根据显示后的真实高度微调
+                            let real_height = tm.window().size().height as i32;
+                            if real_height > 0 && real_height != win_height {
+                                let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, y - real_height)));
+                            }
                             
                             #[cfg(target_os = "windows")]
                             unsafe {
