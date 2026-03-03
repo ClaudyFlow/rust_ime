@@ -70,6 +70,7 @@ pub struct Appearance {
 pub struct TextStyle {
     pub font_family: String,
     pub font_size: u32,
+    pub font_weight: u32,
     pub color: String,
     pub alpha: f32,
 }
@@ -203,24 +204,28 @@ impl Config {
                 pinyin_text: TextStyle {
                     font_family: "".to_string(),
                     font_size: 18,
+                    font_weight: 400,
                     color: "#586069".to_string(),
                     alpha: 1.0,
                 },
                 candidate_text: TextStyle {
                     font_family: "".to_string(),
                     font_size: 18,
+                    font_weight: 600,
                     color: "#24292e".to_string(),
                     alpha: 1.0,
                 },
                 hint_text: TextStyle {
                     font_family: "".to_string(),
                     font_size: 14,
+                    font_weight: 400,
                     color: "#6e7781".to_string(),
                     alpha: 0.8,
                 },
                 comment_text: TextStyle {
                     font_family: "".to_string(),
                     font_size: 12,
+                    font_weight: 400,
                     color: "#0969da".to_string(),
                     alpha: 0.7,
                 },

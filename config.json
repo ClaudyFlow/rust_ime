@@ -34,12 +34,14 @@
     "pinyin_text": {
       "font_family": "",
       "font_size": 18,
+      "font_weight": 400,
       "color": "#586069",
       "alpha": 1.0
     },
     "candidate_text": {
       "font_family": "",
       "font_size": 18,
+      "font_weight": 400,
       "color": "#24292e",
       "alpha": 1.0
     },

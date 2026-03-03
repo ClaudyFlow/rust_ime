@@ -48,8 +48,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     
     window.set_pinyin_font_size(config.appearance.pinyin_text.font_size as f32);
     window.set_pinyin_font_family(SharedString::from(config.appearance.pinyin_text.font_family.clone()));
+    window.set_pinyin_font_weight(config.appearance.pinyin_text.font_weight as i32);
     window.set_candidate_font_size(config.appearance.candidate_text.font_size as f32);
     window.set_candidate_font_family(SharedString::from(config.appearance.candidate_text.font_family.clone()));
+    window.set_candidate_font_weight(config.appearance.candidate_text.font_weight as i32);
 
     
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
@@ -284,8 +286,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             // 字体与字号同步
                             w.set_pinyin_font_size(new_conf.appearance.pinyin_text.font_size as f32);
                             w.set_pinyin_font_family(SharedString::from(new_conf.appearance.pinyin_text.font_family.clone()));
+                            w.set_pinyin_font_weight(new_conf.appearance.pinyin_text.font_weight as i32);
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
+                            w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
                             
                             // 如果页面大小变了且窗口正在显示，尝试刷新显示
                             if old_page_size != new_page_size && w.get_is_visible() {
