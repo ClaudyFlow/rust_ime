@@ -162,6 +162,9 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         let key = match key_code {
             0x41..=0x5A => crate::engine::keys::VirtualKey::from_u32(key_code - 0x41),
             0x30..=0x39 => crate::engine::keys::VirtualKey::from_u32(key_code - 0x30 + 26),
+            0x10 => Some(crate::engine::keys::VirtualKey::Shift),
+            0x11 => Some(crate::engine::keys::VirtualKey::Control),
+            0x12 => Some(crate::engine::keys::VirtualKey::Alt),
             0x20 => Some(crate::engine::keys::VirtualKey::Space), 0x08 => Some(crate::engine::keys::VirtualKey::Backspace), 0x0D => Some(crate::engine::keys::VirtualKey::Enter), 0x1B => Some(crate::engine::keys::VirtualKey::Esc), 0x14 => Some(crate::engine::keys::VirtualKey::CapsLock), 0x09 => Some(crate::engine::keys::VirtualKey::Tab),
             0x25 => Some(crate::engine::keys::VirtualKey::Left), 0x26 => Some(crate::engine::keys::VirtualKey::Up), 0x27 => Some(crate::engine::keys::VirtualKey::Right), 0x28 => Some(crate::engine::keys::VirtualKey::Down),
             0xBB => Some(crate::engine::keys::VirtualKey::Equal), 0xBD => Some(crate::engine::keys::VirtualKey::Minus), 0xBC => Some(crate::engine::keys::VirtualKey::Comma), 0xBE => Some(crate::engine::keys::VirtualKey::Dot), 0xBF => Some(crate::engine::keys::VirtualKey::Slash),

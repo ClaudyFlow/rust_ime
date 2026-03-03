@@ -734,6 +734,10 @@ impl Processor {
 
         if is_release {
             if key == VirtualKey::CapsLock { return Action::Consume; }
+            if key == VirtualKey::Shift && !self.buffer.is_empty() {
+                self.start_global_filter();
+                return Action::Consume;
+            }
             if self.buffer.is_empty() { return Action::PassThrough; }
             return Action::Consume;
         }
