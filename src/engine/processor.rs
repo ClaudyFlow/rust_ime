@@ -1204,27 +1204,23 @@ impl Processor {
         // A. 原始切分（基于空格/大写/数字）
         let mut raw_parsed = self.parse_buffer();
 
-        // --- 增强逻辑：无分隔符笔画过滤支持 ---
-        if self.aux_mode == AuxMode::Stroke && !self.buffer.contains(';') && !self.buffer.contains(' ') && !self.buffer.is_empty() {
-            // 尝试将 buffer 分为 [pinyin] + [stroke_tail]
-            // stroke_tail 最长通常为 2 位
-            for tail_len in 1..=2 {
-                if self.buffer.len() <= tail_len { break; }
-                let (prefix, tail) = self.buffer.split_at(self.buffer.len() - tail_len);
-                if tail.chars().all(|c| c.is_ascii_lowercase()) {
-                    // 检查 prefix 是否是完整的拼音序列
-                    let segments = self.segment_buffer(prefix);
-                    let reconstituted = segments.join("");
-                    if reconstituted == prefix {
-                        // 命中了！我们临时修改 raw_parsed 的最后一部分
-                        if let Some(last) = raw_parsed.last_mut() {
-                            if last.pinyin == self.buffer {
-                                last.pinyin = prefix.to_string();
-                                last.stroke_aux = Some(tail.to_string());
-                                // println!("[Seamless] Split {} into {} + {}", self.buffer, prefix, tail);
-                            }
+        // --- 增强逻辑：无分隔符辅助码过滤支持 (针对 Stroke 模式) ---
+        if self.aux_mode == AuxMode::Stroke && !self.buffer.contains(';') && !self.buffer.is_empty() {
+            if let Some(last) = raw_parsed.last_mut() {
+                // 如果最后一段是纯字母，且没有显式辅助码，尝试进行无缝切分
+                if last.stroke_aux.is_none() && last.english_aux.is_none() && last.pinyin.chars().all(|c| c.is_ascii_lowercase() || c == '\'') {
+                    let p = last.pinyin.clone();
+                    // 尝试从末尾切出 1 到 2 位作为笔画辅助码
+                    for tail_len in (1..=2).rev() {
+                        if p.len() <= tail_len + 1 { continue; } // 至少留 1 位给拼音
+                        let (prefix, tail) = p.split_at(p.len() - tail_len);
+                        // 验证 prefix 是否为合法拼音序列
+                        let segs = self.segment_buffer(prefix);
+                        if segs.join("") == prefix {
+                            last.pinyin = prefix.to_string();
+                            last.stroke_aux = Some(tail.to_string());
+                            break;
                         }
-                        break; 
                     }
                 }
             }
@@ -1402,6 +1398,19 @@ impl Processor {
         if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
             if let Some(user_entries) = self.user_dict.get(&self.last_lookup_pinyin) {
                 let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
+                
+                // 预先获取当前拼音的所有字典精确匹配，用于判断用户词是否在字典中
+                let mut dict_entries = Vec::new();
+                for profile in &self.active_profiles {
+                    if let Some(d) = self.tries.get(profile) {
+                        if let Some(m) = d.get_all_exact(&self.last_lookup_pinyin) {
+                            dict_entries.extend(m);
+                        }
+                    }
+                }
+
+                let has_aux = raw_parsed.last().map_or(false, |p| p.stroke_aux.is_some() || p.english_aux.is_some());
+
                 for (word, _count) in user_entries.iter().rev() {
                     if let Some(pos) = self.candidates.iter().position(|c| c == word) {
                         if insert_pos == 1 && pos == 0 { continue; }
@@ -1409,9 +1418,37 @@ impl Processor {
                         let h = self.candidate_hints.remove(pos);
                         self.candidates.insert(insert_pos, c);
                         self.candidate_hints.insert(insert_pos, h);
-                    } else {
+                    } else if !has_aux {
+                        // 没在 candidates 且没辅码过滤时才加回
                         self.candidates.insert(insert_pos, word.clone());
-                        self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
+                        
+                        // 检查是否为字典中的词
+                        let dict_match = dict_entries.iter().find(|m| {
+                            let target = if self.enable_traditional { &m.1 } else { &m.0 };
+                            target == word
+                        });
+
+                        if let Some(m) = dict_match {
+                            // 是字典词，重建其 hint
+                            let mut h = String::new();
+                            if self.show_tone_hint && !m.2.is_empty() { h.push_str(&m.2); }
+                            if self.show_english_translation && !m.3.is_empty() { 
+                                if !h.is_empty() { h.push(' '); } 
+                                h.push_str(&m.3); 
+                            }
+                            match self.aux_mode {
+                                AuxMode::Stroke => {
+                                    if !m.4.is_empty() {
+                                        if !h.is_empty() { h.push(' '); }
+                                        h.push_str(&get_stroke_desc(&m.4));
+                                    }
+                                }
+                                _ => {}
+                            }
+                            self.candidate_hints.insert(insert_pos, h);
+                        } else {
+                            self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
+                        }
                     }
                 }
             }
