@@ -18,7 +18,7 @@ pub enum GuiEvent {
         commit_mode: String,
     },
     MoveTo { x: i32, y: i32 },
-    ApplyConfig(Box<Config>),
+    ApplyConfig(Config),
     ShowStatus(String, bool), // 状态文字, 是否为中文模式 (用于更新文字)
     SetVisible(bool),         // 窗口显隐 (用于输入法激活/停用)
     OpenTrayMenu { x: i32, y: i32, chinese_enabled: bool, active_profile: String },

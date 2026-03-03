@@ -394,10 +394,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             w.set_show_translation(new_conf.appearance.show_english_translation);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                             
-                            // 更新颜色设置
+                            // 更新颜色设置并强制刷新共享变量
+                            let new_highlight = parse_color(&new_conf.appearance.window_highlight_color);
                             {
                                 let mut c = color_shared.lock().unwrap();
-                                *c = parse_color(&new_conf.appearance.window_highlight_color);
+                                *c = new_highlight;
                                 w.set_accent_color(*c);
                             }
                             w.set_bg_color(parse_color(&new_conf.appearance.window_bg_color));
@@ -411,7 +412,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
                             
-                            // 立即同步一次辅助文本颜色
+                            // 同步辅助文本颜色
                             w.set_aux_text_color(slint::Color::from_rgb_u8(149, 165, 166));
                             w.set_aux_highlight_color(slint::Color::from_rgb_u8(220, 221, 225));
 

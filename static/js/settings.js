@@ -7,12 +7,29 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
+    // 特别处理：显式同步所有已知复选框的状态，防止某些页面没调用 save() 导致的状态丢失
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        const id = cb.id;
+        // 尝试从 bindInput 建立的关系中查找所属 section
+        // 这里采用简单的尝试策略，或者根据 appearance.html 的结构
+        if (config.appearance && id in config.appearance) {
+            config.appearance[id] = cb.checked;
+        } else if (config.input && id in config.input) {
+            config.input[id] = cb.checked;
+        } else if (config.hotkeys && id in config.hotkeys) {
+            config.hotkeys[id] = cb.checked;
+        } else if (id in config) {
+            config[id] = cb.checked;
+        }
+    });
+
     await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
     });
-    showToast("已保存并应用");
+    showToast();
 }
 
 function showToast(message) {

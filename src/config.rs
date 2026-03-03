@@ -189,6 +189,48 @@ pub struct Hotkey {
 }
 
 impl Config {
+    pub fn load() -> Self {
+        let root = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()).unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let config_dir = root.join("configs");
+        if !config_dir.exists() { let _ = std::fs::create_dir_all(&config_dir); }
+
+        let mut conf = Self::default_config();
+
+        let load_file = |name: &str| -> Option<serde_json::Value> {
+            let p = config_dir.join(format!("{}.json", name));
+            if let Ok(f) = std::fs::File::open(p) {
+                serde_json::from_reader(std::io::BufReader::new(f)).ok()
+            } else { None }
+        };
+
+        if let Some(v) = load_file("appearance") { if let Ok(a) = serde_json::from_value(v) { conf.appearance = a; } }
+        if let Some(v) = load_file("input") { if let Ok(i) = serde_json::from_value(v) { conf.input = i; } }
+        if let Some(v) = load_file("hotkeys") { if let Ok(h) = serde_json::from_value(v) { conf.hotkeys = h; } }
+        if let Some(v) = load_file("files") { if let Ok(f) = serde_json::from_value(v) { conf.files = f; } }
+
+        conf
+    }
+
+    pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let root = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()).unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let config_dir = root.join("configs");
+        if !config_dir.exists() { std::fs::create_dir_all(&config_dir)?; }
+
+        let save_file = |name: &str, val: &serde_json::Value| -> Result<(), Box<dyn std::error::Error>> {
+            let p = config_dir.join(format!("{}.json", name));
+            let f = std::fs::File::create(p)?;
+            serde_json::to_writer_pretty(f, val)?;
+            Ok(())
+        };
+
+        save_file("appearance", &serde_json::to_value(&self.appearance)?)?;
+        save_file("input", &serde_json::to_value(&self.input)?)?;
+        save_file("hotkeys", &serde_json::to_value(&self.hotkeys)?)?;
+        save_file("files", &serde_json::to_value(&self.files)?)?;
+
+        Ok(())
+    }
+
     pub fn default_config() -> Self {
         Config {
             files: Files {

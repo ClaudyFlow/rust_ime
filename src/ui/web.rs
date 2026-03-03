@@ -140,11 +140,9 @@ async fn dicts_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-async fn get_config(State((config, _, _)): State<WebState>) -> impl IntoResponse {
-    match config.read() {
-        Ok(c) => Json(c.clone()).into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
+async fn get_config(State((_, _, _)): State<WebState>) -> impl IntoResponse {
+    // 实时读取最新的分段配置
+    Json(crate::Config::load()).into_response()
 }
 
 async fn update_config(
@@ -168,7 +166,8 @@ async fn update_config(
 
         *w = new_config.clone();
     }
-    if let Err(_e) = crate::save_config(&new_config) { return StatusCode::INTERNAL_SERVER_ERROR; }
+    // 使用新重构的 save 方法保存到 configs/ 目录
+    if let Err(_e) = new_config.save() { return StatusCode::INTERNAL_SERVER_ERROR; }
     let _ = tray_tx.send(crate::ui::tray::TrayEvent::ReloadConfig);
     StatusCode::OK
 }
@@ -184,7 +183,7 @@ async fn reset_config(
         };
         *w = default_conf.clone();
     }
-    if let Err(_e) = crate::save_config(&default_conf) { return StatusCode::INTERNAL_SERVER_ERROR; }
+    if let Err(_e) = default_conf.save() { return StatusCode::INTERNAL_SERVER_ERROR; }
     let _ = tray_tx.send(crate::ui::tray::TrayEvent::ReloadConfig);
     StatusCode::OK
 }
