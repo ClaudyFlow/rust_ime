@@ -358,61 +358,78 @@ impl Processor {
 
     /// 双拼转换逻辑 (基于配置方案)
     fn transform_double_pinyin(&self, last_char: char) -> Option<String> {
-        let segments = self.segment_buffer(&self.buffer);
-        let last_segment = segments.last()?;
-        let init_len = self.get_initial_len(last_segment);
-        
         let c_str = last_char.to_string();
 
-        // 1. 如果最后一个片段是声母，现在输入的是韵母
-        if last_segment.len() == init_len && init_len > 0 {
-            let initial = last_segment.as_str();
-            
-            // 从配置中查找韵母映射
-            let rime = self.double_pinyin_scheme.rimes.get(&c_str)?;
-            
-            // 特殊规则逻辑：
-            // 小鹤中 s 和 l 有双重含义，取决于声母
-            let final_rime = if c_str == "s" {
-                if initial == "j" || initial == "q" || initial == "x" { "iong" } else { "ong" }
-            } else if c_str == "l" {
-                if "gkhzhchsh".contains(initial) { "uang" } else { "iang" }
-            } else if c_str == "x" {
-                if "gkhzhchsh".contains(initial) { "ua" } else { "ia" }
-            } else {
-                rime.as_str()
-            };
-
-            // 特殊修正：er (针对零声母 e)
-            if initial == "e" && last_char == 'r' { return Some("er".to_string()); }
-            
-            let mut full = initial.to_string();
-            full.push_str(final_rime);
-            
-            // 拼写修正：j/q/x + ue -> jue/que/xue
-            if (initial == "j" || initial == "q" || initial == "x") && final_rime == "ue" {
-                return Some(format!("{}ue", initial));
-            }
-            
-            return Some(full);
-        }
-        
-        // 2. 处理新音节的声母
-        if self.buffer.is_empty() || self.buffer.ends_with(' ') || (last_segment.len() > init_len) {
-            // 先看有没有专门的声母映射 (如 v -> zh)
+        // 1. 处理首键（声母或零声母）
+        if self.buffer.is_empty() || self.buffer.ends_with(' ') {
+            // A. 专门的声母映射 (如 v -> zh)
             if let Some(mapped) = self.double_pinyin_scheme.initials.get(&c_str) {
                 return Some(mapped.clone());
             }
-            // 零声母 a, o, e 保持原样
+            // B. 零声母 a, o, e 保持原样
             if "aoe".contains(last_char) {
                 return Some(c_str);
             }
-            // 普通声母
+            // C. 普通声母
             if "bpmfdtnlgkhjqxzcsryw".contains(last_char) {
                 return Some(c_str);
             }
+            return None;
         }
 
+        // 2. 处理次键（韵母）
+        let segments = self.segment_buffer(&self.buffer);
+        if let Some(last_segment) = segments.last() {
+            let init_len = self.get_initial_len(last_segment);
+            
+            // 如果最后一个片段正好是一个声母 (如 "zh", "b", "sh")
+            if last_segment.len() == init_len && init_len > 0 {
+                let initial = last_segment.as_str();
+                
+                // 从配置中查找韵母映射
+                if let Some(rime) = self.double_pinyin_scheme.rimes.get(&c_str) {
+                    // 特殊规则逻辑：
+                    let mut final_rime = rime.as_str();
+                    
+                    // 小鹤中 s 和 l 有双重含义，取决于声母
+                    if c_str == "s" {
+                        if initial == "j" || initial == "q" || initial == "x" { final_rime = "iong"; } else { final_rime = "ong"; }
+                    } else if c_str == "l" {
+                        if "gkhzhchsh".contains(initial) { final_rime = "uang"; } else { final_rime = "iang"; }
+                    } else if c_str == "x" {
+                        if "gkhzhchsh".contains(initial) { final_rime = "ua"; } else { final_rime = "ia"; }
+                    }
+
+                    // 特殊修正：er (针对零声母 e)
+                    if initial == "e" && last_char == 'r' { return Some("er".to_string()); }
+                    
+                    let mut full = initial.to_string();
+                    full.push_str(final_rime);
+                    
+                    // 拼写修正：j/q/x + ue -> jue/que/xue
+                    if (initial == "j" || initial == "q" || initial == "x") && final_rime == "ue" {
+                        return Some(format!("{}ue", initial));
+                    }
+                    // 拼写修正：j/q/x + u -> ju/qu/xu (这里的 u 实际上是 v)
+                    if (initial == "j" || initial == "q" || initial == "x") && final_rime == "u" {
+                        return Some(format!("{}u", initial));
+                    }
+                    
+                    return Some(full);
+                }
+            }
+            
+            // 3. 如果上一个音节已完整，当前键开启新音节
+            if last_segment.len() > init_len || init_len == 0 {
+                 if let Some(mapped) = self.double_pinyin_scheme.initials.get(&c_str) {
+                    return Some(mapped.clone());
+                }
+                if "aoe".contains(last_char) || "bpmfdtnlgkhjqxzcsryw".contains(last_char) {
+                    return Some(c_str);
+                }
+            }
+        }
+        
         None
     }
 
