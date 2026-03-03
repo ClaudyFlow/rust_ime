@@ -247,6 +247,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
             let open_menu_time_inner = open_menu_time_for_thread.clone();
+            let lah_inner = last_active_hwnd.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -323,6 +324,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                     GuiEvent::OpenTrayMenu { x, y, chinese_enabled, active_profile } => {
                         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
                         open_menu_time_inner.store(now, std::sync::atomic::Ordering::SeqCst);
+
+                        #[cfg(target_os = "windows")]
+                        unsafe {
+                            let active = GetForegroundWindow();
+                            if active.0 != 0 {
+                                lah_inner.store(active.0 as isize, std::sync::atomic::Ordering::SeqCst);
+                            }
+                        }
 
                         if let Some(tm) = tm_handle.upgrade() {
                             #[cfg(target_os = "windows")]
