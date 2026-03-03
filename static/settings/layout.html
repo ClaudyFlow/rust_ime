@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>键盘布局设置 - rust-ime</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .layout-editor {
+            background: var(--apple-card);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 20px;
+            border: 1px solid var(--apple-border);
+        }
+        .key-map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .key-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .key-label {
+            font-size: 12px;
+            color: #888;
+            font-weight: bold;
+        }
+        .key-input {
+            width: 40px;
+            text-align: center;
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        select, input[type="text"] {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/" class="back-btn">← 返回首页</a>
+            <h1>键盘布局设置</h1>
+            <p>为特定输入方案（如俄语、希腊语）定义 1:1 的按键映射。</p>
+        </div>
+
+        <div class="section">
+            <div class="controls">
+                <span>选择布局方案:</span>
+                <select id="layout-select" onchange="changeLayout()">
+                    <!-- 动态加载 -->
+                </select>
+                <button class="btn" onclick="addNewLayout()">+ 新增方案</button>
+                <button class="btn btn-danger" onclick="deleteLayout()">删除当前方案</button>
+            </div>
+
+            <div id="editor-container" class="layout-editor" style="display:none;">
+                <div class="info">
+                    <p>当 <strong>输入方案</strong> 切换为与 <strong>布局名称</strong> 一致时，下方的映射将生效（直接输出映射后的字符）。</p>
+                </div>
+                
+                <div class="key-map-grid" id="key-grid">
+                    <!-- 动态生成 A-Z -->
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="saveLayoutConfig()">保存全局设置</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/js/settings.js"></script>
+    <script>
+        let currentLayoutName = "";
+        const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+
+        async function init() {
+            await loadConfig();
+            if (!config.input.keyboard_layouts) {
+                config.input.keyboard_layouts = {};
+            }
+            refreshLayoutList();
+        }
+
+        function refreshLayoutList() {
+            const select = document.getElementById('layout-select');
+            select.innerHTML = '<option value="">-- 请选择 --</option>';
+            
+            Object.keys(config.input.keyboard_layouts).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+
+            if (currentLayoutName && config.input.keyboard_layouts[currentLayoutName]) {
+                select.value = currentLayoutName;
+                showEditor();
+            } else {
+                document.getElementById('editor-container').style.display = 'none';
+            }
+        }
+
+        function changeLayout() {
+            currentLayoutName = document.getElementById('layout-select').value;
+            if (currentLayoutName) {
+                showEditor();
+            } else {
+                document.getElementById('editor-container').style.display = 'none';
+            }
+        }
+
+        function showEditor() {
+            const container = document.getElementById('editor-container');
+            container.style.display = 'block';
+            
+            const grid = document.getElementById('key-grid');
+            grid.innerHTML = '';
+
+            const layout = config.input.keyboard_layouts[currentLayoutName];
+
+            letters.forEach(letter => {
+                const val = layout[letter] || "";
+                const div = document.createElement('div');
+                div.className = 'key-item';
+                div.innerHTML = `
+                    <span class="key-label">${letter.toUpperCase()}</span>
+                    <input type="text" class="key-input" value="${val}" 
+                           maxlength="1"
+                           oninput="updateKey('${letter}', this.value)">
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function updateKey(letter, val) {
+            config.input.keyboard_layouts[currentLayoutName][letter] = val;
+        }
+
+        function addNewLayout() {
+            const name = prompt("请输入新布局名称 (建议与 dicts 下的文件夹名一致，如 russian):");
+            if (name && !config.input.keyboard_layouts[name]) {
+                config.input.keyboard_layouts[name] = {};
+                currentLayoutName = name;
+                
+                // 预设一些模板
+                if (name.toLowerCase().includes("russian")) {
+                    const ru = "f d u l t p b q r k y j g h c n e a [ ] s m i o x z v . /".split(" ");
+                    letters.forEach((l, i) => { if(ru[i]) config.input.keyboard_layouts[name][l] = ru[i]; });
+                }
+
+                refreshLayoutList();
+            }
+        }
+
+        function deleteLayout() {
+            if (currentLayoutName && confirm(`确定要删除布局 "${currentLayoutName}" 吗？`)) {
+                delete config.input.keyboard_layouts[currentLayoutName];
+                currentLayoutName = "";
+                refreshLayoutList();
+            }
+        }
+
+        async function saveLayoutConfig() {
+            await saveConfig();
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -102,6 +102,7 @@ pub struct Input {
     pub enable_punctuation_long_press: bool,
     pub punctuation_long_press_mappings: std::collections::HashMap<String, String>,
     pub punctuations: std::collections::HashMap<String, std::collections::HashMap<String, Vec<PunctuationEntry>>>,
+    pub keyboard_layouts: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
@@ -277,6 +278,7 @@ impl Config {
                     ("^", "^"), ("&", "&"), ("*", "*"), ("-", "-"), ("_", "_"), ("=", "="), ("+", "+")
                 ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
                 punctuations: std::collections::HashMap::new(), // Will be populated or loaded
+                keyboard_layouts: std::collections::HashMap::new(),
                 auto_commit_unique_en_fuzhuma: false,
                 auto_commit_unique_full_match: false,
                 enable_prefix_matching: true,

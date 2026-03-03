@@ -296,7 +296,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 let input = args[1..].join(" ");
-                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new());
+                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new(), HashMap::new());
                 p.buffer = input;
                 p.lookup();
                 for (i, cand) in p.candidates.iter().take(10).enumerate() {
@@ -432,7 +432,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         
-            let mut processor_obj = Processor::new(tries_map, default_profile, conf_guard.input.punctuations.clone());
+            let mut processor_obj = Processor::new(
+                tries_map, 
+                default_profile, 
+                conf_guard.input.punctuations.clone(),
+                conf_guard.input.keyboard_layouts.clone()
+            );
             processor_obj.apply_config(&conf_guard);
             processor_obj.set_syllables(load_syllables(&root));    
         let processor = Arc::new(Mutex::new(processor_obj));

@@ -51,6 +51,7 @@ pub struct Processor {
     pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
     pub punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, // Language -> Key -> Entries
+    pub keyboard_layouts: HashMap<String, HashMap<String, String>>, // Layout Name -> Key -> Char
     pub syllables: std::collections::HashSet<String>,
     pub candidates: Vec<String>,
     pub candidate_hints: Vec<String>, 
@@ -191,6 +192,7 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
         punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
+        keyboard_layouts: HashMap<String, HashMap<String, String>>,
     ) -> Self {
         let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
 
@@ -198,6 +200,7 @@ impl Processor {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
             punctuations,
+            keyboard_layouts,
             syllables: std::collections::HashSet::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
@@ -329,6 +332,7 @@ impl Processor {
         self.enable_punctuation_long_press = conf.input.enable_punctuation_long_press;
         self.punctuation_long_press_mappings = conf.input.punctuation_long_press_mappings.clone();
         self.punctuations = conf.input.punctuations.clone();
+        self.keyboard_layouts = conf.input.keyboard_layouts.clone();
 
         if !conf.input.active_profiles.is_empty() {
             self.active_profiles = conf.input.active_profiles.iter().map(|p: &String| p.to_lowercase()).collect();
@@ -799,6 +803,14 @@ impl Processor {
     fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
+                // 检查当前方案是否有关联的键盘布局 (如俄语、希腊语)
+                let lang = self.active_profiles.get(0).cloned().unwrap_or_default().to_lowercase();
+                if let Some(layout) = self.keyboard_layouts.get(&lang) {
+                    if let Some(mapped) = layout.get(&c.to_string()) {
+                        return Action::Emit(mapped.clone());
+                    }
+                }
+
                 let old_buffer = self.buffer.clone();
                 
                 let mut used_double = false;
