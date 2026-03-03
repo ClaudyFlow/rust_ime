@@ -124,6 +124,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         }
                     });
                 }
+
+                let t_title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
+                let t_hwnd = FindWindowW(None, PCWSTR(t_title.as_ptr()));
+                if t_hwnd.0 != 0 {
+                    let mut ex_style = GetWindowLongPtrW(t_hwnd, GWL_EXSTYLE) as u32;
+                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0;
+                    ex_style &= !WS_EX_APPWINDOW.0;
+                    let _ = SetWindowLongPtrW(t_hwnd, GWL_EXSTYLE, ex_style as isize);
+                }
             }
         });
     }
