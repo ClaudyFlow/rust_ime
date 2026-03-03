@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
-use serde_json::Value;
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,14 +43,14 @@ struct ParsedPart {
     raw: String,
 }
 
-use crate::config::AuxMode;
+use crate::config::{AuxMode, PunctuationEntry};
 
 pub struct Processor {
     pub state: ImeState,
     pub buffer: String,
     pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
-    pub punctuation: HashMap<String, Vec<String>>,
+    pub punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, // Language -> Key -> Entries
     pub syllables: std::collections::HashSet<String>,
     pub candidates: Vec<String>,
     pub candidate_hints: Vec<String>, 
@@ -106,6 +105,8 @@ pub struct Processor {
     pub enable_long_press: bool,
     pub long_press_timeout: Duration,
     pub long_press_mappings: HashMap<String, String>,
+    pub enable_punctuation_long_press: bool,
+    pub punctuation_long_press_mappings: HashMap<String, String>,
     pub key_press_info: Option<(VirtualKey, Instant)>,
     pub long_press_triggered: bool,
 
@@ -189,22 +190,14 @@ impl Processor {
     pub fn new(
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
-        punctuation_raw: HashMap<String, Value>, 
+        punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
     ) -> Self {
-        let mut punctuation = HashMap::new();
-        for (k, v) in punctuation_raw {
-            if let Some(arr) = v.as_array() {
-                let chars: Vec<String> = arr.iter().filter_map(|item| item.get("char").and_then(|c| c.as_str())).map(|s| s.to_string()).collect();
-                punctuation.insert(k, chars);
-            }
-        }
-
         let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
 
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
-            punctuation,
+            punctuations,
             syllables: std::collections::HashSet::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
@@ -252,6 +245,8 @@ impl Processor {
             enable_long_press: true,
             long_press_timeout: Duration::from_millis(400),
             long_press_mappings: HashMap::new(),
+            enable_punctuation_long_press: true,
+            punctuation_long_press_mappings: HashMap::new(),
             key_press_info: None,
             long_press_triggered: false,
             nav_mode: false,
@@ -262,7 +257,7 @@ impl Processor {
             double_pinyin_scheme: crate::config::DoublePinyinScheme {
                 name: "小鹤双拼".into(),
                 initials: [("v","zh"), ("u","sh"), ("i","ch")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(),
-                rimes: [("q","iu"), ("w","ei"), ("r","uan")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(), // 简略初始化，实际会被 apply_config 覆盖
+                rimes: [("q","iu"), ("w","ei"), ("r","uan")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(), 
             },
             enable_fuzzy_pinyin: false,
             fuzzy_config: crate::config::FuzzyPinyinConfig {
@@ -330,6 +325,10 @@ impl Processor {
         for lm in &conf.input.long_press_mappings {
             self.long_press_mappings.insert(lm.trigger_key.to_lowercase(), lm.insert_text.clone());
         }
+
+        self.enable_punctuation_long_press = conf.input.enable_punctuation_long_press;
+        self.punctuation_long_press_mappings = conf.input.punctuation_long_press_mappings.clone();
+        self.punctuations = conf.input.punctuations.clone();
 
         if !conf.input.active_profiles.is_empty() {
             self.active_profiles = conf.input.active_profiles.iter().map(|p: &String| p.to_lowercase()).collect();
@@ -661,31 +660,56 @@ impl Processor {
         let is_release = val == 0;
 
         // 处理长按逻辑
-        if self.enable_long_press && is_letter(key) && !shift_pressed {
-            if val == 1 {
-                self.key_press_info = Some((key, now));
-                self.long_press_triggered = false;
-            } else if is_repeat {
-                if !self.long_press_triggered {
-                    if let Some((press_key, press_time)) = self.key_press_info {
-                        if press_key == key && now.duration_since(press_time) >= self.long_press_timeout {
-                            if let Some(c) = key_to_char(key, false) {
-                                if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
-                                    self.long_press_triggered = true;
-                                    if !self.buffer.is_empty() && self.buffer.ends_with(c) {
-                                        self.buffer.pop();
+        if (self.enable_long_press && is_letter(key)) || (self.enable_punctuation_long_press && get_punctuation_key(key, shift_pressed).is_some()) {
+            if !shift_pressed {
+                if val == 1 {
+                    self.key_press_info = Some((key, now));
+                    self.long_press_triggered = false;
+                } else if is_repeat {
+                    if !self.long_press_triggered {
+                        if let Some((press_key, press_time)) = self.key_press_info {
+                            if press_key == key && now.duration_since(press_time) >= self.long_press_timeout {
+                                if is_letter(key) {
+                                    if let Some(c) = key_to_char(key, false) {
+                                        if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
+                                            self.long_press_triggered = true;
+                                            if !self.buffer.is_empty() && self.buffer.ends_with(c) {
+                                                self.buffer.pop();
+                                            }
+                                            return self.inject_text(&replacement);
+                                        }
                                     }
-                                    return self.inject_text(&replacement);
+                                } else {
+                                    // 标点长按
+                                    if let Some(p_key) = get_punctuation_key(key, false) {
+                                        if let Some(replacement) = self.punctuation_long_press_mappings.get(p_key).cloned() {
+                                            self.long_press_triggered = true;
+                                            // 标点通常是直接上屏，或者是接在当前候选词后
+                                            // 我们复用 handle_punctuation 的一部分逻辑，但直接用 replacement
+                                            let mut commit_text = if !self.joined_sentence.is_empty() { 
+                                                self.joined_sentence.trim_end().to_string() 
+                                            } else if !self.candidates.is_empty() { 
+                                                self.candidates[0].trim_end().to_string() 
+                                            } else { 
+                                                self.buffer.trim_end().to_string() 
+                                            };
+                                            commit_text.push_str(&replacement);
+                                            let del_len = self.phantom_text.chars().count();
+                                            self.clear_composing();
+                                            self.commit_history.clear(); 
+                                            return Action::DeleteAndEmit { delete: del_len, insert: commit_text };
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                return Action::Consume; 
-            } else if is_release {
-                self.key_press_info = None;
-                if self.long_press_triggered {
                     return Action::Consume; 
+                } else if is_release {
+                    self.key_press_info = None;
+                    if self.long_press_triggered {
+                        return Action::Consume; 
+                    }
                 }
             }
         }
@@ -1073,19 +1097,23 @@ impl Processor {
                 format!("{:?}", key)
             });
         let punc_key = punc_key_owned.as_str();
-        let zh_puncs = self.punctuation.get(punc_key);
         
-        let zh_punc = if let Some(puncs) = zh_puncs {
+        // 查找当前语言方案的标点映射
+        let lang = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
+        let zh_puncs = self.punctuations.get(&lang).and_then(|m| m.get(punc_key))
+            .or_else(|| self.punctuations.get("chinese").and_then(|m| m.get(punc_key))); // 回退到中文标点
+        
+        let zh_punc = if let Some(entries) = zh_puncs {
             if punc_key == "\"" {
-                let p = if self.quote_open { puncs.get(1).or(puncs.get(0)) } else { puncs.get(0) };
+                let p = if self.quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
                 self.quote_open = !self.quote_open;
-                p.cloned().unwrap_or_else(|| punc_key.to_string())
+                p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
             } else if punc_key == "'" {
-                let p = if self.single_quote_open { puncs.get(1).or(puncs.get(0)) } else { puncs.get(0) };
+                let p = if self.single_quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
                 self.single_quote_open = !self.single_quote_open;
-                p.cloned().unwrap_or_else(|| punc_key.to_string())
+                p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
             } else {
-                puncs.first().cloned().unwrap_or_else(|| punc_key.to_string())
+                entries.first().map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
             }
         } else {
             punc_key.to_string()

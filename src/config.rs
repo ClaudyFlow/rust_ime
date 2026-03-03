@@ -99,6 +99,9 @@ pub struct Input {
     pub enable_long_press: bool,
     pub long_press_timeout_ms: u64,
     pub long_press_mappings: Vec<LongPressMapping>,
+    pub enable_punctuation_long_press: bool,
+    pub punctuation_long_press_mappings: std::collections::HashMap<String, String>,
+    pub punctuations: std::collections::HashMap<String, std::collections::HashMap<String, Vec<PunctuationEntry>>>,
     pub auto_commit_unique_en_fuzhuma: bool,
     pub auto_commit_unique_full_match: bool,
     pub enable_prefix_matching: bool,
@@ -121,6 +124,12 @@ pub struct Input {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: FuzzyPinyinConfig,
     pub enable_traditional: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct PunctuationEntry {
+    pub char: String,
+    pub desc: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -259,6 +268,15 @@ impl Config {
                 enable_long_press: false,
                 long_press_timeout_ms: 400,
                 long_press_mappings: vec![],
+                enable_punctuation_long_press: true,
+                punctuation_long_press_mappings: [
+                    (",", ","), (".", "."), ("?", "?"), ("!", "!"), (";", ";"), (":", ":"),
+                    ("\"", "\""), ("'", "'"), ("(", "("), (")", ")"), ("[", "["), ("]", "]"),
+                    ("{", "{"), ("}", "}"), ("<", "<"), (">", ">"), ("\\", "\\"), ("/", "/"),
+                    ("~", "~"), ("`", "`"), ("@", "@"), ("#", "#"), ("$", "$"), ("%", "%"),
+                    ("^", "^"), ("&", "&"), ("*", "*"), ("-", "-"), ("_", "_"), ("=", "="), ("+", "+")
+                ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                punctuations: std::collections::HashMap::new(), // Will be populated or loaded
                 auto_commit_unique_en_fuzhuma: false,
                 auto_commit_unique_full_match: false,
                 enable_prefix_matching: true,

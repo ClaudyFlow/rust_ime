@@ -87,12 +87,42 @@ pub fn save_config(c: &Config) -> Result<(), Box<dyn std::error::Error>> {
 fn load_config() -> Config {
     let root = find_project_root();
     let p = root.join("config.json");
-    if let Ok(f) = File::open(&p) { 
-        if let Ok(c) = serde_json::from_reader(BufReader::new(f)) { return c; } 
-    }
-    Config::default_config()
-}
+    let mut config = if let Ok(f) = File::open(&p) {
+        if let Ok(c) = serde_json::from_reader(BufReader::new(f)) { c } else { Config::default_config() }
+    } else {
+        Config::default_config()
+    };
 
+    // 如果配置中没有标点映射，尝试从 dicts 目录加载默认值
+    if config.input.punctuations.is_empty() {
+        let mut punctuations = HashMap::new();
+        if let Ok(entries) = std::fs::read_dir(root.join("dicts")) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    let lang = entry.file_name().to_string_lossy().to_string();
+                    let punc_file = entry.path().join("punctuation.json");
+                    if punc_file.exists() {
+                        let raw = load_punctuation_dict(&punc_file.to_string_lossy());
+                        let mut lang_punc = HashMap::new();
+                        for (k, v) in raw {
+                            if let Some(arr) = v.as_array() {
+                                let entries: Vec<config::PunctuationEntry> = arr.iter().filter_map(|item| {
+                                    let c = item.get("char").and_then(|c| c.as_str())?;
+                                    let d = item.get("desc").and_then(|d| d.as_str()).unwrap_or("");
+                                    Some(config::PunctuationEntry { char: c.to_string(), desc: d.to_string() })
+                                }).collect();
+                                lang_punc.insert(k, entries);
+                            }
+                        }
+                        punctuations.insert(lang, lang_punc);
+                    }
+                }
+            }
+        }
+        config.input.punctuations = punctuations;
+    }
+    config
+}
 pub fn load_punctuation_dict(p: &str) -> HashMap<String, Value> {
     let mut m = HashMap::new();
     if let Ok(f) = File::open(p) { 
@@ -393,7 +423,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let tries_arc = Arc::new(RwLock::new(tries_map.clone()));
     
         let conf_guard = config.read().unwrap();
-        let punctuation = load_punctuation_dict(&conf_guard.files.punctuation_file);
         let mut default_profile = conf_guard.input.default_profile.to_lowercase();
         if default_profile.is_empty() || !tries_map.contains_key(&default_profile) {
             if tries_map.contains_key("chinese") {
@@ -403,7 +432,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         
-            let mut processor_obj = Processor::new(tries_map, default_profile, punctuation);
+            let mut processor_obj = Processor::new(tries_map, default_profile, conf_guard.input.punctuations.clone());
             processor_obj.apply_config(&conf_guard);
             processor_obj.set_syllables(load_syllables(&root));    
         let processor = Arc::new(Mutex::new(processor_obj));
