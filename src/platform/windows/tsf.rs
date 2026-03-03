@@ -129,24 +129,16 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
             if (x != 0 || y != 0) && gui_tx.is_some() { let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y }); }
         }
 
-        // 核心修复：如果按下了 Ctrl 或 Alt，且此时没有正在输入拼音，则完全不拦截（Pass-through）
-        // 这解决了 Ctrl+A, Ctrl+C 等快捷键失效的问题
-        if (ctrl || alt) && (key_code != 0x20 && key_code != 0x09) { // 排除 Ctrl+Space 和 Tab
-            let p = processor.lock().unwrap();
-            if p.buffer.is_empty() {
-                let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
-                continue;
-            }
-        }
-
-        let is_lang_toggle = {
-            let c = config.read().unwrap(); 
-            let tab_match = c.hotkeys.enable_tab_toggle && is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift);
-            let ctrl_space_match = c.hotkeys.enable_ctrl_space_toggle && (key_code == 0x20 && ctrl && !alt && !shift);
-            tab_match || ctrl_space_match
+        // 核心热键判定
+        let (enable_tab, enable_ctrl_space, switch_key) = {
+            let c = config.read().unwrap();
+            (c.hotkeys.enable_tab_toggle, c.hotkeys.enable_ctrl_space_toggle, c.hotkeys.switch_language.key.clone())
         };
-        
-        if is_lang_toggle {
+
+        let is_tab_match = enable_tab && is_hk_match(&switch_key, key_code, ctrl, alt, shift);
+        let is_ctrl_space_match = enable_ctrl_space && (key_code == 0x20 && ctrl && !alt && !shift);
+
+        if is_tab_match || is_ctrl_space_match {
             if msg_type == 1 {
                 let mut p = processor.lock().unwrap(); p.toggle();
                 let enabled = p.chinese_enabled; let short = p.get_short_display(); let profile = p.get_current_profile_display();
@@ -156,6 +148,15 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
                 update_gui_impl(&gui_tx, &processor);
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None); continue;
+        }
+
+        // Ctrl/Alt 快捷键放行逻辑 (当没输入拼音时)
+        if (ctrl || alt) && !is_ctrl_space_match {
+            let p = processor.lock().unwrap();
+            if p.buffer.is_empty() {
+                let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
+                continue;
+            }
         }
 
         let key = match key_code {

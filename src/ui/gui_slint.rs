@@ -53,6 +53,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     let random_highlight_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_random_highlight));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
     
+    // 共享颜色状态，解决随机色不更新问题
+    let current_color_shared = std::sync::Arc::new(std::sync::Mutex::new(parse_color(&config.appearance.window_highlight_color)));
+    
     let last_pos = std::sync::Arc::new(std::sync::Mutex::new((0i32, 0i32)));
     let last_pos_for_loop = last_pos.clone();
 
@@ -94,9 +97,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
         });
     }
 
-    // 使用 AtomicBool 在多线程间同步窗口可见性状态
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut current_accent_color = parse_color(&config.appearance.window_highlight_color);
 
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
@@ -107,6 +108,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let page_size_for_loop = page_size_atomic.clone();
             let last_pos_inner = last_pos_for_loop.clone();
             let was_visible_atomic = window_was_visible.clone();
+            let color_shared = current_color_shared.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -119,7 +121,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 let _ = w.window().hide();
                                 was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                             } else {
-                                // 核心优化：仅在窗口“新出现”时生成随机色
                                 if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                     if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
@@ -127,18 +128,21 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                         let r = (now % 150 + 50) as u8;
                                         let g = ((now >> 8) % 150 + 50) as u8;
                                         let b = ((now >> 16) % 150 + 50) as u8;
-                                        current_accent_color = slint::Color::from_rgb_u8(r, g, b);
+                                        let mut c = color_shared.lock().unwrap();
+                                        *c = slint::Color::from_rgb_u8(r, g, b);
                                     }
                                     was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 
-                                w.set_accent_color(current_accent_color);
-                                w.set_pinyin(SharedString::from(&pinyin));
+                                {
+                                    let c = color_shared.lock().unwrap();
+                                    w.set_accent_color(*c);
+                                }
                                 
+                                w.set_pinyin(SharedString::from(&pinyin));
                                 let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
                                 let page = (selected / page_size) * page_size;
                                 let relative_selected = (selected % page_size) as i32;
-                                
                                 let mut data_vec = Vec::new();
                                 for i in page..(page + page_size).min(candidates.len()) {
                                     let cand = &candidates[i];
@@ -154,11 +158,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     }
                                     data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
                                 }
-                                
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
-                                
                                 let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                                 if lx != 0 || ly != 0 {
                                     let mut final_x = lx; let mut final_y = ly;
@@ -184,8 +186,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             sb.set_chinese_enabled(is_active);
                             let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                             let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
-                            
-                            // 延时 1000ms 归位，让用户看清
                             slint::Timer::single_shot(std::time::Duration::from_millis(1000), move || {
                                 #[cfg(target_os = "windows")]
                                 unsafe {
@@ -231,9 +231,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                             w.set_show_translation(new_conf.appearance.show_english_translation);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
-                            current_accent_color = parse_color(&new_conf.appearance.window_highlight_color);
+                            {
+                                let mut c = color_shared.lock().unwrap();
+                                *c = parse_color(&new_conf.appearance.window_highlight_color);
+                                w.set_accent_color(*c);
+                            }
                             w.set_bg_color(parse_color(&new_conf.appearance.window_bg_color));
-                            w.set_accent_color(current_accent_color);
                             w.set_border_color(parse_color(&new_conf.appearance.window_border_color));
                             w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
                             w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color));
