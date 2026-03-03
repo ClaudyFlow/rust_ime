@@ -79,12 +79,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
                     
-                    // 初始定位到右下角
                     let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(sb) = sb_init.upgrade() {
+                        if let Some(_sb) = sb_init.upgrade() {
                             let mut work_area = windows::Win32::Foundation::RECT::default();
                             if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                                let x = work_area.right - 80; 
+                                let x = work_area.right - 100; 
                                 let y = work_area.bottom - 40;
                                 let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
                             }
@@ -95,7 +94,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
         });
     }
 
-    let mut last_pinyin_was_empty = true;
+    // 使用 AtomicBool 在多线程间同步窗口可见性状态
+    let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let mut current_accent_color = parse_color(&config.appearance.window_highlight_color);
 
     std::thread::spawn(move || {
@@ -106,17 +106,21 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let random_highlight_for_loop = random_highlight_atomic.clone();
             let page_size_for_loop = page_size_atomic.clone();
             let last_pos_inner = last_pos_for_loop.clone();
+            let was_visible_atomic = window_was_visible.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
-                            if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                            let should_be_visible = !(pinyin.is_empty() && candidates.is_empty()) && show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                            
+                            if !should_be_visible {
                                 w.set_is_visible(false);
                                 let _ = w.window().hide();
-                                last_pinyin_was_empty = true;
+                                was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                             } else {
-                                if last_pinyin_was_empty && !pinyin.is_empty() {
+                                // 核心优化：仅在窗口“新出现”时生成随机色
+                                if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                     if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
                                         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
@@ -125,13 +129,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                         let b = ((now >> 16) % 150 + 50) as u8;
                                         current_accent_color = slint::Color::from_rgb_u8(r, g, b);
                                     }
-                                    last_pinyin_was_empty = false;
+                                    was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
                                 }
+                                
                                 w.set_accent_color(current_accent_color);
                                 w.set_pinyin(SharedString::from(&pinyin));
+                                
                                 let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
                                 let page = (selected / page_size) * page_size;
                                 let relative_selected = (selected % page_size) as i32;
+                                
                                 let mut data_vec = Vec::new();
                                 for i in page..(page + page_size).min(candidates.len()) {
                                     let cand = &candidates[i];
@@ -145,15 +152,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                             stroke = parts[1].trim().to_string();
                                         } else { english = hint.clone(); }
                                     }
-                                    data_vec.push(CandidateData {
-                                        text: SharedString::from(cand),
-                                        english_aux: SharedString::from(english),
-                                        stroke_aux: SharedString::from(stroke),
-                                    });
+                                    data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
                                 }
+                                
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
+                                
                                 let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                                 if lx != 0 || ly != 0 {
                                     let mut final_x = lx; let mut final_y = ly;
@@ -179,7 +184,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             sb.set_chinese_enabled(is_active);
                             let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                             let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
-                            slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
+                            
+                            // 延时 1000ms 归位，让用户看清
+                            slint::Timer::single_shot(std::time::Duration::from_millis(1000), move || {
                                 #[cfg(target_os = "windows")]
                                 unsafe {
                                     let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
@@ -236,9 +243,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
-                            if let Some(sb) = s.upgrade() {
-                                if new_conf.appearance.show_status_bar { let _ = sb.show(); } else { let _ = sb.hide(); }
-                            }
+                            if let Some(sb) = s.upgrade() { if new_conf.appearance.show_status_bar { let _ = sb.show(); } else { let _ = sb.hide(); } }
                         }
                     }
                     GuiEvent::Exit => { let _ = slint::quit_event_loop(); }

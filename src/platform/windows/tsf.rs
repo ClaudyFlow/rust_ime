@@ -13,12 +13,7 @@ pub struct TsfHost {
 }
 
 impl TsfHost {
-    pub fn new(
-        processor: Arc<Mutex<Processor>>,
-        gui_tx: Option<Sender<GuiEvent>>,
-        config: Arc<RwLock<Config>>,
-        tray_tx: Sender<crate::ui::tray::TrayEvent>,
-    ) -> Self {
+    pub fn new(processor: Arc<Mutex<Processor>>, gui_tx: Option<Sender<GuiEvent>>, config: Arc<RwLock<Config>>, tray_tx: Sender<crate::ui::tray::TrayEvent>) -> Self {
         Self { processor, gui_tx, tray_tx, config }
     }
 }
@@ -27,26 +22,17 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
     if let Some(ref tx) = gui_tx {
         let p = processor.lock().unwrap();
         if p.buffer.is_empty() || !p.chinese_enabled { 
-            let _ = tx.send(GuiEvent::Update { 
-                pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, 
-                sentence: "".into(), cursor_pos: 0, commit_mode: p.commit_mode.clone(),
-            }); 
+            let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into(), cursor_pos: 0, commit_mode: p.commit_mode.clone() }); 
             return; 
         }
         let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
         if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
         if !p.aux_filter.is_empty() {
             let mut display_aux = String::new();
-            for (i, c) in p.aux_filter.chars().enumerate() {
-                if i == 0 { display_aux.push(c.to_ascii_uppercase()); }
-                else { display_aux.push(c.to_ascii_lowercase()); }
-            }
+            for (i, c) in p.aux_filter.chars().enumerate() { if i == 0 { display_aux.push(c.to_ascii_uppercase()); } else { display_aux.push(c.to_ascii_lowercase()); } }
             pinyin.push_str(&display_aux);
         }
-        let _ = tx.send(GuiEvent::Update { 
-            pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), 
-            selected: p.selected, sentence: p.joined_sentence.clone(), cursor_pos: p.cursor_pos, commit_mode: p.commit_mode.clone(),
-        });
+        let _ = tx.send(GuiEvent::Update { pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), selected: p.selected, sentence: p.joined_sentence.clone(), cursor_pos: p.cursor_pos, commit_mode: p.commit_mode.clone() });
     }
 }
 
@@ -61,16 +47,11 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
         info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
         if GetGUIThreadInfo(0, &mut info).is_ok() {
             let mut pt = POINT { x: info.rcCaret.left, y: info.rcCaret.bottom };
-            let hwnd = if info.hwndCaret.0 != 0 { info.hwndCaret } else {
-                let focus = GetFocus(); if focus.0 != 0 { focus } else { GetForegroundWindow() }
-            };
+            let hwnd = if info.hwndCaret.0 != 0 { info.hwndCaret } else { let focus = GetFocus(); if focus.0 != 0 { focus } else { GetForegroundWindow() } };
             if hwnd.0 != 0 { let _ = ClientToScreen(hwnd, &mut pt); if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y)); } }
         }
         let mut pt = POINT::default();
-        if GetCaretPos(&mut pt).is_ok() {
-            let hwnd = GetForegroundWindow();
-            if hwnd.0 != 0 { let _ = ClientToScreen(hwnd, &mut pt); if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y + 20)); } }
-        }
+        if GetCaretPos(&mut pt).is_ok() { let hwnd = GetForegroundWindow(); if hwnd.0 != 0 { let _ = ClientToScreen(hwnd, &mut pt); if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y + 20)); } } }
     }
     None
 }
@@ -89,10 +70,7 @@ impl InputMethodHost for TsfHost {
             use windows::Win32::Security::*;
             let pipe_name_w = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
             let mut sd = SECURITY_DESCRIPTOR::default();
-            unsafe {
-                let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), 1);
-                let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false);
-            }
+            unsafe { let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), 1); let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false); }
             let sd_ptr = &sd as *const _ as usize; 
             let processor = self.processor.clone(); let gui_tx = self.gui_tx.clone(); let tray_tx = self.tray_tx.clone(); let config = self.config.clone();
             for _i in 0..3 {
@@ -104,8 +82,8 @@ impl InputMethodHost for TsfHost {
                             let h = CreateNamedPipeW(PCWSTR(pipe_name_u16.as_ptr()), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
                             if h.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
                             let connect_res = ConnectNamedPipe(h, None);
-                            let already_connected = connect_res.is_err() && connect_res.as_ref().err().unwrap().code() == windows::Win32::Foundation::WIN32_ERROR(997).to_hresult(); // ERROR_IO_PENDING or similar, but simplified here
-                            if connect_res.is_ok() || already_connected {
+                            // 如果成功连接，或者客户端已经连上了
+                            if connect_res.is_ok() || connect_res.err().map_or(false, |e| e.code() == windows::Win32::Foundation::ERROR_PIPE_CONNECTED.to_hresult()) {
                                 let pi = p.clone(); let gi = g.clone(); let ti = t.clone(); let ci = c.clone();
                                 std::thread::spawn(move || { handle_client(h, pi, gi, ti, ci); let _ = CloseHandle(h); });
                             } else { let _ = CloseHandle(h); }
@@ -131,22 +109,14 @@ fn is_hk_match(config_key: &str, pressed_key_code: u32, ctrl: bool, alt: bool, s
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn handle_client(
-    handle: windows::Win32::Foundation::HANDLE, 
-    processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>,
-    gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>,
-    tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>,
-    config: Arc<RwLock<Config>>,
-) {
+unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>, gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>, tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>, config: Arc<RwLock<Config>>) {
     use windows::Win32::Storage::FileSystem::*;
     use crate::engine::processor::Action;
-    
     let mut buffer = [0u8; 1024];
     loop {
         let mut bytes_read = 0;
         if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 { break; }
         if bytes_read < 6 { continue; }
-        
         let msg_type = buffer[0];
         let key_code = u32::from_le_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]);
         let modifiers = buffer[5];
@@ -157,6 +127,16 @@ unsafe fn handle_client(
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
             if x == 0 && y == 0 { if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; } }
             if (x != 0 || y != 0) && gui_tx.is_some() { let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y }); }
+        }
+
+        // 核心修复：如果按下了 Ctrl 或 Alt，且此时没有正在输入拼音，则完全不拦截（Pass-through）
+        // 这解决了 Ctrl+A, Ctrl+C 等快捷键失效的问题
+        if (ctrl || alt) && (key_code != 0x20 && key_code != 0x09) { // 排除 Ctrl+Space 和 Tab
+            let p = processor.lock().unwrap();
+            if p.buffer.is_empty() {
+                let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
+                continue;
+            }
         }
 
         let is_lang_toggle = {
@@ -181,12 +161,7 @@ unsafe fn handle_client(
         let key = match key_code {
             0x41..=0x5A => crate::engine::keys::VirtualKey::from_u32(key_code - 0x41),
             0x30..=0x39 => crate::engine::keys::VirtualKey::from_u32(key_code - 0x30 + 26),
-            0x20 => Some(crate::engine::keys::VirtualKey::Space),
-            0x08 => Some(crate::engine::keys::VirtualKey::Backspace),
-            0x0D => Some(crate::engine::keys::VirtualKey::Enter),
-            0x1B => Some(crate::engine::keys::VirtualKey::Esc),
-            0x14 => Some(crate::engine::keys::VirtualKey::CapsLock),
-            0x09 => Some(crate::engine::keys::VirtualKey::Tab),
+            0x20 => Some(crate::engine::keys::VirtualKey::Space), 0x08 => Some(crate::engine::keys::VirtualKey::Backspace), 0x0D => Some(crate::engine::keys::VirtualKey::Enter), 0x1B => Some(crate::engine::keys::VirtualKey::Esc), 0x14 => Some(crate::engine::keys::VirtualKey::CapsLock), 0x09 => Some(crate::engine::keys::VirtualKey::Tab),
             0x25 => Some(crate::engine::keys::VirtualKey::Left), 0x26 => Some(crate::engine::keys::VirtualKey::Up), 0x27 => Some(crate::engine::keys::VirtualKey::Right), 0x28 => Some(crate::engine::keys::VirtualKey::Down),
             0xBB => Some(crate::engine::keys::VirtualKey::Equal), 0xBD => Some(crate::engine::keys::VirtualKey::Minus), 0xBC => Some(crate::engine::keys::VirtualKey::Comma), 0xBE => Some(crate::engine::keys::VirtualKey::Dot), 0xBF => Some(crate::engine::keys::VirtualKey::Slash),
             0xBA => Some(crate::engine::keys::VirtualKey::Semicolon), 0xDE => Some(crate::engine::keys::VirtualKey::Apostrophe), 0xDB => Some(crate::engine::keys::VirtualKey::LeftBrace), 0xDD => Some(crate::engine::keys::VirtualKey::RightBrace), 0xDC => Some(crate::engine::keys::VirtualKey::Backslash), 0xC0 => Some(crate::engine::keys::VirtualKey::Grave),
@@ -197,24 +172,13 @@ unsafe fn handle_client(
             let mut response = Vec::new();
             if msg_type == 1 || msg_type == 3 {
                 let mut p = processor.lock().unwrap();
-                let val = if msg_type == 1 { 1 } else { 0 };
-                let action = p.handle_key(key, val, shift);
+                let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift);
                 drop(p);
-                
                 match action {
                     Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor); }
-                    Action::DeleteAndEmit { delete, insert } => { 
-                        if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); }
-                        response.extend_from_slice(insert.as_bytes()); 
-                        update_gui_impl(&gui_tx, &processor);
-                    }
+                    Action::DeleteAndEmit { delete, insert } => { if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); } response.extend_from_slice(insert.as_bytes()); update_gui_impl(&gui_tx, &processor); }
                     Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor); }
-                    Action::Alert => {
-                        use windows::Win32::Media::Audio::*;
-                        let sound_path = crate::find_project_root().join("sounds/beep.wav");
-                        if sound_path.exists() { let path_w = windows::core::HSTRING::from(sound_path.to_string_lossy().as_ref()); let _ = PlaySoundW(windows::core::PCWSTR(path_w.as_ptr()), None, SND_FILENAME | SND_ASYNC | SND_NODEFAULT); }
-                        response.push(2); update_gui_impl(&gui_tx, &processor);
-                    }
+                    Action::Alert => { response.push(2); update_gui_impl(&gui_tx, &processor); }
                     Action::Notify(summary, _body) => {
                         let (active, profile) = { let p = processor.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
                         if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active)); }
@@ -227,13 +191,11 @@ unsafe fn handle_client(
             } else {
                 let p = processor.lock().unwrap();
                 let is_letter = key_code >= 0x41 && key_code <= 0x5A;
-                let is_special_intercept = key_code == 0x14;
-                let is_punctuation = match key_code { 0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true, 0x30..=0x39 if shift => true, _ => false };
-                if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punctuation || is_special_intercept) { response.push(2); } else { response.push(0); }
+                let is_special = key_code == 0x14;
+                let is_punct = match key_code { 0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true, 0x30..=0x39 if shift => true, _ => false };
+                if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punct || is_special) { response.push(2); } else { response.push(0); }
             }
             let _ = WriteFile(handle, Some(&response), Some(&mut 0), None);
-        } else {
-            let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
-        }
+        } else { let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None); }
     }
 }
