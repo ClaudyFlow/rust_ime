@@ -50,6 +50,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     window.set_candidate_font_weight(config.appearance.candidate_text.font_weight as i32);
 
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
+    let show_status_bar_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_status_bar));
     let random_highlight_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_random_highlight));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
     
@@ -104,6 +105,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
+            let show_status_bar_for_loop = show_status_bar_atomic.clone();
             let random_highlight_for_loop = random_highlight_atomic.clone();
             let page_size_for_loop = page_size_atomic.clone();
             let last_pos_inner = last_pos_for_loop.clone();
@@ -184,6 +186,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         if let Some(sb) = s.upgrade() {
                             sb.set_status_text(SharedString::from(status.clone()));
                             sb.set_chinese_enabled(is_active);
+                            // 核心修改：如果是非激活状态（切换到了别的输入法），或者配置禁用了状态栏，则隐藏
+                            let show_sb = is_active && show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                            if show_sb { let _ = sb.window().show(); } else { let _ = sb.window().hide(); }
+
                             let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                             let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
                             slint::Timer::single_shot(std::time::Duration::from_millis(1000), move || {
@@ -224,6 +230,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     }
                     GuiEvent::ApplyConfig(new_conf) => {
                         show_candidates_for_loop.store(new_conf.appearance.show_candidates, std::sync::atomic::Ordering::SeqCst);
+                        show_status_bar_for_loop.store(new_conf.appearance.show_status_bar, std::sync::atomic::Ordering::SeqCst);
                         random_highlight_for_loop.store(new_conf.appearance.enable_random_highlight, std::sync::atomic::Ordering::SeqCst);
                         page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
                         if let Some(w) = h.upgrade() {
@@ -246,7 +253,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
-                            if let Some(sb) = s.upgrade() { if new_conf.appearance.show_status_bar { let _ = sb.show(); } else { let _ = sb.hide(); } }
+                            if let Some(sb) = s.upgrade() {
+                                if new_conf.appearance.show_status_bar { let _ = sb.show(); } else { let _ = sb.hide(); } 
+                            }
                         }
                     }
                     GuiEvent::Exit => { let _ = slint::quit_event_loop(); }
