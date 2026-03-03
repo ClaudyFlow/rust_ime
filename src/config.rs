@@ -212,7 +212,6 @@ impl Config {
     }
 
     fn get_config_dir() -> std::path::PathBuf {
-        // 寻找根目录：优先找包含 dicts 的目录
         let mut curr = std::env::current_exe().ok()
             .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
@@ -282,47 +281,19 @@ impl Config {
                 aux_mode: AuxMode::English,
                 candidate_anchor: "bottom".to_string(),
                 candidate_layout: "horizontal".to_string(),
-                
                 corner_radius: 10.0,
-                window_bg_color: "#efefef".to_string(),
+                window_bg_color: "#ffffff".to_string(),
                 window_highlight_color: "#0969da".to_string(),
-                window_border_color: "rgba(0, 0, 0, 0.2)".to_string(),
+                window_border_color: "rgba(0, 0, 0, 0.1)".to_string(),
                 window_padding_x: 18,
                 window_padding_y: 14,
                 item_spacing: 16.0,
                 row_spacing: 8.0,
-
                 theme_mode: "auto".to_string(),
-
-                pinyin_text: TextStyle {
-                    font_family: "".to_string(),
-                    font_size: 18,
-                    font_weight: 400,
-                    color: "#586069".to_string(),
-                    alpha: 1.0,
-                },
-                candidate_text: TextStyle {
-                    font_family: "".to_string(),
-                    font_size: 18,
-                    font_weight: 600,
-                    color: "#24292e".to_string(),
-                    alpha: 1.0,
-                },
-                hint_text: TextStyle {
-                    font_family: "".to_string(),
-                    font_size: 14,
-                    font_weight: 400,
-                    color: "#6e7781".to_string(),
-                    alpha: 0.8,
-                },
-                comment_text: TextStyle {
-                    font_family: "".to_string(),
-                    font_size: 12,
-                    font_weight: 400,
-                    color: "#0969da".to_string(),
-                    alpha: 0.7,
-                },
-
+                pinyin_text: TextStyle { font_family: "".to_string(), font_size: 18, font_weight: 400, color: "#586069".to_string(), alpha: 1.0 },
+                candidate_text: TextStyle { font_family: "".to_string(), font_size: 18, font_weight: 600, color: "#24292e".to_string(), alpha: 1.0 },
+                hint_text: TextStyle { font_family: "".to_string(), font_size: 14, font_weight: 400, color: "#6e7781".to_string(), alpha: 0.8 },
+                comment_text: TextStyle { font_family: "".to_string(), font_size: 12, font_weight: 400, color: "#0969da".to_string(), alpha: 0.7 },
                 preview_mode: "pinyin".to_string(),
                 show_english_aux: true,
                 show_english_translation: false,
@@ -354,7 +325,7 @@ impl Config {
                     ("~", "~"), ("`", "`"), ("@", "@"), ("#", "#"), ("$", "$"), ("%", "%"),
                     ("^", "^"), ("&", "&"), ("*", "*"), ("-", "-"), ("_", "_"), ("=", "="), ("+", "+")
                 ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
-                punctuations: std::collections::HashMap::new(), // Will be populated or loaded
+                punctuations: std::collections::HashMap::new(),
                 keyboard_layouts: std::collections::HashMap::new(),
                 auto_commit_unique_en_fuzhuma: false,
                 auto_commit_unique_full_match: false,
@@ -381,9 +352,7 @@ impl Config {
                 enable_double_pinyin: false,
                 double_pinyin_scheme: DoublePinyinScheme {
                     name: "小鹤双拼".to_string(),
-                    initials: [
-                        ("v", "zh"), ("u", "sh"), ("i", "ch")
-                    ].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+                    initials: [("v", "zh"), ("u", "sh"), ("i", "ch")].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
                     rimes: [
                         ("p", "ie"), ("b", "in"), ("m", "ian"),  ("q", "iu"),
                         ("r", "uan"), ("x", "ia"), ("k", "ao"), ("f", "en"),
@@ -404,12 +373,10 @@ impl Config {
                 enable_tab_toggle: true,
                 enable_ctrl_space_toggle: false,
             },
-
         }
     }
 }
 
-#[allow(dead_code)]
 pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
     let mut combinations = Vec::new();
     for combo_str in s.split('|') {
@@ -431,7 +398,6 @@ pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
     combinations
 }
 
-#[allow(dead_code)]
 fn string_to_key(s: &str) -> Option<evdev::Key> {
     match s {
         "ctrl" | "lctrl" | "rctrl" => Some(evdev::Key::KEY_LEFTCTRL),

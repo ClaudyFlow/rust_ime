@@ -300,6 +300,10 @@ impl Processor {
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
+        
+        // 确保随机高亮的状态虽然由 GUI 处理，但 Processor 也持有配置副本
+        // 这里不需要显式逻辑，因为字段会在下一行同步 (如果 Processor 有对应字段的话)
+
         self.anti_typo_mode = conf.input.anti_typo_mode;
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
