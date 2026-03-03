@@ -12,6 +12,7 @@ component CandidateItem inherits Rectangle {
     in property <int> index;
     in property <bool> show_english_aux;
     in property <bool> show_stroke_aux;
+    in property <bool> show_translation; // 新增：独立控制翻译显示
     in property <bool> is_horizontal;
     
     in property <color> accent_color;
@@ -58,7 +59,8 @@ component CandidateItem inherits Rectangle {
             vertical-alignment: center;
         }
 
-        if show_english_aux && english_aux != "" : Text {
+        // 只要开启了显示翻译或者辅助码开关，且内容不为空，就显示
+        if (show_english_aux || show_translation) && english_aux != "" : Text {
             text: english_aux;
             color: selected ? aux_highlight_color : aux_text_color;
             font-size: font_size * 0.7;
@@ -77,6 +79,7 @@ export component CandidateWindow inherits Window {
     in property <bool> is_horizontal: true;
     in property <bool> show_english_aux: true;
     in property <bool> show_stroke_aux: true;
+    in property <bool> show_translation: true; // 新增
     
     in property <length> pinyin_font_size: 14px;
     in property <string> pinyin_font_family: "";
@@ -139,6 +142,7 @@ export component CandidateWindow inherits Window {
                     is_horizontal: true;
                     show_english_aux: show_english_aux;
                     show_stroke_aux: show_stroke_aux;
+                    show_translation: show_translation; // 传递
                     accent_color: accent_color;
                     text_color: text_color;
                     highlight_text_color: highlight_text_color;
@@ -162,6 +166,7 @@ export component CandidateWindow inherits Window {
                     is_horizontal: false;
                     show_english_aux: show_english_aux;
                     show_stroke_aux: show_stroke_aux;
+                    show_translation: show_translation; // 传递
                     accent_color: accent_color;
                     text_color: text_color;
                     highlight_text_color: highlight_text_color;

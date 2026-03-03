@@ -22,21 +22,17 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
     // 初始设置
     window.set_show_english_aux(config.appearance.show_english_aux);
     window.set_show_stroke_aux(config.appearance.show_stroke_aux);
+    window.set_show_translation(config.appearance.show_english_translation);
     window.set_is_horizontal(config.appearance.candidate_layout == "horizontal");
     
-    // 颜色与样式初始化
     let parse_color = |s: &str| -> slint::Color {
-        if s.starts_with('#') {
-            if s.len() == 7 { // #RRGGBB
-                let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
-                let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
-                let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
-                slint::Color::from_rgb_u8(r, g, b)
-            } else {
-                slint::Color::from_rgb_u8(255, 255, 255)
-            }
+        if s.starts_with('#') && s.len() == 7 {
+            let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
+            let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
+            let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
+            slint::Color::from_rgb_u8(r, g, b)
         } else {
-            slint::Color::from_rgb_u8(255, 255, 255)
+            slint::Color::from_rgb_u8(9, 105, 218)
         }
     };
 
@@ -81,17 +77,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0;
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
-                    
-                    let mut work_area = windows::Win32::Foundation::RECT::default();
-                    if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                        let x = work_area.right - 60; 
-                        let y = work_area.bottom - 40;
-                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
-                    }
                 }
             }
         });
     }
+
+    // 追踪拼音变化，用于降低随机色更新频率
+    let mut last_pinyin_was_empty = true;
+    let mut current_accent_color = parse_color(&config.appearance.window_highlight_color);
 
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
@@ -109,8 +102,24 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                 w.set_is_visible(false);
                                 let _ = w.window().hide();
+                                last_pinyin_was_empty = true; // 重置状态
                             } else {
-                                w.set_pinyin(SharedString::from(pinyin));
+                                // 核心优化：仅在开始输入新词时才生成随机色
+                                if last_pinyin_was_empty && !pinyin.is_empty() {
+                                    if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                                        use std::time::{SystemTime, UNIX_EPOCH};
+                                        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+                                        let r = (now % 150 + 50) as u8;
+                                        let g = ((now >> 8) % 150 + 50) as u8;
+                                        let b = ((now >> 16) % 150 + 50) as u8;
+                                        current_accent_color = slint::Color::from_rgb_u8(r, g, b);
+                                    }
+                                    last_pinyin_was_empty = false;
+                                }
+                                
+                                w.set_accent_color(current_accent_color);
+                                w.set_pinyin(SharedString::from(&pinyin));
+                                
                                 let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
                                 let page = (selected / page_size) * page_size;
                                 let relative_selected = (selected % page_size) as i32;
@@ -137,15 +146,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     });
                                 }
                                 
-                                if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
-                                    use std::time::{SystemTime, UNIX_EPOCH};
-                                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-                                    let r = (now % 150 + 50) as u8;
-                                    let g = ((now >> 8) % 150 + 50) as u8;
-                                    let b = ((now >> 16) % 150 + 50) as u8;
-                                    w.set_accent_color(slint::Color::from_rgb_u8(r, g, b));
-                                }
-
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
@@ -160,15 +160,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     #[cfg(target_os = "windows")]
                                     unsafe {
                                         let win_size = w.window().size();
-                                        let width = win_size.width as i32;
-                                        let height = win_size.height as i32;
                                         let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x: lx, y: ly }, MONITOR_DEFAULTTONEAREST);
                                         let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
                                         if GetMonitorInfoW(monitor, &mut mi).as_bool() {
-                                            if final_x + width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - width - 10; }
-                                            if final_y + height > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - height - 10; }
-                                            if final_x < mi.rcMonitor.left { final_x = mi.rcMonitor.left + 5; }
-                                            if final_y < mi.rcMonitor.top { final_y = mi.rcMonitor.top + 5; }
+                                            if final_x + win_size.width as i32 > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_size.width as i32 - 10; }
+                                            if final_y + win_size.height as i32 > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - win_size.height as i32 - 10; }
                                         }
                                     }
                                     let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
@@ -186,7 +182,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                 (pos.0, pos.1)
                             };
                             let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
-                            slint::Timer::single_shot(std::time::Duration::from_millis(1200), move || {
+                            
+                            slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
                                 #[cfg(target_os = "windows")]
                                 unsafe {
                                     let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
@@ -194,7 +191,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     if s_hwnd.0 != 0 {
                                         let mut work_area = windows::Win32::Foundation::RECT::default();
                                         if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                                            let x = work_area.right - sb.window().size().width as i32 - 20;
+                                            let win_width = sb.window().size().width as i32;
+                                            let x = work_area.right - win_width - 20;
                                             let y = work_area.bottom - 40;
                                             let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
                                         }
@@ -211,12 +209,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             #[cfg(target_os = "windows")]
                             unsafe {
                                 let win_size = w.window().size();
-                                let width = win_size.width as i32; let height = win_size.height as i32;
                                 let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x, y }, MONITOR_DEFAULTTONEAREST);
                                 let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
                                 if GetMonitorInfoW(monitor, &mut mi).as_bool() {
-                                    if final_x + width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - width - 10; }
-                                    if final_y + height > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - height - 10; }
+                                    if final_x + win_size.width as i32 > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_size.width as i32 - 10; }
+                                    if final_y + win_size.height as i32 > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - win_size.height as i32 - 10; }
                                 }
                             }
                             let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
@@ -229,17 +226,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
+                            w.set_show_translation(new_conf.appearance.show_english_translation);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
-                            let parse_color = |s: &str| -> slint::Color {
-                                if s.starts_with('#') && s.len() == 7 {
-                                    let r = u8::from_str_radix(&s[1..3], 16).unwrap_or(255);
-                                    let g = u8::from_str_radix(&s[3..5], 16).unwrap_or(255);
-                                    let b = u8::from_str_radix(&s[5..7], 16).unwrap_or(255);
-                                    slint::Color::from_rgb_u8(r, g, b)
-                                } else { slint::Color::from_rgb_u8(255, 255, 255) }
-                            };
+                            current_accent_color = parse_color(&new_conf.appearance.window_highlight_color);
                             w.set_bg_color(parse_color(&new_conf.appearance.window_bg_color));
-                            w.set_accent_color(parse_color(&new_conf.appearance.window_highlight_color));
+                            w.set_accent_color(current_accent_color);
                             w.set_border_color(parse_color(&new_conf.appearance.window_border_color));
                             w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
                             w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color));
