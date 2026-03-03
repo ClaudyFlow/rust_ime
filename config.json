@@ -20,6 +20,7 @@
     "show_candidates": true,
     "show_status_bar": true,
     "show_english_translation": true,
+    "enable_random_highlight": true,
     "page_size": 5,
     "show_tone_hint": false,
     "show_en_hint": true,

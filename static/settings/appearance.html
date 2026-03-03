@@ -28,6 +28,10 @@
                     <label class="switch"><input type="checkbox" id="show_english_translation"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
+                    <div class="info"><div class="title">随机高亮颜色</div><div class="desc">每次选词时随机变换选中项的背景色</div></div>
+                    <label class="switch"><input type="checkbox" id="enable_random_highlight"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
                     <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数 (1-10)。</div></div>
                     <input type="number" id="page_size" min="1" max="10" step="1" style="width: 80px;">
                 </div>
@@ -156,6 +160,7 @@
             bindInput('show_candidates', 'appearance');
             bindInput('show_status_bar', 'appearance');
             bindInput('show_english_translation', 'appearance');
+            bindInput('enable_random_highlight', 'appearance');
             bindInput('aux_mode', 'appearance');
             bindInput('candidate_anchor', 'appearance');
             bindInput('candidate_layout', 'appearance');

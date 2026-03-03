@@ -27,7 +27,6 @@ component CandidateItem inherits Rectangle {
     background: selected ? accent_color : transparent;
     border-radius: 4px;
     
-    // 内部布局根据外部是横还是纵来调整
     layout := HorizontalLayout {
         padding-left: 8px; padding-right: 8px; 
         padding-top: 6px; padding-bottom: 6px;
@@ -47,7 +46,6 @@ component CandidateItem inherits Rectangle {
             color: selected ? highlight_text_color : text_color; 
             vertical-alignment: center; 
             font-size: font_size;
-            // 优先 Segoe UI Emoji 以尝试获取彩色效果，虽然受限于渲染器，但这能确保 fallback 路径正确
             font-family: font_family != "" ? font_family : "Segoe UI Emoji, Microsoft YaHei, Segoe UI, system-ui";
             font-weight: font_weight; 
         }
@@ -86,28 +84,27 @@ export component CandidateWindow inherits Window {
     in property <length> candidate_font_size: 18px;
     in property <string> candidate_font_family: "";
     in property <int> candidate_font_weight: 400;
-
-    no-frame: true;
-    background: transparent;
-    always-on-top: true;
     
-    // 自动宽高
-    width: main_rect.preferred-width;
-    height: main_rect.preferred-height;
-
-    property <length> border_radius: 6px;
+    in property <length> win_border_radius: 6px;
+    in property <color> accent_color: #0969da;
     in property <color> bg_color: #ffffff;
-    in property <color> accent_color: #3498db;
     in property <color> border_color: #dcdde1;
     in property <color> text_color: #2c3e50;
     in property <color> highlight_text_color: #ffffff;
     in property <color> aux_text_color: #95a5a6;
     in property <color> aux_highlight_color: #dcdde1;
 
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+    
+    width: main_rect.preferred-width;
+    height: main_rect.preferred-height;
+
     main_rect := Rectangle {
         visible: is_visible;
         background: bg_color;
-        border-radius: border_radius;
+        border-radius: win_border_radius;
         border-width: 1px;
         border-color: border_color;
         drop-shadow-blur: 10px;
@@ -118,7 +115,6 @@ export component CandidateWindow inherits Window {
             spacing: 4px;
             alignment: start;
 
-            // 第一行：拼音
             if pinyin != "" : HorizontalLayout {
                 padding-left: 8px;
                 padding-top: 2px;
@@ -132,7 +128,6 @@ export component CandidateWindow inherits Window {
                 }
             }
 
-            // 第二行：候选词（横向排列）或 垂直列表
             if is_horizontal : HorizontalLayout {
                 spacing: 4px;
                 for cand[i] in candidates : CandidateItem {
