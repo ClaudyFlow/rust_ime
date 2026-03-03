@@ -63,6 +63,7 @@ pub struct Processor {
     
     pub show_candidates: bool,
     pub show_english_translation: bool,
+    pub show_stroke_aux: bool,
     pub show_modern_candidates: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
@@ -207,6 +208,7 @@ impl Processor {
             joined_sentence: String::new(),
             show_candidates: true,
             show_english_translation: true,
+            show_stroke_aux: true,
             show_modern_candidates: false,
 
             phantom_mode,
@@ -294,6 +296,7 @@ impl Processor {
         }
         self.show_candidates = conf.appearance.show_candidates;
         self.show_english_translation = conf.appearance.show_english_translation;
+        self.show_stroke_aux = conf.appearance.show_stroke_aux;
         self.page_size = conf.appearance.page_size;
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
@@ -1439,31 +1442,27 @@ impl Processor {
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
             
-            // 英文翻译显示支持：如果开启了开关且数据不为空，
-            // 或者当前处于纯英文方案模式下（此时 en 通常是中文翻译，用户默认希望看到）
+            // 英文翻译显示支持
             let is_pure_english = self.active_profiles.len() == 1 && self.active_profiles[0] == "english";
             if !en.is_empty() && (self.show_english_translation || is_pure_english) {
                 if !h.is_empty() { h.push(' '); }
                 h.push_str(&en);
             }
 
+            // 笔画辅助码显示支持 (显式开关 或 辅码模式为 Stroke)
+            if !stroke_aux.is_empty() && (self.show_stroke_aux || self.aux_mode == AuxMode::Stroke) {
+                if !h.is_empty() { h.push(' '); }
+                h.push_str(&get_stroke_desc(&stroke_aux));
+            }
+
             match self.aux_mode {
                 AuxMode::English => {
-                    // 如果 show_english_translation 没开，或者 en 为空，这里可能还想根据 aux_mode 再次确认显示 (通常 en 就是翻译)
-                    // 但为了避免重复，如果上面已经显示了，这里就不重复加了。
-                    // 这里的 en 在拼音模式下是辅码，在英文模式下是翻译。
                     if !self.show_english_translation && !is_pure_english && !en.is_empty() {
                         if !h.is_empty() { h.push(' '); }
                         h.push_str(&en);
                     }
                 }
-                AuxMode::Stroke => {
-                    if !stroke_aux.is_empty() {
-                        if !h.is_empty() { h.push(' '); }
-                        h.push_str(&get_stroke_desc(&stroke_aux));
-                    }
-                }
-                AuxMode::None => {}
+                _ => {}
             }
             self.candidate_hints.push(h);
         }
