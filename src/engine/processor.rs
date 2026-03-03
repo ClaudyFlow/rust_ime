@@ -1362,6 +1362,20 @@ impl Processor {
                         if let Some(d) = self.tries.get(profile) {
                             let m = d.search_abbreviation(&modified_segments, &self.syllables, 500);
                             for (w, tr, t, e, s, weight) in m {
+                                // 简拼模式也需要应用辅助码过滤
+                                let last_part = raw_parsed.last();
+                                
+                                // 笔画辅助码过滤
+                                if let Some(ref aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
+                                    if !s.to_lowercase().starts_with(&aux.to_lowercase()) { continue; }
+                                }
+                                
+                                // 英文辅助码过滤
+                                if let Some(ref aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
+                                    let aux_lower = aux.to_lowercase();
+                                    if !e.to_lowercase().split(',').any(|part| part.trim().starts_with(&aux_lower)) { continue; }
+                                }
+
                                 if seen.insert(w.clone()) { 
                                     final_matches.push((w, tr, t, e, s, weight, 2)); // Level 2 for Abbrev
                                 }
