@@ -46,7 +46,7 @@ component CandidateItem inherits Rectangle {
             vertical-alignment: center; 
             font-size: font_size;
             // 优先 Segoe UI Emoji 以尝试获取彩色效果，虽然受限于渲染器，但这能确保 fallback 路径正确
-            font-family: font_family != "" ? font_family : "Segoe UI Emoji, Noto Sans SC, Microsoft YaHei";
+            font-family: font_family != "" ? font_family : "Segoe UI Emoji, Microsoft YaHei, Segoe UI, system-ui";
             font-weight: 600; 
         }
         
