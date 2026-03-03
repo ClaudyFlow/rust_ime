@@ -16,6 +16,14 @@
             <h2>候选框显示</h2>
             <div class="grid-2">
                 <div class="setting-item">
+                    <div class="info"><div class="title">主题模式</div><div class="desc">选择候选栏的配色方案</div></div>
+                    <select id="theme_mode">
+                        <option value="light">浅色 (Light)</option>
+                        <option value="dark">深色 (Dark)</option>
+                        <option value="auto">跟随系统 (Auto)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
                     <div class="info"><div class="title">显示候选窗口</div><div class="desc">控制拼写时是否出现选词框</div></div>
                     <label class="switch"><input type="checkbox" id="show_candidates"><span class="slider"></span></label>
                 </div>
@@ -146,6 +154,7 @@
             await loadConfig();
             
             // 绑定基础设置
+            bindInput('theme_mode', 'appearance');
             bindInput('show_candidates', 'appearance');
             bindInput('show_status_bar', 'appearance');
             bindInput('show_english_translation', 'appearance');

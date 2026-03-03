@@ -52,6 +52,8 @@ pub struct Appearance {
     pub item_spacing: f32,
     pub row_spacing: f32,
 
+    pub theme_mode: String, // "light", "dark", "auto"
+
     // Text Styles
     pub pinyin_text: TextStyle,
     pub candidate_text: TextStyle,
@@ -189,6 +191,26 @@ pub struct Hotkey {
 }
 
 impl Config {
+    pub fn apply_theme(&mut self, dark: bool) {
+        if dark {
+            // 深色主题
+            self.appearance.window_bg_color = "#1e1e1e".to_string();
+            self.appearance.window_highlight_color = "#0078d4".to_string();
+            self.appearance.window_border_color = "rgba(255, 255, 255, 0.15)".to_string();
+            self.appearance.pinyin_text.color = "#bbbbbb".to_string();
+            self.appearance.candidate_text.color = "#eeeeee".to_string();
+            self.appearance.hint_text.color = "#888888".to_string();
+        } else {
+            // 浅色主题
+            self.appearance.window_bg_color = "#ffffff".to_string();
+            self.appearance.window_highlight_color = "#0969da".to_string();
+            self.appearance.window_border_color = "rgba(0, 0, 0, 0.1)".to_string();
+            self.appearance.pinyin_text.color = "#586069".to_string();
+            self.appearance.candidate_text.color = "#24292e".to_string();
+            self.appearance.hint_text.color = "#6e7781".to_string();
+        }
+    }
+
     pub fn load() -> Self {
         let root = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()).unwrap_or_else(|_| std::path::PathBuf::from("."));
         let config_dir = root.join("configs");
@@ -258,6 +280,8 @@ impl Config {
                 window_padding_y: 14,
                 item_spacing: 16.0,
                 row_spacing: 8.0,
+
+                theme_mode: "auto".to_string(),
 
                 pinyin_text: TextStyle {
                     font_family: "".to_string(),

@@ -406,7 +406,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
                 }
                 ui::tray::TrayEvent::ReloadConfig => {
-                    let new_conf = Config::load();
+                    let mut new_conf = Config::load();
+
+                    // 应用主题逻辑
+                    match new_conf.appearance.theme_mode.as_str() {
+                        "dark" => new_conf.apply_theme(true),
+                        "light" => new_conf.apply_theme(false),
+                        "auto" => {
+                            #[cfg(target_os = "windows")]
+                            let is_dark = platform::windows::is_system_dark_mode();
+                            #[cfg(not(target_os = "windows"))]
+                            let is_dark = false;
+                            new_conf.apply_theme(is_dark);
+                        }
+                        _ => {}
+                    }
+
                     let enabled = {
                         let mut p = processor_clone.lock().unwrap();
                         p.apply_config(&new_conf);
