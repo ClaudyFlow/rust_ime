@@ -20,14 +20,13 @@ if (Test-Path "target/release/rust_ime_tsf_v3.dll") {
 }
 
 # 4. Copy resource files
-$Resources = @("dicts", "static", "fonts", "sounds", "data", "picture")
+$Resources = @("dicts", "static", "fonts", "sounds", "data", "picture", "configs")
 foreach ($Res in $Resources) {
     if (Test-Path $Res) { 
         Copy-Item -Recurse $Res $ReleaseDir 
     }
 }
 
-if (Test-Path "config.json") { Copy-Item "config.json" $ReleaseDir }
 Copy-Item "INSTALL_GUIDE.md" $ReleaseDir
 Copy-Item "INSTALL_GUIDE_ZH.md" $ReleaseDir
 
