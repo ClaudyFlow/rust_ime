@@ -648,12 +648,12 @@ impl Processor {
         self.single_quote_open = false;
     }
 
-    pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool) -> Action {
+    pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool, ctrl_pressed: bool, alt_pressed: bool) -> Action {
         let now = Instant::now();
         let is_press = val == 1;
 
         // 特殊处理切换键：即使在英文模式下也要能切换回中文
-        if key == VirtualKey::Tab && is_press && self.buffer.is_empty() {
+        if key == VirtualKey::Tab && is_press && self.buffer.is_empty() && !ctrl_pressed && !alt_pressed {
             return self.toggle();
         }
 
@@ -662,6 +662,25 @@ impl Processor {
         }
         let is_repeat = val == 2;
         let is_release = val == 0;
+
+        // --- 新增：Ctrl + 标点符号 -> 强制输出英文标点 ---
+        if is_press && ctrl_pressed && !alt_pressed {
+            if let Some(p_key) = get_punctuation_key(key, shift_pressed) {
+                // 如果当前有输入缓冲区，先上屏首位
+                let mut commit_text = if !self.joined_sentence.is_empty() { 
+                    self.joined_sentence.trim_end().to_string() 
+                } else if !self.candidates.is_empty() { 
+                    self.candidates[0].trim_end().to_string() 
+                } else { 
+                    self.buffer.trim_end().to_string() 
+                };
+                commit_text.push_str(p_key); // 英文标点直接用 p_key
+                let del_len = self.phantom_text.chars().count();
+                self.clear_composing();
+                self.commit_history.clear(); 
+                return Action::DeleteAndEmit { delete: del_len, insert: commit_text };
+            }
+        }
 
         // 处理长按逻辑
         if (self.enable_long_press && is_letter(key)) || (self.enable_punctuation_long_press && get_punctuation_key(key, shift_pressed).is_some()) {

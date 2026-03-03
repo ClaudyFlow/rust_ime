@@ -173,7 +173,7 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
             let mut response = Vec::new();
             if msg_type == 1 || msg_type == 3 {
                 let mut p = processor.lock().unwrap();
-                let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift);
+                let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift, ctrl, alt);
                 drop(p);
                 match action {
                     Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor); }
