@@ -129,6 +129,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
     }
 
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let open_menu_time = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let open_menu_time_for_timer = open_menu_time.clone();
 
     // 定时器：检测托盘菜单失去焦点自动隐藏
     let tm_for_timer = tray_menu_handle.clone();
@@ -137,6 +139,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             if tm.window().is_visible() {
                 #[cfg(target_os = "windows")]
                 unsafe {
+                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
+                    if now - open_time < 500 { return; } // 500ms 宽限期，防止刚打开就因为焦点还没到位而隐藏
+
                     let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                     let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                     let active_hwnd = GetForegroundWindow();
@@ -147,6 +153,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             }
         }
     });
+
+    let open_menu_time_for_thread = open_menu_time.clone();
 
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
@@ -160,6 +168,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             let last_pos_inner = last_pos_for_loop.clone();
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
+            let open_menu_time_inner = open_menu_time_for_thread.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -232,6 +241,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         }
                     }
                     GuiEvent::OpenTrayMenu { x, y, chinese_enabled, active_profile } => {
+                        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+                        open_menu_time_inner.store(now, std::sync::atomic::Ordering::SeqCst);
+
                         if let Some(tm) = tm_handle.upgrade() {
                             tm.set_chinese_enabled(chinese_enabled);
                             tm.set_active_profile(SharedString::from(active_profile));
@@ -246,7 +258,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
                                 if GetMonitorInfoW(monitor, &mut mi).as_bool() {
                                     if final_x + win_width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_width - 10; }
-                                    // 向上弹出
                                     let win_height = tm.window().size().height as i32;
                                     final_y = y - win_height;
                                     if final_y < mi.rcMonitor.top { final_y = y; }
@@ -261,6 +272,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                                 if hwnd.0 != 0 {
+                                    // 确保窗口置顶并获取焦点
+                                    let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                     let _ = SetForegroundWindow(hwnd);
                                 }
                             }

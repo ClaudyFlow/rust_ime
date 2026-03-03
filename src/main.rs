@@ -597,15 +597,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let _ = gui_tx_tray.send(GuiEvent::OpenTrayMenu { x, y, chinese_enabled: enabled, active_profile: profile });
                 }
                 ui::tray::TrayEvent::Restart => {
-                    let args: Vec<String> = std::env::args().collect();
+                    let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("rust-ime.exe"));
+                    let exe_str = exe_path.to_string_lossy();
                     #[cfg(target_os = "windows")]
                     {
-                        // 在 Windows 上，直接 spawn 会因为旧进程尚未退出（互斥锁未释放）而导致新进程启动失败
-                        // 我们使用 cmd /c 延迟 1 秒后再启动新进程，确保旧进程已彻底退出并释放 Global\\RustImeUniqueMutex
-                        let mut full_cmd = format!("timeout /t 1 /nobreak > nul & start \"\" \"{}\"", args[0]);
-                        for arg in args.iter().skip(1) {
-                            full_cmd.push_str(&format!(" \"{}\"", arg));
-                        }
+                        // 使用 cmd /c 配合 timeout，确保主进程退出并释放互斥锁
+                        let full_cmd = format!("timeout /t 1 /nobreak > nul & start \"\" \"{}\"", exe_str);
                         let _ = std::process::Command::new("cmd")
                             .arg("/c")
                             .arg(full_cmd)
@@ -613,7 +610,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     #[cfg(not(target_os = "windows"))]
                     {
-                        let _ = std::process::Command::new(&args[0]).args(&args[1..]).spawn();
+                        let _ = std::process::Command::new(&exe_path).spawn();
                     }
                     std::process::exit(0);
                 }

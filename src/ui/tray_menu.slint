@@ -93,7 +93,7 @@ export component TrayMenu inherits Window {
             }
             TrayMenuItem {
                 text: "重启程序";
-                icon_text: "⟲";
+                icon_text: "↻";
                 clicked => { root.restart(); }
             }
 
@@ -101,7 +101,7 @@ export component TrayMenu inherits Window {
 
             TrayMenuItem {
                 text: "退出程序";
-                icon_text: "✕";
+                icon_text: "×";
                 clicked => { root.exit(); }
             }
         }
