@@ -211,9 +211,21 @@ impl Config {
         }
     }
 
+    fn get_config_dir() -> std::path::PathBuf {
+        // 寻找根目录：优先找包含 dicts 的目录
+        let mut curr = std::env::current_exe().ok()
+            .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+
+        for _ in 0..4 {
+            if curr.join("dicts").exists() { break; }
+            if !curr.pop() { break; }
+        }
+        curr.join("configs")
+    }
+
     pub fn load() -> Self {
-        let root = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()).unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let config_dir = root.join("configs");
+        let config_dir = Self::get_config_dir();
         if !config_dir.exists() { let _ = std::fs::create_dir_all(&config_dir); }
 
         let mut conf = Self::default_config();
@@ -234,8 +246,7 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let root = std::env::current_exe().map(|p| p.parent().unwrap().to_path_buf()).unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let config_dir = root.join("configs");
+        let config_dir = Self::get_config_dir();
         if !config_dir.exists() { std::fs::create_dir_all(&config_dir)?; }
 
         let save_file = |name: &str, val: &serde_json::Value| -> Result<(), Box<dyn std::error::Error>> {
