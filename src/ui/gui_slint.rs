@@ -382,11 +382,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         show_status_bar_for_loop.store(new_conf.appearance.show_status_bar, std::sync::atomic::Ordering::SeqCst);
                         random_highlight_for_loop.store(new_conf.appearance.enable_random_highlight, std::sync::atomic::Ordering::SeqCst);
                         page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
+                        
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
                             w.set_show_stroke_aux(new_conf.appearance.show_stroke_aux);
                             w.set_show_translation(new_conf.appearance.show_english_translation);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
+                            
+                            // 更新颜色设置
                             {
                                 let mut c = color_shared.lock().unwrap();
                                 *c = parse_color(&new_conf.appearance.window_highlight_color);
@@ -396,14 +399,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             w.set_border_color(parse_color(&new_conf.appearance.window_border_color));
                             w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
                             w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color));
+                            
+                            // 更新字号和粗细
                             w.set_pinyin_font_size(new_conf.appearance.pinyin_text.font_size as f32);
-                            w.set_pinyin_font_family(SharedString::from(new_conf.appearance.pinyin_text.font_family.clone()));
                             w.set_pinyin_font_weight(new_conf.appearance.pinyin_text.font_weight as i32);
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
-                            w.set_candidate_font_family(SharedString::from(new_conf.appearance.candidate_text.font_family.clone()));
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
+                            
+                            // 立即同步一次辅助文本颜色
+                            w.set_aux_text_color(slint::Color::from_rgb_u8(149, 165, 166));
+                            w.set_aux_highlight_color(slint::Color::from_rgb_u8(220, 221, 225));
+
                             if let Some(sb) = s.upgrade() {
-                                if new_conf.appearance.show_status_bar { let _ = sb.show(); } else { let _ = sb.hide(); } 
+                                if new_conf.appearance.show_status_bar { let _ = sb.window().show(); } else { let _ = sb.window().hide(); } 
                             }
                         }
                     }

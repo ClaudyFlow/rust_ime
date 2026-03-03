@@ -28,6 +28,10 @@
                     <label class="switch"><input type="checkbox" id="show_english_translation"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
+                    <div class="info"><div class="title">笔画辅助码显示</div><div class="desc">控制是否在候选词旁显示笔画辅助码提示</div></div>
+                    <label class="switch"><input type="checkbox" id="show_stroke_aux"><span class="slider"></span></label>
+                </div>
+                <div class="setting-item">
                     <div class="info"><div class="title">随机高亮颜色</div><div class="desc">每次选词时随机变换选中项的背景色</div></div>
                     <label class="switch"><input type="checkbox" id="enable_random_highlight"><span class="slider"></span></label>
                 </div>
@@ -46,15 +50,8 @@
             </div>
         </div>
 
-        <h2>候选框样式 (GDI)</h2>
+        <h2>候选框样式 (UI)</h2>
         <div class="card">
-            <div class="setting-item">
-                <div class="info"><div class="title">窗口位置</div><div class="desc">相对于光标的偏移位置</div></div>
-                <select id="candidate_anchor">
-                    <option value="bottom">光标下方</option>
-                    <option value="top">光标上方</option>
-                </select>
-            </div>
             <div class="setting-item">
                 <div class="info"><div class="title">候选词排列</div><div class="desc">横向或纵向展示候选词</div></div>
                 <select id="candidate_layout">
@@ -85,13 +82,9 @@
             </div>
         </div>
 
-        <h2>字体与字号</h2>
+        <h2>字体与大小</h2>
         <div class="card">
             <h3>拼音行 (Pinyin)</h3>
-            <div class="setting-item">
-                <div class="info"><div class="title">字体家族</div></div>
-                <select id="pinyin_font_family" class="font-select" style="width:250px;"></select>
-            </div>
             <div class="setting-item">
                 <div class="info"><div class="title">字号</div></div>
                 <input type="number" id="pinyin_font_size">
@@ -119,10 +112,6 @@
             </div>
 
             <h3 style="margin-top:20px;">候选词行 (Candidate)</h3>
-            <div class="setting-item">
-                <div class="info"><div class="title">字体家族</div></div>
-                <select id="candidate_font_family" class="font-select" style="width:250px;"></select>
-            </div>
             <div class="setting-item">
                 <div class="info"><div class="title">字号</div></div>
                 <input type="number" id="candidate_font_size">
@@ -160,9 +149,9 @@
             bindInput('show_candidates', 'appearance');
             bindInput('show_status_bar', 'appearance');
             bindInput('show_english_translation', 'appearance');
+            bindInput('show_stroke_aux', 'appearance');
             bindInput('enable_random_highlight', 'appearance');
             bindInput('aux_mode', 'appearance');
-            bindInput('candidate_anchor', 'appearance');
             bindInput('candidate_layout', 'appearance');
             bindInput('window_bg_color', 'appearance');
             bindInput('window_border_color', 'appearance');
@@ -184,22 +173,18 @@
             document.getElementById('pinyin_font_size').value = p.font_size;
             document.getElementById('pinyin_font_weight').value = p.font_weight || 400;
             document.getElementById('pinyin_color').value = p.color;
-            document.getElementById('pinyin_font_family').setAttribute('data-value', p.font_family);
             
             // 绑定 Candidate 样式
             const c = config.appearance.candidate_text;
             document.getElementById('candidate_font_size').value = c.font_size;
             document.getElementById('candidate_font_weight').value = c.font_weight || 600;
             document.getElementById('candidate_color').value = c.color;
-            document.getElementById('candidate_font_family').setAttribute('data-value', c.font_family);
 
             linkColor('window_bg_color', 'appearance');
             linkColor('window_border_color', 'appearance');
             linkColor('window_highlight_color', 'appearance');
             linkColor('pinyin_color');
             linkColor('candidate_color');
-
-            await loadFonts(['pinyin_font_family', 'candidate_font_family']);
         }
 
         async function save() {
@@ -207,12 +192,10 @@
             config.appearance.pinyin_text.font_size = parseFloat(document.getElementById('pinyin_font_size').value);
             config.appearance.pinyin_text.font_weight = parseInt(document.getElementById('pinyin_font_weight').value);
             config.appearance.pinyin_text.color = document.getElementById('pinyin_color').value;
-            config.appearance.pinyin_text.font_family = document.getElementById('pinyin_font_family').value;
 
             config.appearance.candidate_text.font_size = parseFloat(document.getElementById('candidate_font_size').value);
             config.appearance.candidate_text.font_weight = parseInt(document.getElementById('candidate_font_weight').value);
             config.appearance.candidate_text.color = document.getElementById('candidate_color').value;
-            config.appearance.candidate_text.font_family = document.getElementById('candidate_font_family').value;
 
             await saveConfig();
         }
