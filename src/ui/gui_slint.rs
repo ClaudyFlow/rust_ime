@@ -169,7 +169,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                 if hwnd.0 != 0 {
                     let mut ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
-                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0 | WS_EX_TRANSPARENT.0;
+                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0;
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
                 }

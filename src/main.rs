@@ -155,6 +155,9 @@ pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "windows")]
+    std::env::set_var("SLINT_BACKEND", "software");
+
+    #[cfg(target_os = "windows")]
     let _mutex_handle = unsafe {
         use windows::Win32::System::Threading::*;
         use windows::Win32::Foundation::ERROR_ALREADY_EXISTS;
