@@ -111,7 +111,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
             // 不再转为小写，保留原始 Key
             if let Some(arr) = val.as_array() {
                 if is_english {
-                    let en_hint = arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ");
+                    let en_hint = arr.iter().filter_map(|v| v.as_str()).next().unwrap_or("").to_string();
                     entries.entry(key.clone()).or_default().push(DictEntry {
                         word: key.clone(),
                         trad: key.clone(),

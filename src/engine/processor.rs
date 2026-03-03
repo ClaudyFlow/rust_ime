@@ -1367,8 +1367,10 @@ impl Processor {
             let mut h = String::new();
             if self.show_tone_hint && !tone.is_empty() { h.push_str(&tone); }
             
-            // 英文翻译显示支持：如果开启了开关且数据不为空
-            if self.show_english_translation && !en.is_empty() {
+            // 英文翻译显示支持：如果开启了开关且数据不为空，
+            // 或者当前处于纯英文方案模式下（此时 en 通常是中文翻译，用户默认希望看到）
+            let is_pure_english = self.active_profiles.len() == 1 && self.active_profiles[0] == "english";
+            if !en.is_empty() && (self.show_english_translation || is_pure_english) {
                 if !h.is_empty() { h.push(' '); }
                 h.push_str(&en);
             }
@@ -1378,7 +1380,7 @@ impl Processor {
                     // 如果 show_english_translation 没开，或者 en 为空，这里可能还想根据 aux_mode 再次确认显示 (通常 en 就是翻译)
                     // 但为了避免重复，如果上面已经显示了，这里就不重复加了。
                     // 这里的 en 在拼音模式下是辅码，在英文模式下是翻译。
-                    if !self.show_english_translation && !en.is_empty() {
+                    if !self.show_english_translation && !is_pure_english && !en.is_empty() {
                         if !h.is_empty() { h.push(' '); }
                         h.push_str(&en);
                     }
@@ -1432,7 +1434,8 @@ impl Processor {
                             // 是字典词，重建其 hint
                             let mut h = String::new();
                             if self.show_tone_hint && !m.2.is_empty() { h.push_str(&m.2); }
-                            if self.show_english_translation && !m.3.is_empty() { 
+                            let is_pure_english = self.active_profiles.len() == 1 && self.active_profiles[0] == "english";
+                            if !m.3.is_empty() && (self.show_english_translation || is_pure_english) { 
                                 if !h.is_empty() { h.push(' '); } 
                                 h.push_str(&m.3); 
                             }
