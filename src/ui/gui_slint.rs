@@ -1,7 +1,8 @@
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use slint::{ComponentHandle, SharedString, ModelRc, VecModel};
 use crate::ui::GuiEvent;
 use crate::Config;
+use crate::ui::tray::TrayEvent;
 
 slint::include_modules!();
 
@@ -12,12 +13,41 @@ use windows::core::PCWSTR;
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
 
-pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
+pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEvent>) {
     let window = CandidateWindow::new().expect("Failed to create CandidateWindow");
     let status_bar = StatusBar::new().expect("Failed to create StatusBar");
+    let tray_menu = TrayMenu::new().expect("Failed to create TrayMenu");
     
     let window_handle = window.as_weak();
     let status_bar_handle = status_bar.as_weak();
+    let tray_menu_handle = tray_menu.as_weak();
+
+    // 绑定托盘菜单回调
+    {
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_toggle_ime(move || { let _ = tx.send(TrayEvent::ToggleIme); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_next_profile(move || { let _ = tx.send(TrayEvent::NextProfile); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_open_config(move || { let _ = tx.send(TrayEvent::OpenConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_reload_config(move || { let _ = tx.send(TrayEvent::ReloadConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_restart(move || { let _ = tx.send(TrayEvent::Restart); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        
+        let tx = tray_tx.clone();
+        let tm = tray_menu_handle.clone();
+        tray_menu.on_exit(move || { let _ = tx.send(TrayEvent::Exit); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+    }
 
     // 初始设置
     window.set_show_english_aux(config.appearance.show_english_aux);
@@ -100,10 +130,29 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
 
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
+    // 定时器：检测托盘菜单失去焦点自动隐藏
+    let tm_for_timer = tray_menu_handle.clone();
+    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
+        if let Some(tm) = tm_for_timer.upgrade() {
+            if tm.window().is_visible() {
+                #[cfg(target_os = "windows")]
+                unsafe {
+                    let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
+                    let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
+                    let active_hwnd = GetForegroundWindow();
+                    if hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != hwnd {
+                        let _ = tm.window().hide();
+                    }
+                }
+            }
+        }
+    });
+
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
+            let tm_handle = tray_menu_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
             let show_status_bar_for_loop = show_status_bar_atomic.clone();
             let random_highlight_for_loop = random_highlight_atomic.clone();
@@ -179,6 +228,41 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
                                 }
                                 if !w.window().is_visible() { let _ = w.window().show(); }
+                            }
+                        }
+                    }
+                    GuiEvent::OpenTrayMenu { x, y, chinese_enabled, active_profile } => {
+                        if let Some(tm) = tm_handle.upgrade() {
+                            tm.set_chinese_enabled(chinese_enabled);
+                            tm.set_active_profile(SharedString::from(active_profile));
+                            
+                            let mut final_x = x;
+                            let mut final_y = y;
+                            let win_width = 200; 
+                            
+                            #[cfg(target_os = "windows")]
+                            unsafe {
+                                let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x, y }, MONITOR_DEFAULTTONEAREST);
+                                let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+                                if GetMonitorInfoW(monitor, &mut mi).as_bool() {
+                                    if final_x + win_width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_width - 10; }
+                                    // 向上弹出
+                                    let win_height = tm.window().size().height as i32;
+                                    final_y = y - win_height;
+                                    if final_y < mi.rcMonitor.top { final_y = y; }
+                                }
+                            }
+                            
+                            let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
+                            let _ = tm.window().show();
+                            
+                            #[cfg(target_os = "windows")]
+                            unsafe {
+                                let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
+                                let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
+                                if hwnd.0 != 0 {
+                                    let _ = SetForegroundWindow(hwnd);
+                                }
                             }
                         }
                     }

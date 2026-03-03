@@ -16,6 +16,7 @@ pub enum TrayEvent {
     ReloadConfig,
     SyncStatus { chinese_enabled: bool, active_profile: String },
     ClearUserDict,
+    RequestMenu { x: i32, y: i32 },
 }
 
 #[cfg(target_os = "linux")]
@@ -216,7 +217,9 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
             if lparam.0 as u32 == WM_RBUTTONUP {
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
-                show_context_menu(hwnd, pt.x, pt.y);
+                if let Some(ref tx) = TRAY_TX {
+                    let _ = tx.send(TrayEvent::RequestMenu { x: pt.x, y: pt.y });
+                }
             }
             LRESULT(0)
         }
@@ -239,35 +242,3 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
     }
 }
 
-#[cfg(target_os = "windows")]
-unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
-    let h_menu = CreatePopupMenu().unwrap();
-    if let Some(ref state_arc) = TRAY_STATE {
-        if let Ok(state) = state_arc.lock() {
-            let mode_label = format!("输入法: {}", if state.chinese_enabled { "中" } else { "英" });
-            let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(HSTRING::from(&mode_label).as_ptr()));    
-
-            let profile_zh = match state.active_profile.as_str() {
-                "chinese" => "中文",
-                "english" => "英文",
-                "japanese" => "日文",
-                "mixed" => "中日英混",
-                other => other,
-            };
-            let profile_label = format!("词典方案: {}", profile_zh);
-            let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(HSTRING::from(&profile_label).as_ptr())); 
-            
-            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
-            let _ = AppendMenuW(h_menu, MF_STRING, 1011, PCWSTR(HSTRING::from("配置管理 (Web)").as_ptr()));
-            let _ = AppendMenuW(h_menu, MF_STRING, 1012, PCWSTR(HSTRING::from("重载词库配置").as_ptr()));
-            let _ = AppendMenuW(h_menu, MF_STRING, 1013, PCWSTR(HSTRING::from("重启程序").as_ptr()));
-            let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
-            let _ = AppendMenuW(h_menu, MF_STRING, 1014, PCWSTR(HSTRING::from("退出程序").as_ptr()));   
-        }
-    }
-
-    let _ = SetForegroundWindow(hwnd);
-    let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None);
-    let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
-    let _ = DestroyMenu(h_menu);
-}

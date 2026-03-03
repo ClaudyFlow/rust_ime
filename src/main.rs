@@ -367,8 +367,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // 1. 启动 GUI 线程
         let gui_config = config.read().expect("Failed to acquire config read lock for GUI").clone();
         let gui_tx_main = gui_tx.clone();
+        let tray_tx_gui = tray_tx.clone();
         std::thread::spawn(move || {
-            ui::gui::start_gui(gui_rx, gui_config);
+            ui::gui::start_gui(gui_rx, gui_config, tray_tx_gui);
         });
     
         // 2. 加载词库
@@ -553,6 +554,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut p = processor_clone.lock().unwrap();
                     p.user_dict.clear();
                     println!("[Main] User dictionary cleared in memory.");
+                }
+                ui::tray::TrayEvent::RequestMenu { x, y } => {
+                    let (enabled, profile) = {
+                        let p = processor_clone.lock().unwrap();
+                        (p.chinese_enabled, p.get_current_profile_display())
+                    };
+                    let _ = gui_tx_tray.send(GuiEvent::OpenTrayMenu { x, y, chinese_enabled: enabled, active_profile: profile });
                 }
                 ui::tray::TrayEvent::Restart => {
                     let args: Vec<String> = std::env::args().collect();

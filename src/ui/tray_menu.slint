@@ -1,0 +1,109 @@
+export component TrayMenuItem inherits Rectangle {
+    in property <string> text;
+    in property <string> icon_text;
+    in property <bool> active: false;
+    callback clicked;
+
+    height: 36px;
+    background: touch-area.has-hover ? #f3f4f6 : transparent;
+    border-radius: 6px;
+
+    touch-area := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        alignment: start;
+
+        Text {
+            text: icon_text;
+            font-size: 16px;
+            color: active ? #0969da : #57606a;
+            vertical-alignment: center;
+            width: 20px;
+        }
+
+        Text {
+            text: text;
+            font-size: 14px;
+            color: #24292f;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component TrayMenu inherits Window {
+    title: "RustImeTrayMenu";
+    always-on-top: true;
+    no-frame: true;
+    background: transparent;
+    
+    in property <bool> chinese_enabled;
+    in property <string> active_profile;
+
+    callback toggle_ime();
+    callback next_profile();
+    callback open_config();
+    callback reload_config();
+    callback restart();
+    callback exit();
+
+    width: 200px;
+    height: menu-container.preferred-height;
+
+    menu-container := Rectangle {
+        background: #ffffff;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: #d0d7de;
+        drop-shadow-blur: 15px;
+        drop-shadow-color: rgba(0, 0, 0, 0.1);
+        drop-shadow-offset-y: 4px;
+
+        VerticalLayout {
+            padding: 8px;
+            spacing: 2px;
+
+            TrayMenuItem {
+                text: "输入法: " + (chinese_enabled ? "中" : "英");
+                icon_text: "⌨";
+                active: chinese_enabled;
+                clicked => { root.toggle_ime(); }
+            }
+            TrayMenuItem {
+                text: "词典方案: " + (active_profile == "chinese" ? "中文" : (active_profile == "english" ? "英文" : (active_profile == "japanese" ? "日文" : (active_profile == "mixed" ? "混" : active_profile))));
+                icon_text: "📖";
+                clicked => { root.next_profile(); }
+            }
+            
+            Rectangle { height: 12px; VerticalLayout { padding-top: 6px; padding-bottom: 6px; Rectangle { height: 1px; background: #ebf0f4; } } }
+
+            TrayMenuItem {
+                text: "配置管理 (Web)";
+                icon_text: "⚙";
+                clicked => { root.open_config(); }
+            }
+            TrayMenuItem {
+                text: "重载词库配置";
+                icon_text: "🔄";
+                clicked => { root.reload_config(); }
+            }
+            TrayMenuItem {
+                text: "重启程序";
+                icon_text: "⟲";
+                clicked => { root.restart(); }
+            }
+
+            Rectangle { height: 12px; VerticalLayout { padding-top: 6px; padding-bottom: 6px; Rectangle { height: 1px; background: #ebf0f4; } } }
+
+            TrayMenuItem {
+                text: "退出程序";
+                icon_text: "✕";
+                clicked => { root.exit(); }
+            }
+        }
+    }
+}
