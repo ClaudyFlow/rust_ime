@@ -39,7 +39,7 @@ export component TrayMenu inherits Window {
     title: "RustImeTrayMenu";
     always-on-top: true;
     no-frame: true;
-    background: transparent;
+    background: #ffffff;
     
     in property <bool> chinese_enabled;
     in property <string> active_profile;
@@ -50,9 +50,15 @@ export component TrayMenu inherits Window {
     callback reload_config();
     callback restart();
     callback exit();
+    
+    public function request_focus() {
+        focus_scope.focus();
+    }
 
     width: 200px;
     height: menu-container.preferred-height;
+
+    focus_scope := FocusScope {}
 
     menu-container := Rectangle {
         background: #ffffff;

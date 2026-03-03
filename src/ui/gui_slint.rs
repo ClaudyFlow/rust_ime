@@ -212,19 +212,29 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
 
     // 定时器：检测托盘菜单失去焦点自动隐藏
     let tm_for_timer = tray_menu_handle.clone();
-    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
+    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(150), move || {
         if let Some(tm) = tm_for_timer.upgrade() {
             if tm.window().is_visible() {
                 #[cfg(target_os = "windows")]
                 unsafe {
                     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
                     let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
-                    if now - open_time < 500 { return; } // 500ms 宽限期，防止刚打开就因为焦点还没到位而隐藏
+                    if now - open_time < 600 { return; } 
 
-                    let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
-                    let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                     let active_hwnd = GetForegroundWindow();
-                    if hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != hwnd {
+                    let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
+                    let menu_hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
+                    
+                    if menu_hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != menu_hwnd {
+                        // 检查活动窗口是否是菜单的子窗口或属于同一线程（处理某些特殊 UI 情况）
+                        let active_thread_id = GetWindowThreadProcessId(active_hwnd, None);
+                        let menu_thread_id = GetWindowThreadProcessId(menu_hwnd, None);
+                        if active_thread_id != menu_thread_id {
+                            let _ = tm.window().hide();
+                        }
+                    } else if active_hwnd.0 == 0 {
+                        // 桌面或任务栏等特殊区域，没有明确的 Foreground Window 时也尝试隐藏
+                        // 只要距离打开时间够久且当前没焦点
                         let _ = tm.window().hide();
                     }
                 }
@@ -357,6 +367,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             
                             let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
                             let _ = tm.window().show();
+                            tm.invoke_request_focus();
                             
                             #[cfg(target_os = "windows")]
                             unsafe {
