@@ -58,6 +58,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
 
     #[cfg(target_os = "windows")]
     {
+        let sb_init = status_bar_handle.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(400));
             unsafe {
@@ -78,19 +79,22 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
                     
-                    let mut work_area = windows::Win32::Foundation::RECT::default();
-                    if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                        // 预留足够空间给自适应宽度的状态栏
-                        let x = work_area.right - 80; 
-                        let y = work_area.bottom - 40;
-                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
-                    }
+                    // 初始定位到右下角
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(sb) = sb_init.upgrade() {
+                            let mut work_area = windows::Win32::Foundation::RECT::default();
+                            if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
+                                let x = work_area.right - 80; 
+                                let y = work_area.bottom - 40;
+                                let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
+                            }
+                        }
+                    });
                 }
             }
         });
     }
 
-    // 追踪拼音变化，用于降低随机色更新频率
     let mut last_pinyin_was_empty = true;
     let mut current_accent_color = parse_color(&config.appearance.window_highlight_color);
 
@@ -110,9 +114,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                             if pinyin.is_empty() && candidates.is_empty() || !show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                 w.set_is_visible(false);
                                 let _ = w.window().hide();
-                                last_pinyin_was_empty = true; // 重置状态
+                                last_pinyin_was_empty = true;
                             } else {
-                                // 核心优化：仅在开始输入新词时才生成随机色
                                 if last_pinyin_was_empty && !pinyin.is_empty() {
                                     if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
@@ -124,14 +127,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     }
                                     last_pinyin_was_empty = false;
                                 }
-                                
                                 w.set_accent_color(current_accent_color);
                                 w.set_pinyin(SharedString::from(&pinyin));
-                                
                                 let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
                                 let page = (selected / page_size) * page_size;
                                 let relative_selected = (selected % page_size) as i32;
-                                
                                 let mut data_vec = Vec::new();
                                 for i in page..(page + page_size).min(candidates.len()) {
                                     let cand = &candidates[i];
@@ -143,9 +143,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                             let parts: Vec<&str> = hint.split('/').collect();
                                             english = parts[0].trim().to_string();
                                             stroke = parts[1].trim().to_string();
-                                        } else {
-                                            english = hint.clone();
-                                        }
+                                        } else { english = hint.clone(); }
                                     }
                                     data_vec.push(CandidateData {
                                         text: SharedString::from(cand),
@@ -153,18 +151,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                         stroke_aux: SharedString::from(stroke),
                                     });
                                 }
-                                
                                 w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
-                                
-                                let (lx, ly) = {
-                                    let pos = last_pos_inner.lock().expect("Failed to lock last_pos");
-                                    (pos.0, pos.1)
-                                };
+                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                                 if lx != 0 || ly != 0 {
-                                    let mut final_x = lx;
-                                    let mut final_y = ly;
+                                    let mut final_x = lx; let mut final_y = ly;
                                     #[cfg(target_os = "windows")]
                                     unsafe {
                                         let win_size = w.window().size();
@@ -185,12 +177,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                         if let Some(sb) = s.upgrade() {
                             sb.set_status_text(SharedString::from(status.clone()));
                             sb.set_chinese_enabled(is_active);
-                            let (lx, ly) = {
-                                let pos = last_pos_inner.lock().expect("Failed to lock last_pos");
-                                (pos.0, pos.1)
-                            };
+                            let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                             let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
-                            
                             slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
                                 #[cfg(target_os = "windows")]
                                 unsafe {

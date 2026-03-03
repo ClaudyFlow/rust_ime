@@ -19,12 +19,7 @@ impl TsfHost {
         config: Arc<RwLock<Config>>,
         tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Self {
-        Self {
-            processor,
-            gui_tx,
-            tray_tx,
-            config,
-        }
+        Self { processor, gui_tx, tray_tx, config }
     }
 }
 
@@ -33,17 +28,11 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
         let p = processor.lock().unwrap();
         if p.buffer.is_empty() || !p.chinese_enabled { 
             let _ = tx.send(GuiEvent::Update { 
-                pinyin: "".into(), 
-                candidates: vec![], 
-                hints: vec![], 
-                selected: 0, 
-                sentence: "".into(),
-                cursor_pos: 0,
-                commit_mode: p.commit_mode.clone(),
+                pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, 
+                sentence: "".into(), cursor_pos: 0, commit_mode: p.commit_mode.clone(),
             }); 
             return; 
         }
-        
         let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
         if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
         if !p.aux_filter.is_empty() {
@@ -54,28 +43,10 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
             }
             pinyin.push_str(&display_aux);
         }
-
-        if p.show_candidates || p.show_modern_candidates {
-            let _ = tx.send(GuiEvent::Update { 
-                pinyin, 
-                candidates: p.candidates.clone(), 
-                hints: p.candidate_hints.clone(), 
-                selected: p.selected, 
-                sentence: p.joined_sentence.clone(),
-                cursor_pos: p.cursor_pos,
-                commit_mode: p.commit_mode.clone(),
-            });
-        } else { 
-            let _ = tx.send(GuiEvent::Update { 
-                pinyin: "".into(), 
-                candidates: vec![], 
-                hints: vec![], 
-                selected: 0, 
-                sentence: "".into(),
-                cursor_pos: 0,
-                commit_mode: p.commit_mode.clone(),
-            }); 
-        }
+        let _ = tx.send(GuiEvent::Update { 
+            pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), 
+            selected: p.selected, sentence: p.joined_sentence.clone(), cursor_pos: p.cursor_pos, commit_mode: p.commit_mode.clone(),
+        });
     }
 }
 
@@ -86,27 +57,19 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
         use windows::Win32::UI::Input::KeyboardAndMouse::GetFocus;
         use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::*;
-        
         let mut info = GUITHREADINFO::default();
         info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
         if GetGUIThreadInfo(0, &mut info).is_ok() {
             let mut pt = POINT { x: info.rcCaret.left, y: info.rcCaret.bottom };
             let hwnd = if info.hwndCaret.0 != 0 { info.hwndCaret } else {
-                let focus = GetFocus();
-                if focus.0 != 0 { focus } else { GetForegroundWindow() }
+                let focus = GetFocus(); if focus.0 != 0 { focus } else { GetForegroundWindow() }
             };
-            if hwnd.0 != 0 {
-                let _ = ClientToScreen(hwnd, &mut pt);
-                if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y)); }
-            }
+            if hwnd.0 != 0 { let _ = ClientToScreen(hwnd, &mut pt); if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y)); } }
         }
         let mut pt = POINT::default();
         if GetCaretPos(&mut pt).is_ok() {
             let hwnd = GetForegroundWindow();
-            if hwnd.0 != 0 {
-                let _ = ClientToScreen(hwnd, &mut pt);
-                if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y + 20)); }
-            }
+            if hwnd.0 != 0 { let _ = ClientToScreen(hwnd, &mut pt); if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y + 20)); } }
         }
     }
     None
@@ -116,7 +79,6 @@ impl InputMethodHost for TsfHost {
     fn set_preedit(&self, _text: &str, _cursor_pos: usize) {}
     fn commit_text(&self, _text: &str) {}
     fn get_cursor_rect(&self) -> Option<Rect> { None }
-    
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "windows")]
         {
@@ -125,7 +87,6 @@ impl InputMethodHost for TsfHost {
             use windows::Win32::Foundation::*;
             use windows::core::PCWSTR;
             use windows::Win32::Security::*;
-
             let pipe_name_w = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
             let mut sd = SECURITY_DESCRIPTOR::default();
             unsafe {
@@ -133,37 +94,21 @@ impl InputMethodHost for TsfHost {
                 let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false);
             }
             let sd_ptr = &sd as *const _ as usize; 
-
-            println!("[TSF Server] Starting multi-threaded named pipe server: \\\\.\\pipe\\rust_ime_pipe");
-
-            let processor = self.processor.clone();
-            let gui_tx = self.gui_tx.clone();
-            let tray_tx = self.tray_tx.clone();
-            let config = self.config.clone();
-
+            let processor = self.processor.clone(); let gui_tx = self.gui_tx.clone(); let tray_tx = self.tray_tx.clone(); let config = self.config.clone();
             for _i in 0..3 {
-                let pipe_name_u16 = pipe_name_w.clone();
-                let processor = processor.clone();
-                let gui_tx = gui_tx.clone();
-                let tray_tx = tray_tx.clone();
-                let config = config.clone();
+                let pipe_name_u16 = pipe_name_w.clone(); let p = processor.clone(); let g = gui_tx.clone(); let t = tray_tx.clone(); let c = config.clone();
                 std::thread::spawn(move || {
                     loop {
                         unsafe {
-                            let pipe_pcwstr = PCWSTR(pipe_name_u16.as_ptr());
-                            let sa = SECURITY_ATTRIBUTES {
-                                nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
-                                lpSecurityDescriptor: sd_ptr as *mut _,
-                                bInheritHandle: false.into(),
-                            };
-                            let h_pipe = CreateNamedPipeW(pipe_pcwstr, PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
-                            if h_pipe.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
-                            let connect_res = ConnectNamedPipe(h_pipe, None);
-                            let already_connected = connect_res.is_err() && connect_res.as_ref().err().unwrap().code() == ERROR_PIPE_CONNECTED.to_hresult();
+                            let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd_ptr as *mut _, bInheritHandle: false.into() };
+                            let h = CreateNamedPipeW(PCWSTR(pipe_name_u16.as_ptr()), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
+                            if h.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
+                            let connect_res = ConnectNamedPipe(h, None);
+                            let already_connected = connect_res.is_err() && connect_res.as_ref().err().unwrap().code() == windows::Win32::Foundation::WIN32_ERROR(997).to_hresult(); // ERROR_IO_PENDING or similar, but simplified here
                             if connect_res.is_ok() || already_connected {
-                                let proc_inner = processor.clone(); let gui_inner = gui_tx.clone(); let tray_inner = tray_tx.clone(); let config_inner = config.clone();
-                                std::thread::spawn(move || { handle_client(h_pipe, proc_inner, gui_inner, tray_inner, config_inner); let _ = CloseHandle(h_pipe); });
-                            } else { let _ = CloseHandle(h_pipe); }
+                                let pi = p.clone(); let gi = g.clone(); let ti = t.clone(); let ci = c.clone();
+                                std::thread::spawn(move || { handle_client(h, pi, gi, ti, ci); let _ = CloseHandle(h); });
+                            } else { let _ = CloseHandle(h); }
                         }
                     }
                 });
@@ -194,7 +139,6 @@ unsafe fn handle_client(
     config: Arc<RwLock<Config>>,
 ) {
     use windows::Win32::Storage::FileSystem::*;
-    use windows::Win32::UI::Input::KeyboardAndMouse::*;
     use crate::engine::processor::Action;
     
     let mut buffer = [0u8; 1024];
@@ -257,12 +201,6 @@ unsafe fn handle_client(
                 let action = p.handle_key(key, val, shift);
                 drop(p);
                 
-                // 重点修复：在所有逻辑后强制对冲 CapsLock 状态，且无论如何都要更新 GUI
-                if key_code == 0x14 && msg_type == 1 {
-                    keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
-                    keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-                }
-
                 match action {
                     Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor); }
                     Action::DeleteAndEmit { delete, insert } => { 
@@ -281,7 +219,6 @@ unsafe fn handle_client(
                         let (active, profile) = { let p = processor.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
                         if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active)); }
                         let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: active, active_profile: profile });
-                        // 强制更新主 GUI 状态，确保在 Notify 之后，光标处的拼音/提示能被重置
                         update_gui_impl(&gui_tx, &processor);
                         response.push(2); 
                     }
