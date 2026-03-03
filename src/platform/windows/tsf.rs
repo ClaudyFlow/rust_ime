@@ -45,7 +45,8 @@ fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Proc
         }
         
         let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
-                    if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }        if !p.aux_filter.is_empty() {
+        if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
+        if !p.aux_filter.is_empty() {
             let mut display_aux = String::new();
             for (i, c) in p.aux_filter.chars().enumerate() {
                 if i == 0 { display_aux.push(c.to_ascii_uppercase()); }
@@ -86,41 +87,25 @@ fn get_system_cursor_pos() -> Option<(i32, i32)> {
         use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::*;
         
-        // 1. 尝试 GetGUIThreadInfo (适用于大部分标准 Win32 控件)
         let mut info = GUITHREADINFO::default();
         info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
         if GetGUIThreadInfo(0, &mut info).is_ok() {
-            let mut pt = POINT {
-                x: info.rcCaret.left,
-                y: info.rcCaret.bottom,
-            };
-            
-            // 如果 hwndCaret 为空，尝试使用当前线程的 focus 窗口或前台窗口
-            let hwnd = if info.hwndCaret.0 != 0 {
-                info.hwndCaret
-            } else {
+            let mut pt = POINT { x: info.rcCaret.left, y: info.rcCaret.bottom };
+            let hwnd = if info.hwndCaret.0 != 0 { info.hwndCaret } else {
                 let focus = GetFocus();
                 if focus.0 != 0 { focus } else { GetForegroundWindow() }
             };
-            
             if hwnd.0 != 0 {
                 let _ = ClientToScreen(hwnd, &mut pt);
-                if pt.x != 0 || pt.y != 0 {
-                    return Some((pt.x, pt.y));
-                }
+                if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y)); }
             }
         }
-
-        // 2. 尝试 GetCaretPos (作为备选，适用于某些老旧程序)
         let mut pt = POINT::default();
         if GetCaretPos(&mut pt).is_ok() {
             let hwnd = GetForegroundWindow();
             if hwnd.0 != 0 {
                 let _ = ClientToScreen(hwnd, &mut pt);
-                // 默认光标高度为 20，向下偏移
-                if pt.x != 0 || pt.y != 0 {
-                    return Some((pt.x, pt.y + 20));
-                }
+                if pt.x != 0 || pt.y != 0 { return Some((pt.x, pt.y + 20)); }
             }
         }
     }
@@ -142,14 +127,11 @@ impl InputMethodHost for TsfHost {
             use windows::Win32::Security::*;
 
             let pipe_name_w = crate::registry::to_pcwstr("\\\\.\\pipe\\rust_ime_pipe");
-            
-            // 为了在多线程间共享，我们需要预先分配并初始化安全描述符
             let mut sd = SECURITY_DESCRIPTOR::default();
             unsafe {
                 let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), 1);
                 let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false);
             }
-            
             let sd_ptr = &sd as *const _ as usize; 
 
             println!("[TSF Server] Starting multi-threaded named pipe server: \\\\.\\pipe\\rust_ime_pipe");
@@ -165,63 +147,30 @@ impl InputMethodHost for TsfHost {
                 let gui_tx = gui_tx.clone();
                 let tray_tx = tray_tx.clone();
                 let config = config.clone();
-                
                 std::thread::spawn(move || {
                     loop {
                         unsafe {
-                            // ... 创建管道逻辑保持不变 ...
                             let pipe_pcwstr = PCWSTR(pipe_name_u16.as_ptr());
                             let sa = SECURITY_ATTRIBUTES {
                                 nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
                                 lpSecurityDescriptor: sd_ptr as *mut _,
                                 bInheritHandle: false.into(),
                             };
-
-                            let h_pipe = CreateNamedPipeW(
-                                pipe_pcwstr,
-                                PIPE_ACCESS_DUPLEX,
-                                PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-                                PIPE_UNLIMITED_INSTANCES,
-                                1024,
-                                1024,
-                                0,
-                                Some(&sa),
-                            );
-                            
-                            if h_pipe.is_invalid() {
-                                std::thread::sleep(std::time::Duration::from_millis(100));
-                                continue;
-                            }
-
+                            let h_pipe = CreateNamedPipeW(pipe_pcwstr, PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
+                            if h_pipe.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
                             let connect_res = ConnectNamedPipe(h_pipe, None);
                             let already_connected = connect_res.is_err() && connect_res.as_ref().err().unwrap().code() == ERROR_PIPE_CONNECTED.to_hresult();
-                            
                             if connect_res.is_ok() || already_connected {
-                                let proc_inner = processor.clone();
-                                let gui_inner = gui_tx.clone();
-                                let tray_inner = tray_tx.clone();
-                                let config_inner = config.clone();
-                                
-                                std::thread::spawn(move || {
-                                    handle_client(h_pipe, proc_inner, gui_inner, tray_inner, config_inner);
-                                    let _ = CloseHandle(h_pipe);
-                                });
-                            } else {
-                                let _ = CloseHandle(h_pipe);
-                            }
+                                let proc_inner = processor.clone(); let gui_inner = gui_tx.clone(); let tray_inner = tray_tx.clone(); let config_inner = config.clone();
+                                std::thread::spawn(move || { handle_client(h_pipe, proc_inner, gui_inner, tray_inner, config_inner); let _ = CloseHandle(h_pipe); });
+                            } else { let _ = CloseHandle(h_pipe); }
                         }
                     }
                 });
             }
-
-            // 主线程保持运行
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(3600));
-            }
+            loop { std::thread::sleep(std::time::Duration::from_secs(3600)); }
         }
-
-        #[cfg(not(target_os = "windows"))]
-        { Err("TsfHost 仅支持 Windows。".into()) }
+        #[cfg(not(target_os = "windows"))] { Err("TsfHost 仅支持 Windows。".into()) }
     }
 }
 
@@ -229,32 +178,10 @@ impl InputMethodHost for TsfHost {
 fn is_hk_match(config_key: &str, pressed_key_code: u32, ctrl: bool, alt: bool, shift: bool) -> bool {
     let binding = config_key.to_lowercase();
     let parts: Vec<&str> = binding.split('+').map(|s| s.trim()).collect();
-    let mut req_ctrl = false;
-    let mut req_alt = false;
-    let mut req_shift = false;
-    let mut target_key = "";
-
-    for part in parts {
-        match part {
-            "ctrl" => req_ctrl = true,
-            "alt" => req_alt = true,
-            "shift" => req_shift = true,
-            _ => target_key = part,
-        }
-    }
-
+    let mut req_ctrl = false; let mut req_alt = false; let mut req_shift = false; let mut target_key = "";
+    for part in parts { match part { "ctrl" => req_ctrl = true, "alt" => req_alt = true, "shift" => req_shift = true, _ => target_key = part } }
     if req_ctrl != ctrl || req_alt != alt || req_shift != shift { return false; }
-
-    let target_code = match target_key {
-        "space" => 0x20,
-        "tab" => 0x09,
-        "backspace" => 0x08,
-        "enter" => 0x0D,
-        "esc" => 0x1B,
-        s if s.len() == 1 => s.chars().next().unwrap().to_ascii_uppercase() as u32,
-        _ => 0,
-    };
-
+    let target_code = match target_key { "space" => 0x20, "tab" => 0x09, "backspace" => 0x08, "enter" => 0x0D, "esc" => 0x1B, s if s.len() == 1 => s.chars().next().unwrap().to_ascii_uppercase() as u32, _ => 0 };
     pressed_key_code == target_code
 }
 
@@ -267,37 +194,27 @@ unsafe fn handle_client(
     config: Arc<RwLock<Config>>,
 ) {
     use windows::Win32::Storage::FileSystem::*;
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
     use crate::engine::processor::Action;
     
     let mut buffer = [0u8; 1024];
     loop {
         let mut bytes_read = 0;
-        if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 {
-            break;
-        }
-        
+        if ReadFile(handle, Some(&mut buffer), Some(&mut bytes_read), None).is_err() || bytes_read == 0 { break; }
         if bytes_read < 6 { continue; }
         
         let msg_type = buffer[0];
         let key_code = u32::from_le_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]);
         let modifiers = buffer[5];
-        let shift = (modifiers & 1) != 0;
-        let ctrl = (modifiers & 2) != 0;
-        let alt = (modifiers & 4) != 0;
+        let shift = (modifiers & 1) != 0; let ctrl = (modifiers & 2) != 0; let alt = (modifiers & 4) != 0;
         
-        // 1. 提取位置信息 (仅当数据长度足够时读取)
         if msg_type == 1 && bytes_read >= 14 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
-            if x == 0 && y == 0 {
-                if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; }
-            }
-            if (x != 0 || y != 0) && gui_tx.is_some() {
-                let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y });
-            }
+            if x == 0 && y == 0 { if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; } }
+            if (x != 0 || y != 0) && gui_tx.is_some() { let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y }); }
         }
 
-        // 2. 核心切换热键优先匹配 (使用传入的 config)
         let is_lang_toggle = {
             let c = config.read().unwrap(); 
             let tab_match = c.hotkeys.enable_tab_toggle && is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift);
@@ -307,63 +224,14 @@ unsafe fn handle_client(
         
         if is_lang_toggle {
             if msg_type == 1 {
-                let mut p = processor.lock().unwrap();
-                p.toggle();
-                let enabled = p.chinese_enabled;
-                let short = p.get_short_display();
-                let profile = p.get_current_profile_display();
+                let mut p = processor.lock().unwrap(); p.toggle();
+                let enabled = p.chinese_enabled; let short = p.get_short_display(); let profile = p.get_current_profile_display();
                 drop(p);
                 let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
                 if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { short } else { "英".into() }, enabled)); }
                 update_gui_impl(&gui_tx, &processor);
             }
-            let response = vec![2u8]; // Consume
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-            continue;
-        }
-
-        // 3. 特殊辅助按键拦截 (Shift Global Filter)
-        if key_code == 0x10 && !ctrl && !alt {
-            let mut p = processor.lock().unwrap();
-            if p.chinese_enabled && !p.buffer.is_empty() {
-                if msg_type == 1 {
-                    p.start_global_filter();
-                    drop(p);
-                    update_gui_impl(&gui_tx, &processor);
-                }
-                let response = vec![2u8];
-                let mut bytes_written = 0;
-                let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-                continue;
-            }
-        }
-
-        // 4. 输入状态下的默认热键拦截 (Esc, Enter 等)
-        if (key_code == 0x0D || key_code == 0x08 || (key_code >= 0x30 && key_code <= 0x39)) && !ctrl && !alt && !shift {
-            let p = processor.lock().unwrap();
-            if p.buffer.is_empty() {
-                let response = vec![0u8];
-                let mut bytes_written = 0;
-                let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-                continue;
-            }
-        }
-
-        // 5. 通用 Ctrl/Alt 屏蔽与拦截
-        if ctrl || alt {
-            if msg_type == 1 {
-                let mut p = processor.lock().unwrap();
-                if !p.buffer.is_empty() {
-                    p.reset();
-                    drop(p);
-                    update_gui_impl(&gui_tx, &processor);
-                }
-            }
-            let response = vec![0u8]; // Pass through
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
-            continue;
+            let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None); continue;
         }
 
         let key = match key_code {
@@ -375,21 +243,9 @@ unsafe fn handle_client(
             0x1B => Some(crate::engine::keys::VirtualKey::Esc),
             0x14 => Some(crate::engine::keys::VirtualKey::CapsLock),
             0x09 => Some(crate::engine::keys::VirtualKey::Tab),
-            0x25 => Some(crate::engine::keys::VirtualKey::Left),
-            0x26 => Some(crate::engine::keys::VirtualKey::Up),
-            0x27 => Some(crate::engine::keys::VirtualKey::Right),
-            0x28 => Some(crate::engine::keys::VirtualKey::Down),
-            0xBB => Some(crate::engine::keys::VirtualKey::Equal),
-            0xBD => Some(crate::engine::keys::VirtualKey::Minus),
-            0xBC => Some(crate::engine::keys::VirtualKey::Comma),
-            0xBE => Some(crate::engine::keys::VirtualKey::Dot),
-            0xBF => Some(crate::engine::keys::VirtualKey::Slash),
-            0xBA => Some(crate::engine::keys::VirtualKey::Semicolon),
-            0xDE => Some(crate::engine::keys::VirtualKey::Apostrophe),
-            0xDB => Some(crate::engine::keys::VirtualKey::LeftBrace),
-            0xDD => Some(crate::engine::keys::VirtualKey::RightBrace),
-            0xDC => Some(crate::engine::keys::VirtualKey::Backslash),
-            0xC0 => Some(crate::engine::keys::VirtualKey::Grave),
+            0x25 => Some(crate::engine::keys::VirtualKey::Left), 0x26 => Some(crate::engine::keys::VirtualKey::Up), 0x27 => Some(crate::engine::keys::VirtualKey::Right), 0x28 => Some(crate::engine::keys::VirtualKey::Down),
+            0xBB => Some(crate::engine::keys::VirtualKey::Equal), 0xBD => Some(crate::engine::keys::VirtualKey::Minus), 0xBC => Some(crate::engine::keys::VirtualKey::Comma), 0xBE => Some(crate::engine::keys::VirtualKey::Dot), 0xBF => Some(crate::engine::keys::VirtualKey::Slash),
+            0xBA => Some(crate::engine::keys::VirtualKey::Semicolon), 0xDE => Some(crate::engine::keys::VirtualKey::Apostrophe), 0xDB => Some(crate::engine::keys::VirtualKey::LeftBrace), 0xDD => Some(crate::engine::keys::VirtualKey::RightBrace), 0xDC => Some(crate::engine::keys::VirtualKey::Backslash), 0xC0 => Some(crate::engine::keys::VirtualKey::Grave),
             _ => None,
         };
 
@@ -400,85 +256,47 @@ unsafe fn handle_client(
                 let val = if msg_type == 1 { 1 } else { 0 };
                 let action = p.handle_key(key, val, shift);
                 drop(p);
-                update_gui_impl(&gui_tx, &processor);
+                
+                // 重点修复：在所有逻辑后强制对冲 CapsLock 状态，且无论如何都要更新 GUI
+                if key_code == 0x14 && msg_type == 1 {
+                    keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+                    keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+                }
 
                 match action {
-                    Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); }
+                    Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor); }
                     Action::DeleteAndEmit { delete, insert } => { 
-                        if delete > 0 {
-                            response.push(3);
-                            response.push(delete as u8);
-                        } else {
-                            response.push(1);
-                        }
+                        if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); }
                         response.extend_from_slice(insert.as_bytes()); 
+                        update_gui_impl(&gui_tx, &processor);
                     }
-                    Action::Consume => { 
-                        response.push(2); 
-                        // 特殊处理 CapsLock: 防止切换系统大写锁定状态
-                        if key_code == 0x14 {
-                            #[cfg(target_os = "windows")]
-                            unsafe {
-                                use windows::Win32::UI::Input::KeyboardAndMouse::*;
-                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
-                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-                            }
-                        }
-                    }
+                    Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor); }
                     Action::Alert => {
                         use windows::Win32::Media::Audio::*;
-                        let root = crate::find_project_root();
-                        let sound_path = root.join("sounds/beep.wav");
-                        if sound_path.exists() {
-                            let path_w = windows::core::HSTRING::from(sound_path.to_string_lossy().as_ref());
-                            let _ = windows::core::PCWSTR(path_w.as_ptr()); // Just to keep path alive if needed
-                            let _ = PlaySoundW(windows::core::PCWSTR(path_w.as_ptr()), None, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
-                        }
-                        response.push(2);
+                        let sound_path = crate::find_project_root().join("sounds/beep.wav");
+                        if sound_path.exists() { let path_w = windows::core::HSTRING::from(sound_path.to_string_lossy().as_ref()); let _ = PlaySoundW(windows::core::PCWSTR(path_w.as_ptr()), None, SND_FILENAME | SND_ASYNC | SND_NODEFAULT); }
+                        response.push(2); update_gui_impl(&gui_tx, &processor);
                     }
                     Action::Notify(summary, _body) => {
-                        // 特殊处理 CapsLock: 防止切换系统大写锁定状态
-                        if key_code == 0x14 {
-                            #[cfg(target_os = "windows")]
-                            unsafe {
-                                use windows::Win32::UI::Input::KeyboardAndMouse::*;
-                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
-                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-                            }
-                        }
-                        let (active, profile) = {
-                            let p = processor.lock().unwrap();
-                            (p.chinese_enabled, p.get_current_profile_display())
-                        };
-                        if let Some(ref tx) = gui_tx {
-                            let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active));
-                        }
-                        let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
-                            chinese_enabled: active, 
-                            active_profile: profile 
-                        });
+                        let (active, profile) = { let p = processor.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
+                        if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active)); }
+                        let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: active, active_profile: profile });
+                        // 强制更新主 GUI 状态，确保在 Notify 之后，光标处的拼音/提示能被重置
+                        update_gui_impl(&gui_tx, &processor);
                         response.push(2); 
                     }
                     _ => { response.push(0); }
                 }
             } else {
-                // TestKeyDown (2) 或 TestKeyUp (4)
                 let p = processor.lock().unwrap();
                 let is_letter = key_code >= 0x41 && key_code <= 0x5A;
-                let is_special_intercept = key_code == 0x14; // CapsLock
-                let is_punctuation = match key_code {
-                    0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true,
-                    0x30..=0x39 if shift => true,
-                    _ => false,
-                };
+                let is_special_intercept = key_code == 0x14;
+                let is_punctuation = match key_code { 0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true, 0x30..=0x39 if shift => true, _ => false };
                 if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punctuation || is_special_intercept) { response.push(2); } else { response.push(0); }
             }
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+            let _ = WriteFile(handle, Some(&response), Some(&mut 0), None);
         } else {
-            let response = vec![0u8]; 
-            let mut bytes_written = 0;
-            let _ = WriteFile(handle, Some(&response), Some(&mut bytes_written), None);
+            let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
         }
     }
 }

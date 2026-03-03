@@ -77,6 +77,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0 | WS_EX_TOPMOST.0;
                     ex_style &= !WS_EX_APPWINDOW.0;
                     let _ = SetWindowLongPtrW(s_hwnd, GWL_EXSTYLE, ex_style as isize);
+                    
+                    let mut work_area = windows::Win32::Foundation::RECT::default();
+                    if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
+                        // 预留足够空间给自适应宽度的状态栏
+                        let x = work_area.right - 80; 
+                        let y = work_area.bottom - 40;
+                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
+                    }
                 }
             }
         });
