@@ -84,9 +84,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                     
                     let mut work_area = windows::Win32::Foundation::RECT::default();
                     if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                        let x = work_area.right - 50; 
+                        let x = work_area.right - 60; 
                         let y = work_area.bottom - 40;
-                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 40, 26, SWP_NOACTIVATE);
+                        let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
                     }
                 }
             }
@@ -194,9 +194,9 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config) {
                                     if s_hwnd.0 != 0 {
                                         let mut work_area = windows::Win32::Foundation::RECT::default();
                                         if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                                            let x = work_area.right - 50;
+                                            let x = work_area.right - sb.window().size().width as i32 - 20;
                                             let y = work_area.bottom - 40;
-                                            let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 40, 26, SWP_NOACTIVATE);
+                                            let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
                                         }
                                     }
                                 }
