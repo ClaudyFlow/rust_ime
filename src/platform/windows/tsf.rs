@@ -411,7 +411,18 @@ unsafe fn handle_client(
                         }
                         response.extend_from_slice(insert.as_bytes()); 
                     }
-                    Action::Consume => { response.push(2); }
+                    Action::Consume => { 
+                        response.push(2); 
+                        // 特殊处理 CapsLock: 防止切换系统大写锁定状态
+                        if key_code == 0x14 {
+                            #[cfg(target_os = "windows")]
+                            unsafe {
+                                use windows::Win32::UI::Input::KeyboardAndMouse::*;
+                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+                            }
+                        }
+                    }
                     Action::Alert => {
                         use windows::Win32::Media::Audio::*;
                         let root = crate::find_project_root();
@@ -424,6 +435,15 @@ unsafe fn handle_client(
                         response.push(2);
                     }
                     Action::Notify(summary, _body) => {
+                        // 特殊处理 CapsLock: 防止切换系统大写锁定状态
+                        if key_code == 0x14 {
+                            #[cfg(target_os = "windows")]
+                            unsafe {
+                                use windows::Win32::UI::Input::KeyboardAndMouse::*;
+                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+                                keybd_event(VK_CAPITAL.0 as u8, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+                            }
+                        }
                         let (active, profile) = {
                             let p = processor.lock().unwrap();
                             (p.chinese_enabled, p.get_current_profile_display())
