@@ -163,15 +163,11 @@ impl ITfTextInputProcessor_Impl for TextService {
                 keystroke_mgr.AdviseKeyEventSink(client_id, &sink, true)?;
             }
         }
-        // 通知服务器已激活
-        let _ = self.send_key_to_server(5, 0, 0, None);
         Ok(())
     }
 
     fn Deactivate(&self) -> Result<()> {
         log("RustIME: TextService::Deactivate");
-        // 通知服务器已停用，隐藏状态栏
-        let _ = self.send_key_to_server(6, 0, 0, None);
         
         let mgr_opt = {
             let mut lock = self.thread_mgr.write().expect("Failed to lock thread_mgr for write in Deactivate");

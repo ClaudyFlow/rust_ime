@@ -122,53 +122,6 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         let modifiers = buffer[5];
         let shift = (modifiers & 1) != 0; let ctrl = (modifiers & 2) != 0; let alt = (modifiers & 4) != 0;
         
-        if msg_type == 5 { // Activated
-            // println!("[TSF] Client activated, showing status bar");
-            {
-                let mut p = processor.lock().unwrap();
-                p.reset();
-                let short = p.get_short_display();
-                let enabled = p.chinese_enabled;
-                if let Some(ref tx) = gui_tx {
-                    let _ = tx.send(GuiEvent::ShowStatus(short, enabled));
-                    let _ = tx.send(GuiEvent::SetVisible(true));
-                    let _ = tx.send(GuiEvent::Update {
-                        pinyin: "".into(),
-                        candidates: vec![],
-                        hints: vec![],
-                        selected: 0,
-                        sentence: "".into(),
-                        cursor_pos: 0,
-                        commit_mode: "single".into(),
-                    });
-                }
-            }
-            let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
-            continue;
-        }
-
-        if msg_type == 6 { // Deactivated
-            // println!("[TSF] Client deactivated, hiding status bar");
-            {
-                let mut p = processor.lock().unwrap();
-                p.reset();
-                if let Some(ref tx) = gui_tx {
-                    let _ = tx.send(GuiEvent::SetVisible(false));
-                    let _ = tx.send(GuiEvent::Update {
-                        pinyin: "".into(),
-                        candidates: vec![],
-                        hints: vec![],
-                        selected: 0,
-                        sentence: "".into(),
-                        cursor_pos: 0,
-                        commit_mode: "single".into(),
-                    });
-                }
-            }
-            let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
-            continue;
-        }
-
         if msg_type == 1 && bytes_read >= 14 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
