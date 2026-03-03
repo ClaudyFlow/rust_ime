@@ -41,31 +41,81 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
     let status_bar_handle = status_bar.as_weak();
     let tray_menu_handle = tray_menu.as_weak();
 
+    let last_active_hwnd = std::sync::Arc::new(std::sync::atomic::AtomicIsize::new(0));
+    
     // 绑定托盘菜单回调
     {
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_toggle_ime(move || { let _ = tx.send(TrayEvent::ToggleIme); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_toggle_ime(move || { 
+            let _ = tx.send(TrayEvent::ToggleIme); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
         
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_next_profile(move || { let _ = tx.send(TrayEvent::NextProfile); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_next_profile(move || { 
+            let _ = tx.send(TrayEvent::NextProfile); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
         
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_open_config(move || { let _ = tx.send(TrayEvent::OpenConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_open_config(move || { 
+            let _ = tx.send(TrayEvent::OpenConfig); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
         
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_reload_config(move || { let _ = tx.send(TrayEvent::ReloadConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_reload_config(move || { 
+            let _ = tx.send(TrayEvent::ReloadConfig); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
         
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_restart(move || { let _ = tx.send(TrayEvent::Restart); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_restart(move || { 
+            let _ = tx.send(TrayEvent::Restart); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
         
+        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_exit(move || { let _ = tx.send(TrayEvent::Exit); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
+        tray_menu.on_exit(move || { 
+            let _ = tx.send(TrayEvent::Exit); 
+            if let Some(m) = tm.upgrade() { 
+                let _ = m.window().hide(); 
+                #[cfg(target_os = "windows")]
+                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
+            } 
+        });
     }
 
     // 初始设置
