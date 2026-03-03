@@ -124,12 +124,24 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         
         if msg_type == 5 { // Activated
             // println!("[TSF] Client activated, showing status bar");
-            if let Some(ref tx) = gui_tx {
-                let p = processor.lock().unwrap();
+            {
+                let mut p = processor.lock().unwrap();
+                p.reset();
                 let short = p.get_short_display();
                 let enabled = p.chinese_enabled;
-                let _ = tx.send(GuiEvent::ShowStatus(short, enabled));
-                let _ = tx.send(GuiEvent::SetVisible(true));
+                if let Some(ref tx) = gui_tx {
+                    let _ = tx.send(GuiEvent::ShowStatus(short, enabled));
+                    let _ = tx.send(GuiEvent::SetVisible(true));
+                    let _ = tx.send(GuiEvent::Update {
+                        pinyin: "".into(),
+                        candidates: vec![],
+                        hints: vec![],
+                        selected: 0,
+                        sentence: "".into(),
+                        cursor_pos: 0,
+                        commit_mode: "single".into(),
+                    });
+                }
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
             continue;
@@ -137,8 +149,21 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
 
         if msg_type == 6 { // Deactivated
             // println!("[TSF] Client deactivated, hiding status bar");
-            if let Some(ref tx) = gui_tx {
-                let _ = tx.send(GuiEvent::SetVisible(false));
+            {
+                let mut p = processor.lock().unwrap();
+                p.reset();
+                if let Some(ref tx) = gui_tx {
+                    let _ = tx.send(GuiEvent::SetVisible(false));
+                    let _ = tx.send(GuiEvent::Update {
+                        pinyin: "".into(),
+                        candidates: vec![],
+                        hints: vec![],
+                        selected: 0,
+                        sentence: "".into(),
+                        cursor_pos: 0,
+                        commit_mode: "single".into(),
+                    });
+                }
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
             continue;

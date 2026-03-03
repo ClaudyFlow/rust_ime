@@ -398,6 +398,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let _ = sb.window().hide();
                             }
                         }
+                        if !visible {
+                            if let Some(w) = h.upgrade() {
+                                let _ = w.window().hide();
+                            }
+                        }
                     }
                     GuiEvent::MoveTo { x, y } => {
                         if x == 0 && y == 0 { return; }
