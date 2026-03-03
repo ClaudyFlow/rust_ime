@@ -46,12 +46,12 @@ impl Tray for ImeTray {
 
         vec![
             StandardItem {
-                label: format!("中英切换: {}", if self.chinese_enabled { "当前:中" } else { "当前:英" }),
+                label: format!("输入法: {}", if self.chinese_enabled { "中" } else { "英" }),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleIme); }),    
                 ..Default::default()
             }.into(),
             StandardItem {
-                label: format!("切换方案: {}", profile_zh),
+                label: format!("词典方案: {}", profile_zh),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::NextProfile); }),  
                 ..Default::default()
             }.into(),
@@ -244,7 +244,7 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
     let h_menu = CreatePopupMenu().unwrap();
     if let Some(ref state_arc) = TRAY_STATE {
         if let Ok(state) = state_arc.lock() {
-            let mode_label = format!("中英切换: {}", if state.chinese_enabled { "当前:中" } else { "当前:英" });
+            let mode_label = format!("输入法: {}", if state.chinese_enabled { "中" } else { "英" });
             let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(HSTRING::from(&mode_label).as_ptr()));    
 
             let profile_zh = match state.active_profile.as_str() {
@@ -254,7 +254,7 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32) {
                 "mixed" => "中日英混",
                 other => other,
             };
-            let profile_label = format!("切换方案: {}", profile_zh);
+            let profile_label = format!("词典方案: {}", profile_zh);
             let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(HSTRING::from(&profile_label).as_ptr())); 
             
             let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, PCWSTR(std::ptr::null()));
