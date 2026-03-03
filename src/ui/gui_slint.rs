@@ -222,8 +222,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let _ = w.window().hide();
                                 was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                             } else {
-                                if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
-                                    if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                                if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                                    if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
                                         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
                                         let r = (now % 150 + 50) as u8;
@@ -231,8 +231,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                         let b = ((now >> 16) % 150 + 50) as u8;
                                         let mut c = color_shared.lock().unwrap();
                                         *c = slint::Color::from_rgb_u8(r, g, b);
+                                        was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
                                     }
-                                    was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
+                                } else {
+                                    // 未开启随机高亮时，确保 was_visible 标志同步
+                                    if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
+                                        was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
+                                    }
                                 }
                                 
                                 {

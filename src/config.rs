@@ -248,9 +248,9 @@ impl Config {
 
                 preview_mode: "pinyin".to_string(),
                 show_english_aux: true,
-                show_english_translation: true,
-                enable_random_highlight: true,
-                show_stroke_aux: true,
+                show_english_translation: false,
+                enable_random_highlight: false,
+                show_stroke_aux: false,
                 show_pinyin_hint: true,
                 show_learning_stroke_hint: true,
                 show_learning_english_hint: true,

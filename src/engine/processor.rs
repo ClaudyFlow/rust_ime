@@ -1444,26 +1444,22 @@ impl Processor {
             
             let is_pure_english = self.active_profiles.len() == 1 && self.active_profiles[0] == "english";
 
-            // 英文翻译显示：在英文方案中，en 字段存储的是中文翻译。
-            // 只要开启了显示翻译开关，或者当前处于纯英文模式，就显示 en 内容。
-            if !en.is_empty() && (self.show_english_translation || is_pure_english) {
-                if !h.is_empty() { h.push(' '); }
-                h.push_str(&en);
-            }
-
-            // 笔画辅助码显示：仅在非纯英文模式下，或者显式开启了笔画显示时才增加。
-            if !stroke_aux.is_empty() && (self.show_stroke_aux || self.aux_mode == AuxMode::Stroke) {
-                if !h.is_empty() { h.push(' '); }
-                h.push_str(&get_stroke_desc(&stroke_aux));
-            }
-
-            // 针对 AuxMode::English 的特殊处理
-            if self.aux_mode == AuxMode::English && !is_pure_english && !self.show_english_translation && !en.is_empty() {
-                 // 如果辅码模式是英文，且没开翻译显示，且不是纯英文方案，那么 en 可能作为辅码提示
-                 if !h.contains(&en) {
+            // 英文内容显示逻辑：
+            // 1. 如果开启了翻译显示开关 (show_english_translation)
+            // 2. 或者当前处于纯英文模式 (is_pure_english)
+            // 3. 或者当前辅码模式是 English 且没开翻译显示 (此时作为辅码提示显示)
+            if !en.is_empty() {
+                let should_show_en = self.show_english_translation || is_pure_english || (self.aux_mode == AuxMode::English && !self.show_english_translation);
+                if should_show_en {
                     if !h.is_empty() { h.push(' '); }
                     h.push_str(&en);
-                 }
+                }
+            }
+
+            // 笔画辅助码显示逻辑：必须显式开启了笔画显示开关 (show_stroke_aux)
+            if self.show_stroke_aux && !stroke_aux.is_empty() {
+                if !h.is_empty() { h.push(' '); }
+                h.push_str(&get_stroke_desc(&stroke_aux));
             }
             
             self.candidate_hints.push(h);
