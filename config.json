@@ -154,10 +154,12 @@
         "d": "ai", "j": "an", "t": "ue", "c": "ao", "s": "ong",
         "z": "ou", "y": "un", "w": "ei", "l": "iang"
       }
+    "hotkeys": {
+      "switch_language": { "key": "tab", "description": "核心: 切换中/英文模式" },
+      "enable_tab_toggle": true,
+      "enable_ctrl_space_toggle": false
     }
-  },
-  "hotkeys": {
-    "switch_language": { "key": "tab", "description": "核心: 切换中/英文模式" },
+    }
     "switch_language_alt": { "key": "ctrl+space", "description": "核心: 切换中/英文模式 (备选)" },
     "switch_dictionary": { "key": "ctrl+alt+s", "description": "功能: 切换输入方案/词库" },
     "cycle_preview_mode": { "key": "ctrl+alt+p", "description": "界面: 切换屏幕预览模式" },

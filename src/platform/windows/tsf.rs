@@ -300,7 +300,9 @@ unsafe fn handle_client(
         // 2. 核心切换热键优先匹配 (使用传入的 config)
         let is_lang_toggle = {
             let c = config.read().unwrap(); 
-            is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift)
+            let tab_match = c.hotkeys.enable_tab_toggle && is_hk_match(&c.hotkeys.switch_language.key, key_code, ctrl, alt, shift);
+            let ctrl_space_match = c.hotkeys.enable_ctrl_space_toggle && (key_code == 0x20 && ctrl && !alt && !shift);
+            tab_match || ctrl_space_match
         };
         
         if is_lang_toggle {

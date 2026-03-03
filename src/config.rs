@@ -168,6 +168,8 @@ pub struct ProfileKey {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Hotkeys {
     pub switch_language: Hotkey,
+    pub enable_tab_toggle: bool,
+    pub enable_ctrl_space_toggle: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -302,7 +304,10 @@ impl Config {
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
+                enable_tab_toggle: true,
+                enable_ctrl_space_toggle: false,
             },
+
         }
     }
 }
