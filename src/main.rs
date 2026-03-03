@@ -601,24 +601,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     let _ = gui_tx_tray.send(GuiEvent::OpenTrayMenu { x, y, chinese_enabled: enabled, active_profile: profile });
                 }
-                ui::tray::TrayEvent::Restart => {
-                    let exe_path = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("rust-ime.exe"));
-                    let exe_str = exe_path.to_string_lossy();
-                    #[cfg(target_os = "windows")]
-                    {
-                        // 使用 cmd /c 配合 timeout，确保主进程退出并释放互斥锁
-                        let full_cmd = format!("timeout /t 1 /nobreak > nul & start \"\" \"{}\"", exe_str);
-                        let _ = std::process::Command::new("cmd")
-                            .arg("/c")
-                            .arg(full_cmd)
-                            .spawn();
-                    }
-                    #[cfg(not(target_os = "windows"))]
-                    {
-                        let _ = std::process::Command::new(&exe_path).spawn();
-                    }
-                    std::process::exit(0);
-                }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
             }
         }

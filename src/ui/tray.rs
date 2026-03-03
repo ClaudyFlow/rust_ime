@@ -11,7 +11,6 @@ pub enum TrayEvent {
     ToggleIme,
     NextProfile,
     OpenConfig,
-    Restart,
     Exit,
     ReloadConfig,
     SyncStatus { chinese_enabled: bool, active_profile: String },
@@ -65,11 +64,6 @@ impl Tray for ImeTray {
             StandardItem {
                 label: "重载词库配置".to_string(),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ReloadConfig); }), 
-                ..Default::default()
-            }.into(),
-            StandardItem {
-                label: "重启程序".to_string(),
-                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::Restart); }),      
                 ..Default::default()
             }.into(),
             MenuItem::Separator,
@@ -231,7 +225,6 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     1002 => { let _ = tx.send(TrayEvent::NextProfile); }
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
-                    1013 => { let _ = tx.send(TrayEvent::Restart); }
                     1014 => { let _ = tx.send(TrayEvent::Exit); }
                     _ => {}
                 }

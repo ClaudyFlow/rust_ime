@@ -97,11 +97,6 @@ export component TrayMenu inherits Window {
                 icon_text: "🔄";
                 clicked => { root.reload_config(); }
             }
-            TrayMenuItem {
-                text: "重启程序";
-                icon_text: "↻";
-                clicked => { root.restart(); }
-            }
 
             Rectangle { height: 12px; VerticalLayout { padding-top: 6px; padding-bottom: 6px; Rectangle { height: 1px; background: #ebf0f4; } } }
 

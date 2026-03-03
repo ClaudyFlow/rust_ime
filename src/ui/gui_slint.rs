@@ -96,18 +96,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
         let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_restart(move || { 
-            let _ = tx.send(TrayEvent::Restart); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
-        
-        let lah = last_active_hwnd.clone();
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
         tray_menu.on_exit(move || { 
             let _ = tx.send(TrayEvent::Exit); 
             if let Some(m) = tm.upgrade() { 
