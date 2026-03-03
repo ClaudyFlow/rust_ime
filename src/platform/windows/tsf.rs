@@ -123,19 +123,22 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         let shift = (modifiers & 1) != 0; let ctrl = (modifiers & 2) != 0; let alt = (modifiers & 4) != 0;
         
         if msg_type == 5 { // Activated
+            // println!("[TSF] Client activated, showing status bar");
             if let Some(ref tx) = gui_tx {
                 let p = processor.lock().unwrap();
                 let short = p.get_short_display();
                 let enabled = p.chinese_enabled;
                 let _ = tx.send(GuiEvent::ShowStatus(short, enabled));
+                let _ = tx.send(GuiEvent::SetVisible(true));
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
             continue;
         }
 
         if msg_type == 6 { // Deactivated
+            // println!("[TSF] Client deactivated, hiding status bar");
             if let Some(ref tx) = gui_tx {
-                let _ = tx.send(GuiEvent::ShowStatus("".into(), false)); // is_active = false will hide it
+                let _ = tx.send(GuiEvent::SetVisible(false));
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
             continue;

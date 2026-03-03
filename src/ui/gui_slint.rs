@@ -9,9 +9,28 @@ slint::include_modules!();
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::WindowsAndMessaging::*;
 #[cfg(target_os = "windows")]
+use windows::Win32::Foundation::*;
+#[cfg(target_os = "windows")]
 use windows::core::PCWSTR;
 #[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+
+#[cfg(target_os = "windows")]
+unsafe fn hide_window_from_taskbar(title_str: &str) {
+    let mut title_w: Vec<u16> = title_str.encode_utf16().collect();
+    title_w.push(0);
+    let hwnd = FindWindowW(None, PCWSTR(title_w.as_ptr()));
+    if hwnd.0 != 0 {
+        let mut ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        if (ex_style & WS_EX_TOOLWINDOW.0) == 0 {
+            ex_style |= WS_EX_TOOLWINDOW.0;
+            ex_style &= !WS_EX_APPWINDOW.0;
+            let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
+            // 刷新窗口样式以生效
+            let _ = SetWindowPos(hwnd, HWND(0), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+        }
+    }
+}
 
 pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEvent>) {
     let window = CandidateWindow::new().expect("Failed to create CandidateWindow");
@@ -183,6 +202,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                 match event {
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
+                            #[cfg(target_os = "windows")]
+                            unsafe { hide_window_from_taskbar("RustImeCandidateWindow"); }
                             let should_be_visible = !(pinyin.is_empty() && candidates.is_empty()) && show_candidates_for_loop.load(std::sync::atomic::Ordering::SeqCst);
                             
                             if !should_be_visible {
@@ -254,6 +275,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         open_menu_time_inner.store(now, std::sync::atomic::Ordering::SeqCst);
 
                         if let Some(tm) = tm_handle.upgrade() {
+                            #[cfg(target_os = "windows")]
+                            unsafe { hide_window_from_taskbar("RustImeTrayMenu"); }
                             tm.set_chinese_enabled(chinese_enabled);
                             tm.set_active_profile(SharedString::from(active_profile));
                             
@@ -288,32 +311,33 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             }
                         }
                     }
-                    GuiEvent::ShowStatus(status, is_active) => {
+                    GuiEvent::ShowStatus(status, is_chinese) => {
                         if let Some(sb) = s.upgrade() {
+                            #[cfg(target_os = "windows")]
+                            unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
                             sb.set_status_text(SharedString::from(status.clone()));
-                            sb.set_chinese_enabled(is_active);
-                            // 核心修改：如果是非激活状态（切换到了别的输入法），或者配置禁用了状态栏，则隐藏
-                            let show_sb = is_active && show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
-                            if show_sb { let _ = sb.window().show(); } else { let _ = sb.window().hide(); }
-
-                            let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
-                            let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly - 50)));
-                            slint::Timer::single_shot(std::time::Duration::from_millis(1000), move || {
+                            sb.set_chinese_enabled(is_chinese);
+                            
+                            let show_pref = show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                            if show_pref && !sb.window().is_visible() {
+                                let _ = sb.window().show();
+                            }
+                        }
+                        // 同步更新托盘菜单界面
+                        if let Some(tm) = tm_handle.upgrade() {
+                            tm.set_chinese_enabled(is_chinese);
+                        }
+                    }
+                    GuiEvent::SetVisible(visible) => {
+                        if let Some(sb) = s.upgrade() {
+                            let show_pref = show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                            if visible && show_pref {
                                 #[cfg(target_os = "windows")]
-                                unsafe {
-                                    let s_title = "RustImeStatusBar\0".encode_utf16().collect::<Vec<u16>>();
-                                    let s_hwnd = FindWindowW(None, PCWSTR(s_title.as_ptr()));
-                                    if s_hwnd.0 != 0 {
-                                        let mut work_area = windows::Win32::Foundation::RECT::default();
-                                        if SystemParametersInfoW(SPI_GETWORKAREA, 0, Some(&mut work_area as *mut _ as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)).is_ok() {
-                                            let win_width = sb.window().size().width as i32;
-                                            let x = work_area.right - win_width - 20;
-                                            let y = work_area.bottom - 40;
-                                            let _ = SetWindowPos(s_hwnd, HWND_TOPMOST, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);
-                                        }
-                                    }
-                                }
-                            });
+                                unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
+                                let _ = sb.window().show();
+                            } else {
+                                let _ = sb.window().hide();
+                            }
                         }
                     }
                     GuiEvent::MoveTo { x, y } => {
