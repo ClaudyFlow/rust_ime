@@ -39,8 +39,8 @@ export component TrayMenu inherits Window {
     title: "RustImeTrayMenu";
     always-on-top: true;
     no-frame: true;
-    background: #ffffff;
-    
+    background: transparent;
+
     in property <bool> chinese_enabled;
     in property <string> active_profile;
 
@@ -48,17 +48,18 @@ export component TrayMenu inherits Window {
     callback next_profile();
     callback open_config();
     callback reload_config();
-    callback restart();
     callback exit();
     
+    // 用于自动关闭逻辑：通过 FocusScope 暴露焦点状态
+    out property <bool> has_focus: fs.has-focus;
     public function request_focus() {
-        focus_scope.focus();
+        fs.focus();
     }
 
     width: 200px;
     height: menu-container.preferred-height;
-
-    focus_scope := FocusScope {}
+    
+    fs := FocusScope {}
 
     menu-container := Rectangle {
         background: #ffffff;
@@ -84,7 +85,7 @@ export component TrayMenu inherits Window {
                 icon_text: "📖";
                 clicked => { root.next_profile(); }
             }
-            
+
             Rectangle { height: 12px; VerticalLayout { padding-top: 6px; padding-bottom: 6px; Rectangle { height: 1px; background: #ebf0f4; } } }
 
             TrayMenuItem {

@@ -26,7 +26,6 @@ unsafe fn hide_window_from_taskbar(title_str: &str) {
             ex_style |= WS_EX_TOOLWINDOW.0;
             ex_style &= !WS_EX_APPWINDOW.0;
             let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
-            // 刷新窗口样式以生效
             let _ = SetWindowPos(hwnd, HWND(0), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE);
         }
     }
@@ -41,69 +40,27 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
     let status_bar_handle = status_bar.as_weak();
     let tray_menu_handle = tray_menu.as_weak();
 
-    let last_active_hwnd = std::sync::Arc::new(std::sync::atomic::AtomicIsize::new(0));
-    
     // 绑定托盘菜单回调
     {
-        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_toggle_ime(move || { 
-            let _ = tx.send(TrayEvent::ToggleIme); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
+        tray_menu.on_toggle_ime(move || { let _ = tx.send(TrayEvent::ToggleIme); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
         
-        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_next_profile(move || { 
-            let _ = tx.send(TrayEvent::NextProfile); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
+        tray_menu.on_next_profile(move || { let _ = tx.send(TrayEvent::NextProfile); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
         
-        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_open_config(move || { 
-            let _ = tx.send(TrayEvent::OpenConfig); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
+        tray_menu.on_open_config(move || { let _ = tx.send(TrayEvent::OpenConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
         
-        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_reload_config(move || { 
-            let _ = tx.send(TrayEvent::ReloadConfig); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
+        tray_menu.on_reload_config(move || { let _ = tx.send(TrayEvent::ReloadConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
         
-        let lah = last_active_hwnd.clone();
         let tx = tray_tx.clone();
         let tm = tray_menu_handle.clone();
-        tray_menu.on_exit(move || { 
-            let _ = tx.send(TrayEvent::Exit); 
-            if let Some(m) = tm.upgrade() { 
-                let _ = m.window().hide(); 
-                #[cfg(target_os = "windows")]
-                unsafe { let prev = lah.load(std::sync::atomic::Ordering::SeqCst); if prev != 0 { let _ = SetForegroundWindow(HWND(prev as isize)); } }
-            } 
-        });
+        tray_menu.on_exit(move || { let _ = tx.send(TrayEvent::Exit); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
     }
 
     // 初始设置
@@ -141,7 +98,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
     let random_highlight_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_random_highlight));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
     
-    // 共享颜色状态，解决随机色不更新问题
     let current_color_shared = std::sync::Arc::new(std::sync::Mutex::new(parse_color(&config.appearance.window_highlight_color)));
     
     let last_pos = std::sync::Arc::new(std::sync::Mutex::new((0i32, 0i32)));
@@ -200,29 +156,36 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
 
     // 定时器：检测托盘菜单失去焦点自动隐藏
     let tm_for_timer = tray_menu_handle.clone();
-    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(150), move || {
+    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
         if let Some(tm) = tm_for_timer.upgrade() {
             if tm.window().is_visible() {
+                // 如果 Slint 报告窗口不再处于活跃状态，则尝试隐藏
+                if !tm.get_has_focus() {
+                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+                    let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
+                    if now - open_time > 800 {
+                        let _ = tm.window().hide();
+                        return;
+                    }
+                }
+                
                 #[cfg(target_os = "windows")]
                 unsafe {
                     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
                     let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
-                    if now - open_time < 600 { return; } 
+                    if now - open_time < 800 { return; } 
 
                     let active_hwnd = GetForegroundWindow();
                     let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                     let menu_hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                     
                     if menu_hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != menu_hwnd {
-                        // 检查活动窗口是否是菜单的子窗口或属于同一线程（处理某些特殊 UI 情况）
                         let active_thread_id = GetWindowThreadProcessId(active_hwnd, None);
                         let menu_thread_id = GetWindowThreadProcessId(menu_hwnd, None);
                         if active_thread_id != menu_thread_id {
                             let _ = tm.window().hide();
                         }
                     } else if active_hwnd.0 == 0 {
-                        // 桌面或任务栏等特殊区域，没有明确的 Foreground Window 时也尝试隐藏
-                        // 只要距离打开时间够久且当前没焦点
                         let _ = tm.window().hide();
                     }
                 }
@@ -245,7 +208,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
             let open_menu_time_inner = open_menu_time_for_thread.clone();
-            let lah_inner = last_active_hwnd.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -323,17 +285,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
                         open_menu_time_inner.store(now, std::sync::atomic::Ordering::SeqCst);
 
-                        #[cfg(target_os = "windows")]
-                        unsafe {
-                            let active = GetForegroundWindow();
-                            if active.0 != 0 {
-                                lah_inner.store(active.0 as isize, std::sync::atomic::Ordering::SeqCst);
-                            }
-                        }
-
                         if let Some(tm) = tm_handle.upgrade() {
-                            #[cfg(target_os = "windows")]
-                            unsafe { hide_window_from_taskbar("RustImeTrayMenu"); }
                             tm.set_chinese_enabled(chinese_enabled);
                             tm.set_active_profile(SharedString::from(active_profile));
                             
@@ -359,10 +311,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             
                             #[cfg(target_os = "windows")]
                             unsafe {
+                                std::thread::spawn(|| {
+                                    std::thread::sleep(std::time::Duration::from_millis(50));
+                                    let _ = slint::invoke_from_event_loop(|| {
+                                        unsafe { hide_window_from_taskbar("RustImeTrayMenu"); }
+                                    });
+                                });
                                 let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                                 if hwnd.0 != 0 {
-                                    // 确保窗口置顶并获取焦点
                                     let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
                                     let _ = SetForegroundWindow(hwnd);
                                 }
@@ -381,7 +338,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let _ = sb.window().show();
                             }
                         }
-                        // 同步更新托盘菜单界面
                         if let Some(tm) = tm_handle.upgrade() {
                             tm.set_chinese_enabled(is_chinese);
                         }
