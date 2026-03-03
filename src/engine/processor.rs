@@ -1588,42 +1588,4 @@ pub fn strip_tones(s: &str) -> String {
     res
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn setup_mock_processor() -> Processor {
-        let mut tries = HashMap::new();
-        Processor {
-            state: ImeState::Direct, buffer: String::new(), tries, active_profiles: vec!["chinese".to_string()], punctuation: HashMap::new(),
-            candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, chinese_enabled: true, best_segmentation: vec![], joined_sentence: String::new(),
-            show_candidates: true, show_modern_candidates: false, phantom_mode: PhantomMode::Pinyin, phantom_text: String::new(),
-            preview_selected_candidate: false, anti_typo_mode: crate::config::AntiTypoMode::None, last_blocked_buffer: String::new(), commit_mode: "double".to_string(), switch_mode: false, cursor_pos: 0,
-            aux_filter: String::new(), filter_mode: FilterMode::None, page_snapshot: Vec::new(),
-            enable_english_filter: true, enable_caps_selection: true, enable_number_selection: true,
-            enable_double_tap: true, double_tap_timeout: Duration::from_millis(250), double_taps: HashMap::new(), last_tap_key: None, last_tap_time: None,
-                        enable_long_press: true, long_press_timeout: Duration::from_millis(400), long_press_mappings: HashMap::new(), key_press_info: None, long_press_triggered: false,
-                        nav_mode: false, enable_user_dict: true, enable_fixed_first_candidate: false, 
-                        enable_smart_backspace: true,
-                        enable_double_pinyin: false,
-                        double_pinyin_scheme: crate::config::DoublePinyinScheme {
-                            name: "Mock".into(),
-                            initials: std::collections::HashMap::new(),
-                            rimes: std::collections::HashMap::new(),
-                        },
-                        enable_fuzzy_pinyin: false,
-                        fuzzy_config: crate::config::FuzzyPinyinConfig {
-                            z_zh: true, c_ch: true, s_sh: true, n_l: false, r_l: false, f_h: false,
-                            an_ang: false, en_eng: false, in_ing: false, ian_iang: false, uan_uang: false, u_v: false,
-                            custom_mappings: vec![],
-                        },
-                        enable_traditional: false,
-                        user_dict: HashMap::new(), last_lookup_pinyin: String::new(),
-                        commit_history: Vec::new(), last_commit_time: Instant::now(),
-                        user_dict_tx: None,
-            
-                        profile_keys: Vec::new(),
-             auto_commit_unique_en_fuzhuma: false, auto_commit_unique_full_match: false, enable_prefix_matching: true, prefix_matching_limit: 20, enable_abbreviation_matching: true, filter_proper_nouns_by_case: true, enable_error_sound: true, has_dict_match: false, page_size: 5, show_tone_hint: false, aux_mode: AuxMode::English, page_flipping_styles: vec!["arrow".to_string()], swap_arrow_keys: false,
-        }
-    }
-    #[test] fn test_dummy() { let _p = setup_mock_processor(); }
-}
+

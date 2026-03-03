@@ -285,8 +285,8 @@ unsafe fn handle_client(
         let ctrl = (modifiers & 2) != 0;
         let alt = (modifiers & 4) != 0;
         
-        // 1. 提取位置信息
-        if msg_type == 1 {
+        // 1. 提取位置信息 (仅当数据长度足够时读取)
+        if msg_type == 1 && bytes_read >= 14 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
             if x == 0 && y == 0 {
