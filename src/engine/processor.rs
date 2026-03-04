@@ -798,16 +798,14 @@ impl Processor {
                         if !profiles.is_empty() {
                             self.active_profiles = profiles;
                             let display = self.get_current_profile_display();
-                            let short_display = match display.to_lowercase().as_str() {
-                                "chinese" => "中",
-                                "english" => "英",
-                                "japanese" => "日",
-                                "mixed" => "混",
-                                _ => if display.len() > 1 { &display[..1] } else { &display }
-                            };
+                            let short_display = self.get_short_display();
                             let _ = self.lookup();
                             self.switch_mode = false;
-                            return Action::Notify(short_display.into(), format!("方案: {}", display));
+                            return Action::Notify(short_display, format!("方案: {}", display));
+                        } else {
+                            // 切换失败提示
+                            self.switch_mode = false;
+                            return Action::Notify("❌".into(), format!("错误: 方案 [{}] 的词库未加载", p_str));
                         }
                     }
                 }
