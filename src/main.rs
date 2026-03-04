@@ -243,7 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         active_profile: "".into(),
         show_status_bar_pref: config.read().unwrap().appearance.show_status_bar,
         show_candidates_pref: config.read().unwrap().appearance.show_candidates,
-        is_ime_active: false,
+        is_ime_active: true, // 默认开启，等待 TSF 实际反馈
         pinyin: "".into(),
         candidates: vec![],
         hints: vec![],
