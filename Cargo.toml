@@ -71,7 +71,8 @@ windows-core = "0.52"
 
 [build-dependencies]
 slint-build = "1.9"
-winres = "0.1"
+winres = "0.1.12"
+embed-resource = "1.8"
 
 [[bin]]
 name = "rust-ime"

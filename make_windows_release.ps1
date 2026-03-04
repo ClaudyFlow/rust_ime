@@ -81,4 +81,20 @@ pause
 $InstallBat | Out-File -FilePath "$ReleaseDir\install.bat" -Encoding ascii
 $UninstallBat | Out-File -FilePath "$ReleaseDir\uninstall.bat" -Encoding ascii
 
+# 6. Try to build Inno Setup package if ISCC.exe exists
+$ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+if (Test-Path $ISCC) {
+    Write-Host "Inno Setup found. Building installer package..." -ForegroundColor Cyan
+    & $ISCC "rust-ime.iss"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Installer created successfully: RustIME_Setup.exe" -ForegroundColor Green
+        Move-Item "Output\RustIME_Setup.exe" "release\RustIME_Setup_$Timestamp.exe"
+    }
+} else {
+    Write-Host "Inno Setup (ISCC.exe) not found at default location. Skipping installer build." -ForegroundColor Yellow
+}
+
 Write-Host "Packaging complete! Files are available in: $ReleaseDir" -ForegroundColor Yellow
+if (Test-Path "release\RustIME_Setup_$Timestamp.exe") {
+    Write-Host "One-click Installer: release\RustIME_Setup_$Timestamp.exe" -ForegroundColor Cyan
+}
