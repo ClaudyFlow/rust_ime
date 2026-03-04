@@ -156,35 +156,30 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
 
     // 定时器：检测托盘菜单失去焦点自动隐藏
     let tm_for_timer = tray_menu_handle.clone();
-    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
+    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(100), move || {
         if let Some(tm) = tm_for_timer.upgrade() {
             if tm.window().is_visible() {
-                // 如果 Slint 报告窗口不再处于活跃状态，则尝试隐藏
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+                let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
+                
+                // 缩短保护期到 200ms
+                if now - open_time < 200 { return; } 
+
+                // 1. 检查 Slint 内部焦点
                 if !tm.get_has_focus() {
-                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
-                    let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
-                    if now - open_time > 800 {
-                        let _ = tm.window().hide();
-                        return;
-                    }
+                    let _ = tm.window().hide();
+                    return;
                 }
                 
                 #[cfg(target_os = "windows")]
                 unsafe {
-                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
-                    let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
-                    if now - open_time < 800 { return; } 
-
                     let active_hwnd = GetForegroundWindow();
                     let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                     let menu_hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                     
+                    // 2. 检查 Windows 前台窗口
                     if menu_hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != menu_hwnd {
-                        let active_thread_id = GetWindowThreadProcessId(active_hwnd, None);
-                        let menu_thread_id = GetWindowThreadProcessId(menu_hwnd, None);
-                        if active_thread_id != menu_thread_id {
-                            let _ = tm.window().hide();
-                        }
+                        let _ = tm.window().hide();
                     } else if active_hwnd.0 == 0 {
                         let _ = tm.window().hide();
                     }
