@@ -295,6 +295,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.show_status_bar_pref = new_show;
+                    // 强制触发一次同步
                     let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }
                 ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => {

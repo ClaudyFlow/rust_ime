@@ -136,15 +136,12 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         let sb_opt = s.upgrade();
                         let w_opt = h.upgrade();
                         
-                        // 1. 状态栏逻辑 (物理隔离并基于偏好)
+                        // 1. 状态栏逻辑：完全解放！只要用户偏好开启，它就显示
                         if let Some(sb) = sb_opt {
                             sb.set_status_text(SharedString::from(state.status_text));
                             sb.set_chinese_enabled(state.chinese_enabled);
                             
-                            // 最终可见性 = 用户开启了状态栏。
-                            // 只有在明确失焦(state.is_ime_active == false)且不是在操作托盘时才考虑隐藏，
-                            // 但为了解决无法呼出的问题，我们让状态栏偏好拥有更高优先级。
-                            let final_sb_visible = state.show_status_bar_pref && state.is_ime_active;
+                            let final_sb_visible = state.show_status_bar_pref;
                             if final_sb_visible {
                                 #[cfg(target_os = "windows")]
                                 unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
@@ -154,9 +151,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             }
                         }
 
-                        // 2. 候选栏逻辑
+                        // 2. 候选栏逻辑：保留焦点绑定，确保它只在打字时出现
                         if let Some(w) = w_opt {
-                            // 最终可见性 = 输入法激活 && 用户开启了候选栏 && 有拼音输入
                             let final_w_visible = state.is_ime_active && state.show_candidates_pref && !state.pinyin.is_empty();
                             
                             if !final_w_visible {
