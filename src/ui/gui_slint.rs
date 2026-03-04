@@ -233,22 +233,25 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         }
                     }
                     GuiEvent::SetVisible(visible) => {
+                        // 1. 处理状态栏：只有当用户偏好开启且输入法激活时才显示
                         if let Some(sb) = s.upgrade() {
                             let show_pref = show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst);
-                            if visible && show_pref {
-                                #[cfg(target_os = "windows")]
-                                unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
-                                let _ = sb.window().show();
-                            } else {
-                                // 这里只有在输入法停用(!visible)时才真正隐藏
-                                if !visible {
-                                    let _ = sb.window().hide();
+                            if visible {
+                                if show_pref {
+                                    #[cfg(target_os = "windows")]
+                                    unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
+                                    let _ = sb.window().show();
                                 }
+                            } else {
+                                // 输入法停用时，无条件隐藏状态栏
+                                let _ = sb.window().hide();
                             }
                         }
+                        // 2. 处理候选栏：输入法停用时隐藏，激活时不在这里主动显示（由 Update 事件控制）
                         if !visible {
                             if let Some(w) = h.upgrade() {
                                 let _ = w.window().hide();
+                                was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                             }
                         }
                     }
