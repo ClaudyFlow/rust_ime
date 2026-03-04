@@ -211,9 +211,20 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
             if lparam.0 as u32 == WM_RBUTTONUP {
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
-                if let Some(ref tx) = TRAY_TX {
-                    let _ = tx.send(TrayEvent::RequestMenu { x: pt.x, y: pt.y });
-                }
+                
+                let h_menu = CreatePopupMenu().unwrap();
+                let _ = AppendMenuW(h_menu, MF_STRING, 1001, windows::core::w!("切换中/英"));
+                let _ = AppendMenuW(h_menu, MF_STRING, 1002, windows::core::w!("切换方案"));
+                let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
+                let _ = AppendMenuW(h_menu, MF_STRING, 1011, windows::core::w!("配置管理 (Web)"));
+                let _ = AppendMenuW(h_menu, MF_STRING, 1012, windows::core::w!("重载词库配置"));
+                let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
+                let _ = AppendMenuW(h_menu, MF_STRING, 1014, windows::core::w!("退出程序"));
+                
+                let _ = SetForegroundWindow(hwnd);
+                let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, None);
+                let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+                let _ = DestroyMenu(h_menu);
             }
             LRESULT(0)
         }

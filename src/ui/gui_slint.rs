@@ -281,61 +281,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             }
                         }
                     }
-                    GuiEvent::OpenTrayMenu { x, y, chinese_enabled, active_profile } => {
-                        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
-                        open_menu_time_inner.store(now, std::sync::atomic::Ordering::SeqCst);
-
-                        if let Some(tm) = tm_handle.upgrade() {
-                            tm.set_chinese_enabled(chinese_enabled);
-                            tm.set_active_profile(SharedString::from(active_profile));
-                            
-                            let mut final_x = x;
-                            let mut final_y = y;
-                            let win_width = 200; 
-                            
-                            let mut win_height = tm.window().size().height as i32;
-                            if win_height <= 0 { win_height = 260; } 
-
-                            #[cfg(target_os = "windows")]
-                            unsafe {
-                                let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x, y }, MONITOR_DEFAULTTONEAREST);
-                                let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
-                                if GetMonitorInfoW(monitor, &mut mi).as_bool() {
-                                    if final_x + win_width > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_width - 10; }
-                                    final_y = y - win_height;
-                                    if final_y < mi.rcMonitor.top { final_y = y; }
-                                }
-                            }
-                            
-                            let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
-                            let _ = tm.window().show();
-                            tm.invoke_request_focus();
-                            
-                            // 再次根据显示后的真实高度微调
-                            let real_height = tm.window().size().height as i32;
-                            if real_height > 0 && real_height != win_height {
-                                let _ = tm.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, y - real_height)));
-                            }
-                            
-                            #[cfg(target_os = "windows")]
-                            unsafe {
-                                std::thread::spawn(|| {
-                                    std::thread::sleep(std::time::Duration::from_millis(50));
-                                    let _ = slint::invoke_from_event_loop(|| {
-                                        unsafe { hide_window_from_taskbar("RustImeTrayMenu"); }
-                                    });
-                                });
-                                let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
-                                let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
-                                if hwnd.0 != 0 {
-                                    let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
-                                    let _ = SetForegroundWindow(hwnd);
-                                    // 强制重绘，解决第二次点开显示不全的问题
-                                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
-                                    let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
-                                }
-                            }
-                        }
+                    GuiEvent::OpenTrayMenu { .. } => {
+                        // 禁用 Slint 菜单，已改用原生菜单
                     }
                     GuiEvent::ShowStatus(status, is_chinese) => {
                         if let Some(sb) = s.upgrade() {
