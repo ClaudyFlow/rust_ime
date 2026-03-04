@@ -212,19 +212,54 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
                 
-                let h_menu = CreatePopupMenu().unwrap();
-                let _ = AppendMenuW(h_menu, MF_STRING, 1001, windows::core::w!("切换中/英"));
-                let _ = AppendMenuW(h_menu, MF_STRING, 1002, windows::core::w!("切换方案"));
-                let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
-                let _ = AppendMenuW(h_menu, MF_STRING, 1011, windows::core::w!("配置管理 (Web)"));
-                let _ = AppendMenuW(h_menu, MF_STRING, 1012, windows::core::w!("重载词库配置"));
-                let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
-                let _ = AppendMenuW(h_menu, MF_STRING, 1014, windows::core::w!("退出程序"));
-                
-                let _ = SetForegroundWindow(hwnd);
-                let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, None);
-                let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
-                let _ = DestroyMenu(h_menu);
+                if let Some(state_arc) = &TRAY_STATE {
+                    if let Ok(state) = state_arc.lock() {
+                        let h_menu = CreatePopupMenu().unwrap();
+                        
+                        // 1. 输入法状态
+                        let activated_label = format!("输入法: {}", if state.chinese_enabled { "激活 (中)" } else { "未激活 (英)" });
+                        let mut activated_w: Vec<u16> = activated_label.encode_utf16().collect();
+                        activated_w.push(0);
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(activated_w.as_ptr()));
+                        
+                        // 2. 词典方案
+                        let profile_zh = match state.active_profile.as_str() {
+                            "chinese" => "中文",
+                            "english" => "英文",
+                            "japanese" => "日文",
+                            "mixed" => "混合",
+                            other => other,
+                        };
+                        let profile_label = format!("词典方案: {}", profile_zh);
+                        let mut profile_w: Vec<u16> = profile_label.encode_utf16().collect();
+                        profile_w.push(0);
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(profile_w.as_ptr()));
+                        
+                        let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
+                        
+                        // 3. 管理设置
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1011, windows::core::w!("管理设置 (Web)"));
+                        
+                        // 4. 重载词库
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1012, windows::core::w!("重载词库配置"));
+                        
+                        let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
+                        
+                        // 5. 退出程序
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1014, windows::core::w!("退出程序"));
+                        
+                        // 强制夺取焦点：这是菜单点击外部能自动消失的关键
+                        let _ = SetForegroundWindow(hwnd);
+                        
+                        // 弹出并追踪菜单
+                        let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, None);
+                        
+                        // 发送空消息：这是 Windows 托盘的经典补丁，确保下次弹出正常
+                        let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
+                        
+                        let _ = DestroyMenu(h_menu);
+                    }
+                }
             }
             LRESULT(0)
         }
