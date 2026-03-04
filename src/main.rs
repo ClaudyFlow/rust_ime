@@ -104,6 +104,9 @@ pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 强制使用 Skia 渲染后端以支持彩色 Emoji 和高质量文字渲染
+    std::env::set_var("SLINT_BACKEND", "skia");
+
     #[cfg(target_os = "windows")]
     let _mutex_handle = unsafe {
         use windows::Win32::System::Threading::*;

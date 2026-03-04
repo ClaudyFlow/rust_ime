@@ -61,9 +61,14 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
     window.set_text_color(parse_color(&config.appearance.candidate_text.color));
     window.set_highlight_text_color(parse_color(&config.appearance.window_bg_color));
     
-    let emoji_font = ", Segoe UI Emoji, Microsoft YaHei, system-ui";
-    window.set_pinyin_font_family(SharedString::from(config.appearance.pinyin_text.font_family.clone() + emoji_font));
-    window.set_candidate_font_family(SharedString::from(config.appearance.candidate_text.font_family.clone() + emoji_font));
+    let font_stack = format!("{}, Segoe UI Emoji, Microsoft YaHei, Arial, system-ui", config.appearance.candidate_text.font_family);
+    window.set_pinyin_font_family(SharedString::from(&font_stack));
+    window.set_candidate_font_family(SharedString::from(&font_stack));
+    
+    window.set_pinyin_font_size(config.appearance.pinyin_text.font_size as f32);
+    window.set_pinyin_font_weight(config.appearance.pinyin_text.font_weight as i32);
+    window.set_candidate_font_size(config.appearance.candidate_text.font_size as f32);
+    window.set_candidate_font_weight(config.appearance.candidate_text.font_weight as i32);
 
     let show_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_candidates));
     let show_status_bar_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_status_bar));
