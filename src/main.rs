@@ -43,7 +43,6 @@ use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 #[cfg(target_os = "linux")]
 use daemonize::Daemonize;
-use std::process::Command;
 
 use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
@@ -105,10 +104,6 @@ pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 移除软渲染限制，让系统自动决定 GPU/CPU
-    // #[cfg(target_os = "windows")]
-    // std::env::set_var("SLINT_BACKEND", "software");
-
     #[cfg(target_os = "windows")]
     let _mutex_handle = unsafe {
         use windows::Win32::System::Threading::*;
@@ -117,11 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let name = PCWSTR("Global\\RustImeUniqueMutex\0".encode_utf16().collect::<Vec<u16>>().as_ptr());
         let handle = CreateMutexW(None, true, name)?;
-        if let Ok(_) = windows::Win32::Foundation::GetLastError() {
-            // 获取错误码，如果是已存在则退出
-        }
-        let last_err = windows::Win32::Foundation::GetLastError();
-        if last_err == ERROR_ALREADY_EXISTS {
+        if windows::Win32::Foundation::GetLastError().is_err_and(|e| e.code() == ERROR_ALREADY_EXISTS.to_hresult()) {
              let _ = notify_rust::Notification::new()
                 .summary("Rust IME")
                 .body("程序已经在运行中。")
@@ -139,15 +130,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
     }
 
-    // 1. 确定并锁定工作目录
     let root = find_project_root();
     env::set_current_dir(&root)?;
-    println!("[Main] 锁定工作目录: {:?}", root);
 
     let args: Vec<String> = env::args().collect();
     let mut should_daemonize = true;
 
-    // 处理命令行参数
     if args.len() > 1 {
         match args[1].as_str() {
             "--compile-only" => {
@@ -192,13 +180,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // 2. 核心检测：如果 data 目录为空，必须先编译
     if !root.join("data/chinese/trie.index").exists() {
-        println!("[Main] 词库索引缺失，正在进行静默编译...");
         let _ = engine::compiler::check_and_compile_all();
     }
 
-    // 3. 加载配置和标点 (优化后的加载逻辑)
     let mut current_config = Config::load();
     {
         let mut punctuations = HashMap::new();
@@ -220,12 +205,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (gui_tx, gui_rx) = std::sync::mpsc::channel();
     let (tray_tx, tray_rx) = std::sync::mpsc::channel();
     
-    // 4. 启动 GUI
     let gui_config = config.read().unwrap().clone();
-    let tray_tx_gui = tray_tx.clone();
-    std::thread::spawn(move || { ui::gui::start_gui(gui_rx, gui_config, tray_tx_gui); });
+    let tray_tx_for_gui = tray_tx.clone();
+    std::thread::spawn(move || { ui::gui::start_gui(gui_rx, gui_config, tray_tx_for_gui); });
 
-    // 5. 加载词库地图
     let mut tries_map = HashMap::new();
     if let Ok(entries) = std::fs::read_dir(root.join("data")) {
         for entry in entries.flatten() {
@@ -242,10 +225,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let tries_count = tries_map.len();
-    println!("[Main] 成功加载 {} 个词库方案。", tries_count);
-
-    // 6. 初始化 Processor
     let conf_guard = config.read().unwrap();
     let default_p = conf_guard.input.default_profile.clone();
     let mut processor_obj = Processor::new(tries_map, default_p, conf_guard.input.punctuations.clone());
@@ -254,14 +233,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);
 
-    // 7. 启动托盘
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_candidates, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
-    // 8. 消息循环处理
     let processor_clone = processor.clone();
     let gui_tx_tray = gui_tx.clone();
+    let tray_tx_for_main_loop = tray_tx.clone();
     let config_msg = config.clone();
     
     std::thread::spawn(move || {
@@ -283,11 +261,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.active_profile = profile);
                     let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
                 }
+                ui::tray::TrayEvent::ToggleStatusBar => {
+                    let mut new_show = false;
+                    if let Ok(mut w) = config_msg.write() {
+                        w.appearance.show_status_bar = !w.appearance.show_status_bar;
+                        new_show = w.appearance.show_status_bar;
+                        let _ = w.save();
+                    }
+                    tray_handle.update(|t| t.show_status_bar = new_show);
+                    let _ = gui_tx_tray.send(GuiEvent::SetVisible(new_show));
+                }
+                ui::tray::TrayEvent::OpenConfig => {
+                    if !WEB_SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
+                        WEB_SERVER_RUNNING.store(true, std::sync::atomic::Ordering::SeqCst);
+                        let config_web = config_msg.clone();
+                        let tray_tx_web = tray_tx_for_main_loop.clone();
+                        std::thread::spawn(move || {
+                            if let Ok(rt) = tokio::runtime::Runtime::new() {
+                                rt.block_on(async {
+                                    let server = ui::web::WebServer::new(18765, Arc::new(std::sync::atomic::AtomicU16::new(18765)), config_web, Arc::new(RwLock::new(HashMap::new())), tray_tx_web);
+                                    server.start().await;
+                                });
+                            }
+                        });
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+                    let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg("http://localhost:18765").spawn();
+                }
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = Config::load();
-                    if let Ok(mut p) = processor_clone.lock() {
-                        p.apply_config(&new_conf);
-                    }
+                    if let Ok(mut p) = processor_clone.lock() { p.apply_config(&new_conf); }
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf));
                 }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
@@ -296,7 +299,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 9. 启动 TSF 主机
     #[cfg(target_os = "windows")]
     {
         let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx), config.clone(), tray_tx);
@@ -310,5 +312,11 @@ pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
     let exe = std::env::current_exe()?;
     let exe_path = exe.to_str().ok_or("Invalid path")?;
     let _ = std::process::Command::new("reg").arg("add").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run").arg("/v").arg("RustIME").arg("/t").arg("REG_SZ").arg("/d").arg(exe_path).arg("/f").status();
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = std::process::Command::new("reg").arg("delete").arg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run").arg("/v").arg("RustIME").arg("/f").status();
     Ok(())
 }

@@ -158,9 +158,9 @@ async fn update_config(
         // 处理自启逻辑变化
         if w.input.autostart != new_config.input.autostart {
             if new_config.input.autostart {
-                let _ = crate::setup_autostart();
+                let _ = crate::config::setup_autostart();
             } else {
-                let _ = crate::remove_autostart();
+                let _ = crate::config::remove_autostart();
             }
         }
 

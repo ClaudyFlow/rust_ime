@@ -10,6 +10,7 @@ use tiny_skia::*;
 pub enum TrayEvent {
     ToggleIme,
     NextProfile,
+    ToggleStatusBar,
     OpenConfig,
     Exit,
     ReloadConfig,
@@ -21,6 +22,7 @@ pub enum TrayEvent {
 pub struct ImeTray {
     pub chinese_enabled: bool,
     pub active_profile: String,
+    pub show_status_bar: bool,
     pub tx: Sender<TrayEvent>,
 }
 
@@ -36,11 +38,7 @@ impl Tray for ImeTray {
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
         let profile_zh = match self.active_profile.as_str() {
-            "chinese" => "中文",
-            "english" => "英文",
-            "japanese" => "日文",
-            "mixed" => "中日英混",
-            other => other,
+            "chinese" => "中文", "english" => "英文", "japanese" => "日文", "mixed" => "中日英混", other => other,
         };
 
         vec![
@@ -52,6 +50,11 @@ impl Tray for ImeTray {
             StandardItem {
                 label: format!("词典方案: {}", profile_zh),
                 activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::NextProfile); }),  
+                ..Default::default()
+            }.into(),
+            StandardItem {
+                label: if self.show_status_bar { "隐藏状态栏" } else { "显示状态栏" }.to_string(),
+                activate: Box::new(|this: &mut Self| { let _ = this.tx.send(TrayEvent::ToggleStatusBar); }),
                 ..Default::default()
             }.into(),
             MenuItem::Separator,
@@ -94,6 +97,7 @@ const TRAY_ICON_ID: u32 = 1;
 pub struct ImeTrayStub {
     pub chinese_enabled: bool,
     pub active_profile: String,
+    pub show_status_bar: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -118,7 +122,7 @@ impl WindowsTrayHandle {
 
 #[cfg(target_os = "windows")]
 pub fn start_tray(
-    chinese_enabled: bool, active_profile: String, _show_candidates: bool,
+    _is_linux: bool, active_profile: String, show_status_bar: bool,
     _anti_typo_mode: crate::config::AntiTypoMode,
     _double_pinyin: bool,
     _commit_mode: String,
@@ -127,7 +131,7 @@ pub fn start_tray(
     event_tx: Sender<TrayEvent>
 ) -> WindowsTrayHandle {
     let state = Arc::new(Mutex::new(ImeTrayStub {
-        chinese_enabled, active_profile,
+        chinese_enabled: true, active_profile, show_status_bar,
     }));
 
     unsafe {
@@ -136,7 +140,6 @@ pub fn start_tray(
     }
 
     let (tx, rx) = std::sync::mpsc::channel();
-    let _state_clone = state.clone();
     std::thread::spawn(move || {
         unsafe {
             let instance = windows::Win32::System::LibraryLoader::GetModuleHandleW(None).unwrap_or_default();
@@ -155,13 +158,12 @@ pub fn start_tray(
                 WS_POPUP, 0, 0, 0, 0, None, None, instance, None
             );
 
-            // 直接加载 .ico 文件，Windows 会自动选择最合适的尺寸
             let icon_path = "picture/rust-ime_v2.ico\0".encode_utf16().collect::<Vec<u16>>();
             let h_icon = match LoadImageW(
                 None,
                 PCWSTR(icon_path.as_ptr()),
                 IMAGE_ICON,
-                0, 0, // 使用默认尺寸
+                0, 0,
                 LR_LOADFROMFILE | LR_DEFAULTSIZE
             ) {
                 Ok(handle) => HICON(handle.0),
@@ -178,12 +180,8 @@ pub fn start_tray(
                 ..Default::default()
             };
 
-            let _tip_str = "Rust IME";
-            
             if Shell_NotifyIconW(NIM_ADD, &nid).as_bool() {
                 println!("[Tray] 系统托盘初始化成功。");
-            } else {
-                eprintln!("[Tray] 系统托盘初始化失败。");
             }
             let _ = tx.send(hwnd);
 
@@ -212,19 +210,13 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                     if let Ok(state) = state_arc.lock() {
                         let h_menu = CreatePopupMenu().unwrap();
                         
-                        // 1. 输入法状态
                         let activated_label = format!("输入法: {}", if state.chinese_enabled { "激活 (中)" } else { "未激活 (英)" });
                         let mut activated_w: Vec<u16> = activated_label.encode_utf16().collect();
                         activated_w.push(0);
                         let _ = AppendMenuW(h_menu, MF_STRING, 1001, PCWSTR(activated_w.as_ptr()));
                         
-                        // 2. 词典方案
                         let profile_zh = match state.active_profile.as_str() {
-                            "chinese" => "中文",
-                            "english" => "英文",
-                            "japanese" => "日文",
-                            "mixed" => "混合",
-                            other => other,
+                            "chinese" => "中文", "english" => "英文", "japanese" => "日文", "mixed" => "混合", other => other,
                         };
                         let profile_label = format!("词典方案: {}", profile_zh);
                         let mut profile_w: Vec<u16> = profile_label.encode_utf16().collect();
@@ -232,27 +224,20 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                         let _ = AppendMenuW(h_menu, MF_STRING, 1002, PCWSTR(profile_w.as_ptr()));
                         
                         let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
+
+                        let sb_label = if state.show_status_bar { "隐藏状态栏" } else { "显示状态栏" };
+                        let mut sb_w: Vec<u16> = sb_label.encode_utf16().collect();
+                        sb_w.push(0);
+                        let _ = AppendMenuW(h_menu, MF_STRING, 1003, PCWSTR(sb_w.as_ptr()));
                         
-                        // 3. 管理设置
                         let _ = AppendMenuW(h_menu, MF_STRING, 1011, windows::core::w!("管理设置 (Web)"));
-                        
-                        // 4. 重载词库
                         let _ = AppendMenuW(h_menu, MF_STRING, 1012, windows::core::w!("重载词库配置"));
-                        
                         let _ = AppendMenuW(h_menu, MF_SEPARATOR, 0, None);
-                        
-                        // 5. 退出程序
                         let _ = AppendMenuW(h_menu, MF_STRING, 1014, windows::core::w!("退出程序"));
                         
-                        // 强制夺取焦点：这是菜单点击外部能自动消失的关键
                         let _ = SetForegroundWindow(hwnd);
-                        
-                        // 弹出并追踪菜单
                         let _ = TrackPopupMenu(h_menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, None);
-                        
-                        // 发送空消息：这是 Windows 托盘的经典补丁，确保下次弹出正常
                         let _ = PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0));
-                        
                         let _ = DestroyMenu(h_menu);
                     }
                 }
@@ -265,6 +250,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 match id {
                     1001 => { let _ = tx.send(TrayEvent::ToggleIme); }
                     1002 => { let _ = tx.send(TrayEvent::NextProfile); }
+                    1003 => { let _ = tx.send(TrayEvent::ToggleStatusBar); }
                     1011 => { let _ = tx.send(TrayEvent::OpenConfig); }
                     1012 => { let _ = tx.send(TrayEvent::ReloadConfig); }
                     1014 => { let _ = tx.send(TrayEvent::Exit); }
@@ -276,4 +262,3 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
-
