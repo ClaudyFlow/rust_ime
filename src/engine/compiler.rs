@@ -33,17 +33,29 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
     if Path::new("dicts/chinese/chars.json").exists() {
         let src = Path::new("dicts/chinese/chars.json");
         let dst = Path::new("dicts/chinese/syllables.txt");
-        let should_update = !dst.exists() || {
-            let src_mtime = src.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
-            let dst_mtime = dst.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
-            src_mtime > dst_mtime
-        };
-        if should_update {
-            println!("[Compiler] 更新音节表 (Syllables)...");
+        if should_update_syllables(src, dst) {
+            println!("[Compiler] 更新拼音音节表...");
             extract_syllables_to_file("dicts/chinese/chars.json", "dicts/chinese/syllables.txt")?;
         }
     }
+    
+    if Path::new("dicts/stroke/words/stroke_char.json").exists() {
+        let src = Path::new("dicts/stroke/words/stroke_char.json");
+        let dst = Path::new("dicts/stroke/syllables.txt");
+        if should_update_syllables(src, dst) {
+            println!("[Compiler] 更新笔画编码表...");
+            extract_syllables_to_file("dicts/stroke/words/stroke_char.json", "dicts/stroke/syllables.txt")?;
+        }
+    }
     Ok(())
+}
+
+fn should_update_syllables(src: &Path, dst: &Path) -> bool {
+    !dst.exists() || {
+        let src_mtime = src.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
+        let dst_mtime = dst.metadata().and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH);
+        src_mtime > dst_mtime
+    }
 }
 
 fn should_compile(src_dir: &Path, target_file: &Path) -> bool {

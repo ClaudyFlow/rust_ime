@@ -958,7 +958,8 @@ impl Processor {
                     return Action::PassThrough;
                 }
 
-                if self.enable_smart_backspace {
+                let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
+                if self.enable_smart_backspace && current_profile != "stroke" {
                     // 智能删除逻辑：以音节为单位，先删韵母，再删声母
                     let segments = self.segment_buffer(&self.buffer);
                     if let Some(last) = segments.last() {
@@ -1231,7 +1232,49 @@ impl Processor {
     pub fn lookup(&mut self) -> Option<Action> {
         if self.buffer.is_empty() { self.reset(); return None; }
 
-        // 1. 优先处理分页过滤模式
+        let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
+        let is_stroke = current_profile == "stroke";
+
+        // 1. 笔画输入法专用逻辑：跳过拼音切分，直接全量匹配
+        if is_stroke {
+            let mut matches = Vec::new();
+            if let Some(d) = self.tries.get("stroke") {
+                if let Some(m) = d.get_all_exact(&self.buffer) {
+                    for (w, tr, t, e, s, weight) in m {
+                        matches.push((w, tr, t, e, s, weight, 3));
+                    }
+                }
+                // 支持前缀匹配
+                if self.enable_prefix_matching {
+                    let m = d.search_bfs(&self.buffer, 50);
+                    for (w, tr, t, e, s, weight) in m {
+                        matches.push((w, tr, t, e, s, weight, 1));
+                    }
+                }
+            }
+            
+            // 按权重排序
+            matches.sort_by(|a, b| b.6.cmp(&a.6).then_with(|| b.5.cmp(&a.5)));
+            
+            self.candidates.clear();
+            self.candidate_hints.clear();
+            self.has_dict_match = !matches.is_empty();
+            self.last_lookup_pinyin = self.buffer.clone();
+            
+            for (w, tr, _, _, _, _, _) in matches {
+                self.candidates.push(if self.enable_traditional { tr } else { w });
+                self.candidate_hints.push(String::new());
+            }
+            
+            if self.candidates.is_empty() { 
+                self.candidates.push(self.buffer.clone()); 
+                self.candidate_hints.push(String::new()); 
+            }
+            self.selected = 0; self.page = 0; self.update_state();
+            return None;
+        }
+
+        // 2. 优先处理分页过滤模式
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_cands = Vec::new();

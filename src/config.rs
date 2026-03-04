@@ -282,6 +282,7 @@ impl Config {
                     Profile { name: "chinese".to_string(), path: "data/chinese/trie".to_string() },
                     Profile { name: "english".to_string(), path: "data/english/trie".to_string() },
                     Profile { name: "japanese".to_string(), path: "data/japanese/trie".to_string() },
+                    Profile { name: "stroke".to_string(), path: "data/stroke/trie".to_string() },
                 ],
             },
             appearance: Appearance {
@@ -349,6 +350,7 @@ impl Config {
                     ProfileKey { key: "c".into(), profile: "chinese".into() },
                     ProfileKey { key: "e".into(), profile: "english".into() },
                     ProfileKey { key: "j".into(), profile: "japanese".into() },
+                    ProfileKey { key: "b".into(), profile: "stroke".into() },
                     ProfileKey { key: "m".into(), profile: "chinese,english,japanese".into() },
                 ],
                 page_flipping_keys: vec!["arrow".to_string(), "minus_equal".to_string(), "comma_dot".to_string()],
