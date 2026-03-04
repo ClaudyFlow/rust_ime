@@ -84,8 +84,6 @@ use windows::{
 };
 #[cfg(target_os = "windows")]
 use std::sync::{Arc, Mutex};
-#[cfg(target_os = "windows")]
-use image;
 
 #[cfg(target_os = "windows")]
 const WM_TRAYICON: u32 = WM_USER + 100;
@@ -157,18 +155,17 @@ pub fn start_tray(
                 WS_POPUP, 0, 0, 0, 0, None, None, instance, None
             );
 
-            // Load custom icon
-            let h_icon = if let Ok(img) = image::open("picture/rust-ime_v2.png") {
-                let img = img.resize(32, 32, image::imageops::FilterType::Lanczos3);
-                let rgba = img.to_rgba8();
-                let mut bgra = Vec::with_capacity(rgba.len());
-                for pixel in rgba.pixels() {
-                    bgra.push(pixel[2]); bgra.push(pixel[1]); bgra.push(pixel[0]); bgra.push(pixel[3]);
-                }
-                let and_mask = vec![0u8; 32 * 32 / 8];
-                CreateIcon(None, 32, 32, 1, 32, and_mask.as_ptr(), bgra.as_ptr()).unwrap_or_else(|_| LoadIconW(None, IDI_APPLICATION).unwrap_or_default())
-            } else {
-                LoadIconW(None, IDI_APPLICATION).unwrap_or_default()
+            // 直接加载 .ico 文件，Windows 会自动选择最合适的尺寸
+            let icon_path = "picture/rust-ime_v2.ico\0".encode_utf16().collect::<Vec<u16>>();
+            let h_icon = match LoadImageW(
+                None,
+                PCWSTR(icon_path.as_ptr()),
+                IMAGE_ICON,
+                0, 0, // 使用默认尺寸
+                LR_LOADFROMFILE | LR_DEFAULTSIZE
+            ) {
+                Ok(handle) => HICON(handle.0),
+                Err(_) => LoadIconW(None, IDI_APPLICATION).unwrap_or_default(),
             };
 
             let nid = NOTIFYICONDATAW {
