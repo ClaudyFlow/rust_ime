@@ -333,8 +333,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                 let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
                                 let hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
                                 if hwnd.0 != 0 {
-                                    let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                                    let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED);
                                     let _ = SetForegroundWindow(hwnd);
+                                    // 强制重绘，解决第二次点开显示不全的问题
+                                    let _ = windows::Win32::Graphics::Gdi::InvalidateRect(hwnd, None, true);
+                                    let _ = windows::Win32::Graphics::Gdi::UpdateWindow(hwnd);
                                 }
                             }
                         }
