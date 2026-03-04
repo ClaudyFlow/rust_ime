@@ -220,6 +220,18 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             }
                         }
                     }
+                    GuiEvent::UpdateStatusBarVisible(visible) => {
+                        show_status_bar_for_loop.store(visible, std::sync::atomic::Ordering::SeqCst);
+                        if let Some(sb) = s.upgrade() {
+                            if visible {
+                                #[cfg(target_os = "windows")]
+                                unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
+                                let _ = sb.window().show();
+                            } else {
+                                let _ = sb.window().hide();
+                            }
+                        }
+                    }
                     GuiEvent::SetVisible(visible) => {
                         if let Some(sb) = s.upgrade() {
                             let show_pref = show_status_bar_for_loop.load(std::sync::atomic::Ordering::SeqCst);
@@ -228,7 +240,10 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                 unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
                                 let _ = sb.window().show();
                             } else {
-                                let _ = sb.window().hide();
+                                // 这里只有在输入法停用(!visible)时才真正隐藏
+                                if !visible {
+                                    let _ = sb.window().hide();
+                                }
                             }
                         }
                         if !visible {

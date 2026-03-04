@@ -20,6 +20,7 @@ pub enum GuiEvent {
     MoveTo { x: i32, y: i32 },
     ApplyConfig(Config),
     ShowStatus(String, bool), // 状态文字, 是否为中文模式 (用于更新文字)
+    UpdateStatusBarVisible(bool), // 手动更新状态栏显隐
     SetVisible(bool),         // 窗口显隐 (用于输入法激活/停用)
     OpenTrayMenu { x: i32, y: i32, chinese_enabled: bool, active_profile: String },
     Exit,

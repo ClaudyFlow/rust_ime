@@ -269,7 +269,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = w.save();
                     }
                     tray_handle.update(|t| t.show_status_bar = new_show);
-                    let _ = gui_tx_tray.send(GuiEvent::SetVisible(new_show));
+                    let _ = gui_tx_tray.send(GuiEvent::UpdateStatusBarVisible(new_show));
                 }
                 ui::tray::TrayEvent::OpenConfig => {
                     if !WEB_SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
