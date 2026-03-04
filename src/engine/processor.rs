@@ -596,6 +596,7 @@ impl Processor {
             "chinese" => "中".to_string(),
             "english" => "英".to_string(),
             "japanese" => "日".to_string(),
+            "stroke" => "笔".to_string(),
             "mixed" => "混".to_string(),
             _ => {
                 let mut chars = display.chars();
@@ -1220,6 +1221,16 @@ impl Processor {
 
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
+        
+        // 快捷切换模式下的提示优先
+        if self.switch_mode {
+            let target = "[方案切换]".to_string();
+            if target == self.phantom_text { return Action::Consume; }
+            let old_phantom = self.phantom_text.clone();
+            self.phantom_text = target.clone();
+            return Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target };
+        }
+
         let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].clone() } else { self.buffer.clone() };
         if target == self.phantom_text { return Action::Consume; }
         let old_phantom = self.phantom_text.clone(); self.phantom_text = target.clone();

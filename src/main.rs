@@ -107,6 +107,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 强制使用 Skia 渲染后端以支持彩色 Emoji 和高质量文字渲染
     std::env::set_var("SLINT_BACKEND", "skia");
 
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "--compile-only" {
+        println!("[Main] 正在强制编译词库...");
+        let _ = engine::compiler::check_and_compile_all();
+        return Ok(());
+    }
+
     #[cfg(target_os = "windows")]
     let _mutex_handle = unsafe {
         use windows::Win32::System::Threading::*;
@@ -272,7 +279,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.chinese_enabled = enabled;
-                    state.status_text = short;
+                    state.status_text = if enabled { short } else { "英".into() };
                     let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }
                 ui::tray::TrayEvent::NextProfile => {
@@ -283,7 +290,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     tray_handle.update(|t| t.active_profile = profile);
                     
                     let mut state = app_state_tray.lock().unwrap();
-                    state.status_text = short;
+                    state.status_text = if enabled { short } else { "英".into() };
                     state.chinese_enabled = enabled;
                     let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }

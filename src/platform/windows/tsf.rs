@@ -22,17 +22,25 @@ impl TsfHost {
 fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Processor>>, app_state: &Arc<Mutex<crate::ui::AppState>>) {
     if let Some(ref tx) = gui_tx {
         let p = processor.lock().unwrap();
-        let mut state = app_state.lock().unwrap();
+        let short_display = p.get_short_display();
+        let chinese_enabled = p.chinese_enabled;
         
-        state.chinese_enabled = p.chinese_enabled;
-        state.status_text = if p.chinese_enabled { p.get_short_display() } else { "英".into() };
-        
-        if p.buffer.is_empty() || !p.chinese_enabled { 
-            state.pinyin = "".into();
-            state.candidates = vec![];
-            state.hints = vec![];
-            state.selected_index = 0;
-        } else {
+        {
+            let mut state = app_state.lock().unwrap();
+            state.chinese_enabled = chinese_enabled;
+            
+            // 关键修复：只有在不是正在显示临时通知（如“快捷切换”）的情况下，才同步短图标
+            // 或者：如果 buffer 有内容，强制显示当前的方案图标
+            if !p.buffer.is_empty() || !state.status_text.contains("...") {
+                 state.status_text = if chinese_enabled { short_display } else { "英".into() };
+            }
+            
+            if p.buffer.is_empty() || !p.chinese_enabled { 
+                state.pinyin = "".into();
+                state.candidates = vec![];
+                state.hints = vec![];
+                state.selected_index = 0;
+            } else {
             let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
             if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
             if !p.aux_filter.is_empty() {
