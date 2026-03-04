@@ -329,6 +329,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(mut p) = processor_clone.lock() { p.apply_config(&new_conf); }
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf));
                 }
+                ui::tray::TrayEvent::ShowNotification(msg) => {
+                    let mut state = app_state_tray.lock().unwrap();
+                    state.status_text = msg;
+                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                }
+                ui::tray::TrayEvent::ClearUserDict => {
+                    if let Ok(mut p) = processor_clone.lock() {
+                        p.user_dict.clear();
+                    }
+                }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
                 _ => {}
             }

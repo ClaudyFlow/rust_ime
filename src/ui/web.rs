@@ -275,11 +275,18 @@ async fn toggle_dict(Json(req): Json<ToggleRequest>) -> StatusCode {
     }
 }
 
-async fn compile_dicts_handler() -> StatusCode {
+async fn compile_dicts_handler(State((_, _, tray_tx)): State<WebState>) -> StatusCode {
+    let _ = tray_tx.send(crate::ui::tray::TrayEvent::ShowNotification("正在编译词库...".into()));
     match crate::engine::compiler::check_and_compile_all() {
-        Ok(_) => StatusCode::OK,
+        Ok(_) => {
+            let _ = tray_tx.send(crate::ui::tray::TrayEvent::ShowNotification("词库编译完成".into()));
+            // 编译完成后自动重载
+            let _ = tray_tx.send(crate::ui::tray::TrayEvent::ReloadConfig);
+            StatusCode::OK
+        },
         Err(e) => {
             eprintln!("[Web] 词库编译失败: {}", e);
+            let _ = tray_tx.send(crate::ui::tray::TrayEvent::ShowNotification(format!("编译失败: {}", e)));
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
