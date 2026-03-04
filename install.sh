@@ -100,8 +100,8 @@ echo "✅ Installed binary to: /usr/local/bin/rust-ime"
 # 4.2 Install icon
 ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 sudo mkdir -p "$ICON_DIR"
-if [ -f "$INSTALL_PATH/picture/rust-ime.png" ]; then
-    sudo cp -f "$INSTALL_PATH/picture/rust-ime.png" "$ICON_DIR/rust-ime.png"
+if [ -f "$INSTALL_PATH/picture/rust-ime_v2.png" ]; then
+    sudo cp -f "$INSTALL_PATH/picture/rust-ime_v2.png" "$ICON_DIR/rust-ime.png"
     echo "✅ Installed icon to: $ICON_DIR/rust-ime.png"
 fi
 

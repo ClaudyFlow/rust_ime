@@ -158,7 +158,7 @@ pub fn start_tray(
             );
 
             // Load custom icon
-            let h_icon = if let Ok(img) = image::open("picture/rust-ime.png") {
+            let h_icon = if let Ok(img) = image::open("picture/rust-ime_v2.png") {
                 let img = img.resize(32, 32, image::imageops::FilterType::Lanczos3);
                 let rgba = img.to_rgba8();
                 let mut bgra = Vec::with_capacity(rgba.len());

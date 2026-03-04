@@ -1264,34 +1264,14 @@ impl Processor {
 
         // 2. 准备切分方案
         // A. 原始切分（基于空格/大写/数字）
-        let mut raw_parsed = self.parse_buffer();
-
-        // --- 增强逻辑：无分隔符辅助码过滤支持 (针对 Stroke 模式) ---
-        if self.aux_mode == AuxMode::Stroke && !self.buffer.contains(';') && !self.buffer.is_empty() {
-            if let Some(last) = raw_parsed.last_mut() {
-                // 如果最后一段是纯字母，且没有显式辅助码，尝试进行无缝切分
-                if last.stroke_aux.is_none() && last.english_aux.is_none() && last.pinyin.chars().all(|c| c.is_ascii_lowercase() || c == '\'') {
-                    let p = last.pinyin.clone();
-                    // 尝试从末尾切出 1 到 2 位作为笔画辅助码
-                    for tail_len in (1..=2).rev() {
-                        if p.len() <= tail_len + 1 { continue; } // 至少留 1 位给拼音
-                        let (prefix, tail) = p.split_at(p.len() - tail_len);
-                        // 验证 prefix 是否为合法拼音序列
-                        let segs = self.segment_buffer(prefix);
-                        if segs.join("") == prefix {
-                            last.pinyin = prefix.to_string();
-                            last.stroke_aux = Some(tail.to_string());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        let raw_parsed = self.parse_buffer();
 
         // B. 智能切分（针对 mtian 这种无分隔符的）
         let mut smart_segments = Vec::new();
         if !self.buffer.contains(' ') && !self.buffer.contains('\'') {
-            smart_segments = self.segment_buffer(&self.buffer);
+            // 关键修复：只提取拼音部分进行智能切分，排除大写字母(英文辅码)、数字(指定序号)和分号(笔画辅码)
+            let pinyin_only: String = raw_parsed.iter().map(|p| p.pinyin.clone()).collect();
+            smart_segments = self.segment_buffer(&pinyin_only);
         }
 
         // 我们尝试两种检索策略：全量检索 (raw) 和 智能切分检索 (smart)
