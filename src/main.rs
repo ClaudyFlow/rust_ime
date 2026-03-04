@@ -295,8 +295,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.show_status_bar_pref = new_show;
-                    // 强制触发一次同步
-                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                    // 发送强力显隐信号
+                    let _ = gui_tx_tray.send(GuiEvent::ForceStatusVisible(new_show));
                 }
                 ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => {
                     let mut state = app_state_tray.lock().unwrap();

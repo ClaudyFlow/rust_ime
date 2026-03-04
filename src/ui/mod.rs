@@ -23,6 +23,7 @@ pub struct AppState {
 #[derive(Debug, Clone, PartialEq)]
 pub enum GuiEvent {
     SyncState(AppState), // 单一数据源同步
+    ForceStatusVisible(bool), // 强制、独立的状态栏显隐控制 (不受任何焦点影响)
     Update {
         pinyin: String,
         candidates: Vec<String>,

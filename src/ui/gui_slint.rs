@@ -136,13 +136,13 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         let sb_opt = s.upgrade();
                         let w_opt = h.upgrade();
                         
-                        // 1. 状态栏逻辑：完全解放！只要用户偏好开启，它就显示
+                        // 1. 状态栏数据更新
                         if let Some(sb) = sb_opt {
                             sb.set_status_text(SharedString::from(state.status_text));
                             sb.set_chinese_enabled(state.chinese_enabled);
                             
-                            let final_sb_visible = state.show_status_bar_pref;
-                            if final_sb_visible {
+                            // 只有在 SyncState 里，我们才根据偏好维持状态
+                            if state.show_status_bar_pref {
                                 #[cfg(target_os = "windows")]
                                 unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
                                 if !sb.window().is_visible() { let _ = sb.window().show(); }
@@ -151,7 +151,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             }
                         }
 
-                        // 2. 候选栏逻辑：保留焦点绑定，确保它只在打字时出现
+                        // 2. 候选栏逻辑 (保持原来的打字显隐)
                         if let Some(w) = w_opt {
                             let final_w_visible = state.is_ime_active && state.show_candidates_pref && !state.pinyin.is_empty();
                             
@@ -162,7 +162,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                     was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                                 }
                             } else {
-                                // ... (显示逻辑保持不变)
+                                // ... (显示逻辑)
                                 if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                     if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
@@ -230,9 +230,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             }
                         }
                     }
-                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
+                    GuiEvent::ForceStatusVisible(visible) => {
+                        if let Some(sb) = s.upgrade() {
+                            if visible {
+                                #[cfg(target_os = "windows")]
+                                unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
+                                let _ = sb.window().show();
+                            } else {
+                                let _ = sb.window().hide();
+                            }
+                        }
+                    }
+                    GuiEvent::Update { pinyin, .. } => {
                         if let Some(w) = h.upgrade() {
-                            // 旧事件不再处理显隐逻辑，只更新内容以防万一
                             w.set_pinyin(SharedString::from(&pinyin));
                         }
                     }
@@ -243,12 +253,8 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             sb.set_chinese_enabled(is_chinese);
                         }
                     }
-                    GuiEvent::UpdateStatusBarVisible(_) => {
-                        // 废弃，由 SyncState 统一处理
-                    }
-                    GuiEvent::SetVisible(_) => {
-                        // 废弃，由 SyncState 统一处理
-                    }
+                    GuiEvent::UpdateStatusBarVisible(_) => {}
+                    GuiEvent::SetVisible(_) => {}
                     GuiEvent::MoveTo { x, y } => {
                         if x == 0 && y == 0 { return; }
                         if let Ok(mut pos) = last_pos_inner.lock() { *pos = (x, y); }
