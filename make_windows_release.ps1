@@ -2,6 +2,12 @@
 Write-Host "Building release version..." -ForegroundColor Cyan
 cargo build --release
 
+# 1.5 Pre-compile dictionaries so user doesn't have to wait on first run
+Write-Host "Pre-compiling dictionaries..." -ForegroundColor Cyan
+if (Test-Path "target/release/rust-ime.exe") {
+    & "target/release/rust-ime.exe" --compile-only
+}
+
 # 2. Create release directory with Timestamp
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmm"
 if (!(Test-Path "release")) { New-Item -ItemType Directory "release" }

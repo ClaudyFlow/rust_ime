@@ -21,6 +21,9 @@ pub mod evdev {
 #[cfg(target_os = "windows")]
 pub mod registry;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[cfg(target_os = "windows")]
 pub const IME_ID: windows::core::GUID = windows::core::GUID::from_u128(0xc03c9525_2c5e_4959_9988_51787281d523);
 #[cfg(target_os = "windows")]
