@@ -10,29 +10,43 @@ pub struct TsfHost {
     gui_tx: Option<Sender<GuiEvent>>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
     config: Arc<RwLock<Config>>,
+    app_state: Arc<Mutex<crate::ui::AppState>>,
 }
 
 impl TsfHost {
-    pub fn new(processor: Arc<Mutex<Processor>>, gui_tx: Option<Sender<GuiEvent>>, config: Arc<RwLock<Config>>, tray_tx: Sender<crate::ui::tray::TrayEvent>) -> Self {
-        Self { processor, gui_tx, tray_tx, config }
+    pub fn new(processor: Arc<Mutex<Processor>>, gui_tx: Option<Sender<GuiEvent>>, config: Arc<RwLock<Config>>, tray_tx: Sender<crate::ui::tray::TrayEvent>, app_state: Arc<Mutex<crate::ui::AppState>>) -> Self {
+        Self { processor, gui_tx, tray_tx, config, app_state }
     }
 }
 
-fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Processor>>) {
+fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Processor>>, app_state: &Arc<Mutex<crate::ui::AppState>>) {
     if let Some(ref tx) = gui_tx {
         let p = processor.lock().unwrap();
+        let mut state = app_state.lock().unwrap();
+        
+        state.chinese_enabled = p.chinese_enabled;
+        state.status_text = if p.chinese_enabled { p.get_short_display() } else { "英".into() };
+        
         if p.buffer.is_empty() || !p.chinese_enabled { 
-            let _ = tx.send(GuiEvent::Update { pinyin: "".into(), candidates: vec![], hints: vec![], selected: 0, sentence: "".into(), cursor_pos: 0, commit_mode: p.commit_mode.clone() }); 
-            return; 
+            state.pinyin = "".into();
+            state.candidates = vec![];
+            state.hints = vec![];
+            state.selected_index = 0;
+        } else {
+            let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
+            if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
+            if !p.aux_filter.is_empty() {
+                let mut display_aux = String::new();
+                for (i, c) in p.aux_filter.chars().enumerate() { if i == 0 { display_aux.push(c.to_ascii_uppercase()); } else { display_aux.push(c.to_ascii_lowercase()); } }
+                pinyin.push_str(&display_aux);
+            }
+            state.pinyin = pinyin;
+            state.candidates = p.candidates.clone();
+            state.hints = p.candidate_hints.clone();
+            state.selected_index = p.selected;
         }
-        let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
-        if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
-        if !p.aux_filter.is_empty() {
-            let mut display_aux = String::new();
-            for (i, c) in p.aux_filter.chars().enumerate() { if i == 0 { display_aux.push(c.to_ascii_uppercase()); } else { display_aux.push(c.to_ascii_lowercase()); } }
-            pinyin.push_str(&display_aux);
-        }
-        let _ = tx.send(GuiEvent::Update { pinyin, candidates: p.candidates.clone(), hints: p.candidate_hints.clone(), selected: p.selected, sentence: p.joined_sentence.clone(), cursor_pos: p.cursor_pos, commit_mode: p.commit_mode.clone() });
+        
+        let _ = tx.send(GuiEvent::SyncState(state.clone()));
     }
 }
 
@@ -73,8 +87,10 @@ impl InputMethodHost for TsfHost {
             unsafe { let _ = InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), 1); let _ = SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR(&mut sd as *mut _ as *mut _), true, None, false); }
             let sd_ptr = &sd as *const _ as usize; 
             let processor = self.processor.clone(); let gui_tx = self.gui_tx.clone(); let tray_tx = self.tray_tx.clone(); let config = self.config.clone();
+            let app_state = self.app_state.clone();
             for _i in 0..3 {
                 let pipe_name_u16 = pipe_name_w.clone(); let p = processor.clone(); let g = gui_tx.clone(); let t = tray_tx.clone(); let c = config.clone();
+                let a = app_state.clone();
                 std::thread::spawn(move || {
                     loop {
                         unsafe {
@@ -82,10 +98,9 @@ impl InputMethodHost for TsfHost {
                             let h = CreateNamedPipeW(PCWSTR(pipe_name_u16.as_ptr()), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
                             if h.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
                             let connect_res = ConnectNamedPipe(h, None);
-                            // 如果成功连接，或者客户端已经连上了
                             if connect_res.is_ok() || connect_res.err().map_or(false, |e| e.code() == windows::Win32::Foundation::ERROR_PIPE_CONNECTED.to_hresult()) {
-                                let pi = p.clone(); let gi = g.clone(); let ti = t.clone(); let ci = c.clone();
-                                std::thread::spawn(move || { handle_client(h, pi, gi, ti, ci); let _ = CloseHandle(h); });
+                                let pi = p.clone(); let gi = g.clone(); let ti = t.clone(); let ci = c.clone(); let ai = a.clone();
+                                std::thread::spawn(move || { handle_client(h, pi, gi, ti, ci, ai); let _ = CloseHandle(h); });
                             } else { let _ = CloseHandle(h); }
                         }
                     }
@@ -109,7 +124,7 @@ fn is_hk_match(config_key: &str, pressed_key_code: u32, ctrl: bool, alt: bool, s
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>, gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>, tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>, config: Arc<RwLock<Config>>) {
+unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: std::sync::Arc<std::sync::Mutex<crate::engine::Processor>>, gui_tx: Option<std::sync::mpsc::Sender<crate::ui::GuiEvent>>, tray_tx: std::sync::mpsc::Sender<crate::ui::tray::TrayEvent>, config: Arc<RwLock<Config>>, app_state: Arc<Mutex<crate::ui::AppState>>) {
     use windows::Win32::Storage::FileSystem::*;
     use crate::engine::processor::Action;
     let mut buffer = [0u8; 1024];
@@ -122,6 +137,23 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         let modifiers = buffer[5];
         let shift = (modifiers & 1) != 0; let ctrl = (modifiers & 2) != 0; let alt = (modifiers & 4) != 0;
         
+        // 焦点变化消息
+        if msg_type == 5 {
+            let active = key_code != 0;
+            {
+                let mut state = app_state.lock().unwrap();
+                state.is_ime_active = active;
+                // 停用时清理拼音
+                if !active {
+                    state.pinyin = "".into();
+                    state.candidates = vec![];
+                }
+            }
+            update_gui_impl(&gui_tx, &processor, &app_state);
+            let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None);
+            continue;
+        }
+
         if msg_type == 1 && bytes_read >= 14 {
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
@@ -144,8 +176,7 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
                 let enabled = p.chinese_enabled; let short = p.get_short_display(); let profile = p.get_current_profile_display();
                 drop(p);
                 let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
-                if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(if enabled { short } else { "英".into() }, enabled)); }
-                update_gui_impl(&gui_tx, &processor);
+                update_gui_impl(&gui_tx, &processor, &app_state);
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None); continue;
         }
@@ -179,15 +210,19 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
                 let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift, ctrl, alt);
                 drop(p);
                 match action {
-                    Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor); }
-                    Action::DeleteAndEmit { delete, insert } => { if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); } response.extend_from_slice(insert.as_bytes()); update_gui_impl(&gui_tx, &processor); }
-                    Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor); }
-                    Action::Alert => { response.push(2); update_gui_impl(&gui_tx, &processor); }
+                    Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
+                    Action::DeleteAndEmit { delete, insert } => { if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); } response.extend_from_slice(insert.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
+                    Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
+                    Action::Alert => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
                     Action::Notify(summary, _body) => {
                         let (active, profile) = { let p = processor.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
-                        if let Some(ref tx) = gui_tx { let _ = tx.send(crate::ui::GuiEvent::ShowStatus(summary, active)); }
+                        {
+                            let mut state = app_state.lock().unwrap();
+                            state.status_text = summary;
+                            state.chinese_enabled = active;
+                        }
                         let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: active, active_profile: profile });
-                        update_gui_impl(&gui_tx, &processor);
+                        update_gui_impl(&gui_tx, &processor, &app_state);
                         response.push(2); 
                     }
                     _ => { response.push(0); }

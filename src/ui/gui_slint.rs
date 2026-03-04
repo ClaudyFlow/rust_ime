@@ -132,6 +132,104 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
+                    GuiEvent::SyncState(state) => {
+                        let sb_opt = s.upgrade();
+                        let w_opt = h.upgrade();
+                        
+                        // 1. 状态栏逻辑 (物理隔离并基于偏好)
+                        if let Some(sb) = sb_opt {
+                            sb.set_status_text(SharedString::from(state.status_text));
+                            sb.set_chinese_enabled(state.chinese_enabled);
+                            
+                            // 最终可见性 = 输入法激活 && 用户开启了状态栏
+                            let final_sb_visible = state.is_ime_active && state.show_status_bar_pref;
+                            if final_sb_visible {
+                                #[cfg(target_os = "windows")]
+                                unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
+                                if !sb.window().is_visible() { let _ = sb.window().show(); }
+                            } else {
+                                if sb.window().is_visible() { let _ = sb.window().hide(); }
+                            }
+                        }
+
+                        // 2. 候选栏逻辑
+                        if let Some(w) = w_opt {
+                            // 最终可见性 = 输入法激活 && 用户开启了候选栏 && 有拼音输入
+                            let final_w_visible = state.is_ime_active && state.show_candidates_pref && !state.pinyin.is_empty();
+                            
+                            if !final_w_visible {
+                                w.set_is_visible(false);
+                                let _ = w.window().hide();
+                                was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
+                            } else {
+                                // ... (下文的显示逻辑保持一致，但基于 state 更新内容)
+                                if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                                    if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
+                                        use std::time::{SystemTime, UNIX_EPOCH};
+                                        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+                                        let r = (now % 150 + 50) as u8;
+                                        let g = ((now >> 8) % 150 + 50) as u8;
+                                        let b = ((now >> 16) % 150 + 50) as u8;
+                                        let mut c = color_shared.lock().unwrap();
+                                        *c = slint::Color::from_rgb_u8(r, g, b);
+                                        was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
+                                    }
+                                } else {
+                                    was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
+                                }
+                                
+                                {
+                                    let c = color_shared.lock().unwrap();
+                                    w.set_accent_color(*c);
+                                }
+                                
+                                w.set_pinyin(SharedString::from(&state.pinyin));
+                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                                let page = (state.selected_index / page_size) * page_size;
+                                let relative_selected = (state.selected_index % page_size) as i32;
+                                let mut data_vec = Vec::new();
+                                for i in page..(page + page_size).min(state.candidates.len()) {
+                                    let cand = &state.candidates[i];
+                                    let hint = state.hints.get(i).cloned().unwrap_or_default();
+                                    let mut english = String::new();
+                                    let mut stroke = String::new();
+                                    if !hint.is_empty() {
+                                        if hint.contains('/') {
+                                            let parts: Vec<&str> = hint.split('/').collect();
+                                            english = parts[0].trim().to_string();
+                                            stroke = parts[1].trim().to_string();
+                                        } else { english = hint.clone(); }
+                                    }
+                                    data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                }
+                                w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
+                                w.set_selected_index(relative_selected);
+                                w.set_is_visible(true);
+                                
+                                // 设置位置
+                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                if lx != 0 || ly != 0 {
+                                    let mut final_x = lx; let mut final_y = ly;
+                                    #[cfg(target_os = "windows")]
+                                    unsafe {
+                                        let win_size = w.window().size();
+                                        let monitor = MonitorFromPoint(windows::Win32::Foundation::POINT { x: lx, y: ly }, MONITOR_DEFAULTTONEAREST);
+                                        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+                                        if GetMonitorInfoW(monitor, &mut mi).as_bool() {
+                                            if final_x + win_size.width as i32 > mi.rcMonitor.right { final_x = mi.rcMonitor.right - win_size.width as i32 - 10; }
+                                            if final_y + win_size.height as i32 > mi.rcMonitor.bottom { final_y = mi.rcMonitor.bottom - win_size.height as i32 - 10; }
+                                        }
+                                    }
+                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
+                                }
+                                if !w.window().is_visible() {
+                                    #[cfg(target_os = "windows")]
+                                    unsafe { hide_window_from_taskbar("RustImeCandidateWindow"); }
+                                    let _ = w.window().show();
+                                }
+                            }
+                        }
+                    }
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
                             #[cfg(target_os = "windows")]

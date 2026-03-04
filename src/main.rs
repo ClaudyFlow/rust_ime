@@ -237,10 +237,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
+    // 全局状态维护
+    let app_state = Arc::new(Mutex::new(ui::AppState {
+        chinese_enabled: true,
+        active_profile: "".into(),
+        show_status_bar_pref: config.read().unwrap().appearance.show_status_bar,
+        show_candidates_pref: config.read().unwrap().appearance.show_candidates,
+        is_ime_active: false,
+        pinyin: "".into(),
+        candidates: vec![],
+        hints: vec![],
+        selected_index: 0,
+        status_text: "中".into(),
+    }));
+
     let processor_clone = processor.clone();
     let gui_tx_tray = gui_tx.clone();
     let tray_tx_for_main_loop = tray_tx.clone();
     let config_msg = config.clone();
+    let app_state_tray = app_state.clone();
     
     std::thread::spawn(move || {
         while let Ok(event) = tray_rx.recv() {
@@ -251,7 +266,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let enabled = p.chinese_enabled;
                     let short = p.get_short_display();
                     tray_handle.update(|t| t.chinese_enabled = enabled);
-                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
+                    
+                    let mut state = app_state_tray.lock().unwrap();
+                    state.chinese_enabled = enabled;
+                    state.status_text = short;
+                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }
                 ui::tray::TrayEvent::NextProfile => {
                     let mut p = processor_clone.lock().unwrap();
@@ -259,7 +278,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let enabled = p.chinese_enabled;
                     let short = p.get_short_display();
                     tray_handle.update(|t| t.active_profile = profile);
-                    let _ = gui_tx_tray.send(GuiEvent::ShowStatus(short, enabled));
+                    
+                    let mut state = app_state_tray.lock().unwrap();
+                    state.status_text = short;
+                    state.chinese_enabled = enabled;
+                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }
                 ui::tray::TrayEvent::ToggleStatusBar => {
                     let mut new_show = false;
@@ -269,7 +292,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = w.save();
                     }
                     tray_handle.update(|t| t.show_status_bar = new_show);
-                    let _ = gui_tx_tray.send(GuiEvent::UpdateStatusBarVisible(new_show));
+                    
+                    let mut state = app_state_tray.lock().unwrap();
+                    state.show_status_bar_pref = new_show;
+                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                }
+                ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => {
+                    let mut state = app_state_tray.lock().unwrap();
+                    state.chinese_enabled = chinese_enabled;
+                    state.active_profile = active_profile;
+                    // 这里不强制同步 GUI，因为 TSF 那边会处理更细致的更新
                 }
                 ui::tray::TrayEvent::OpenConfig => {
                     if !WEB_SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
@@ -301,7 +333,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "windows")]
     {
-        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx), config.clone(), tray_tx);
+        let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx), config.clone(), tray_tx, app_state.clone());
         host.run()?;
     }
     Ok(())

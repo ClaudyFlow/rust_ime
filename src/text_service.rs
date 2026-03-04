@@ -185,7 +185,10 @@ impl ITfTextInputProcessor_Impl for TextService {
 }
 
 impl ITfKeyEventSink_Impl for TextService {
-    fn OnSetFocus(&self, _fforeground: BOOL) -> Result<()> { Ok(()) }
+    fn OnSetFocus(&self, fforeground: BOOL) -> Result<()> {
+        let _ = self.send_key_to_server(5, if fforeground.as_bool() { 1 } else { 0 }, 0, None);
+        Ok(())
+    }
     
     fn OnTestKeyDown(&self, context: Option<&ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
         let key_code = wparam.0 as u32;
