@@ -122,13 +122,13 @@ pub struct Processor {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: crate::config::FuzzyPinyinConfig,
     pub enable_traditional: bool,
-    pub user_dict: HashMap<String, Vec<(String, u32)>>, // 拼音 -> Vec<(词组, 词频)>
+    pub user_dict: HashMap<String, HashMap<String, Vec<(String, u32)>>>, // 方案 -> 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
     // 连续选词记忆
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
-    pub user_dict_tx: Option<std::sync::mpsc::Sender<HashMap<String, Vec<(String, u32)>>>>,
+    pub user_dict_tx: Option<std::sync::mpsc::Sender<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
 
     // 标点状态相关
     pub quote_open: bool,
@@ -1468,7 +1468,20 @@ impl Processor {
 
         // 4. 用户词库重排
         if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
-            if let Some(user_entries) = self.user_dict.get(&self.last_lookup_pinyin) {
+            // 获取当前活跃的所有方案的用户词库
+            let mut combined_user_entries = Vec::new();
+            for profile in &self.active_profiles {
+                if let Some(profile_dict) = self.user_dict.get(profile) {
+                    if let Some(entries) = profile_dict.get(&self.last_lookup_pinyin) {
+                        combined_user_entries.extend(entries.clone());
+                    }
+                }
+            }
+            
+            if !combined_user_entries.is_empty() {
+                // 按词频降序排列合并后的结果
+                combined_user_entries.sort_by(|a, b| b.1.cmp(&a.1));
+
                 let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
                 
                 // 预先获取当前拼音的所有字典精确匹配，用于判断用户词是否在字典中
@@ -1483,7 +1496,7 @@ impl Processor {
 
                 let has_aux = raw_parsed.last().map_or(false, |p| p.stroke_aux.is_some() || p.english_aux.is_some());
 
-                for (word, _count) in user_entries.iter().rev() {
+                for (word, _count) in combined_user_entries.iter().rev() {
                     if let Some(pos) = self.candidates.iter().position(|c| c == word) {
                         if insert_pos == 1 && pos == 0 { continue; }
                         let c = self.candidates.remove(pos);
@@ -1637,13 +1650,13 @@ impl Processor {
     }
 
     fn load_user_dict(&mut self) {
-        println!("[Processor] Loading user dictionary...");
+        println!("[Processor] Loading profile-aware user dictionary...");
         let path = std::path::Path::new("data/user_dict.json");
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
                     self.user_dict = dict;
-                    println!("[Processor] User dictionary loaded ({} entries).", self.user_dict.len());
+                    println!("[Processor] User dictionary loaded ({} profiles).", self.user_dict.len());
                 }
             }
         } else {
@@ -1652,7 +1665,7 @@ impl Processor {
 
         // 启动后台保存线程
         if self.user_dict_tx.is_none() {
-            let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, Vec<(String, u32)>>>();
+            let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, HashMap<String, Vec<(String, u32)>>>>();
             self.user_dict_tx = Some(tx);
             std::thread::spawn(move || {
                 let path = std::path::PathBuf::from("data/user_dict.json");
@@ -1678,12 +1691,19 @@ impl Processor {
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
-        let entries = self.user_dict.entry(pinyin.to_string()).or_insert(Vec::new());
+        
+        // 关键：获取当前活跃的第一个方案作为归属方案
+        let profile = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
+        
+        let profile_dict = self.user_dict.entry(profile).or_insert_with(HashMap::new);
+        let entries = profile_dict.entry(pinyin.to_string()).or_insert_with(Vec::new);
+        
         if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
             entries[pos].1 += 1;
         } else {
             entries.push((word.to_string(), 1));
         }
+        
         // 简单的排序：按频率降序
         entries.sort_by(|a, b| b.1.cmp(&a.1));
         self.save_user_dict();
