@@ -138,6 +138,13 @@
                     <option value="900">900 - Black</option>
                 </select>
             </div>
+            <div class="setting-item">
+                <div class="info"><div class="title">文字颜色</div></div>
+                <div class="color-picker-group">
+                    <input type="text" id="candidate_color" style="width:100px;">
+                    <div class="color-preview"><input type="color" id="candidate_color_picker"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -153,7 +160,7 @@
         async function init() {
             await loadConfig();
             
-            // 绑定基础设置
+            // 1. 基础外观设置
             bindInput('theme_mode', 'appearance');
             bindInput('show_candidates', 'appearance');
             bindInput('show_status_bar', 'appearance');
@@ -162,50 +169,38 @@
             bindInput('enable_random_highlight', 'appearance');
             bindInput('aux_mode', 'appearance');
             bindInput('candidate_layout', 'appearance');
+            
+            // 2. 窗口样式设置
             bindInput('window_bg_color', 'appearance');
             bindInput('window_border_color', 'appearance');
             bindInput('window_highlight_color', 'appearance');
-
-            // 绑定候选词数量 (page_size)
-            const pageSizeInput = document.getElementById('page_size');
-            pageSizeInput.value = config.appearance.page_size || 5;
-            pageSizeInput.onchange = () => {
-                let val = parseInt(pageSizeInput.value);
-                if (isNaN(val) || val < 1) val = 1;
-                if (val > 10) val = 10;
-                pageSizeInput.value = val;
-                config.appearance.page_size = val;
-            };
-
-            // 绑定 Pinyin 样式
-            const p = config.appearance.pinyin_text;
-            document.getElementById('pinyin_font_size').value = p.font_size;
-            document.getElementById('pinyin_font_weight').value = p.font_weight || 400;
-            document.getElementById('pinyin_color').value = p.color;
             
-            // 绑定 Candidate 样式
-            const c = config.appearance.candidate_text;
-            document.getElementById('candidate_font_size').value = c.font_size;
-            document.getElementById('candidate_font_weight').value = c.font_weight || 600;
-            document.getElementById('candidate_color').value = c.color;
-
+            // 颜色选择器同步
             linkColor('window_bg_color', 'appearance');
             linkColor('window_border_color', 'appearance');
             linkColor('window_highlight_color', 'appearance');
-            linkColor('pinyin_color');
-            linkColor('candidate_color');
+
+            // 3. 分页大小 (page_size)
+            bindInput('page_size', 'appearance');
+
+            // 4. 拼音样式设置 (嵌套对象 pinyin_text)
+            bindInput('pinyin_font_size', 'appearance', 'pinyin_text.font_size');
+            bindInput('pinyin_font_weight', 'appearance', 'pinyin_text.font_weight');
+            bindInput('pinyin_color', 'appearance', 'pinyin_text.color');
+            
+            linkColor('pinyin_color', 'appearance', 'pinyin_text.color');
+            
+            // 5. 候选词样式设置 (嵌套对象 candidate_text)
+            bindInput('candidate_font_size', 'appearance', 'candidate_text.font_size');
+            bindInput('candidate_font_weight', 'appearance', 'candidate_text.font_weight');
+            bindInput('candidate_color', 'appearance', 'candidate_text.color');
+
+            linkColor('candidate_color', 'appearance', 'candidate_text.color');
         }
 
         async function save() {
-            // 手动同步一些复杂的嵌套对象
-            config.appearance.pinyin_text.font_size = parseFloat(document.getElementById('pinyin_font_size').value);
-            config.appearance.pinyin_text.font_weight = parseInt(document.getElementById('pinyin_font_weight').value);
-            config.appearance.pinyin_text.color = document.getElementById('pinyin_color').value;
-
-            config.appearance.candidate_text.font_size = parseFloat(document.getElementById('candidate_font_size').value);
-            config.appearance.candidate_text.font_weight = parseInt(document.getElementById('candidate_font_weight').value);
-            config.appearance.candidate_text.color = document.getElementById('candidate_color').value;
-
+            // 所有绑定已经通过 bindInput 自动更新了 config 对象
+            // 且类型转换在 settings.js 的 bindInput 中处理
             await saveConfig();
         }
 

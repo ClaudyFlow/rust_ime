@@ -15,7 +15,6 @@ pub enum TrayEvent {
     ReloadConfig,
     SyncStatus { chinese_enabled: bool, active_profile: String },
     ClearUserDict,
-    RequestMenu { x: i32, y: i32 },
 }
 
 #[cfg(target_os = "linux")]
@@ -212,7 +211,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 let mut pt = POINT::default();
                 let _ = GetCursorPos(&mut pt);
                 
-                if let Some(state_arc) = &TRAY_STATE {
+                if let Some(state_arc) = (&raw const TRAY_STATE).as_ref().and_then(|opt| opt.as_ref()) {
                     if let Ok(state) = state_arc.lock() {
                         let h_menu = CreatePopupMenu().unwrap();
                         

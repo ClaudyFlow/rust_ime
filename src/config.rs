@@ -1,10 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-#[cfg(target_os = "linux")]
-use evdev;
-#[cfg(target_os = "windows")]
-use crate::evdev;
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Config {
     pub files: Files,
@@ -377,52 +372,3 @@ impl Config {
     }
 }
 
-pub fn parse_key(s: &str) -> Vec<Vec<Vec<evdev::Key>>> {
-    let mut combinations = Vec::new();
-    for combo_str in s.split('|') {
-        let mut requirements = Vec::new();
-        for part in combo_str.split('+') {
-            let k = part.to_lowercase().trim().to_string();
-            let mut keys = Vec::new();
-            match k.as_str() {
-                "ctrl" => { keys.push(evdev::Key::KEY_LEFTCTRL); keys.push(evdev::Key::KEY_RIGHTCTRL); }
-                "shift" => { keys.push(evdev::Key::KEY_LEFTSHIFT); keys.push(evdev::Key::KEY_RIGHTSHIFT); }
-                "alt" => { keys.push(evdev::Key::KEY_LEFTALT); keys.push(evdev::Key::KEY_RIGHTALT); }
-                "meta" | "win" => { keys.push(evdev::Key::KEY_LEFTMETA); keys.push(evdev::Key::KEY_RIGHTMETA); }
-                _ => { if let Some(key) = string_to_key(&k) { keys.push(key); } }
-            }
-            if !keys.is_empty() { requirements.push(keys); }
-        }
-        if !requirements.is_empty() { combinations.push(requirements); }
-    }
-    combinations
-}
-
-fn string_to_key(s: &str) -> Option<evdev::Key> {
-    match s {
-        "ctrl" | "lctrl" | "rctrl" => Some(evdev::Key::KEY_LEFTCTRL),
-        "shift" | "lshift" | "rshift" => Some(evdev::Key::KEY_LEFTSHIFT),
-        "alt" | "lalt" | "ralt" => Some(evdev::Key::KEY_LEFTALT),
-        "meta" | "win" | "command" => Some(evdev::Key::KEY_LEFTMETA),
-        "space" => Some(evdev::Key::KEY_SPACE),
-        "enter" => Some(evdev::Key::KEY_ENTER),
-        "tab" => Some(evdev::Key::KEY_TAB),
-        "backspace" => Some(evdev::Key::KEY_BACKSPACE),
-        "esc" | "escape" => Some(evdev::Key::KEY_ESC),
-        "caps_lock" | "caps" => Some(evdev::Key::KEY_CAPSLOCK),
-        "a" => Some(evdev::Key::KEY_A), "b" => Some(evdev::Key::KEY_B), "c" => Some(evdev::Key::KEY_C),
-        "d" => Some(evdev::Key::KEY_D), "e" => Some(evdev::Key::KEY_E), "f" => Some(evdev::Key::KEY_F),
-        "g" => Some(evdev::Key::KEY_G), "h" => Some(evdev::Key::KEY_H), "i" => Some(evdev::Key::KEY_I),
-        "j" => Some(evdev::Key::KEY_J), "k" => Some(evdev::Key::KEY_K), "l" => Some(evdev::Key::KEY_L),
-        "m" => Some(evdev::Key::KEY_M), "n" => Some(evdev::Key::KEY_N), "o" => Some(evdev::Key::KEY_O),
-        "p" => Some(evdev::Key::KEY_P), "q" => Some(evdev::Key::KEY_Q), "r" => Some(evdev::Key::KEY_R),
-        "s" => Some(evdev::Key::KEY_S), "t" => Some(evdev::Key::KEY_T), "u" => Some(evdev::Key::KEY_U),
-        "v" => Some(evdev::Key::KEY_V), "w" => Some(evdev::Key::KEY_W), "x" => Some(evdev::Key::KEY_X),
-        "y" => Some(evdev::Key::KEY_Y), "z" => Some(evdev::Key::KEY_Z),
-        "0" => Some(evdev::Key::KEY_0), "1" => Some(evdev::Key::KEY_1), "2" => Some(evdev::Key::KEY_2),
-        "3" => Some(evdev::Key::KEY_3), "4" => Some(evdev::Key::KEY_4), "5" => Some(evdev::Key::KEY_5),
-        "6" => Some(evdev::Key::KEY_6), "7" => Some(evdev::Key::KEY_7), "8" => Some(evdev::Key::KEY_8),
-        "9" => Some(evdev::Key::KEY_9),
-        _ => None,
-    }
-}

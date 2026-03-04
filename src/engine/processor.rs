@@ -64,7 +64,6 @@ pub struct Processor {
     pub show_candidates: bool,
     pub show_english_translation: bool,
     pub show_stroke_aux: bool,
-    pub show_modern_candidates: bool,
     pub phantom_mode: PhantomMode,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
@@ -193,7 +192,6 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
         punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
-        keyboard_layouts: HashMap<String, HashMap<String, String>>,
     ) -> Self {
         let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
 
@@ -201,7 +199,7 @@ impl Processor {
             state: ImeState::Direct, buffer: String::new(), tries, 
             active_profiles: vec![initial_profile],
             punctuations,
-            keyboard_layouts,
+            keyboard_layouts: HashMap::new(),
             syllables: std::collections::HashSet::new(),
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
@@ -209,7 +207,6 @@ impl Processor {
             show_candidates: true,
             show_english_translation: true,
             show_stroke_aux: true,
-            show_modern_candidates: false,
 
             phantom_mode,
             phantom_text: String::new(),

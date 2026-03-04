@@ -36,7 +36,7 @@ use std::sync::{Arc, RwLock, Mutex};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::collections::HashMap;
-use std::io::{BufReader, Write};
+use std::io::BufReader;
 #[cfg(target_os = "linux")]
 use signal_hook::consts::signal::*;
 #[cfg(target_os = "linux")]
@@ -231,7 +231,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 let input = args[1..].join(" ");
-                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new(), HashMap::new());
+                let mut p = Processor::new(tries_map, "chinese".into(), HashMap::new());
                 p.buffer = input;
                 p.lookup();
                 for (i, cand) in p.candidates.iter().take(10).enumerate() {
@@ -365,7 +365,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         else if let Some(k) = tries_map.keys().next() { default_profile = k.clone(); }
     }
     
-    let mut processor_obj = Processor::new(tries_map, default_profile, conf_guard.input.punctuations.clone(), conf_guard.input.keyboard_layouts.clone());
+    let mut processor_obj = Processor::new(tries_map, default_profile, conf_guard.input.punctuations.clone());
     processor_obj.apply_config(&conf_guard);
     processor_obj.set_syllables(load_syllables(&root));    
     let processor = Arc::new(Mutex::new(processor_obj));
@@ -463,10 +463,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => { tray_handle.update(|t| { t.chinese_enabled = chinese_enabled; t.active_profile = active_profile; }); }
                 ui::tray::TrayEvent::ClearUserDict => { let mut p = processor_clone.lock().unwrap(); p.user_dict.clear(); }
-                ui::tray::TrayEvent::RequestMenu { x, y } => {
-                    let (enabled, profile) = { let p = processor_clone.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
-                    let _ = gui_tx_tray.send(GuiEvent::OpenTrayMenu { x, y, chinese_enabled: enabled, active_profile: profile });
-                }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
             }
         }

@@ -31,37 +31,12 @@ unsafe fn hide_window_from_taskbar(title_str: &str) {
     }
 }
 
-pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEvent>) {
+pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEvent>) {
     let window = CandidateWindow::new().expect("Failed to create CandidateWindow");
     let status_bar = StatusBar::new().expect("Failed to create StatusBar");
-    let tray_menu = TrayMenu::new().expect("Failed to create TrayMenu");
     
     let window_handle = window.as_weak();
     let status_bar_handle = status_bar.as_weak();
-    let tray_menu_handle = tray_menu.as_weak();
-
-    // 绑定托盘菜单回调
-    {
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
-        tray_menu.on_toggle_ime(move || { let _ = tx.send(TrayEvent::ToggleIme); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
-        
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
-        tray_menu.on_next_profile(move || { let _ = tx.send(TrayEvent::NextProfile); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
-        
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
-        tray_menu.on_open_config(move || { let _ = tx.send(TrayEvent::OpenConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
-        
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
-        tray_menu.on_reload_config(move || { let _ = tx.send(TrayEvent::ReloadConfig); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
-        
-        let tx = tray_tx.clone();
-        let tm = tray_menu_handle.clone();
-        tray_menu.on_exit(move || { let _ = tx.send(TrayEvent::Exit); if let Some(m) = tm.upgrade() { let _ = m.window().hide(); } });
-    }
 
     // 初始设置
     window.set_show_english_aux(config.appearance.show_english_aux);
@@ -137,64 +112,16 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                         }
                     });
                 }
-
-                let t_title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
-                let t_hwnd = FindWindowW(None, PCWSTR(t_title.as_ptr()));
-                if t_hwnd.0 != 0 {
-                    let mut ex_style = GetWindowLongPtrW(t_hwnd, GWL_EXSTYLE) as u32;
-                    ex_style |= WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0;
-                    ex_style &= !WS_EX_APPWINDOW.0;
-                    let _ = SetWindowLongPtrW(t_hwnd, GWL_EXSTYLE, ex_style as isize);
-                }
             }
         });
     }
 
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let open_menu_time = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let open_menu_time_for_timer = open_menu_time.clone();
-
-    // 定时器：检测托盘菜单失去焦点自动隐藏
-    let tm_for_timer = tray_menu_handle.clone();
-    slint::Timer::default().start(slint::TimerMode::Repeated, std::time::Duration::from_millis(100), move || {
-        if let Some(tm) = tm_for_timer.upgrade() {
-            if tm.window().is_visible() {
-                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
-                let open_time = open_menu_time_for_timer.load(std::sync::atomic::Ordering::SeqCst);
-                
-                // 缩短保护期到 200ms
-                if now - open_time < 200 { return; } 
-
-                // 1. 检查 Slint 内部焦点
-                if !tm.get_has_focus() {
-                    let _ = tm.window().hide();
-                    return;
-                }
-                
-                #[cfg(target_os = "windows")]
-                unsafe {
-                    let active_hwnd = GetForegroundWindow();
-                    let title = "RustImeTrayMenu\0".encode_utf16().collect::<Vec<u16>>();
-                    let menu_hwnd = FindWindowW(None, PCWSTR(title.as_ptr()));
-                    
-                    // 2. 检查 Windows 前台窗口
-                    if menu_hwnd.0 != 0 && active_hwnd.0 != 0 && active_hwnd != menu_hwnd {
-                        let _ = tm.window().hide();
-                    } else if active_hwnd.0 == 0 {
-                        let _ = tm.window().hide();
-                    }
-                }
-            }
-        }
-    });
-
-    let open_menu_time_for_thread = open_menu_time.clone();
 
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
-            let tm_handle = tray_menu_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
             let show_status_bar_for_loop = show_status_bar_atomic.clone();
             let random_highlight_for_loop = random_highlight_atomic.clone();
@@ -202,7 +129,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
             let last_pos_inner = last_pos_for_loop.clone();
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
-            let open_menu_time_inner = open_menu_time_for_thread.clone();
             
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
@@ -229,7 +155,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                                         was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
                                     }
                                 } else {
-                                    // 未开启随机高亮时，确保 was_visible 标志同步
                                     if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                         was_visible_atomic.store(true, std::sync::atomic::Ordering::SeqCst);
                                     }
@@ -281,9 +206,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             }
                         }
                     }
-                    GuiEvent::OpenTrayMenu { .. } => {
-                        // 禁用 Slint 菜单，已改用原生菜单
-                    }
+                    GuiEvent::OpenTrayMenu { .. } => {}
                     GuiEvent::ShowStatus(status, is_chinese) => {
                         if let Some(sb) = s.upgrade() {
                             #[cfg(target_os = "windows")]
@@ -295,9 +218,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             if show_pref && !sb.window().is_visible() {
                                 let _ = sb.window().show();
                             }
-                        }
-                        if let Some(tm) = tm_handle.upgrade() {
-                            tm.set_chinese_enabled(is_chinese);
                         }
                     }
                     GuiEvent::SetVisible(visible) => {
@@ -347,7 +267,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             w.set_show_translation(new_conf.appearance.show_english_translation);
                             w.set_is_horizontal(new_conf.appearance.candidate_layout == "horizontal");
                             
-                            // 更新颜色设置并强制刷新共享变量
                             let new_highlight = parse_color(&new_conf.appearance.window_highlight_color);
                             {
                                 let mut c = color_shared.lock().unwrap();
@@ -359,13 +278,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, tray_tx: Sender<TrayEve
                             w.set_text_color(parse_color(&new_conf.appearance.candidate_text.color));
                             w.set_highlight_text_color(parse_color(&new_conf.appearance.window_bg_color));
                             
-                            // 更新字号和粗细
                             w.set_pinyin_font_size(new_conf.appearance.pinyin_text.font_size as f32);
                             w.set_pinyin_font_weight(new_conf.appearance.pinyin_text.font_weight as i32);
                             w.set_candidate_font_size(new_conf.appearance.candidate_text.font_size as f32);
                             w.set_candidate_font_weight(new_conf.appearance.candidate_text.font_weight as i32);
                             
-                            // 同步辅助文本颜色
                             w.set_aux_text_color(slint::Color::from_rgb_u8(149, 165, 166));
                             w.set_aux_highlight_color(slint::Color::from_rgb_u8(220, 221, 225));
 

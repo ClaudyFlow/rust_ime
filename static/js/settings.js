@@ -7,37 +7,20 @@ async function loadConfig() {
 }
 
 async function saveConfig() {
-    // 特别处理：显式同步所有已知复选框的状态，防止某些页面没调用 save() 导致的状态丢失
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(cb => {
-        const id = cb.id;
-        // 尝试从 bindInput 建立的关系中查找所属 section
-        // 这里采用简单的尝试策略，或者根据 appearance.html 的结构
-        if (config.appearance && id in config.appearance) {
-            config.appearance[id] = cb.checked;
-        } else if (config.input && id in config.input) {
-            config.input[id] = cb.checked;
-        } else if (config.hotkeys && id in config.hotkeys) {
-            config.hotkeys[id] = cb.checked;
-        } else if (id in config) {
-            config[id] = cb.checked;
-        }
-    });
-
     await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
     });
-    showToast();
+    showToast("设置已保存并应用");
 }
 
 function showToast(message) {
     const toast = document.getElementById('toast');
     if (toast) {
         toast.innerText = message;
-        toast.style.display = 'block';
-        setTimeout(() => toast.style.display = 'none', 2000);
+        toast.className = "status-toast show";
+        setTimeout(() => { toast.className = "status-toast"; }, 2000);
     }
 }
 
@@ -48,33 +31,41 @@ async function resetConfig() {
     }
 }
 
-function bindInput(id, section, property) {
+function getNestedValue(obj, path) {
+    return path.split('.').reduce((prev, curr) => prev && prev[curr], obj);
+}
+
+function setNestedValue(obj, path, value) {
+    const parts = path.split('.');
+    const last = parts.pop();
+    const target = parts.reduce((prev, curr) => prev && prev[curr], obj);
+    if (target) target[last] = value;
+}
+
+function bindInput(id, section, propertyPath) {
     const el = document.getElementById(id);
     if (!el) return;
 
-    let val;
-    if (section && property) {
-        val = config[section][property];
-    } else if (section) {
-        val = config[section][id];
-    } else {
-        val = config[id];
-    }
+    // 确定目标属性路径
+    const path = propertyPath || id;
+    const targetSection = section ? config[section] : config;
+    
+    let val = getNestedValue(targetSection, path);
 
     if (el.type === 'checkbox') {
         el.checked = !!val;
         el.onchange = () => {
-            if (section && property) config[section][property] = el.checked;
-            else if (section) config[section][id] = el.checked;
-            else config[id] = el.checked;
+            setNestedValue(targetSection, path, el.checked);
         };
     } else {
-        el.value = val !== undefined ? val : "";
+        el.value = (val !== undefined && val !== null) ? val : "";
         const update = () => {
-            const newVal = el.type === 'number' ? parseFloat(el.value) : el.value;
-            if (section && property) config[section][property] = newVal;
-            else if (section) config[section][id] = newVal;
-            else config[id] = newVal;
+            let newVal = el.value;
+            if (el.type === 'number') {
+                newVal = parseFloat(el.value);
+                if (isNaN(newVal)) newVal = 0;
+            }
+            setNestedValue(targetSection, path, newVal);
         };
         el.oninput = update;
         if (el.tagName === 'SELECT') {
@@ -83,20 +74,17 @@ function bindInput(id, section, property) {
     }
 }
 
-function linkColor(id, section, property) {
+function linkColor(id, section, propertyPath) {
     const txt = document.getElementById(id);
     const picker = document.getElementById(id + '_picker');
     if (!txt || !picker) return;
 
+    const path = propertyPath || id;
+    const targetSection = section ? config[section] : config;
+
     const toHex = (color) => {
         if (!color) return "#000000";
         if (color.startsWith('#')) return color.substring(0, 7);
-        if (color.startsWith('rgba') || color.startsWith('rgb')) {
-            const m = color.match(/\d+/g);
-            if (m && m.length >= 3) {
-                return "#" + m.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
-            }
-        }
         return "#000000";
     };
 
@@ -107,13 +95,11 @@ function linkColor(id, section, property) {
 
     txt.oninput = () => {
         picker.value = toHex(txt.value);
-        if (section && property) config[section][property] = txt.value;
-        else if (section) config[section][id] = txt.value;
+        setNestedValue(targetSection, path, txt.value);
     };
     picker.oninput = () => {
         txt.value = picker.value;
-        if (section && property) config[section][property] = picker.value;
-        else if (section) config[section][id] = picker.value;
+        setNestedValue(targetSection, path, picker.value);
     };
 }
 
