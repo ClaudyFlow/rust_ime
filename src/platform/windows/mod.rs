@@ -1,7 +1,7 @@
 pub mod tsf;
 
 #[cfg(target_os = "windows")]
-pub fn is_system_dark_mode() -> bool {
+pub fn _is_system_dark_mode() -> bool {
     use windows::Win32::System::Registry::*;
     use windows::core::PCWSTR;
 

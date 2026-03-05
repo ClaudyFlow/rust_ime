@@ -347,7 +347,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
-                _ => {}
             }
         }
     });

@@ -160,70 +160,72 @@
         </section>
 
         <section id="stroke-aux">
-            <h2>进阶：笔画辅助码 (SBSRF)</h2>
+            <h2>进阶：笔画输入法与辅助码 (SBSRF)</h2>
             <div class="feature-card">
-                <p>笔画辅助码是基于汉字<b>笔画结构</b>的精准过滤方案。它使用 5x5 的 <b>QWER 按键矩阵</b>，每个按键代表两个连续笔画。</p>
-                
-                <h3>1. 笔画映射键盘布局</h3>
+                <p>这是本引擎最核心的原创设计方案。它不仅可以作为拼音的辅助过滤码，更可以作为一套<b>独立、高效的笔画输入法</b>。其核心逻辑是：<b>一键代表两个连续笔画</b>。</p>
+
+                <h3>1. 设计思想：双笔一键</h3>
+                <p>传统的笔画输入法（1-5数字键）效率低下，因为每输入一个笔画就需要点击一次按键。SBSRF 方案通过 5x5 的字母矩阵，让您每一次击键都能输入两个笔画，大幅提升了输入速度。</p>
+
+                <h3>2. 映射表 (5x5 矩阵)</h3>
                 <p>我们将 1(横)、2(竖)、3(撇)、4(捺/点)、5(折) 映射到键盘。矩阵的<b>行代表第 1 笔</b>，<b>列代表第 2 笔</b>。</p>
 
                 <div class="keyboard-grid">
                     <div class="row-label">横 (1) 行：第 1 笔是“横”</div>
-                    <div class="key-cap"><span class="key-letter">G</span><span class="key-desc">横横</span></div>
-                    <div class="key-cap"><span class="key-letter">F</span><span class="key-desc">横竖</span></div>
-                    <div class="key-cap"><span class="key-letter">D</span><span class="key-desc">横撇</span></div>
-                    <div class="key-cap"><span class="key-letter">S</span><span class="key-desc">横捺</span></div>
-                    <div class="key-cap"><span class="key-letter">A</span><span class="key-desc">横折</span></div>
+                    <div class="key-cap"><span class="key-letter">G</span><span class="key-desc">横横 (11)</span></div>
+                    <div class="key-cap"><span class="key-letter">F</span><span class="key-desc">横竖 (12)</span></div>
+                    <div class="key-cap"><span class="key-letter">D</span><span class="key-desc">横撇 (13)</span></div>
+                    <div class="key-cap"><span class="key-letter">S</span><span class="key-desc">横捺 (14)</span></div>
+                    <div class="key-cap"><span class="key-letter">A</span><span class="key-desc">横折 (15)</span></div>
 
                     <div class="row-label">竖 (2) 行：第 1 笔是“竖”</div>
-                    <div class="key-cap"><span class="key-letter">H</span><span class="key-desc">竖横</span></div>
-                    <div class="key-cap"><span class="key-letter">J</span><span class="key-desc">竖竖</span></div>
-                    <div class="key-cap"><span class="key-letter">K</span><span class="key-desc">竖撇</span></div>
-                    <div class="key-cap"><span class="key-letter">L</span><span class="key-desc">竖捺</span></div>
-                    <div class="key-cap"><span class="key-letter">M</span><span class="key-desc">竖折</span></div>
+                    <div class="key-cap"><span class="key-letter">H</span><span class="key-desc">竖横 (21)</span></div>
+                    <div class="key-cap"><span class="key-letter">J</span><span class="key-desc">竖竖 (22)</span></div>
+                    <div class="key-cap"><span class="key-letter">K</span><span class="key-desc">竖撇 (23)</span></div>
+                    <div class="key-cap"><span class="key-letter">L</span><span class="key-desc">竖捺 (24)</span></div>
+                    <div class="key-cap"><span class="key-letter">M</span><span class="key-desc">竖折 (25)</span></div>
 
                     <div class="row-label">撇 (3) 行：第 1 笔是“撇”</div>
-                    <div class="key-cap"><span class="key-letter">T</span><span class="key-desc">撇横</span></div>
-                    <div class="key-cap"><span class="key-letter">R</span><span class="key-desc">撇竖</span></div>
-                    <div class="key-cap"><span class="key-letter">E</span><span class="key-desc">撇撇</span></div>
-                    <div class="key-cap"><span class="key-letter">W</span><span class="key-desc">撇捺</span></div>
-                    <div class="key-cap"><span class="key-letter">Q</span><span class="key-desc">撇折</span></div>
+                    <div class="key-cap"><span class="key-letter">T</span><span class="key-desc">撇横 (31)</span></div>
+                    <div class="key-cap"><span class="key-letter">R</span><span class="key-desc">撇竖 (32)</span></div>
+                    <div class="key-cap"><span class="key-letter">E</span><span class="key-desc">撇撇 (33)</span></div>
+                    <div class="key-cap"><span class="key-letter">W</span><span class="key-desc">撇捺 (34)</span></div>
+                    <div class="key-cap"><span class="key-letter">Q</span><span class="key-desc">撇折 (35)</span></div>
 
                     <div class="row-label">捺 (4) 行：第 1 笔是“捺”</div>
-                    <div class="key-cap"><span class="key-letter">Y</span><span class="key-desc">捺横</span></div>
-                    <div class="key-cap"><span class="key-letter">U</span><span class="key-desc">捺竖</span></div>
-                    <div class="key-cap"><span class="key-letter">I</span><span class="key-desc">捺撇</span></div>
-                    <div class="key-cap"><span class="key-letter">O</span><span class="key-desc">捺捺</span></div>
-                    <div class="key-cap"><span class="key-letter">P</span><span class="key-desc">捺折</span></div>
+                    <div class="key-cap"><span class="key-letter">Y</span><span class="key-desc">捺横 (41)</span></div>
+                    <div class="key-cap"><span class="key-letter">U</span><span class="key-desc">捺竖 (42)</span></div>
+                    <div class="key-cap"><span class="key-letter">I</span><span class="key-desc">捺撇 (43)</span></div>
+                    <div class="key-cap"><span class="key-letter">O</span><span class="key-desc">捺捺 (44)</span></div>
+                    <div class="key-cap"><span class="key-letter">P</span><span class="key-desc">捺折 (45)</span></div>
 
                     <div class="row-label">折 (5) 行：第 1 笔是“折”</div>
-                    <div class="key-cap"><span class="key-letter">N</span><span class="key-desc">折横</span></div>
-                    <div class="key-cap"><span class="key-letter">B</span><span class="key-desc">折竖</span></div>
-                    <div class="key-cap"><span class="key-letter">V</span><span class="key-desc">折撇</span></div>
-                    <div class="key-cap"><span class="key-letter">C</span><span class="key-desc">折捺</span></div>
-                    <div class="key-cap"><span class="key-letter">X</span><span class="key-desc">折折</span></div>
+                    <div class="key-cap"><span class="key-letter">N</span><span class="key-desc">折横 (51)</span></div>
+                    <div class="key-cap"><span class="key-letter">B</span><span class="key-desc">折竖 (52)</span></div>
+                    <div class="key-cap"><span class="key-letter">V</span><span class="key-desc">折撇 (53)</span></div>
+                    <div class="key-cap"><span class="key-letter">C</span><span class="key-desc">折捺 (54)</span></div>
+                    <div class="key-cap"><span class="key-letter">X</span><span class="key-desc">折折 (55)</span></div>
                 </div>
 
-                <h3>2. 编码规则</h3>
+                <h3>3. 使用方法</h3>
                 <ul>
-                    <li><b>首 2 笔 (第 1 键)</b>：汉字的前两画。例如“的”前两画是撇、竖，对应 <code>x</code>。</li>
-                    <li><b>末 2 笔 (第 2 键)</b>：汉字的最后两画。例如“的”最后两画是捺、点（按捺处理），对应 <code>o</code>，但系统规则为了兼容性，此处对应 <code>y</code> (捺横)。</li>
+                    <li><b>场景一：独立输入模式</b>：按下 <code>`</code> 键进入方案切换，选择 <code>stroke</code>。此时您可以直接输入上述字母。例如输入 <code>fth</code> 即可根据笔画序列匹配词条。<b>此模式下不使用数字 1-5 输入笔画</b>。</li>
+                    <li><b>场景二：拼音辅助过滤</b>：在输入拼音后，输入 <b>分号 ;</b> 键，随后输入笔画字母进行过滤。例如 <code>de;rp</code>。</li>
                 </ul>
 
                 <div class="example-box">
                     <p><b>实战演练</b></p>
                     <ul>
-                        <li><b>人</b> (ren)：前两画“撇捺” ⮕ 输入 <code>renv</code> 瞬间定位。</li>
-                        <li><b>的</b> (de)：前两画“撇竖”(x)，末两画“捺横”(y) ⮕ 输入 <code>dexy</code> 精准定位。</li>
+                        <li><b>人</b> (ren)：笔画为“撇、捺”(3、4)，对应坐标 (3,4) 即按键 <code>W</code>。输入 <code>ren;w</code> 瞬间定位。</li>
+                        <li><b>的</b> (de)：前两画“撇、竖”(3,2=R)，末两画“点、折”(4,5=P)。输入 <code>de;rp</code> 精准定位。</li>
                     </ul>
                 </div>
 
                 <div class="pro-tip">
-                    <b>说明：</b>笔画辅助码默认开启。如果发现某个字无法定位，可以在 Web 端“词库编辑器”中查看该字的 <code>stroke_aux</code> 字段进行确认。
+                    <b>说明：</b>如果某个字映射结果与直觉不符，可以在 Web 端“辅助码对照表”中查看每个字的精确 <code>stroke_aux</code>。
                 </div>
             </div>
         </section>
-
         <section id="proper-nouns">
             <h2>4. 专有名词原生隔离</h2>
             <div class="feature-card">
