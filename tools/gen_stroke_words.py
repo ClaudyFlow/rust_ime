@@ -6,9 +6,9 @@ def generate_stroke_words():
     words_dict_path = 'dicts/chinese/words/words.json'
     output_path = 'dicts/stroke/words/stroke_words.json'
     
-    # 1. 建立 汉字 -> 编码 的反向索引
-    print("正在建立汉字编码索引...")
-    char_to_code = {}
+    # 1. 建立 汉字 -> (编码, 拼音) 的反向索引
+    print("正在建立汉字编码与拼音索引...")
+    char_to_info = {}
     if not os.path.exists(char_dict_path):
         print("错误: 未找到 stroke_char.json")
         return
@@ -18,12 +18,18 @@ def generate_stroke_words():
         for code, entries in stroke_dict.items():
             for entry in entries:
                 char = entry['char']
-                # 如果一个字有多个编码（虽然少见），保留最短的或第一个
-                if char not in char_to_code or len(code) < len(char_to_code[char]):
-                    char_to_code[char] = code
+                tone = entry.get('tone', '')
+                # 如果一个字有多个编码，保留最短的；保留第一个有声调的拼音
+                if char not in char_to_info or len(code) < len(char_to_info[char]['code']):
+                    char_to_info[char] = {
+                        'code': code,
+                        'tone': tone
+                    }
+                elif not char_to_info[char]['tone'] and tone:
+                    char_to_info[char]['tone'] = tone
 
     # 2. 读取拼音词库并转换
-    print("正在合成笔画组词词库...")
+    print("正在合成笔画组词词库 (含拼音信息)...")
     stroke_words = {}
     if not os.path.exists(words_dict_path):
         print("错误: 未找到 words.json")
@@ -42,12 +48,15 @@ def generate_stroke_words():
             # 只处理 2 字及以上的词
             if len(word) < 2: continue
             
-            # 获取每个字的编码
+            # 获取每个字的编码和拼音
             codes = []
+            tones = []
             valid = True
             for char in word:
-                if char in char_to_code:
-                    codes.append(char_to_code[char])
+                if char in char_to_info:
+                    info = char_to_info[char]
+                    codes.append(info['code'])
+                    tones.append(info['tone'])
                 else:
                     valid = False
                     break
@@ -58,9 +67,7 @@ def generate_stroke_words():
             final_code = ""
             if len(word) == 2:
                 # 2字词: 1前2 + 2前2
-                c1 = codes[0]
-                c2 = codes[1]
-                final_code = c1[:2] + c2[:2]
+                final_code = codes[0][:2] + codes[1][:2]
             elif len(word) == 3:
                 # 3字词: 1首 + 2首 + 3前2
                 final_code = codes[0][0] + codes[1][0] + codes[2][:2]
@@ -75,7 +82,8 @@ def generate_stroke_words():
                 stroke_words[final_code].append({
                     "char": word,
                     "weight": weight,
-                    "trad": trad
+                    "trad": trad,
+                    "tone": " ".join(tones) # 合成完整拼音
                 })
                 count += 1
 
@@ -87,7 +95,7 @@ def generate_stroke_words():
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(stroke_words, f, ensure_ascii=False, indent=2)
         
-    print("笔画组词词库合成完成！")
+    print("笔画组词词库 (含拼音) 合成完成！")
 
 if __name__ == "__main__":
     generate_stroke_words()
