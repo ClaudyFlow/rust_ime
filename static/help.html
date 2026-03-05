@@ -268,41 +268,91 @@
                     <b>说明：</b>如果某个字映射结果与直觉不符，可以在 Web 端“辅助码对照表”中查看每个字的精确 <code>stroke_aux</code>。
                 </div>
 
-                <h3>5. 易错笔顺对照表 (标准规范)</h3>
-                <div class="example-box">
-                    <p>笔画顺序是精准匹配的核心。以下是几个常见的易错汉字及其标准编码：</p>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                        <tr style="border-bottom: 1px solid #d2d2d7;">
-                            <th style="text-align: left; padding: 8px;">汉字</th>
-                            <th style="text-align: left; padding: 8px;">标准笔顺 (数字)</th>
-                            <th style="text-align: left; padding: 8px;">字母编码</th>
-                            <th style="text-align: left; padding: 8px;">关键点</th>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px;"><b>万</b> (wàn)</td>
-                            <td style="padding: 8px;">1, 5, 3</td>
-                            <td style="padding: 8px;"><code>at</code></td>
-                            <td style="padding: 8px;">先横后折再撇</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px;"><b>九</b> (jiǔ)</td>
-                            <td style="padding: 8px;">3, 5</td>
-                            <td style="padding: 8px;"><code>q</code></td>
-                            <td style="padding: 8px;">先撇后横折弯钩</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px;"><b>了</b> (le)</td>
-                            <td style="padding: 8px;">5, 2</td>
-                            <td style="padding: 8px;"><code>b</code></td>
-                            <td style="padding: 8px;">横撇是一笔</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px;"><b>为</b> (wèi)</td>
-                            <td style="padding: 8px;">4, 3, 5, 4</td>
-                            <td style="padding: 8px;"><code>ic</code></td>
-                            <td style="padding: 8px;">先两点后折捺</td>
-                        </tr>
-                    </table>
+                <h3>5. 汉字笔画纠错与编码手册</h3>
+                <div class="mistake-manual">
+                    <style>
+                        .mistake-manual { font-size: 14px; }
+                        .mistake-group { margin-bottom: 25px; background: #f8f9fa; padding: 20px; border-radius: 16px; border: 1px solid #e5e5e5; }
+                        .mistake-group h4 { margin-top: 0; color: #ff3b30; border-bottom: 1px solid #ff3b30; display: inline-block; padding-bottom: 3px; }
+                        .mistake-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+                        .mistake-item { background: white; padding: 10px; border-radius: 8px; border: 1px solid #d2d2d7; }
+                        .mistake-char { font-weight: bold; font-size: 18px; color: var(--apple-accent); margin-right: 5px; }
+                        .mistake-code { color: #86868b; font-family: monospace; font-weight: bold; }
+                        .mistake-desc { display: block; font-size: 12px; color: #8e8e93; margin-top: 4px; }
+                    </style>
+
+                    <div class="mistake-group">
+                        <h4>一、笔顺易错 (最常写错顺序)</h4>
+                        <div class="mistake-list">
+                            <div class="mistake-item"><span class="mistake-char">火</span>编码: <span class="mistake-code">iw</span><span class="mistake-desc">点→撇→撇→捺 (❌先两边)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">方</span>编码: <span class="mistake-code">yv</span><span class="mistake-desc">点→横→横折钩→撇 (❌最后点)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">为</span>编码: <span class="mistake-code">ic</span><span class="mistake-desc">点→撇→横折钩→点 (❌先横折钩)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">片</span>编码: <span class="mistake-code">ra</span><span class="mistake-desc">撇→竖→横→横折 (❌先横折)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">九</span>编码: <span class="mistake-code">q</span><span class="mistake-desc">撇→横折弯钩 (❌先弯钩)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">万</span>编码: <span class="mistake-code">at</span><span class="mistake-desc">横→横折钩→撇 (❌最后捺)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">比</span>编码: <span class="mistake-code">aq</span><span class="mistake-desc">横→竖提→撇→竖弯钩</span></div>
+                            <div class="mistake-item"><span class="mistake-char">再</span>编码: <span class="mistake-code">fbg</span><span class="mistake-desc">横→竖→横折钩→竖→横→横</span></div>
+                            <div class="mistake-item"><span class="mistake-char">凸</span>编码: <span class="mistake-code">hmg</span><span class="mistake-desc">竖→横→竖→横折折折→横</span></div>
+                            <div class="mistake-item"><span class="mistake-char">凹</span>编码: <span class="mistake-code">mmg</span><span class="mistake-desc">竖→横折折→竖→横折→横</span></div>
+                            <div class="mistake-item"><span class="mistake-char">母</span>编码: <span class="mistake-code">xyy</span><span class="mistake-desc">竖折→横折钩→点→横→点</span></div>
+                        </div>
+                    </div>
+
+                    <div class="mistake-group">
+                        <h4>二、笔画数量/长短易错</h4>
+                        <div class="mistake-list">
+                            <div class="mistake-item"><span class="mistake-char">具</span>编码: <span class="mistake-code">mggw</span><span class="mistake-desc">中间三横 (❌两横)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">冒</span>编码: <span class="mistake-code">mgmgg</span><span class="mistake-desc">上部是冃，两横不接框</span></div>
+                            <div class="mistake-item"><span class="mistake-char">肺</span>编码: <span class="mistake-code">qgfb</span><span class="mistake-desc">右边一竖到底 (❌多一横)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">黄</span>编码: <span class="mistake-code">fhmfdy</span><span class="mistake-desc">下部是“由” (❌写成田)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">考</span>编码: <span class="mistake-code">fda</span><span class="mistake-desc">下面是丂 (❌少笔)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">周</span>编码: <span class="mistake-code">qffn</span><span class="mistake-desc">上部是土 (上短下长)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">喜</span>编码: <span class="mistake-code">ffnifn</span><span class="mistake-desc">上部是士 (上长下短)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">身</span>编码: <span class="mistake-code">rngt</span><span class="mistake-desc">中间短提、末撇穿出</span></div>
+                            <div class="mistake-item"><span class="mistake-char">燕</span>编码: <span class="mistake-code">fhmfgqoo</span><span class="mistake-desc">上部是廿 (四横)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">录</span>编码: <span class="mistake-code">nfyw</span><span class="mistake-desc">下非“水”，左点+提</span></div>
+                            <div class="mistake-item"><span class="mistake-char">没</span>编码: <span class="mistake-code">odxy</span><span class="mistake-desc">右是殳，竖弯不出钩</span></div>
+                        </div>
+                    </div>
+
+                    <div class="mistake-group">
+                        <h4>三、出头/不出头易错</h4>
+                        <div class="mistake-list">
+                            <div class="mistake-item"><span class="mistake-char">寻</span>编码: <span class="mistake-code">ngl</span><span class="mistake-desc">中横不出头</span></div>
+                            <div class="mistake-item"><span class="mistake-char">雪</span>编码: <span class="mistake-code">sboong</span><span class="mistake-desc">下部中横不出头</span></div>
+                            <div class="mistake-item"><span class="mistake-char">建</span>编码: <span class="mistake-code">ngfc</span><span class="mistake-desc">中横出头</span></div>
+                            <div class="mistake-item"><span class="mistake-char">康</span>编码: <span class="mistake-code">yqgldy</span><span class="mistake-desc">中横出头</span></div>
+                            <div class="mistake-item"><span class="mistake-char">临</span>编码: <span class="mistake-code">jtubg</span><span class="mistake-desc">左边是两竖 (❌写成撇)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">巷</span>编码: <span class="mistake-code">fhwnn</span><span class="mistake-desc">下部是巳 (❌写成㔾)</span></div>
+                            <div class="mistake-item"><span class="mistake-char">窗</span>编码: <span class="mistake-code">ovimqy</span><span class="mistake-desc">内非“夕”，点出头</span></div>
+                        </div>
+                    </div>
+
+                    <div class="mistake-group">
+                        <h4>四、多撇/少撇易错</h4>
+                        <div class="mistake-list">
+                            <div class="mistake-item"><span class="mistake-char">免</span>编码: <span class="mistake-code">qmdn</span><span class="mistake-desc">第六笔撇通下来</span></div>
+                            <div class="mistake-item"><span class="mistake-char">象</span>编码: <span class="mistake-code">qmdvey</span><span class="mistake-desc">撇通下来</span></div>
+                            <div class="mistake-item"><span class="mistake-char">卑</span>编码: <span class="mistake-code">rndf</span><span class="mistake-desc">撇通下来</span></div>
+                            <div class="mistake-item"><span class="mistake-char">畏</span>编码: <span class="mistake-code">mfgvy</span><span class="mistake-desc">不要多一撇</span></div>
+                            <div class="mistake-item"><span class="mistake-char">展</span>编码: <span class="mistake-code">ntjaw</span><span class="mistake-desc">不要多一撇</span></div>
+                            <div class="mistake-item"><span class="mistake-char">武</span>编码: <span class="mistake-code">ghhc</span><span class="mistake-desc">不要多一撇</span></div>
+                        </div>
+                    </div>
+
+                    <div class="mistake-group">
+                        <h4>五、点画易错 (有点/无点/顺序)</h4>
+                        <div class="mistake-list">
+                            <div class="mistake-item"><span class="mistake-char">市</span>编码: <span class="mistake-code">ymh</span><span class="mistake-desc">顶部有点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">沛</span>编码: <span class="mistake-code">ogmh</span><span class="mistake-desc">右侧无点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">尧</span>编码: <span class="mistake-code">atq</span><span class="mistake-desc">无点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">步</span>编码: <span class="mistake-code">hhkt</span><span class="mistake-desc">下部无点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">纸</span>编码: <span class="mistake-code">xdnn</span><span class="mistake-desc">右侧无点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">义</span>编码: <span class="mistake-code">iy</span><span class="mistake-desc">先写点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">发</span>编码: <span class="mistake-code">vcy</span><span class="mistake-desc">后写点</span></div>
+                            <div class="mistake-item"><span class="mistake-char">成</span>编码: <span class="mistake-code">dxw</span><span class="mistake-desc">后写点</span></div>
+                        </div>
+                    </div>
                 </div>
 
                 <h3>6. 学习与练习模式</h3>
