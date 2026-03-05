@@ -3,8 +3,6 @@ use ksni::menu::{StandardItem, MenuItem};
 #[cfg(target_os = "linux")]
 use ksni::{Tray, ToolTip, TrayService, Handle};
 use std::sync::mpsc::Sender;
-#[cfg(target_os = "linux")]
-use tiny_skia::*;
 
 #[derive(Debug, Clone)]
 pub enum TrayEvent {
@@ -77,6 +75,41 @@ impl Tray for ImeTray {
             }.into(),
         ]
     }
+}
+
+#[cfg(target_os = "linux")]
+pub struct LinuxTrayHandle(Handle<ImeTray>);
+
+#[cfg(target_os = "linux")]
+impl LinuxTrayHandle {
+    pub fn update<F>(&self, f: F)
+    where
+        F: FnOnce(&mut ImeTray) + Send + 'static,
+    {
+        self.0.update(f);
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn start_tray(
+    _is_linux: bool, active_profile: String, show_status_bar: bool,
+    _anti_typo_mode: crate::config::AntiTypoMode,
+    _double_pinyin: bool,
+    _commit_mode: String,
+    _preview_mode: String,
+    _candidate_layout: String,
+    tx: Sender<TrayEvent>
+) -> LinuxTrayHandle {
+    let tray = ImeTray {
+        chinese_enabled: true,
+        active_profile,
+        show_status_bar,
+        tx,
+    };
+    let service = TrayService::new(tray);
+    let handle = service.handle();
+    service.spawn();
+    LinuxTrayHandle(handle)
 }
 
 #[cfg(target_os = "windows")]

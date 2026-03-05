@@ -84,6 +84,7 @@ pub enum AntiTypoMode {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Input {
     pub autostart: bool,
+    pub device_path: String,
     pub commit_mode: String,
     pub default_profile: String,
     pub paste_method: String,
@@ -316,6 +317,7 @@ impl Config {
             },
             input: Input {
                 autostart: true,
+                device_path: "/dev/input/event4".to_string(),
                 commit_mode: "single".to_string(),
                 default_profile: "chinese".to_string(),
                 paste_method: "shift_insert".to_string(),
@@ -386,6 +388,16 @@ impl Config {
             },
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+pub fn setup_autostart() -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub fn remove_autostart() -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]

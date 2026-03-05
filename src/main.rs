@@ -275,7 +275,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     p.toggle();
                     let enabled = p.chinese_enabled;
                     let short = p.get_short_display();
-                    tray_handle.update(|t| t.chinese_enabled = enabled);
+                    tray_handle.update(move |t| t.chinese_enabled = enabled);
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.chinese_enabled = enabled;
@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let profile = p.next_profile();
                     let enabled = p.chinese_enabled;
                     let short = p.get_short_display();
-                    tray_handle.update(|t| t.active_profile = profile);
+                    tray_handle.update(move |t| t.active_profile = profile);
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.status_text = if enabled { short } else { "英".into() };
@@ -301,7 +301,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         new_show = w.appearance.show_status_bar;
                         let _ = w.save();
                     }
-                    tray_handle.update(|t| t.show_status_bar = new_show);
+                    tray_handle.update(move |t| t.show_status_bar = new_show);
                     
                     let mut state = app_state_tray.lock().unwrap();
                     state.show_status_bar_pref = new_show;
@@ -356,6 +356,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut host = platform::windows::tsf::TsfHost::new(processor, Some(gui_tx), config.clone(), tray_tx, app_state.clone());
         host.run()?;
     }
+
+    #[cfg(target_os = "linux")]
+    {
+        let dev_path = config.read().unwrap().input.device_path.clone();
+        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &dev_path, Some(gui_tx), config.clone(), tray_tx)?;
+        host.run()?;
+    }
+
     Ok(())
 }
 

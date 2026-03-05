@@ -4,11 +4,62 @@ use crate::platform::traits::{InputMethodHost, Rect};
 use crate::platform::linux::vkbd::Vkbd;
 use crate::config::Config;
 use crate::ui::GuiEvent;
+use crate::engine::keys::VirtualKey;
 use evdev::{Device, InputEventKind, Key};
 use std::collections::HashSet;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
-use crate::config::parse_key;
+
+fn evdev_to_virtual(key: Key) -> Option<VirtualKey> {
+    match key {
+        Key::KEY_A => Some(VirtualKey::A), Key::KEY_B => Some(VirtualKey::B), Key::KEY_C => Some(VirtualKey::C), Key::KEY_D => Some(VirtualKey::D), Key::KEY_E => Some(VirtualKey::E), Key::KEY_F => Some(VirtualKey::F), Key::KEY_G => Some(VirtualKey::G), Key::KEY_H => Some(VirtualKey::H), Key::KEY_I => Some(VirtualKey::I), Key::KEY_J => Some(VirtualKey::J), Key::KEY_K => Some(VirtualKey::K), Key::KEY_L => Some(VirtualKey::L), Key::KEY_M => Some(VirtualKey::M), Key::KEY_N => Some(VirtualKey::N), Key::KEY_O => Some(VirtualKey::O), Key::KEY_P => Some(VirtualKey::P), Key::KEY_Q => Some(VirtualKey::Q), Key::KEY_R => Some(VirtualKey::R), Key::KEY_S => Some(VirtualKey::S), Key::KEY_T => Some(VirtualKey::T), Key::KEY_U => Some(VirtualKey::U), Key::KEY_V => Some(VirtualKey::V), Key::KEY_W => Some(VirtualKey::W), Key::KEY_X => Some(VirtualKey::X), Key::KEY_Y => Some(VirtualKey::Y), Key::KEY_Z => Some(VirtualKey::Z),
+        Key::KEY_0 => Some(VirtualKey::Digit0), Key::KEY_1 => Some(VirtualKey::Digit1), Key::KEY_2 => Some(VirtualKey::Digit2), Key::KEY_3 => Some(VirtualKey::Digit3), Key::KEY_4 => Some(VirtualKey::Digit4), Key::KEY_5 => Some(VirtualKey::Digit5), Key::KEY_6 => Some(VirtualKey::Digit6), Key::KEY_7 => Some(VirtualKey::Digit7), Key::KEY_8 => Some(VirtualKey::Digit8), Key::KEY_9 => Some(VirtualKey::Digit9),
+        Key::KEY_SPACE => Some(VirtualKey::Space), Key::KEY_ENTER => Some(VirtualKey::Enter), Key::KEY_TAB => Some(VirtualKey::Tab), Key::KEY_BACKSPACE => Some(VirtualKey::Backspace), Key::KEY_ESC => Some(VirtualKey::Esc), Key::KEY_CAPSLOCK => Some(VirtualKey::CapsLock),
+        Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => Some(VirtualKey::Shift),
+        Key::KEY_LEFTCTRL | Key::KEY_RIGHTCTRL => Some(VirtualKey::Control),
+        Key::KEY_LEFTALT | Key::KEY_RIGHTALT => Some(VirtualKey::Alt),
+        Key::KEY_LEFT => Some(VirtualKey::Left), Key::KEY_RIGHT => Some(VirtualKey::Right), Key::KEY_UP => Some(VirtualKey::Up), Key::KEY_DOWN => Some(VirtualKey::Down),
+        Key::KEY_PAGEUP => Some(VirtualKey::PageUp), Key::KEY_PAGEDOWN => Some(VirtualKey::PageDown), Key::KEY_HOME => Some(VirtualKey::Home), Key::KEY_END => Some(VirtualKey::End), Key::KEY_DELETE => Some(VirtualKey::Delete),
+        Key::KEY_GRAVE => Some(VirtualKey::Grave), Key::KEY_MINUS => Some(VirtualKey::Minus), Key::KEY_EQUAL => Some(VirtualKey::Equal), Key::KEY_LEFTBRACE => Some(VirtualKey::LeftBrace), Key::KEY_RIGHTBRACE => Some(VirtualKey::RightBrace), Key::KEY_BACKSLASH => Some(VirtualKey::Backslash), Key::KEY_SEMICOLON => Some(VirtualKey::Semicolon), Key::KEY_APOSTROPHE => Some(VirtualKey::Apostrophe), Key::KEY_COMMA => Some(VirtualKey::Comma), Key::KEY_DOT => Some(VirtualKey::Dot), Key::KEY_SLASH => Some(VirtualKey::Slash),
+        _ => None,
+    }
+}
+
+fn name_to_evdev_key(name: &str) -> Key {
+    match name.to_lowercase().as_str() {
+        "ctrl" | "control" => Key::KEY_LEFTCTRL,
+        "alt" => Key::KEY_LEFTALT,
+        "shift" => Key::KEY_LEFTSHIFT,
+        "meta" | "super" | "win" => Key::KEY_LEFTMETA,
+        "tab" => Key::KEY_TAB,
+        "space" => Key::KEY_SPACE,
+        "caps" | "capslock" => Key::KEY_CAPSLOCK,
+        "esc" | "escape" => Key::KEY_ESC,
+        "enter" => Key::KEY_ENTER,
+        "backspace" => Key::KEY_BACKSPACE,
+        "left" => Key::KEY_LEFT,
+        "right" => Key::KEY_RIGHT,
+        "up" => Key::KEY_UP,
+        "down" => Key::KEY_DOWN,
+        "a" => Key::KEY_A, "b" => Key::KEY_B, "c" => Key::KEY_C, "d" => Key::KEY_D, "e" => Key::KEY_E, "f" => Key::KEY_F, "g" => Key::KEY_G, "h" => Key::KEY_H, "i" => Key::KEY_I, "j" => Key::KEY_J, "k" => Key::KEY_K, "l" => Key::KEY_L, "m" => Key::KEY_M, "n" => Key::KEY_N, "o" => Key::KEY_O, "p" => Key::KEY_P, "q" => Key::KEY_Q, "r" => Key::KEY_R, "s" => Key::KEY_S, "t" => Key::KEY_T, "u" => Key::KEY_U, "v" => Key::KEY_V, "w" => Key::KEY_W, "x" => Key::KEY_X, "y" => Key::KEY_Y, "z" => Key::KEY_Z,
+        "0" => Key::KEY_0, "1" => Key::KEY_1, "2" => Key::KEY_2, "3" => Key::KEY_3, "4" => Key::KEY_4, "5" => Key::KEY_5, "6" => Key::KEY_6, "7" => Key::KEY_7, "8" => Key::KEY_8, "9" => Key::KEY_9,
+        _ => Key::KEY_RESERVED,
+    }
+}
+
+fn parse_key(s: &str) -> Vec<Vec<Vec<Key>>> {
+    s.split(',')
+        .map(|combo| {
+            combo.trim().split('+')
+                .map(|part| {
+                    part.trim().split('|')
+                        .map(name_to_evdev_key)
+                        .collect()
+                })
+                .collect()
+        })
+        .collect()
+}
 
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
@@ -114,6 +165,9 @@ impl InputMethodHost for EvdevHost {
                     if key == Key::KEY_TAB && !has_mod {
                         if val == 1 { self.tab_held_and_not_used = true; } 
                         else if val == 0 {
+                            if self.tab_held_and_not_used {
+                                let mut p = self.processor.lock().unwrap();
+                                p.toggle();
                                 let enabled = p.chinese_enabled;
                                 let profile = p.get_current_profile_display();
                                 drop(p);
@@ -170,30 +224,34 @@ impl InputMethodHost for EvdevHost {
                     let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
-                        match p.handle_key(key, val, shift, ctrl, alt) {
-                            Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                            Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                            Action::Notify(_, _) => { 
-                                // 此处原本负责位置切换提示，现在已无处发送通知，仅保持逻辑通过
+                        if let Some(vk) = evdev_to_virtual(key) {
+                            match p.handle_key(vk, val, shift, ctrl, alt) {
+                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
+                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
+                                Action::Notify(_, _) => { 
+                                    // 此处原本负责位置切换提示，现在已无处发送通知，仅保持逻辑通过
+                                }
+                                Action::Alert => { 
+                                    if self.config.read().unwrap().input.enable_error_sound { 
+                                        let root = crate::find_project_root();
+                                        let sound_path = root.join("sounds/beep.wav");
+                                        if sound_path.exists() {
+                                            let _ = std::process::Command::new("canberra-gtk-play")
+                                                .arg("-f")
+                                                .arg(sound_path)
+                                                .spawn();
+                                        } else {
+                                            let _ = std::process::Command::new("canberra-gtk-play")
+                                                .arg("--id=dialog-error")
+                                                .spawn();
+                                        }
+                                    } 
+                                }
+                                Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
+                                _ => {}
                             }
-                            Action::Alert => { 
-                                if self.config.read().unwrap().input.enable_error_sound { 
-                                    let root = crate::find_project_root();
-                                    let sound_path = root.join("sounds/beep.wav");
-                                    if sound_path.exists() {
-                                        let _ = std::process::Command::new("canberra-gtk-play")
-                                            .arg("-f")
-                                            .arg(sound_path)
-                                            .spawn();
-                                    } else {
-                                        let _ = std::process::Command::new("canberra-gtk-play")
-                                            .arg("--id=dialog-error")
-                                            .spawn();
-                                    }
-                                } 
-                            }
-                            Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
-                            _ => {}
+                        } else {
+                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                         }
                         drop(p); if val != 0 { self.update_gui(); }
                     } else {
@@ -250,7 +308,7 @@ impl EvdevHost {
                     }
                 }
             }
-            if p.show_candidates || p.show_modern_candidates {
+            if p.show_candidates {
                 let _ = tx.send(GuiEvent::Update { 
                     pinyin, 
                     candidates: p.candidates.clone(), 

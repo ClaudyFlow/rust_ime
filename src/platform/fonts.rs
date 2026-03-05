@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use std::process::Command;
 
 #[derive(serde::Serialize, Clone)]
 pub struct FontInfo {
