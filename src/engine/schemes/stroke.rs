@@ -103,13 +103,20 @@ impl InputScheme for StrokeScheme {
     }
 
     fn handle_special_key(&self, key: VirtualKey, buffer: &mut String, context: &SchemeContext) -> Option<Action> {
-        // 笔画模式下，1-5 数字优先作为输入
+        // 笔画模式下，1-5 数字优先作为输入，但如果有候选词，则优先选词
         if let Some(digit) = crate::engine::processor::key_to_digit(key) {
             if digit >= 1 && digit <= 5 {
+                // 如果当前已经有候选词了，我们返回 None，让 Processor 的通用选词逻辑去处理
+                if context.candidate_count > 0 {
+                    return None;
+                }
+                
+                // 否则，将其作为笔画输入
                 buffer.push_str(&digit.to_string());
                 return Some(Action::Consume);
             }
         }
         None
     }
+
 }

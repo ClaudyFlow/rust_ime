@@ -512,10 +512,6 @@ impl Processor {
                     self.switch_mode = false;
                     return Action::Notify("位置切换".into(), "窗口已移至顶部".into());
                 }
-                VirtualKey::B => {
-                    self.switch_mode = false;
-                    return Action::Notify("位置切换".into(), "窗口已移至底部".into());
-                }
                 _ if is_letter(key) => {
                     let k = key_to_char(key, false).unwrap_or(' ').to_string();
                     let mut target_profile = None;
@@ -604,6 +600,7 @@ impl Processor {
                 syllables: &self.syllables,
                 _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
+                candidate_count: self.candidates.len(),
                 _filter_mode: self.filter_mode.clone(),
                 _aux_filter: &self.aux_filter,
             };
@@ -964,6 +961,7 @@ impl Processor {
                 syllables: &self.syllables,
                 _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
+                candidate_count: self.candidates.len(),
                 _filter_mode: self.filter_mode.clone(),
                 _aux_filter: &self.aux_filter,
             };
