@@ -21,6 +21,11 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+Write-Host "--- 4.5 Pre-compiling dictionaries..." -ForegroundColor Cyan
+if (Test-Path "target\release\rust-ime.exe") {
+    & "target\release\rust-ime.exe" --compile-only
+}
+
 Write-Host "--- 5. Registering new TSF DLL..." -ForegroundColor Cyan
 $NewExePath = "target\release\rust-ime.exe"
 if (Test-Path $NewExePath) {

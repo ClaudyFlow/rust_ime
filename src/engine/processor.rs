@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
+use crate::engine::scheme::{InputScheme, SchemeCandidate, SchemeContext};
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -133,42 +134,13 @@ pub struct Processor {
     // 标点状态相关
     pub quote_open: bool,
     pub single_quote_open: bool,
+
+    // 方案注册表
+    pub schemes: HashMap<String, Box<dyn InputScheme>>,
 }
 
 fn get_stroke_desc(code: &str) -> String {
     code.to_string()
-}
-
-fn encode_stroke(s: &str) -> String {
-    let mut res = String::new();
-    let chars: Vec<char> = s.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        if i + 1 < chars.len() {
-            let pair = format!("{}{}", chars[i], chars[i+1]);
-            let code = match pair.as_str() {
-                "11" => 'g', "12" => 'f', "13" => 'd', "14" => 's', "15" => 'a',
-                "21" => 'h', "22" => 'j', "23" => 'k', "24" => 'l', "25" => 'm',
-                "31" => 't', "32" => 'r', "33" => 'e', "34" => 'w', "35" => 'q',
-                "41" => 'y', "42" => 'u', "43" => 'i', "44" => 'o', "45" => 'p',
-                "51" => 'n', "52" => 'b', "53" => 'v', "54" => 'c', "55" => 'x',
-                _ => ' ',
-            };
-            if code != ' ' {
-                res.push(code);
-                i += 2;
-                continue;
-            }
-        }
-        let code = match chars[i] {
-            '1' => 'g', '2' => 'h', '3' => 't', '4' => 'y', '5' => 'n',
-            c if c.is_ascii_lowercase() => c, // 允许直接输入映射后的字母
-            _ => ' ',
-        };
-        if code != ' ' { res.push(code); }
-        i += 1;
-    }
-    res
 }
 
 impl Processor {
@@ -307,6 +279,12 @@ impl Processor {
             user_dict_tx: None,
             quote_open: false,
             single_quote_open: false,
+            schemes: {
+                let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
+                m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
+                m.insert("english".to_string(), Box::new(crate::engine::schemes::EnglishScheme::new()));
+                m
+            },
         }
     }
 
@@ -1111,15 +1089,9 @@ impl Processor {
 
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
-                let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
-                let is_stroke = current_profile == "stroke";
-                
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
-                    // 笔画输入法特殊处理：1-5 优先作为输入，不作为选词
-                    if !is_stroke || (digit == 0 || digit > 5) {
-                        let abs_idx = self.page + digit - 1;
-                        if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
-                    }
+                    let abs_idx = self.page + digit - 1;
+                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
                 }
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
                 if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
@@ -1280,47 +1252,59 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return None; }
 
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
-        let is_stroke = current_profile == "stroke";
+        
+        // --- 方案化架构介入 ---
+        if let Some(scheme) = self.schemes.get(&current_profile) {
+            let context = SchemeContext {
+                config: &crate::Config::load(), // 暂时每次创建，后续应优化为引用
+                tries: &self.tries,
+                syllables: &self.syllables,
+                user_dict: &self.user_dict,
+                filter_mode: self.filter_mode.clone(),
+                aux_filter: &self.aux_filter,
+            };
 
-        // 1. 笔画输入法专用逻辑：跳过拼音切分，直接全量匹配
-        if is_stroke {
-            let encoded = encode_stroke(&self.buffer);
-            let mut matches = Vec::new();
-            if let Some(d) = self.tries.get("stroke") {
-                if let Some(m) = d.get_all_exact(&encoded) {
-                    for (w, tr, t, e, s, weight) in m {
-                        matches.push((w, tr, t, e, s, weight, 3));
-                    }
-                }
-                // 支持前缀匹配
-                if self.enable_prefix_matching {
-                    let m = d.search_bfs(&encoded, 50);
-                    for (w, tr, t, e, s, weight) in m {
-                        matches.push((w, tr, t, e, s, weight, 1));
-                    }
-                }
-            }
+            // 1. 预处理
+            let query = scheme.pre_process(&self.buffer, &context);
             
-            // 按权重排序
-            matches.sort_by(|a, b| b.6.cmp(&a.6).then_with(|| b.5.cmp(&a.5)));
+            // 2. 检索
+            let mut candidates = scheme.lookup(&query, &context);
             
+            // 3. 后处理
+            scheme.post_process(&query, &mut candidates, &context);
+
+            // 4. 将结果同步到 Processor 状态
             self.candidates.clear();
             self.candidate_hints.clear();
-            self.has_dict_match = !matches.is_empty();
-            self.last_lookup_pinyin = self.buffer.clone();
-            
-            for (w, tr, _, _, _, _, _) in matches {
-                self.candidates.push(if self.enable_traditional { tr } else { w });
+            self.has_dict_match = !candidates.is_empty();
+            self.last_lookup_pinyin = query.clone();
+
+            for c in candidates {
+                let text = if self.enable_traditional { c.traditional } else { c.simplified };
+                self.candidates.push(text);
+                
+                let mut hint = String::new();
+                if self.show_tone_hint && !c.tone.is_empty() { hint.push_str(&c.tone); }
+                if !c.english.is_empty() {
+                    if !hint.is_empty() { hint.push(' '); }
+                    hint.push_str(&c.english);
+                }
+                if self.show_stroke_aux && !c.stroke_aux.is_empty() {
+                    if !hint.is_empty() { hint.push(' '); }
+                    hint.push_str(&c.stroke_aux);
+                }
+                self.candidate_hints.push(hint);
+            }
+
+            if self.candidates.is_empty() {
+                self.candidates.push(self.buffer.clone());
                 self.candidate_hints.push(String::new());
             }
-            
-            if self.candidates.is_empty() { 
-                self.candidates.push(self.buffer.clone()); 
-                self.candidate_hints.push(String::new()); 
-            }
+
             self.selected = 0; self.page = 0; self.update_state();
             return None;
         }
+        // --- 方案化架构结束 ---
 
         // 2. 优先处理分页过滤模式
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {

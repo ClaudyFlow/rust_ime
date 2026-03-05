@@ -9,6 +9,7 @@ use std::time::SystemTime;
 
 pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all("data")?;
+    println!("[Compiler] 正在扫描 dicts 目录...");
 
     if let Ok(entries) = fs::read_dir("dicts") {
         for entry in entries.flatten() {
@@ -16,18 +17,24 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
                 let src_path = format!("dicts/{}", dir_name);
                 let out_dir = format!("data/{}", dir_name);
+                
+                println!("[Compiler] 检查方案: {}", dir_name);
                 fs::create_dir_all(&out_dir)?;
                 
                 let trie_idx = format!("{}/trie.index", out_dir);
                 if should_compile(Path::new(&src_path), Path::new(&trie_idx)) {
-                    println!("[Compiler] 方案 [{}] 检测到变动 ({} 字节)，正在重新编译...", dir_name, src_path.len());
+                    println!("[Compiler] 方案 [{}] 需要编译，正在执行...", dir_name);
                     let is_english = dir_name.contains("english");
                     let start = std::time::Instant::now();
                     compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
                     println!("[Compiler] 方案 [{}] 编译完成，耗时 {:?}", dir_name, start.elapsed());
+                } else {
+                    println!("[Compiler] 方案 [{}] 已是最新，跳过。", dir_name);
                 }
             }
         }
+    } else {
+        println!("[Compiler] 错误：无法读取 dicts 目录！");
     }
     
     if Path::new("dicts/chinese/chars.json").exists() {
