@@ -83,7 +83,7 @@ def generate_stroke_words():
                     "char": word,
                     "weight": weight,
                     "trad": trad,
-                    "tone": " ".join(tones) # 合成完整拼音
+                    "tone": "".join(tones) # 去除音节间的空格
                 })
                 count += 1
 
