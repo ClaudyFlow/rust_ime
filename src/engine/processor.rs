@@ -607,6 +607,7 @@ impl Processor {
                 tries: &self.tries,
                 syllables: &self.syllables,
                 user_dict: &self.user_dict,
+                active_profiles: &self.active_profiles,
                 filter_mode: self.filter_mode.clone(),
                 aux_filter: &self.aux_filter,
             };
@@ -966,6 +967,7 @@ impl Processor {
                 tries: &self.tries,
                 syllables: &self.syllables,
                 user_dict: &self.user_dict,
+                active_profiles: &self.active_profiles,
                 filter_mode: self.filter_mode.clone(),
                 aux_filter: &self.aux_filter,
             };

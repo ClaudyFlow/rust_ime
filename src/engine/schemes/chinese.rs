@@ -201,15 +201,17 @@ impl InputScheme for ChineseScheme {
             let mut matches = Vec::new();
             let pinyin_variants = self.get_fuzzy_variants(&part.pinyin, context);
             
-            if let Some(d) = context.tries.get("chinese") {
-                for py in &pinyin_variants {
-                    if let Some(m) = d.get_all_exact(py) {
-                        for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 3)); }
-                    }
-                    if context.config.input.enable_prefix_matching && !py.is_empty() {
-                        let limit = if part.stroke_aux.is_some() || part.english_aux.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
-                        let m = d.search_bfs(py, limit);
-                        for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 1)); }
+            for profile in context.active_profiles {
+                if let Some(d) = context.tries.get(profile) {
+                    for py in &pinyin_variants {
+                        if let Some(m) = d.get_all_exact(py) {
+                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 3)); }
+                        }
+                        if context.config.input.enable_prefix_matching && !py.is_empty() {
+                            let limit = if part.stroke_aux.is_some() || part.english_aux.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
+                            let m = d.search_bfs(py, limit);
+                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 1)); }
+                        }
                     }
                 }
             }

@@ -38,6 +38,7 @@ pub struct SchemeContext<'a> {
     pub tries: &'a HashMap<String, Trie>,
     pub syllables: &'a std::collections::HashSet<String>,
     pub user_dict: &'a HashMap<String, HashMap<String, Vec<(String, u32)>>>,
+    pub active_profiles: &'a [String],
     pub filter_mode: FilterMode,
     pub aux_filter: &'a str,
 }
