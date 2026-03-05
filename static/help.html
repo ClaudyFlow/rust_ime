@@ -207,11 +207,22 @@
                     <div class="key-cap"><span class="key-letter">X</span><span class="key-desc">折折 (55)</span></div>
                 </div>
 
-                <h3>3. 使用方法</h3>
+                <h3>3. 编码规则</h3>
                 <ul>
-                    <li><b>场景一：独立输入模式</b>：按下 <code>`</code> 键进入方案切换，选择 <code>stroke</code>。此时您可以直接输入上述字母。例如输入 <code>fth</code> 即可根据笔画序列匹配词条。<b>此模式下不使用数字 1-5 输入笔画</b>。</li>
-                    <li><b>场景二：拼音辅助过滤</b>：在输入拼音后，输入 <b>分号 ;</b> 键，随后输入笔画字母进行过滤。例如 <code>de;rp</code>。</li>
+                    <li><b>单字输入</b>：依次输入笔画对对应的字母。例如“的”的前两画为“撇、竖”（32=R），继续输入后续笔画即可。</li>
+                    <li><b>词组输入 (等长 4 键制)</b>：借鉴五笔逻辑，无论词组多长，统一使用 4 个按键完成编码：
+                        <ul>
+                            <li><b>2 字词</b>：取第 1 字的前 2 键 + 第 2 字的前 2 键。
+                                <br>示例：<code>中国</code> ⮕ <code>m</code>(中1)+<code>n</code>(中2) + <code>a</code>(国1)+<code>h</code>(国2) = <b><code>mnah</code></b></li>
+                            <li><b>3 字词</b>：取第 1 字首键 + 第 2 字首键 + 第 3 字前 2 键。
+                                <br>示例：<code>计算机</code> ⮕ <code>y</code>(计1) + <code>t</code>(算1) + <code>f</code>(机1)+<code>s</code>(机2) = <b><code>ytfs</code></b></li>
+                            <li><b>4 字及以上</b>：取前 3 个字的首键 + 最后一个字的第一个键。
+                                <br>示例：<code>中华人民共和国</code> ⮕ <code>m</code>(中1) + <code>r</code>(华1) + <code>r</code>(人1) + <code>a</code>(国1) = <b><code>mrra</code></b></li>
+                        </ul>
+                    </li>
                 </ul>
+
+                <h3>4. 使用场景</h3>
 
                 <div class="example-box">
                     <p><b>实战演练</b></p>
