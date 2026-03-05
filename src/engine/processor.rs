@@ -228,6 +228,7 @@ impl Processor {
                 m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
                 m.insert("english".to_string(), Box::new(crate::engine::schemes::EnglishScheme::new()));
                 m.insert("chinese".to_string(), Box::new(crate::engine::schemes::ChineseScheme::new()));
+                m.insert("japanese".to_string(), Box::new(crate::engine::schemes::JapaneseScheme::new()));
                 m
             },
         }
@@ -832,23 +833,40 @@ impl Processor {
         
         // 查找当前语言方案的标点映射
         let lang = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
-        let zh_puncs = self.punctuations.get(&lang).and_then(|m| m.get(punc_key))
-            .or_else(|| self.punctuations.get("chinese").and_then(|m| m.get(punc_key))); // 回退到中文标点
         
-        let zh_punc = if let Some(entries) = zh_puncs {
-            if punc_key == "\"" {
-                let p = if self.quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
-                self.quote_open = !self.quote_open;
-                p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
-            } else if punc_key == "'" {
-                let p = if self.single_quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
-                self.single_quote_open = !self.single_quote_open;
-                p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
-            } else {
-                entries.first().map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
+        // 日语特有标点映射逻辑
+        let zh_punc = if lang == "japanese" {
+            match (punc_key, shift_pressed) {
+                (".", false) => "。".to_string(),
+                (",", false) => "、".to_string(),
+                ("?", _) => "？".to_string(),
+                ("!", _) => "！".to_string(),
+                ("/", false) => "・".to_string(),
+                ("[", false) => "「".to_string(),
+                ("]", false) => "」".to_string(),
+                ("-", false) => "ー".to_string(),
+                ("-", true) => "＝".to_string(),
+                _ => punc_key.to_string(),
             }
         } else {
-            punc_key.to_string()
+            let zh_puncs = self.punctuations.get(&lang).and_then(|m| m.get(punc_key))
+                .or_else(|| self.punctuations.get("chinese").and_then(|m| m.get(punc_key))); // 回退到中文标点
+            
+            if let Some(entries) = zh_puncs {
+                if punc_key == "\"" {
+                    let p = if self.quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
+                    self.quote_open = !self.quote_open;
+                    p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
+                } else if punc_key == "'" {
+                    let p = if self.single_quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
+                    self.single_quote_open = !self.single_quote_open;
+                    p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
+                } else {
+                    entries.first().map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
+                }
+            } else {
+                punc_key.to_string()
+            }
         };
 
         let mut commit_text = if !self.joined_sentence.is_empty() { 
