@@ -980,9 +980,15 @@ impl Processor {
             for c in candidates {
                 let text = if self.enable_traditional { c.traditional } else { c.simplified };
                 self.candidates.push(text);
-                
+
                 let mut hint = String::new();
-                if self.show_tone_hint && !c.tone.is_empty() { hint.push_str(&c.tone); }
+
+                // 声调提示逻辑：仅在笔画模式或混合模式下显示
+                let is_chinese_pure = self.active_profiles.len() == 1 && self.active_profiles[0] == "chinese";
+                if self.show_tone_hint && !c.tone.is_empty() && !is_chinese_pure {
+                    hint.push_str(&c.tone);
+                }
+
                 if !c.english.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.english);

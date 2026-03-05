@@ -91,10 +91,13 @@ impl InputScheme for StrokeScheme {
     }
 
     fn post_process(&self, _query: &str, candidates: &mut Vec<SchemeCandidate>, _context: &SchemeContext) {
-        // 按匹配级别和权重排序
+        // 按综合得分排序：基础分(匹配级别) + 词频权重
         candidates.sort_by(|a, b| {
-            b.match_level.cmp(&a.match_level)
-                .then_with(|| b.weight.cmp(&a.weight))
+            let get_score = |c: &SchemeCandidate| -> i64 {
+                let level_score = if c.match_level == 3 { 10_000_000 } else { 0 };
+                level_score + (c.weight as i64)
+            };
+            get_score(b).cmp(&get_score(a))
         });
         
         // 去重
