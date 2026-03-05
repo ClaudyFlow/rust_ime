@@ -14,7 +14,6 @@ pub struct SchemeCandidate {
     pub english: String,       // 英文释义/提示
     pub stroke_aux: String,    // 笔画辅助码提示
     pub weight: u32,           // 排序权重
-    pub category: String,      // 字词分类 (如 level-1, rare)
     pub match_level: u8,       // 匹配级别：3=精确, 2=简拼, 1=前缀
 }
 
@@ -28,7 +27,6 @@ impl SchemeCandidate {
             english: String::new(),
             stroke_aux: String::new(),
             weight,
-            category: String::new(),
             match_level: 1,
         }
     }
