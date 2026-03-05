@@ -7,4 +7,3 @@ pub mod schemes;
 
 pub use trie::Trie;
 pub use processor::Processor;
-pub use scheme::{InputScheme, SchemeContext, SchemeCandidate};

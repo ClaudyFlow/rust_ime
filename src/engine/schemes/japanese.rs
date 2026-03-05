@@ -65,7 +65,7 @@ impl InputScheme for JapaneseScheme {
         // 只有在缓冲区为空时，标点符号才可能通过 handle_direct -> handle_punctuation 走通用逻辑
         // 在缓冲区不为空时，我们需要拦截这些按键实现上屏并附带标点
         
-        let shift = false; // 简化处理，主要处理非 shift 情况
+        let _shift = false; // 简化处理，主要处理非 shift 情况
         
         let punc = match key {
             VirtualKey::Dot => Some("。"),
@@ -77,7 +77,7 @@ impl InputScheme for JapaneseScheme {
             _ => None,
         };
 
-        if let Some(p) = punc {
+        if let Some(_p) = punc {
             // 如果缓冲区有内容，这里逻辑较复杂，暂时返回 None 让 Processor 通用逻辑处理
             // 但对于日语模式，我们希望直接映射
             // 修正：如果 buffer 为空，我们在通用逻辑处理；如果 buffer 不为空，这里拦截并处理上屏
