@@ -52,6 +52,12 @@ impl Trie {
 
     pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
         let mut results = Vec::new();
+        
+        // 支持通配符 z：将其转换为正则搜索
+        if prefix.contains('z') {
+            return self.search_wildcard(prefix, limit);
+        }
+
         let matcher = fst::automaton::Str::new(prefix).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
 
@@ -65,6 +71,47 @@ impl Trie {
             }
         }
         results
+    }
+
+    /// 通配符搜索实现：z 匹配任意单个 a-y 字母
+    pub fn search_wildcard(&self, pattern: &str, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
+        let mut results = Vec::new();
+        
+        // 简单的 DFS 实现通配符匹配
+        let mut stream = self.index.stream();
+        while let Some((key_bytes, offset)) = stream.next() {
+            let key = String::from_utf8_lossy(key_bytes);
+            if self.wildcard_match(pattern, &key) {
+                let pairs = self.read_block(offset as usize);
+                for pair in pairs {
+                    if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
+                        results.push(pair);
+                        if results.len() >= limit { return results; }
+                    }
+                }
+            }
+        }
+        results
+    }
+
+    fn wildcard_match(&self, pattern: &str, key: &str) -> bool {
+        let p_chars: Vec<char> = pattern.chars().collect();
+        let k_chars: Vec<char> = key.chars().collect();
+        
+        // 如果 pattern 不包含通配符且不是 key 的前缀，快速失败
+        if !pattern.contains('z') {
+            return key.starts_with(pattern);
+        }
+
+        // 简易正则逻辑：z 匹配任意 1 个字符
+        if p_chars.len() > k_chars.len() { return false; }
+        
+        for i in 0..p_chars.len() {
+            if p_chars[i] != 'z' && p_chars[i] != k_chars[i] {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
