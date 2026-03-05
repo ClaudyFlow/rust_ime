@@ -127,8 +127,6 @@ pub struct Processor {
     pub quote_open: bool,
     pub single_quote_open: bool,
 
-    pub pending_multiplier: usize,
-
     // 方案注册表
     pub schemes: HashMap<String, Box<dyn InputScheme>>,
 }
@@ -221,7 +219,6 @@ impl Processor {
             user_dict_tx: None,
             quote_open: false,
             single_quote_open: false,
-            pending_multiplier: 0,
             schemes: {
                 let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
                 m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
@@ -510,28 +507,9 @@ impl Processor {
 
         if self.switch_mode && is_press {
             match key {
-                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; self.pending_multiplier = 0; return Action::Notify("快捷切换".into(), "已退出".into()); }
-                _ if is_digit(key) => {
-                    let digit = key_to_digit(key).unwrap_or(0);
-                    self.pending_multiplier = self.pending_multiplier * 10 + digit;
-                    return Action::Consume;
-                }
-                VirtualKey::D => {
-                    self.switch_mode = false;
-                    let count = self.pending_multiplier.max(1);
-                    self.pending_multiplier = 0;
-                    let mut total_del = 0;
-                    for _ in 0..count {
-                        if let Some((_, word)) = self.commit_history.pop() {
-                            total_del += word.chars().count();
-                        }
-                    }
-                    if total_del > 0 { return Action::DeleteAndEmit { delete: total_del, insert: "".into() }; }
-                    return Action::Consume;
-                }
+                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
                 VirtualKey::E => {
                     self.switch_mode = false;
-                    self.pending_multiplier = 0;
                     if let Some((pinyin, word)) = self.commit_history.pop() {
                         let del_count = word.chars().count();
                         self.buffer = pinyin;
@@ -541,20 +519,8 @@ impl Processor {
                     }
                     return Action::Consume;
                 }
-                VirtualKey::R => {
-                    self.switch_mode = false;
-                    let count = self.pending_multiplier.max(1);
-                    self.pending_multiplier = 0;
-                    if let Some((_, word)) = self.commit_history.last() {
-                        let mut insert = String::new();
-                        for _ in 0..count { insert.push_str(word); }
-                        return Action::Emit(insert);
-                    }
-                    return Action::Consume;
-                }
                 VirtualKey::Z => {
                     self.switch_mode = false;
-                    self.pending_multiplier = 0;
                     if let Some(_d) = self.tries.get("english") {
                         self.active_profiles = vec!["english".to_string()];
                         self.reset();
@@ -577,11 +543,9 @@ impl Processor {
                             let short_display = self.get_short_display();
                             let _ = self.lookup();
                             self.switch_mode = false;
-                            self.pending_multiplier = 0;
                             return Action::Notify(short_display, format!("方案: {}", display));
                         } else {
                             self.switch_mode = false;
-                            self.pending_multiplier = 0;
                             return Action::Notify("❌".into(), format!("错误: 方案 [{}] 的词库未加载", p_str));
                         }
                     }
