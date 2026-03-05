@@ -3,6 +3,7 @@ use slint::{ComponentHandle, SharedString, ModelRc, VecModel};
 use crate::ui::GuiEvent;
 use crate::Config;
 use crate::ui::tray::TrayEvent;
+use notify_rust::Notification;
 
 slint::include_modules!();
 
@@ -278,9 +279,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                     let page = (state.selected_index / page_size) * page_size;
                                     let relative_selected = (state.selected_index % page_size) as i32;
                                     let mut data_vec = Vec::new();
+                                    let mut notify_body = String::new();
+                                    
                                     for i in page..(page + page_size).min(state.candidates.len()) {
                                         let cand = &state.candidates[i];
                                         let hint = state.hints.get(i).cloned().unwrap_or_default();
+                                        
+                                        let display_idx = (i % page_size) + 1;
+                                        if i == state.selected_index {
+                                            notify_body.push_str(&format!("【{}.{}】 ", display_idx, cand));
+                                        } else {
+                                            notify_body.push_str(&format!("{}.{} ", display_idx, cand));
+                                        }
+
                                         let mut english = String::new();
                                         let mut stroke = String::new();
                                         if !hint.is_empty() {
@@ -292,6 +303,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                         }
                                         data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
                                     }
+                                    
+                                    // 发送桌面通知作为候选窗
+                                    let _ = Notification::new()
+                                        .summary(&state.pinyin)
+                                        .body(&notify_body)
+                                        .appname("rust-ime")
+                                        .timeout(2000) // 2秒自动消失
+                                        .show();
+
                                     w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                     w.set_selected_index(relative_selected);
                                     w.set_is_visible(true);
@@ -379,9 +399,19 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                     let page = (selected / page_size) * page_size;
                                     let relative_selected = (selected % page_size) as i32;
                                     let mut data_vec = Vec::new();
+                                    let mut notify_body = String::new();
+
                                     for i in page..(page + page_size).min(candidates.len()) {
                                         let cand = &candidates[i];
                                         let hint = hints.get(i).cloned().unwrap_or_default();
+
+                                        let display_idx = (i % page_size) + 1;
+                                        if i == selected {
+                                            notify_body.push_str(&format!("【{}.{}】 ", display_idx, cand));
+                                        } else {
+                                            notify_body.push_str(&format!("{}.{} ", display_idx, cand));
+                                        }
+
                                         let mut english = String::new();
                                         let mut stroke = String::new();
                                         if !hint.is_empty() {
@@ -393,6 +423,15 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                         }
                                         data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
                                     }
+
+                                    // 发送桌面通知
+                                    let _ = Notification::new()
+                                        .summary(&pinyin)
+                                        .body(&notify_body)
+                                        .appname("rust-ime")
+                                        .timeout(2000)
+                                        .show();
+
                                     w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
                                     w.set_selected_index(relative_selected);
                                     w.set_is_visible(true);
