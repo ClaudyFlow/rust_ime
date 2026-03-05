@@ -139,6 +139,38 @@ fn get_stroke_desc(code: &str) -> String {
     code.to_string()
 }
 
+fn encode_stroke(s: &str) -> String {
+    let mut res = String::new();
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if i + 1 < chars.len() {
+            let pair = format!("{}{}", chars[i], chars[i+1]);
+            let code = match pair.as_str() {
+                "11" => 'g', "12" => 'f', "13" => 'd', "14" => 's', "15" => 'a',
+                "21" => 'h', "22" => 'j', "23" => 'k', "24" => 'l', "25" => 'm',
+                "31" => 't', "32" => 'r', "33" => 'e', "34" => 'w', "35" => 'q',
+                "41" => 'y', "42" => 'u', "43" => 'i', "44" => 'o', "45" => 'p',
+                "51" => 'n', "52" => 'b', "53" => 'v', "54" => 'c', "55" => 'x',
+                _ => ' ',
+            };
+            if code != ' ' {
+                res.push(code);
+                i += 2;
+                continue;
+            }
+        }
+        let code = match chars[i] {
+            '1' => 'g', '2' => 'h', '3' => 't', '4' => 'y', '5' => 'n',
+            c if c.is_ascii_lowercase() => c, // 允许直接输入映射后的字母
+            _ => ' ',
+        };
+        if code != ' ' { res.push(code); }
+        i += 1;
+    }
+    res
+}
+
 impl Processor {
     fn parse_buffer(&self) -> Vec<ParsedPart> {
         let buffer_normalized = strip_tones(&self.buffer);
@@ -1079,9 +1111,15 @@ impl Processor {
 
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
+                let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
+                let is_stroke = current_profile == "stroke";
+                
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
-                    let abs_idx = self.page + digit - 1;
-                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
+                    // 笔画输入法特殊处理：1-5 优先作为输入，不作为选词
+                    if !is_stroke || (digit == 0 || digit > 5) {
+                        let abs_idx = self.page + digit - 1;
+                        if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
+                    }
                 }
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
                 if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
@@ -1246,16 +1284,17 @@ impl Processor {
 
         // 1. 笔画输入法专用逻辑：跳过拼音切分，直接全量匹配
         if is_stroke {
+            let encoded = encode_stroke(&self.buffer);
             let mut matches = Vec::new();
             if let Some(d) = self.tries.get("stroke") {
-                if let Some(m) = d.get_all_exact(&self.buffer) {
+                if let Some(m) = d.get_all_exact(&encoded) {
                     for (w, tr, t, e, s, weight) in m {
                         matches.push((w, tr, t, e, s, weight, 3));
                     }
                 }
                 // 支持前缀匹配
                 if self.enable_prefix_matching {
-                    let m = d.search_bfs(&self.buffer, 50);
+                    let m = d.search_bfs(&encoded, 50);
                     for (w, tr, t, e, s, weight) in m {
                         matches.push((w, tr, t, e, s, weight, 1));
                     }
