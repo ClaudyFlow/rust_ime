@@ -66,33 +66,46 @@ def enrich_stroke_dict_v2():
         print("错误: 未找到笔画词典 JSON 文件")
         return
 
-    new_stroke_dict = {}
+    # 3.1 处理全码和注入级别
+    processed_dict = {}
     for code, chars in stroke_dict.items():
         enriched_chars = []
         for item in chars:
             char = item['char'] if isinstance(item, dict) else item
-            
             info = char_info.get(char, {})
             weight = char_weights.get(char, item.get('weight', 1) if isinstance(item, dict) else 1)
             
             entry = {
-                "char": char,
-                "weight": weight,
-                "tone": info.get('tone', ''),
-                "trad": info.get('trad', char),
-                "en": info.get('en', ''),
-                "category": info.get('category', 'rare') # 默认标记为生僻
+                "char": char, "weight": weight,
+                "tone": info.get('tone', ''), "trad": info.get('trad', char),
+                "en": info.get('en', ''), "category": info.get('category', 'rare')
             }
             enriched_chars.append(entry)
-            
-        # 内部排序
         enriched_chars.sort(key=lambda x: x['weight'], reverse=True)
-        new_stroke_dict[code] = enriched_chars
+        processed_dict[code] = enriched_chars
+
+    # 3.2 生成 4 键简码 (前三末一)
+    print("正在生成单字 4 键简码...")
+    final_stroke_dict = processed_dict.copy()
+    for code, entries in processed_dict.items():
+        if len(code) > 4:
+            short_code = code[:3] + code[-1]
+            if short_code not in final_stroke_dict:
+                final_stroke_dict[short_code] = []
+            
+            # 避免重复添加
+            existing_chars = {e['char'] for e in final_stroke_dict[short_code]}
+            for entry in entries:
+                if entry['char'] not in existing_chars:
+                    final_stroke_dict[short_code].append(entry)
 
     # 4. 写回
-    print(f"正在保存丰富后的词典 (含级别信息)...")
+    print(f"正在保存丰富后的词典 (含 4 键简码)...")
+    for code in final_stroke_dict:
+        final_stroke_dict[code].sort(key=lambda x: x['weight'], reverse=True)
+
     with open(stroke_json_path, 'w', encoding='utf-8') as f:
-        json.dump(new_stroke_dict, f, ensure_ascii=False, indent=2)
+        json.dump(final_stroke_dict, f, ensure_ascii=False, indent=2)
     
     print("笔画词典 V2 丰富完成！")
 
