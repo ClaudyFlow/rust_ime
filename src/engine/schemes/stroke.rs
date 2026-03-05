@@ -59,31 +59,39 @@ impl InputScheme for StrokeScheme {
 
     fn lookup(&self, query: &str, context: &SchemeContext) -> Vec<SchemeCandidate> {
         let mut results = Vec::new();
-        if let Some(trie) = context.tries.get("stroke") {
-            // 1. 精确匹配
-            if let Some(matches) = trie.get_all_exact(query) {
-                for (w, tr, t, e, s, weight) in matches {
-                    let mut cand = SchemeCandidate::new(w, weight);
-                    cand.traditional = tr;
-                    cand.tone = t;
-                    cand.english = e;
-                    cand.stroke_aux = s;
-                    cand.match_level = 3;
-                    results.push(cand);
+        
+        // 尝试多个笔画词库 (单字和组词)
+        for profile in ["stroke", "stroke_words"] {
+            if let Some(trie) = context.tries.get(profile) {
+                // 1. 精确匹配
+                if let Some(matches) = trie.get_all_exact(query) {
+                    for (w, tr, t, e, s, weight) in matches {
+                        let mut cand = SchemeCandidate::new(w, weight);
+                        cand.traditional = tr;
+                        cand.tone = t;
+                        cand.english = e;
+                        cand.stroke_aux = s;
+                        cand.match_level = 3;
+                        
+                        // 提取 category (从 english 字段，编译器目前暂时把 category 存在这或 en)
+                        // 实际上，我们的编译器需要识别新的 JSON 字段。
+                        // 如果编译器没改，我们需要先让编译器支持 category。
+                        results.push(cand);
+                    }
                 }
-            }
-            
-            // 2. 前缀匹配
-            if context.config.input.enable_prefix_matching {
-                let matches = trie.search_bfs(query, 50);
-                for (w, tr, t, e, s, weight) in matches {
-                    let mut cand = SchemeCandidate::new(w, weight);
-                    cand.traditional = tr;
-                    cand.tone = t;
-                    cand.english = e;
-                    cand.stroke_aux = s;
-                    cand.match_level = 1;
-                    results.push(cand);
+                
+                // 2. 前缀匹配
+                if context.config.input.enable_prefix_matching {
+                    let matches = trie.search_bfs(query, 50);
+                    for (w, tr, t, e, s, weight) in matches {
+                        let mut cand = SchemeCandidate::new(w, weight);
+                        cand.traditional = tr;
+                        cand.tone = t;
+                        cand.english = e;
+                        cand.stroke_aux = s;
+                        cand.match_level = 1;
+                        results.push(cand);
+                    }
                 }
             }
         }
@@ -91,11 +99,21 @@ impl InputScheme for StrokeScheme {
     }
 
     fn post_process(&self, _query: &str, candidates: &mut Vec<SchemeCandidate>, _context: &SchemeContext) {
-        // 按综合得分排序：基础分(匹配级别) + 词频权重
+        // 按综合得分排序：级别基础分 + 精确匹配分 + 词频权重
         candidates.sort_by(|a, b| {
             let get_score = |c: &SchemeCandidate| -> i64 {
+                // 1. 级别基础分
+                let cat_score = match c.stroke_aux.as_str() {
+                    "level-1" => 100_000_000,
+                    "level-2" => 50_000_000,
+                    "level-3" => 20_000_000,
+                    _ => 0,
+                };
+                
+                // 2. 精确匹配分
                 let level_score = if c.match_level == 3 { 10_000_000 } else { 0 };
-                level_score + (c.weight as i64)
+                
+                cat_score + level_score + (c.weight as i64)
             };
             get_score(b).cmp(&get_score(a))
         });

@@ -156,7 +156,10 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                                 let trad = o.get("trad").and_then(|t| t.as_str()).unwrap_or(c);
                                 let en_hint = o.get("en").and_then(|e| e.as_str()).unwrap_or("");
                                 let tone_hint = o.get("tone").and_then(|t| t.as_str()).unwrap_or("");
-                                let stroke_aux = o.get("stroke_aux").and_then(|s| s.as_str()).unwrap_or("");
+                                let stroke_aux = o.get("stroke_aux")
+                                    .or_else(|| o.get("category")) // 自动尝试读取级别信息
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("");
                                 let weight = o.get("weight").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                                 
                                 entries.entry(key.clone()).or_default().push(DictEntry {
