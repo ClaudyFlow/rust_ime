@@ -167,44 +167,68 @@
                 <h3>1. 设计思想：双笔一键</h3>
                 <p>传统的笔画输入法（1-5数字键）效率低下，因为每输入一个笔画就需要点击一次按键。SBSRF 方案通过 5x5 的字母矩阵，让您每一次击键都能输入两个笔画，大幅提升了输入速度。</p>
 
-                <h3>2. 映射表 (5x5 矩阵)</h3>
-                <p>我们将 1(横)、2(竖)、3(撇)、4(捺/点)、5(折) 映射到键盘。矩阵的<b>行代表第 1 笔</b>，<b>列代表第 2 笔</b>。</p>
+                <h3>2. 映射布局：5x5 视觉矩阵</h3>
+                <p>我们将键盘划分为 5 个逻辑区（横、竖、撇、捺、折）。每个按键代表两笔：<b>行代表第 1 笔，列代表第 2 笔</b>。</p>
 
-                <div class="keyboard-grid">
-                    <div class="row-label">横 (1) 行：第 1 笔是“横”</div>
-                    <div class="key-cap"><span class="key-letter">G</span><span class="key-desc">横横 (11)</span></div>
-                    <div class="key-cap"><span class="key-letter">F</span><span class="key-desc">横竖 (12)</span></div>
-                    <div class="key-cap"><span class="key-letter">D</span><span class="key-desc">横撇 (13)</span></div>
-                    <div class="key-cap"><span class="key-letter">S</span><span class="key-desc">横捺 (14)</span></div>
-                    <div class="key-cap"><span class="key-letter">A</span><span class="key-desc">横折 (15)</span></div>
+                <div class="keyboard-visual">
+                    <style>
+                        .keyboard-visual { background: #2c2c2e; padding: 20px; border_radius: 20px; color: white; margin: 20px 0; }
+                        .zone-row { display: flex; align-items: center; margin-bottom: 8px; }
+                        .zone-label { width: 100px; font-weight: bold; font-size: 14px; color: #ff9f0a; }
+                        .key-node { 
+                            width: 60px; height: 60px; border: 1px solid #48484a; border-radius: 10px;
+                            margin-right: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                            background: #3a3a3c;
+                        }
+                        .key-main { font-size: 18px; font-weight: 800; color: #0a84ff; }
+                        .key-sub { font-size: 10px; color: #8e8e93; }
+                        .h-zone { border-left: 4px solid #30d158; } /* 横 - 绿 */
+                        .v-zone { border-left: 4px solid #ff375f; } /* 竖 - 红 */
+                        .p-zone { border-left: 4px solid #5e5ce6; } /* 撇 - 蓝 */
+                        .n-zone { border-left: 4px solid #ffd60a; } /* 捺 - 黄 */
+                        .z-zone { border-left: 4px solid #bf5af2; } /* 折 - 紫 */
+                    </style>
 
-                    <div class="row-label">竖 (2) 行：第 1 笔是“竖”</div>
-                    <div class="key-cap"><span class="key-letter">H</span><span class="key-desc">竖横 (21)</span></div>
-                    <div class="key-cap"><span class="key-letter">J</span><span class="key-desc">竖竖 (22)</span></div>
-                    <div class="key-cap"><span class="key-letter">K</span><span class="key-desc">竖撇 (23)</span></div>
-                    <div class="key-cap"><span class="key-letter">L</span><span class="key-desc">竖捺 (24)</span></div>
-                    <div class="key-cap"><span class="key-letter">M</span><span class="key-desc">竖折 (25)</span></div>
-
-                    <div class="row-label">撇 (3) 行：第 1 笔是“撇”</div>
-                    <div class="key-cap"><span class="key-letter">T</span><span class="key-desc">撇横 (31)</span></div>
-                    <div class="key-cap"><span class="key-letter">R</span><span class="key-desc">撇竖 (32)</span></div>
-                    <div class="key-cap"><span class="key-letter">E</span><span class="key-desc">撇撇 (33)</span></div>
-                    <div class="key-cap"><span class="key-letter">W</span><span class="key-desc">撇捺 (34)</span></div>
-                    <div class="key-cap"><span class="key-letter">Q</span><span class="key-desc">撇折 (35)</span></div>
-
-                    <div class="row-label">捺 (4) 行：第 1 笔是“捺”</div>
-                    <div class="key-cap"><span class="key-letter">Y</span><span class="key-desc">捺横 (41)</span></div>
-                    <div class="key-cap"><span class="key-letter">U</span><span class="key-desc">捺竖 (42)</span></div>
-                    <div class="key-cap"><span class="key-letter">I</span><span class="key-desc">捺撇 (43)</span></div>
-                    <div class="key-cap"><span class="key-letter">O</span><span class="key-desc">捺捺 (44)</span></div>
-                    <div class="key-cap"><span class="key-letter">P</span><span class="key-desc">捺折 (45)</span></div>
-
-                    <div class="row-label">折 (5) 行：第 1 笔是“折”</div>
-                    <div class="key-cap"><span class="key-letter">N</span><span class="key-desc">折横 (51)</span></div>
-                    <div class="key-cap"><span class="key-letter">B</span><span class="key-desc">折竖 (52)</span></div>
-                    <div class="key-cap"><span class="key-letter">V</span><span class="key-desc">折撇 (53)</span></div>
-                    <div class="key-cap"><span class="key-letter">C</span><span class="key-desc">折捺 (54)</span></div>
-                    <div class="key-cap"><span class="key-letter">X</span><span class="key-desc">折折 (55)</span></div>
+                    <div class="zone-row h-zone">
+                        <div class="zone-label">横区 (1)</div>
+                        <div class="key-node"><span class="key-main">G</span><span class="key-sub">11</span></div>
+                        <div class="key-node"><span class="key-main">F</span><span class="key-sub">12</span></div>
+                        <div class="key-node"><span class="key-main">D</span><span class="key-sub">13</span></div>
+                        <div class="key-node"><span class="key-main">S</span><span class="key-sub">14</span></div>
+                        <div class="key-node"><span class="key-main">A</span><span class="key-sub">15</span></div>
+                    </div>
+                    <div class="zone-row v-zone">
+                        <div class="zone-label">竖区 (2)</div>
+                        <div class="key-node"><span class="key-main">H</span><span class="key-sub">21</span></div>
+                        <div class="key-node"><span class="key-main">J</span><span class="key-sub">22</span></div>
+                        <div class="key-node"><span class="key-main">K</span><span class="key-sub">23</span></div>
+                        <div class="key-node"><span class="key-main">L</span><span class="key-sub">24</span></div>
+                        <div class="key-node"><span class="key-main">M</span><span class="key-sub">25</span></div>
+                    </div>
+                    <div class="zone-row p-zone">
+                        <div class="zone-label">撇区 (3)</div>
+                        <div class="key-node"><span class="key-main">T</span><span class="key-sub">31</span></div>
+                        <div class="key-node"><span class="key-main">R</span><span class="key-sub">32</span></div>
+                        <div class="key-node"><span class="key-main">E</span><span class="key-sub">33</span></div>
+                        <div class="key-node"><span class="key-main">W</span><span class="key-sub">34</span></div>
+                        <div class="key-node"><span class="key-main">Q</span><span class="key-sub">35</span></div>
+                    </div>
+                    <div class="zone-row n-zone">
+                        <div class="zone-label">捺区 (4)</div>
+                        <div class="key-node"><span class="key-main">Y</span><span class="key-sub">41</span></div>
+                        <div class="key-node"><span class="key-main">U</span><span class="key-sub">42</span></div>
+                        <div class="key-node"><span class="key-main">I</span><span class="key-sub">43</span></div>
+                        <div class="key-node"><span class="key-main">O</span><span class="key-sub">44</span></div>
+                        <div class="key-node"><span class="key-main">P</span><span class="key-sub">45</span></div>
+                    </div>
+                    <div class="zone-row z-zone">
+                        <div class="zone-label">折区 (5)</div>
+                        <div class="key-node"><span class="key-main">N</span><span class="key-sub">51</span></div>
+                        <div class="key-node"><span class="key-main">B</span><span class="key-sub">52</span></div>
+                        <div class="key-node"><span class="key-main">V</span><span class="key-sub">53</span></div>
+                        <div class="key-node"><span class="key-main">C</span><span class="key-sub">54</span></div>
+                        <div class="key-node"><span class="key-main">X</span><span class="key-sub">55</span></div>
+                    </div>
                 </div>
 
                 <h3>3. 编码规则</h3>
