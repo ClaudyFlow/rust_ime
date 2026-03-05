@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
-use crate::engine::scheme::{InputScheme, SchemeCandidate, SchemeContext};
+use crate::engine::scheme::{InputScheme, SchemeContext};
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -129,10 +129,6 @@ pub struct Processor {
 
     // 方案注册表
     pub schemes: HashMap<String, Box<dyn InputScheme>>,
-}
-
-fn get_stroke_desc(code: &str) -> String {
-    code.to_string()
 }
 
 impl Processor {
@@ -606,10 +602,10 @@ impl Processor {
                 config: &crate::Config::load(),
                 tries: &self.tries,
                 syllables: &self.syllables,
-                user_dict: &self.user_dict,
+                _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
-                filter_mode: self.filter_mode.clone(),
-                aux_filter: &self.aux_filter,
+                _filter_mode: self.filter_mode.clone(),
+                _aux_filter: &self.aux_filter,
             };
             if let Some(act) = scheme.handle_special_key(key, &mut self.buffer, &context) {
                 if act == Action::Consume {
@@ -966,10 +962,10 @@ impl Processor {
                 config: &crate::Config::load(), // 暂时每次创建，后续应优化为引用
                 tries: &self.tries,
                 syllables: &self.syllables,
-                user_dict: &self.user_dict,
+                _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
-                filter_mode: self.filter_mode.clone(),
-                aux_filter: &self.aux_filter,
+                _filter_mode: self.filter_mode.clone(),
+                _aux_filter: &self.aux_filter,
             };
 
             // 1. 预处理

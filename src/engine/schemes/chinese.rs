@@ -1,6 +1,5 @@
 use crate::engine::scheme::{InputScheme, SchemeContext, SchemeCandidate};
-use crate::engine::keys::VirtualKey;
-use crate::engine::processor::{Action, strip_tones};
+use crate::engine::processor::strip_tones;
 
 pub struct ChineseScheme;
 
@@ -9,8 +8,6 @@ struct ParsedPart {
     pinyin: String,
     stroke_aux: Option<String>,
     english_aux: Option<String>,
-    specified_idx: Option<usize>,
-    raw: String,
 }
 
 impl ChineseScheme {
@@ -26,7 +23,6 @@ impl ChineseScheme {
         for part in parts {
             let mut stroke_aux = None;
             let mut english_aux = None;
-            let mut specified_idx = None;
 
             let pinyin_end = part.char_indices().find(|(i, c)| {
                 *c == ';' || c.is_ascii_digit() || (*i > 0 && c.is_ascii_uppercase())
@@ -47,19 +43,12 @@ impl ChineseScheme {
                 let english_end = rest.find(|c: char| c.is_ascii_digit()).unwrap_or(rest.len());
                 let e = &rest[..english_end];
                 if !e.is_empty() { english_aux = Some(e.to_string()); }
-                rest = &rest[english_end..];
-            }
-
-            if !rest.is_empty() && rest.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                specified_idx = rest.parse().ok();
             }
 
             result.push(ParsedPart {
                 pinyin,
                 stroke_aux,
                 english_aux,
-                specified_idx,
-                raw: part.to_string(),
             });
         }
         result

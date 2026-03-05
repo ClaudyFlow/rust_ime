@@ -37,20 +37,21 @@ pub struct SchemeContext<'a> {
     pub config: &'a Config,
     pub tries: &'a HashMap<String, Trie>,
     pub syllables: &'a std::collections::HashSet<String>,
-    pub user_dict: &'a HashMap<String, HashMap<String, Vec<(String, u32)>>>,
+    pub _user_dict: &'a HashMap<String, HashMap<String, Vec<(String, u32)>>>,
     pub active_profiles: &'a [String],
-    pub filter_mode: FilterMode,
-    pub aux_filter: &'a str,
+    pub _filter_mode: FilterMode,
+    pub _aux_filter: &'a str,
 }
 
 /// 输入方案接口定义
 pub trait InputScheme: Send + Sync {
     /// 获取方案唯一标识名称
+    #[allow(dead_code)]
     fn name(&self) -> &str;
 
     /// 预处理阶段：转换输入缓冲区
     /// 例如：双拼转全拼，或者笔画数字转映射字母
-    fn pre_process(&self, buffer: &str, context: &SchemeContext) -> String {
+    fn pre_process(&self, buffer: &str, _context: &SchemeContext) -> String {
         buffer.to_string()
     }
 
