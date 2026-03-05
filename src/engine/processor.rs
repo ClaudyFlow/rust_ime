@@ -508,10 +508,6 @@ impl Processor {
         if self.switch_mode {
             match key {
                 VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
-                VirtualKey::T => {
-                    self.switch_mode = false;
-                    return Action::Notify("位置切换".into(), "窗口已移至顶部".into());
-                }
                 _ if is_letter(key) => {
                     let k = key_to_char(key, false).unwrap_or(' ').to_string();
                     let mut target_profile = None;
