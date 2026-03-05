@@ -329,6 +329,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         });
                         std::thread::sleep(std::time::Duration::from_millis(500));
                     }
+                    #[cfg(target_os = "linux")]
+                    {
+                        let _ = std::process::Command::new("xdg-open").arg("http://127.0.0.1:18765").spawn();
+                        let _ = open::that("http://127.0.0.1:18765");
+                    }
+                    #[cfg(target_os = "windows")]
                     let _ = std::process::Command::new("cmd").arg("/c").arg("start").arg("http://localhost:18765").spawn();
                 }
                 ui::tray::TrayEvent::ReloadConfig => {

@@ -121,13 +121,24 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
     #[cfg(target_os = "linux")]
     {
         let sb_init = status_bar_handle.clone();
+        let w_init = window_handle.clone();
+        // 初始映射窗口但放在屏幕外，防止后续频繁 show() 夺取焦点
+        let _ = status_bar.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+        let _ = window.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+        let _ = status_bar.window().show();
+        let _ = window.window().show();
+
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(600));
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(sb) = sb_init.upgrade() {
-                    // 默认放在右下角 (假设分辨率 1920x1080，Slint 在 Linux 下 set_position 效果取决于合成器)
-                    // 后续可通过 MoveTo 消息由 Host 动态调整
-                    let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(1800, 1000)));
+                    // 只有开启了状态栏才移到可见区域
+                    if sb.window().is_visible() {
+                        let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(1800, 1000)));
+                    }
+                }
+                if let Some(w) = w_init.upgrade() {
+                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
                 }
             });
         });
@@ -158,20 +169,31 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             sb.set_status_text(SharedString::from(state.status_text));
                             sb.set_chinese_enabled(state.chinese_enabled);
                             
-                            // 只有在 SyncState 里，我们才根据偏好维持状态
+                            #[cfg(target_os = "windows")]
                             if state.show_status_bar_pref {
-                                #[cfg(target_os = "windows")]
                                 unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
                                 if !sb.window().is_visible() { let _ = sb.window().show(); }
                             } else {
                                 if sb.window().is_visible() { let _ = sb.window().hide(); }
                             }
+
+                            #[cfg(target_os = "linux")]
+                            if !state.show_status_bar_pref {
+                                let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+                            } else {
+                                // 如果没被 MoveTo 过，强制一个右下角位置
+                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                if lx == 0 && ly == 0 {
+                                    let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(1800, 1000)));
+                                }
+                            }
                         }
 
-                        // 2. 候选栏逻辑 (保持原来的打字显隐)
+                        // 2. 候选栏逻辑
                         if let Some(w) = w_opt {
                             let final_w_visible = state.is_ime_active && state.show_candidates_pref && !state.pinyin.is_empty();
                             
+                            #[cfg(target_os = "windows")]
                             if !final_w_visible {
                                 if w.window().is_visible() {
                                     w.set_is_visible(false);
@@ -179,7 +201,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                     was_visible_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                                 }
                             } else {
-                                // ... (显示逻辑)
                                 if random_highlight_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
                                     if !was_visible_atomic.load(std::sync::atomic::Ordering::SeqCst) {
                                         use std::time::{SystemTime, UNIX_EPOCH};
@@ -223,7 +244,6 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                 w.set_selected_index(relative_selected);
                                 w.set_is_visible(true);
                                 
-                                // 设置位置
                                 let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
                                 if lx != 0 || ly != 0 {
                                     let mut final_x = lx; let mut final_y = ly;
@@ -245,59 +265,141 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                     let _ = w.window().show();
                                 }
                             }
+
+                            #[cfg(target_os = "linux")]
+                            {
+                                if !final_w_visible {
+                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+                                    w.set_is_visible(false);
+                                } else {
+                                    // 模拟显示逻辑
+                                    w.set_pinyin(SharedString::from(&state.pinyin));
+                                    let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                                    let page = (state.selected_index / page_size) * page_size;
+                                    let relative_selected = (state.selected_index % page_size) as i32;
+                                    let mut data_vec = Vec::new();
+                                    for i in page..(page + page_size).min(state.candidates.len()) {
+                                        let cand = &state.candidates[i];
+                                        let hint = state.hints.get(i).cloned().unwrap_or_default();
+                                        let mut english = String::new();
+                                        let mut stroke = String::new();
+                                        if !hint.is_empty() {
+                                            if hint.contains('/') {
+                                                let parts: Vec<&str> = hint.split('/').collect();
+                                                english = parts[0].trim().to_string();
+                                                stroke = parts[1].trim().to_string();
+                                            } else { english = hint.clone(); }
+                                        }
+                                        data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                    }
+                                    w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
+                                    w.set_selected_index(relative_selected);
+                                    w.set_is_visible(true);
+                                    
+                                    let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                    if lx != 0 || ly != 0 {
+                                        let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly)));
+                                    }
+                                }
+                            }
                         }
                     }
                     GuiEvent::ForceStatusVisible(visible) => {
                         if let Some(sb) = s.upgrade() {
+                            #[cfg(target_os = "windows")]
                             if visible {
-                                #[cfg(target_os = "windows")]
                                 unsafe { hide_window_from_taskbar("RustImeStatusBar"); }
                                 let _ = sb.window().show();
                             } else {
                                 let _ = sb.window().hide();
                             }
+
+                            #[cfg(target_os = "linux")]
+                            if visible {
+                                // 如果没被 MoveTo 过，强制一个右下角位置
+                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                let (final_x, final_y) = if lx == 0 && ly == 0 { (1800, 1000) } else { (lx, ly) };
+                                let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(final_x, final_y)));
+                            } else {
+                                let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+                            }
                         }
                     }
                     GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
-                            if pinyin.is_empty() {
-                                if w.window().is_visible() {
-                                    w.set_is_visible(false);
-                                    let _ = w.window().hide();
-                                }
-                            } else {
-                                w.set_pinyin(SharedString::from(&pinyin));
-                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
-                                let page = (selected / page_size) * page_size;
-                                let relative_selected = (selected % page_size) as i32;
-                                
-                                let mut data_vec = Vec::new();
-                                for i in page..(page + page_size).min(candidates.len()) {
-                                    let cand = &candidates[i];
-                                    let hint = hints.get(i).cloned().unwrap_or_default();
-                                    let mut english = String::new();
-                                    let mut stroke = String::new();
-                                    if !hint.is_empty() {
-                                        if hint.contains('/') {
-                                            let parts: Vec<&str> = hint.split('/').collect();
-                                            english = parts[0].trim().to_string();
-                                            stroke = parts[1].trim().to_string();
-                                        } else { english = hint.clone(); }
+                            #[cfg(target_os = "windows")]
+                            {
+                                if pinyin.is_empty() {
+                                    if w.window().is_visible() {
+                                        w.set_is_visible(false);
+                                        let _ = w.window().hide();
                                     }
-                                    data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                } else {
+                                    w.set_pinyin(SharedString::from(&pinyin));
+                                    let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                                    let page = (selected / page_size) * page_size;
+                                    let relative_selected = (selected % page_size) as i32;
+                                    let mut data_vec = Vec::new();
+                                    for i in page..(page + page_size).min(candidates.len()) {
+                                        let cand = &candidates[i];
+                                        let hint = hints.get(i).cloned().unwrap_or_default();
+                                        let mut english = String::new();
+                                        let mut stroke = String::new();
+                                        if !hint.is_empty() {
+                                            if hint.contains('/') {
+                                                let parts: Vec<&str> = hint.split('/').collect();
+                                                english = parts[0].trim().to_string();
+                                                stroke = parts[1].trim().to_string();
+                                            } else { english = hint.clone(); }
+                                        }
+                                        data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                    }
+                                    w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
+                                    w.set_selected_index(relative_selected);
+                                    w.set_is_visible(true);
+                                    if !w.window().is_visible() {
+                                        unsafe { hide_window_from_taskbar("RustImeCandidateWindow"); }
+                                        let _ = w.window().show();
+                                    }
+                                    let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                    if lx != 0 || ly != 0 {
+                                        let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly)));
+                                    }
                                 }
-                                w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
-                                w.set_selected_index(relative_selected);
-                                w.set_is_visible(true);
+                            }
 
-                                if !w.window().is_visible() {
-                                    let _ = w.window().show();
-                                }
-                                
-                                // 设置位置
-                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
-                                if lx != 0 || ly != 0 {
-                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly)));
+                            #[cfg(target_os = "linux")]
+                            {
+                                if pinyin.is_empty() {
+                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(-2000, -2000)));
+                                    w.set_is_visible(false);
+                                } else {
+                                    w.set_pinyin(SharedString::from(&pinyin));
+                                    let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                                    let page = (selected / page_size) * page_size;
+                                    let relative_selected = (selected % page_size) as i32;
+                                    let mut data_vec = Vec::new();
+                                    for i in page..(page + page_size).min(candidates.len()) {
+                                        let cand = &candidates[i];
+                                        let hint = hints.get(i).cloned().unwrap_or_default();
+                                        let mut english = String::new();
+                                        let mut stroke = String::new();
+                                        if !hint.is_empty() {
+                                            if hint.contains('/') {
+                                                let parts: Vec<&str> = hint.split('/').collect();
+                                                english = parts[0].trim().to_string();
+                                                stroke = parts[1].trim().to_string();
+                                            } else { english = hint.clone(); }
+                                        }
+                                        data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                    }
+                                    w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
+                                    w.set_selected_index(relative_selected);
+                                    w.set_is_visible(true);
+                                    let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                    if lx != 0 || ly != 0 {
+                                        let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly)));
+                                    }
                                 }
                             }
                         }
