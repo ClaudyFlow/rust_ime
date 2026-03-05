@@ -1020,6 +1020,7 @@ impl Processor {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.english);
                 }
+                // 笔画编码提示逻辑 (学习模式)：开启 show_stroke_aux 时显示
                 if self.show_stroke_aux && !c.stroke_aux.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.stroke_aux);
