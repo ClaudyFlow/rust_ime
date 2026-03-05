@@ -508,7 +508,7 @@ impl Processor {
             return Action::PassThrough;
         }
 
-        if self.switch_mode {
+        if self.switch_mode && is_press {
             match key {
                 VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; self.pending_multiplier = 0; return Action::Notify("快捷切换".into(), "已退出".into()); }
                 _ if is_digit(key) => {
@@ -527,6 +527,7 @@ impl Processor {
                         }
                     }
                     if total_del > 0 { return Action::DeleteAndEmit { delete: total_del, insert: "".into() }; }
+                    return Action::Consume;
                 }
                 VirtualKey::E => {
                     self.switch_mode = false;
@@ -536,11 +537,9 @@ impl Processor {
                         self.buffer = pinyin;
                         self.state = ImeState::Composing;
                         let _ = self.lookup();
-                        // 修正：我们需要先执行物理删除，然后再让 UI 显示缓冲区
-                        // 这是一个复合动作，Action 目前只支持一个。
-                        // 技巧：让 UI 删除，同时 Processor 已经更新了 buffer，UI 在下一次渲染时会自动显示 buffer。
                         return Action::DeleteAndEmit { delete: del_count, insert: "".into() };
                     }
+                    return Action::Consume;
                 }
                 VirtualKey::R => {
                     self.switch_mode = false;
@@ -551,15 +550,17 @@ impl Processor {
                         for _ in 0..count { insert.push_str(word); }
                         return Action::Emit(insert);
                     }
+                    return Action::Consume;
                 }
                 VirtualKey::Z => {
                     self.switch_mode = false;
                     self.pending_multiplier = 0;
-                    if let Some(d) = self.tries.get("english") {
+                    if let Some(_d) = self.tries.get("english") {
                         self.active_profiles = vec!["english".to_string()];
                         self.reset();
                         return Action::Notify("英".into(), "已切换至英语方案".into());
                     }
+                    return Action::Consume;
                 }
                 _ if is_letter(key) => {
                     let k = key_to_char(key, false).unwrap_or(' ').to_string();
@@ -587,6 +588,11 @@ impl Processor {
                 }
                 _ => {} 
             }
+            return Action::Consume;
+        }
+
+        // 统一拦截 switch_mode 下的所有按键释放
+        if self.switch_mode && is_release {
             return Action::Consume;
         }
 
