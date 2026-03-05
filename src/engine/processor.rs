@@ -127,6 +127,8 @@ pub struct Processor {
     pub quote_open: bool,
     pub single_quote_open: bool,
 
+    pub pending_multiplier: usize,
+
     // 方案注册表
     pub schemes: HashMap<String, Box<dyn InputScheme>>,
 }
@@ -219,6 +221,7 @@ impl Processor {
             user_dict_tx: None,
             quote_open: false,
             single_quote_open: false,
+            pending_multiplier: 0,
             schemes: {
                 let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
                 m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
@@ -507,7 +510,57 @@ impl Processor {
 
         if self.switch_mode {
             match key {
-                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
+                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; self.pending_multiplier = 0; return Action::Notify("快捷切换".into(), "已退出".into()); }
+                _ if is_digit(key) => {
+                    let digit = key_to_digit(key).unwrap_or(0);
+                    self.pending_multiplier = self.pending_multiplier * 10 + digit;
+                    return Action::Consume;
+                }
+                VirtualKey::D => {
+                    self.switch_mode = false;
+                    let count = self.pending_multiplier.max(1);
+                    self.pending_multiplier = 0;
+                    let mut total_del = 0;
+                    for _ in 0..count {
+                        if let Some((_, word)) = self.commit_history.pop() {
+                            total_del += word.chars().count();
+                        }
+                    }
+                    if total_del > 0 { return Action::DeleteAndEmit { delete: total_del, insert: "".into() }; }
+                }
+                VirtualKey::E => {
+                    self.switch_mode = false;
+                    self.pending_multiplier = 0;
+                    if let Some((pinyin, word)) = self.commit_history.pop() {
+                        let del_count = word.chars().count();
+                        self.buffer = pinyin;
+                        self.state = ImeState::Composing;
+                        let _ = self.lookup();
+                        // 修正：我们需要先执行物理删除，然后再让 UI 显示缓冲区
+                        // 这是一个复合动作，Action 目前只支持一个。
+                        // 技巧：让 UI 删除，同时 Processor 已经更新了 buffer，UI 在下一次渲染时会自动显示 buffer。
+                        return Action::DeleteAndEmit { delete: del_count, insert: "".into() };
+                    }
+                }
+                VirtualKey::R => {
+                    self.switch_mode = false;
+                    let count = self.pending_multiplier.max(1);
+                    self.pending_multiplier = 0;
+                    if let Some((_, word)) = self.commit_history.last() {
+                        let mut insert = String::new();
+                        for _ in 0..count { insert.push_str(word); }
+                        return Action::Emit(insert);
+                    }
+                }
+                VirtualKey::Z => {
+                    self.switch_mode = false;
+                    self.pending_multiplier = 0;
+                    if let Some(d) = self.tries.get("english") {
+                        self.active_profiles = vec!["english".to_string()];
+                        self.reset();
+                        return Action::Notify("英".into(), "已切换至英语方案".into());
+                    }
+                }
                 _ if is_letter(key) => {
                     let k = key_to_char(key, false).unwrap_or(' ').to_string();
                     let mut target_profile = None;
@@ -523,10 +576,11 @@ impl Processor {
                             let short_display = self.get_short_display();
                             let _ = self.lookup();
                             self.switch_mode = false;
+                            self.pending_multiplier = 0;
                             return Action::Notify(short_display, format!("方案: {}", display));
                         } else {
-                            // 切换失败提示
                             self.switch_mode = false;
+                            self.pending_multiplier = 0;
                             return Action::Notify("❌".into(), format!("错误: 方案 [{}] 的词库未加载", p_str));
                         }
                     }
