@@ -86,28 +86,32 @@ def enrich_stroke_dict_v2():
 
     # 3.2 生成 4 键简码 (前三末一)
     print("正在生成单字 4 键简码...")
-    final_stroke_dict = processed_dict.copy()
+    short_stroke_dict = {}
     for code, entries in processed_dict.items():
         if len(code) > 4:
             short_code = code[:3] + code[-1]
-            if short_code not in final_stroke_dict:
-                final_stroke_dict[short_code] = []
+            if short_code not in short_stroke_dict:
+                short_stroke_dict[short_code] = []
             
             # 避免重复添加
-            existing_chars = {e['char'] for e in final_stroke_dict[short_code]}
+            existing_chars = {e['char'] for e in short_stroke_dict[short_code]}
             for entry in entries:
                 if entry['char'] not in existing_chars:
-                    final_stroke_dict[short_code].append(entry)
+                    short_stroke_dict[short_code].append(entry)
 
     # 4. 写回
-    print(f"正在保存丰富后的词典 (含 4 键简码)...")
-    for code in final_stroke_dict:
-        final_stroke_dict[code].sort(key=lambda x: x['weight'], reverse=True)
-
+    print(f"正在保存全码词典: {stroke_json_path}")
     with open(stroke_json_path, 'w', encoding='utf-8') as f:
-        json.dump(final_stroke_dict, f, ensure_ascii=False, indent=2)
+        json.dump(processed_dict, f, ensure_ascii=False, indent=2)
+
+    short_json_path = 'dicts/stroke/words/stroke_short.json'
+    print(f"正在保存简码词典: {short_json_path}")
+    for code in short_stroke_dict:
+        short_stroke_dict[code].sort(key=lambda x: x['weight'], reverse=True)
+    with open(short_json_path, 'w', encoding='utf-8') as f:
+        json.dump(short_stroke_dict, f, ensure_ascii=False, indent=2)
     
-    print("笔画词典 V2 丰富完成！")
+    print("笔画词典 V2 拆分保存完成！")
 
 if __name__ == "__main__":
     enrich_stroke_dict_v2()
