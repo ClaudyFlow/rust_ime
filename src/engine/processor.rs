@@ -982,14 +982,17 @@ impl Processor {
                 self.candidates.push(text);
 
                 let mut hint = String::new();
-
+                
                 // 声调提示逻辑：仅在笔画模式或混合模式下显示
                 let is_chinese_pure = self.active_profiles.len() == 1 && self.active_profiles[0] == "chinese";
+                let is_stroke = current_profile == "stroke";
+                
                 if self.show_tone_hint && !c.tone.is_empty() && !is_chinese_pure {
                     hint.push_str(&c.tone);
                 }
 
-                if !c.english.is_empty() {
+                // 笔画模式下不显示英文翻译
+                if !is_stroke && !c.english.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.english);
                 }
@@ -998,6 +1001,56 @@ impl Processor {
                     hint.push_str(&c.stroke_aux);
                 }
                 self.candidate_hints.push(hint);
+            }
+
+            // --- 恢复：用户词库重排 (调频功能) ---
+            if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
+                let mut combined_user_entries = Vec::new();
+                for profile in &self.active_profiles {
+                    if let Some(profile_dict) = self.user_dict.get(profile) {
+                        if let Some(entries) = profile_dict.get(&self.last_lookup_pinyin) {
+                            combined_user_entries.extend(entries.clone());
+                        }
+                    }
+                }
+                
+                if !combined_user_entries.is_empty() {
+                    combined_user_entries.sort_by(|a, b| b.1.cmp(&a.1));
+                    let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
+                    
+                    for (word, _count) in combined_user_entries.iter().rev() {
+                        if let Some(pos) = self.candidates.iter().position(|c| c == word) {
+                            if insert_pos == 1 && pos == 0 { continue; }
+                            let c = self.candidates.remove(pos);
+                            let h = self.candidate_hints.remove(pos);
+                            self.candidates.insert(insert_pos, c);
+                            self.candidate_hints.insert(insert_pos, h);
+                        } else if self.filter_mode == FilterMode::None {
+                            // 只有在非过滤模式下才把不在当前列表的词加回来，避免干扰过滤
+                            self.candidates.insert(insert_pos, word.clone());
+                            self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
+                        }
+                    }
+                }
+            }
+
+            // --- 全局过滤逻辑增强：穿透声调符号 ---
+            if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
+                let filter_lower = self.aux_filter.to_lowercase();
+                let mut fc = Vec::new();
+                let mut fh = Vec::new();
+                for (i, hint) in self.candidate_hints.iter().enumerate() {
+                    let hint_clean = strip_tones(&hint.to_lowercase());
+                    let parts: Vec<&str> = hint_clean.split_whitespace().collect();
+                    if parts.iter().any(|p| p.starts_with(&filter_lower)) {
+                        fc.push(self.candidates[i].clone());
+                        fh.push(hint.clone());
+                    }
+                }
+                if !fc.is_empty() {
+                    self.candidates = fc;
+                    self.candidate_hints = fh;
+                }
             }
 
             if self.candidates.is_empty() {
