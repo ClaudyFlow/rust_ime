@@ -28,7 +28,7 @@ pub struct ImeTray {
 #[cfg(target_os = "linux")]
 impl Tray for ImeTray {
     fn icon_name(&self) -> String {
-        if self.chinese_enabled { "rust-ime-zh".into() } else { "rust-ime-en".into() }
+        "rust-ime".into()
     }
 
     fn title(&self) -> String {

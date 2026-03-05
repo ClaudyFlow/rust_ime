@@ -118,6 +118,21 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
         });
     }
 
+    #[cfg(target_os = "linux")]
+    {
+        let sb_init = status_bar_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(sb) = sb_init.upgrade() {
+                    // 默认放在右下角 (假设分辨率 1920x1080，Slint 在 Linux 下 set_position 效果取决于合成器)
+                    // 后续可通过 MoveTo 消息由 Host 动态调整
+                    let _ = sb.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(1800, 1000)));
+                }
+            });
+        });
+    }
+
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     std::thread::spawn(move || {
@@ -243,9 +258,48 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                             }
                         }
                     }
-                    GuiEvent::Update { pinyin, .. } => {
+                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
                         if let Some(w) = h.upgrade() {
-                            w.set_pinyin(SharedString::from(&pinyin));
+                            if pinyin.is_empty() {
+                                if w.window().is_visible() {
+                                    w.set_is_visible(false);
+                                    let _ = w.window().hide();
+                                }
+                            } else {
+                                w.set_pinyin(SharedString::from(&pinyin));
+                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst); 
+                                let page = (selected / page_size) * page_size;
+                                let relative_selected = (selected % page_size) as i32;
+                                
+                                let mut data_vec = Vec::new();
+                                for i in page..(page + page_size).min(candidates.len()) {
+                                    let cand = &candidates[i];
+                                    let hint = hints.get(i).cloned().unwrap_or_default();
+                                    let mut english = String::new();
+                                    let mut stroke = String::new();
+                                    if !hint.is_empty() {
+                                        if hint.contains('/') {
+                                            let parts: Vec<&str> = hint.split('/').collect();
+                                            english = parts[0].trim().to_string();
+                                            stroke = parts[1].trim().to_string();
+                                        } else { english = hint.clone(); }
+                                    }
+                                    data_vec.push(CandidateData { text: SharedString::from(cand), english_aux: SharedString::from(english), stroke_aux: SharedString::from(stroke) });
+                                }
+                                w.set_candidates(ModelRc::new(VecModel::from(data_vec)));
+                                w.set_selected_index(relative_selected);
+                                w.set_is_visible(true);
+
+                                if !w.window().is_visible() {
+                                    let _ = w.window().show();
+                                }
+                                
+                                // 设置位置
+                                let (lx, ly) = { let pos = last_pos_inner.lock().unwrap(); (pos.0, pos.1) };
+                                if lx != 0 || ly != 0 {
+                                    let _ = w.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(lx, ly)));
+                                }
+                            }
                         }
                     }
                     GuiEvent::OpenTrayMenu { .. } => {}
