@@ -142,10 +142,6 @@ impl CandidateDisplay for SlintDisplay {
         self.apply_style(config);
     }
 
-    fn is_visible(&self) -> bool {
-        self.window.window().is_visible()
-    }
-
     fn close(&mut self) {
         let _ = self.window.window().hide();
         let _ = self.status_bar.window().hide();

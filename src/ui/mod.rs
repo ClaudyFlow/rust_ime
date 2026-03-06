@@ -24,9 +24,6 @@ pub trait CandidateDisplay {
     /// 应用配置更新
     fn apply_config(&mut self, config: &Config);
 
-    /// 获取显示状态（可选，用于同步）
-    fn is_visible(&self) -> bool;
-
     /// 销毁或关闭显示
     fn close(&mut self);
 }

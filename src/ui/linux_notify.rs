@@ -117,10 +117,6 @@ impl CandidateDisplay for LinuxNotifyDisplay {
         self.config = config.clone();
     }
 
-    fn is_visible(&self) -> bool {
-        self.active_notification.is_some()
-    }
-
     fn close(&mut self) {
         if let Some(h) = self.active_notification.take() {
             h.close();
