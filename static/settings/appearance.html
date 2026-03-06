@@ -44,10 +44,6 @@
                     <label class="switch"><input type="checkbox" id="enable_random_highlight"><span class="slider"></span></label>
                 </div>
                 <div class="setting-item">
-                    <div class="info"><div class="title">使用桌面通知 (Linux)</div><div class="desc">在 Linux 下使用桌面通知显示候选词 (解决焦点问题)</div></div>
-                    <label class="switch"><input type="checkbox" id="enable_notification_candidates"><span class="slider"></span></label>
-                </div>
-                <div class="setting-item">
                     <div class="info"><div class="title">候选词数量</div><div class="desc">每页显示的候选词个数 (1-10)。</div></div>
                     <input type="number" id="page_size" min="1" max="10" step="1" style="width: 80px;">
                 </div>
@@ -171,7 +167,6 @@
             bindInput('show_english_translation', 'appearance');
             bindInput('show_stroke_aux', 'appearance');
             bindInput('enable_random_highlight', 'appearance');
-            bindInput('enable_notification_candidates', 'appearance');
             bindInput('aux_mode', 'appearance');
             bindInput('candidate_layout', 'appearance');
             

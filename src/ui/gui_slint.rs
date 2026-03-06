@@ -75,7 +75,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
     let show_status_bar_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_status_bar));
     let random_highlight_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_random_highlight));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
-    let enable_notification_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_notification_candidates));
+    let enable_notification_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.input.enable_notification_candidates));
     
     let current_color_shared = std::sync::Arc::new(std::sync::Mutex::new(parse_color(&config.appearance.window_highlight_color)));
     
@@ -178,22 +178,38 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                     };
 
                     if let (Some(py), Some(cands), Some(hnts), Some(sel)) = (pinyin, candidates, hints, selected) {
-                                            if py.is_empty() {
-                                                if let Some(h) = active_notification.take() {
-                                                    h.close();
-                                                }
-                                            } else {
-                                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst);
-                                                let page = (sel / page_size) * page_size;
+                        if py.is_empty() {
+                            if let Some(h) = active_notification.take() {
+                                h.close();
+                            }
+                        } else {
+                            let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                            let page = (sel / page_size) * page_size;
                         
                             let mut notify_body = String::new();
                             for i in page..(page + page_size).min(cands.len()) {
                                 let cand = &cands[i];
+                                let hint = hnts.get(i).cloned().unwrap_or_default();
+                                
+                                // 提取英文辅助码逻辑
+                                let mut english = String::new();
+                                if !hint.is_empty() {
+                                    if hint.contains('/') {
+                                        let parts: Vec<&str> = hint.split('/').collect();
+                                        english = parts[0].trim().to_string();
+                                    } else { english = hint.clone(); }
+                                }
+
                                 let display_idx = (i % page_size) + 1;
+                                let mut entry = format!("{}.{}", display_idx, cand);
+                                if !english.is_empty() {
+                                    entry.push_str(&format!("({})", english));
+                                }
+
                                 if i == sel {
-                                    notify_body.push_str(&format!("【{}.{}】 ", display_idx, cand));
+                                    notify_body.push_str(&format!("【{}】 ", entry));
                                 } else {
-                                    notify_body.push_str(&format!("{}.{} ", display_idx, cand));
+                                    notify_body.push_str(&format!("{} ", entry));
                                 }
                             }
 
@@ -502,7 +518,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         show_status_bar_for_loop.store(new_conf.appearance.show_status_bar, std::sync::atomic::Ordering::SeqCst);
                         random_highlight_for_loop.store(new_conf.appearance.enable_random_highlight, std::sync::atomic::Ordering::SeqCst);
                         page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
-                        enable_notify_for_loop.store(new_conf.appearance.enable_notification_candidates, std::sync::atomic::Ordering::SeqCst);
+                        enable_notify_for_loop.store(new_conf.input.enable_notification_candidates, std::sync::atomic::Ordering::SeqCst);
                         
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);

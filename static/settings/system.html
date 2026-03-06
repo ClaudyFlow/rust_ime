@@ -56,6 +56,13 @@
                 </div>
                 <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
             </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">使用桌面通知 (Linux)</div>
+                    <div class="desc">在 Linux 下使用桌面通知显示候选词 (解决候选窗焦点问题)。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_notification_candidates"><span class="slider"></span></label>
+            </div>
         </div>
     </div>
 
@@ -83,6 +90,7 @@
             bindInput('enable_fixed_first_candidate', 'input');
             bindInput('commit_mode', 'input');
             bindInput('autostart', 'input');
+            bindInput('enable_notification_candidates', 'input');
         }
 
         function toggleProfile(name, el) {

@@ -63,7 +63,6 @@ pub struct Appearance {
     pub show_learning_stroke_hint: bool,
     pub show_learning_english_hint: bool,
     pub auto_pronounce: bool,
-    pub enable_notification_candidates: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -123,6 +122,7 @@ pub struct Input {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: FuzzyPinyinConfig,
     pub enable_traditional: bool,
+    pub enable_notification_candidates: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -315,7 +315,6 @@ impl Config {
                 show_learning_stroke_hint: true,
                 show_learning_english_hint: true,
                 auto_pronounce: true,
-                enable_notification_candidates: true,
             },
             input: Input {
                 autostart: true,
@@ -382,6 +381,7 @@ impl Config {
                     custom_mappings: vec![],
                 },
                 enable_traditional: false,
+                enable_notification_candidates: true,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
