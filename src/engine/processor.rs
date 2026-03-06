@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
 use crate::engine::scheme::{InputScheme, SchemeContext};
@@ -139,9 +140,11 @@ impl Processor {
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
         punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
+        syllables: HashSet<String>,
     ) -> Self {
         let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
         let user_dict = Arc::new(Mutex::new(HashMap::new()));
+        let syllables_arc = Arc::new(syllables.clone());
         
         let mut pipelines = HashMap::new();
         for (name, trie) in &tries {
@@ -150,7 +153,10 @@ impl Processor {
                 user_dict: user_dict.clone(), 
                 profile: name.clone() 
             }));
-            pipeline.add_translator(Box::new(TableTranslator { trie: Arc::new(trie.clone()) }));
+            pipeline.add_translator(Box::new(TableTranslator { 
+                trie: Arc::new(trie.clone()),
+                syllables: syllables_arc.clone(),
+            }));
             pipeline.add_filter(Box::new(crate::engine::pipeline::SortFilter));
             pipeline.add_filter(Box::new(crate::engine::pipeline::TraditionalFilter));
             pipelines.insert(name.clone(), pipeline);
@@ -161,7 +167,7 @@ impl Processor {
             active_profiles: vec![initial_profile],
             punctuations,
             keyboard_layouts: HashMap::new(),
-            syllables: std::collections::HashSet::new(),
+            syllables,
             candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
             joined_sentence: String::new(),
@@ -268,9 +274,6 @@ impl Processor {
         self.show_tone_hint = conf.appearance.show_tone_hint;
         self.aux_mode = conf.appearance.aux_mode;
         
-        // 确保随机高亮的状态虽然由 GUI 处理，但 Processor 也持有配置副本
-        // 这里不需要显式逻辑，因为字段会在下一行同步 (如果 Processor 有对应字段的话)
-
         self.anti_typo_mode = conf.input.anti_typo_mode;
         self.commit_mode = conf.input.commit_mode.clone();
         self.auto_commit_unique_en_fuzhuma = conf.input.auto_commit_unique_en_fuzhuma;
@@ -1351,8 +1354,6 @@ fn get_punctuation_key(key: VirtualKey, shift: bool) -> Option<&'static str> {
 }
 pub fn strip_tones(s: &str) -> String {
     let mut res = String::new();
-    for c in s.chars() { match c { 'ā'|'á'|'ǎ'|'à' => res.push('a'), 'ē'|'é'|'ě'|'è' => res.push('e'), 'ī'|'í'|'ǐ'|'ì' => res.push('i'), 'ō'|'ó'|'ǒ'|'ò' => res.push('o'), 'ū'|'ú'|'ǔ'|'ù' => res.push('u'), 'ǖ'|'ǘ'|'ǚ'|'ǜ' => res.push('v'), 'Ā'|'Á'|'Ǎ'|'À' => res.push('A'), 'Ē'|'É'|'Ě'|'È' => res.push('E'), 'Ī'|'Í'|'Ǐ'|'Ì' => res.push('I'), 'Ō'|'Ó'|'Ǒ'|'Ò' => res.push('O'), 'Ū'|'Ú'|'Ǔ'|'Ù' => res.push('U'), 'Ǖ'|'Ǘ'|'Ǚ'|'Ǜ' => res.push('V'), _ => res.push(c) } } 
+    for c in s.chars() { match c { 'ā'|'á'|'ǎ'|'à' => res.push('a'), 'ē'|'é'|'ě'|'è' => res.push('e'), 'ī'|'í'|'ǐ'|'ì' => res.push('i'), 'ō'|'ó'|'ǒ'|'ò' => res.push('o'), 'ū'|'ú'|'ǔ'|'ù' => res.push('u'), 'ǖ'|'ǘ'|'ǚ'|'ǜ' => res.push('v'), 'Ā'|'Á'|'Ǎ'|'À' => res.push('a'), 'Ē'|'É'|'Ě'|'È' => res.push('e'), 'Ī'|'Í'|'Ǐ'|'Ì' => res.push('i'), 'Ō'|'Ó'|'Ǒ'|'Ò' => res.push('o'), 'Ū'|'Ú'|'Ǔ'|'Ù' => res.push('u'), 'Ǖ'|'Ǘ'|'Ǚ'|'Ǜ' => res.push('v'), _ => res.push(c) } } 
     res
 }
-
-

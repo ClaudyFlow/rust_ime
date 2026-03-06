@@ -8,6 +8,8 @@ use crate::engine::keys::VirtualKey;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Candidate {
     pub text: String,
+    pub simplified: String,
+    pub traditional: String,
     pub hint: String,
     pub source: String, // 来源：如 "User", "Table", "Script"
     pub weight: f64,
@@ -67,20 +69,39 @@ impl Segmentor for DefaultSegmentor {
 /// 系统词库翻译器
 pub struct TableTranslator {
     pub trie: Arc<Trie>,
+    pub syllables: Arc<HashSet<String>>,
 }
 impl Translator for TableTranslator {
-    fn translate(&self, _input: &str, segments: &[String], _config: &Config) -> Vec<Candidate> {
+    fn translate(&self, _input: &str, segments: &[String], config: &Config) -> Vec<Candidate> {
         if segments.is_empty() { return vec![]; }
         let query = segments.join("");
-        // 使用 search_bfs 检索，limit 设为 100
-        self.trie.search_bfs(&query, 100).into_iter().map(|(text, en_aux, stroke_aux, _meaning, _extra, weight)| {
-            // 合并 hint
-            let mut hint = en_aux;
-            if !stroke_aux.is_empty() {
-                if !hint.is_empty() { hint.push_str(" / "); }
+        
+        // 1. 尝试全拼/前缀匹配
+        let mut results = self.trie.search_bfs(&query, 100);
+        
+        // 2. 如果结果不足，尝试简拼匹配 (只有当开启简拼且 query 较短时)
+        if results.len() < 5 && config.input.enable_abbreviation_matching {
+            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, 100);
+            for ar in abbr_results {
+                if !results.iter().any(|r| r.0 == ar.0) {
+                    results.push(ar);
+                }
+            }
+        }
+
+        results.into_iter().map(|(text, en_aux, stroke_aux, _meaning, trad, weight)| {
+            let mut hint = String::new();
+            if config.appearance.show_english_aux && !en_aux.is_empty() {
+                hint.push_str(&en_aux);
+            }
+            if config.appearance.show_stroke_aux && !stroke_aux.is_empty() {
+                if !hint.is_empty() { hint.push(' '); }
                 hint.push_str(&stroke_aux);
             }
+
             Candidate {
+                simplified: text.clone(),
+                traditional: if trad.is_empty() { text.clone() } else { trad },
                 text,
                 hint,
                 source: "Table".into(),
@@ -105,8 +126,10 @@ impl Translator for UserDictTranslator {
             if let Some(words) = profile_dict.get(&query) {
                 for (text, freq) in words {
                     results.push(Candidate {
+                        simplified: text.clone(),
+                        traditional: text.clone(),
                         text: text.clone(),
-                        hint: "User".into(),
+                        hint: "★".into(),
                         source: "User".into(),
                         weight: (*freq as f64) + 1000000.0,
                     });
@@ -134,10 +157,9 @@ impl Filter for SortFilter {
 pub struct TraditionalFilter;
 impl Filter for TraditionalFilter {
     fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
-        if !config.input.enable_traditional { return; }
-        // TODO: 真正的繁简转换逻辑
+        let use_trad = config.input.enable_traditional;
         for c in candidates.iter_mut() {
-            c.text = format!("(繁){}", c.text); // 临时占位
+            c.text = if use_trad { c.traditional.clone() } else { c.simplified.clone() };
         }
     }
 }

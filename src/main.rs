@@ -230,9 +230,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let conf_guard = config.read().unwrap();
     let default_p = conf_guard.input.default_profile.clone();
-    let mut processor_obj = Processor::new(tries_map, default_p, conf_guard.input.punctuations.clone());
+    let syllables = load_syllables(&root);
+    let mut processor_obj = Processor::new(tries_map, default_p, conf_guard.input.punctuations.clone(), syllables);
     processor_obj.apply_config(&conf_guard);
-    processor_obj.set_syllables(load_syllables(&root));    
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);
 
