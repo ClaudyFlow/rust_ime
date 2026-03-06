@@ -6,6 +6,14 @@ pub struct Config {
     pub appearance: Appearance,
     pub input: Input,
     pub hotkeys: Hotkeys,
+    pub linux: LinuxConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct LinuxConfig {
+    pub device_path: String,
+    pub paste_method: String, // "shift_insert", "ctrl_v", "ctrl_shift_v", "unicode", "fcitx5"
+    pub enable_notification_candidates: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -54,7 +62,6 @@ pub struct Appearance {
     pub hint_text: TextStyle,
     pub comment_text: TextStyle, // For extra info like "User", "Emoji"
 
-    pub preview_mode: String,
     pub show_english_aux: bool,
     pub show_english_translation: bool,
     pub enable_random_highlight: bool,
@@ -84,10 +91,8 @@ pub enum AntiTypoMode {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Input {
     pub autostart: bool,
-    pub device_path: String,
     pub commit_mode: String,
     pub default_profile: String,
-    pub paste_method: String,
     pub clipboard_delay_ms: u64,
     pub anti_typo_mode: AntiTypoMode,
     pub enable_double_tap: bool,
@@ -122,7 +127,6 @@ pub struct Input {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: FuzzyPinyinConfig,
     pub enable_traditional: bool,
-    pub enable_notification_candidates: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -306,7 +310,6 @@ impl Config {
                 candidate_text: TextStyle { font_family: "".to_string(), font_size: 18, font_weight: 600, color: "#24292e".to_string(), alpha: 1.0 },
                 hint_text: TextStyle { font_family: "".to_string(), font_size: 14, font_weight: 400, color: "#6e7781".to_string(), alpha: 0.8 },
                 comment_text: TextStyle { font_family: "".to_string(), font_size: 12, font_weight: 400, color: "#0969da".to_string(), alpha: 0.7 },
-                preview_mode: "pinyin".to_string(),
                 show_english_aux: true,
                 show_english_translation: false,
                 enable_random_highlight: false,
@@ -318,10 +321,8 @@ impl Config {
             },
             input: Input {
                 autostart: true,
-                device_path: "/dev/input/event4".to_string(),
                 commit_mode: "single".to_string(),
                 default_profile: "chinese".to_string(),
-                paste_method: "shift_insert".to_string(),
                 clipboard_delay_ms: 10,
                 anti_typo_mode: AntiTypoMode::None,
                 enable_double_tap: false,
@@ -381,12 +382,16 @@ impl Config {
                     custom_mappings: vec![],
                 },
                 enable_traditional: false,
-                enable_notification_candidates: true,
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
                 enable_tab_toggle: true,
                 enable_ctrl_space_toggle: false,
+            },
+            linux: LinuxConfig {
+                device_path: "/dev/input/event4".to_string(),
+                paste_method: "shift_insert".to_string(),
+                enable_notification_candidates: true,
             },
         }
     }

@@ -56,12 +56,35 @@
                 </div>
                 <label class="switch"><input type="checkbox" id="autostart"><span class="slider"></span></label>
             </div>
+        </div>
+
+        <h2>Linux 专属设置</h2>
+        <div class="card">
             <div class="setting-item">
                 <div class="info">
-                    <div class="title">使用桌面通知 (Linux)</div>
+                    <div class="title">使用桌面通知</div>
                     <div class="desc">在 Linux 下使用桌面通知显示候选词 (解决候选窗焦点问题)。</div>
                 </div>
-                <label class="switch"><input type="checkbox" id="enable_notification_candidates"><span class="slider"></span></label>
+                <label class="switch"><input type="checkbox" id="linux_enable_notification_candidates"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">粘贴模式</div>
+                    <div class="desc">选择将中文注入到应用程序的方式。</div>
+                </div>
+                <select id="linux_paste_method">
+                    <option value="shift_insert">Shift + Insert (推荐)</option>
+                    <option value="ctrl_v">Ctrl + V</option>
+                    <option value="ctrl_shift_v">Ctrl + Shift + V</option>
+                    <option value="fcitx5">Fcitx5 接口 (需 Fcitx5 运行)</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">键盘设备路径</div>
+                    <div class="desc">evdev 拦截的键盘硬件路径。</div>
+                </div>
+                <input type="text" id="linux_device_path" placeholder="/dev/input/eventX">
             </div>
         </div>
     </div>
@@ -90,7 +113,11 @@
             bindInput('enable_fixed_first_candidate', 'input');
             bindInput('commit_mode', 'input');
             bindInput('autostart', 'input');
-            bindInput('enable_notification_candidates', 'input');
+            
+            // Linux 专属
+            bindInput('linux_enable_notification_candidates', 'linux', 'enable_notification_candidates');
+            bindInput('linux_paste_method', 'linux', 'paste_method');
+            bindInput('linux_device_path', 'linux', 'device_path');
         }
 
         function toggleProfile(name, el) {

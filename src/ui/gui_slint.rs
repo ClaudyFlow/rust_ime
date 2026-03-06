@@ -7,7 +7,7 @@ use crate::ui::slint_window::SlintDisplay;
 
 pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEvent>) {
     let mut display: Box<dyn CandidateDisplay> = if cfg!(target_os = "linux") {
-        if config.input.enable_notification_candidates {
+        if config.linux.enable_notification_candidates {
             Box::new(LinuxNotifyDisplay::new(config.clone()))
         } else {
             Box::new(SlintDisplay::new(config.clone()))

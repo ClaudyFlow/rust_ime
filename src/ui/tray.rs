@@ -96,7 +96,6 @@ pub fn start_tray(
     _anti_typo_mode: crate::config::AntiTypoMode,
     _double_pinyin: bool,
     _commit_mode: String,
-    _preview_mode: String,
     _candidate_layout: String,
     tx: Sender<TrayEvent>
 ) -> LinuxTrayHandle {
@@ -160,7 +159,6 @@ pub fn start_tray(
     _anti_typo_mode: crate::config::AntiTypoMode,
     _double_pinyin: bool,
     _commit_mode: String,
-    _preview_mode: String,
     _candidate_layout: String,
     event_tx: Sender<TrayEvent>
 ) -> WindowsTrayHandle {

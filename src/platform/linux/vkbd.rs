@@ -344,7 +344,7 @@ impl Vkbd {
 
     pub fn apply_config(&mut self, config: &crate::config::Config) {
         self.clipboard_delay_ms = config.input.clipboard_delay_ms;
-        self.paste_mode = match config.input.paste_method.as_str() {
+        self.paste_mode = match config.linux.paste_method.as_str() {
             "ctrl_v" => PasteMode::CtrlV,
             "ctrl_shift_v" => PasteMode::CtrlShiftV,
             "unicode" => PasteMode::UnicodeHex,

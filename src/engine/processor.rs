@@ -302,10 +302,7 @@ impl Processor {
         self.phantom_mode = if cfg!(target_os = "windows") {
             PhantomMode::None
         } else {
-            match conf.appearance.preview_mode.as_str() {
-                "pinyin" => PhantomMode::Pinyin,
-                _ => PhantomMode::None,
-            }
+            PhantomMode::Pinyin
         };
 
         if self.buffer.is_empty() {

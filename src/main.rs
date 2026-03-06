@@ -237,7 +237,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(conf_guard);
 
     let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.preview_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
+    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
     drop(conf);
 
     // 全局状态维护
@@ -358,7 +358,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        let dev_path = config.read().unwrap().input.device_path.clone();
+        let dev_path = config.read().unwrap().linux.device_path.clone();
         let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &dev_path, Some(gui_tx), config.clone(), tray_tx)?;
         host.run()?;
     }

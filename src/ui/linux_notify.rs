@@ -20,7 +20,7 @@ impl LinuxNotifyDisplay {
 
 impl CandidateDisplay for LinuxNotifyDisplay {
     fn update_candidates(&mut self, pinyin: &str, candidates: Vec<String>, hints: Vec<String>, selected: usize) {
-        if !self.config.input.enable_notification_candidates {
+        if !self.config.linux.enable_notification_candidates {
             if let Some(h) = self.active_notification.take() {
                 h.close();
             }
