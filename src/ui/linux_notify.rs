@@ -1,10 +1,11 @@
-use notify_rust::{Notification, NotificationHandle};
+use notify_rust::{Notification, NotificationHandle, Hint};
 use crate::ui::CandidateDisplay;
 use crate::config::Config;
 
 pub struct LinuxNotifyDisplay {
     active_notification: Option<NotificationHandle>,
     config: Config,
+    last_content: String, // 缓存内容，避免重复发送完全相同的内容
 }
 
 impl LinuxNotifyDisplay {
@@ -12,6 +13,7 @@ impl LinuxNotifyDisplay {
         Self {
             active_notification: None,
             config,
+            last_content: String::new(),
         }
     }
 }
@@ -29,6 +31,7 @@ impl CandidateDisplay for LinuxNotifyDisplay {
             if let Some(h) = self.active_notification.take() {
                 h.close();
             }
+            self.last_content.clear();
             return;
         }
 
@@ -40,7 +43,6 @@ impl CandidateDisplay for LinuxNotifyDisplay {
             let cand = &candidates[i];
             let hint = hints.get(i).cloned().unwrap_or_default();
             
-            // 提取辅助码/提示逻辑 (保持与原 gui_slint.rs 一致)
             let mut aux = String::new();
             if !hint.is_empty() {
                 if hint.contains('/') {
@@ -63,15 +65,26 @@ impl CandidateDisplay for LinuxNotifyDisplay {
             }
         }
 
+        let current_content = format!("{}:{}", pinyin, notify_body);
+        if current_content == self.last_content {
+            return;
+        }
+        self.last_content = current_content;
+
         if let Some(ref mut h) = self.active_notification {
             h.summary(pinyin);
             h.body(&notify_body);
+            // 每次更新都显式设置 transient 确保不存入通知历史堆栈
+            h.hint(Hint::Transient(true));
+            h.hint(Hint::Custom("x-canonical-private-synchronous".to_string(), "true".to_string()));
             h.update();
         } else {
             self.active_notification = Notification::new()
                 .summary(pinyin)
                 .body(&notify_body)
                 .appname("rust-ime")
+                .hint(Hint::Transient(true))
+                .hint(Hint::Custom("x-canonical-private-synchronous".to_string(), "true".to_string()))
                 .timeout(0) 
                 .show()
                 .ok();
@@ -79,24 +92,24 @@ impl CandidateDisplay for LinuxNotifyDisplay {
     }
 
     fn update_status(&mut self, text: &str, _chinese_enabled: bool) {
-        // Linux 下状态切换也用通知显示，或者仅在需要时显示
+        if text.is_empty() { return; }
         let _ = Notification::new()
             .summary("Rust IME")
             .body(text)
             .appname("rust-ime")
+            .hint(Hint::Transient(true))
             .timeout(1500)
             .show();
     }
 
-    fn move_to(&mut self, _x: i32, _y: i32) {
-        // 通知无法移动位置
-    }
+    fn move_to(&mut self, _x: i32, _y: i32) {}
 
     fn set_visible(&mut self, visible: bool) {
         if !visible {
             if let Some(h) = self.active_notification.take() {
                 h.close();
             }
+            self.last_content.clear();
         }
     }
 
