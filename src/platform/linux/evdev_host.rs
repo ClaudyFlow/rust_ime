@@ -227,6 +227,13 @@ impl InputMethodHost for EvdevHost {
                     let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
+                        // 【关键修复】特殊处理 Enter：如果缓冲区为空，直接透传物理按键，确保换行功能
+                        if (key == Key::KEY_ENTER || key == Key::KEY_KPENTER) && p.buffer.is_empty() {
+                            drop(p);
+                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                            continue;
+                        }
+
                         if let Some(vk) = evdev_to_virtual(key) {
                             match p.handle_key(vk, val, shift, ctrl, alt) {
                                 Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
