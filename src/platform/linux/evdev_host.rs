@@ -63,13 +63,15 @@ fn parse_key(s: &str) -> Vec<Vec<Vec<Key>>> {
 
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
-    vkbd: Mutex<Vkbd>,
+    vkbd: Arc<Mutex<Vkbd>>,
     dev: Arc<Mutex<Device>>, // 修改为 Arc 以便在 Guard 中共享
     gui_tx: Option<Sender<GuiEvent>>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
     should_exit: Arc<AtomicBool>,
     config: Arc<std::sync::RwLock<Config>>,
     tab_held_and_not_used: bool,
+    lookup_tx: std::sync::mpsc::Sender<()>,
+    lookup_pending: Arc<AtomicBool>,
 }
 
 struct GrabGuard {
@@ -107,14 +109,42 @@ impl EvdevHost {
         tray_tx: Sender<crate::ui::tray::TrayEvent>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let dev = Device::open(device_path)?;
-        let mut vkbd = Vkbd::new(&dev)?;
+        let vkbd_raw = Vkbd::new(&dev)?;
+        let vkbd = Arc::new(Mutex::new(vkbd_raw));
         {
             let conf = config.read().unwrap();
-            vkbd.apply_config(&conf);
+            vkbd.lock().unwrap().apply_config(&conf);
         }
+
+        let (lookup_tx, lookup_rx) = std::sync::mpsc::channel::<()>();
+        let lookup_pending = Arc::new(AtomicBool::new(false));
+
+        // 启动后台检索线程
+        let p_bg = processor.clone();
+        let v_bg = vkbd.clone();
+        let g_bg = gui_tx.clone();
+        let pending_bg = lookup_pending.clone();
+
+        std::thread::spawn(move || {
+            while let Ok(_) = lookup_rx.recv() {
+                // 消耗掉积压的所有检索请求，只做最后一次
+                while let Ok(_) = lookup_rx.try_recv() {}
+
+                let mut p = p_bg.lock().unwrap();
+                if let Some(commit_action) = p.lookup() {
+                    if let Ok(mut vkbd) = v_bg.lock() {
+                        execute_action(&mut *vkbd, commit_action);
+                    }
+                }
+                update_gui_internal(&*p, &g_bg);
+                pending_bg.store(false, Ordering::SeqCst);
+            }
+        });
+
         Ok(Self {
-            processor, vkbd: Mutex::new(vkbd), dev: Arc::new(Mutex::new(dev)), gui_tx, tray_tx,
+            processor, vkbd, dev: Arc::new(Mutex::new(dev)), gui_tx, tray_tx,
             should_exit: Arc::new(AtomicBool::new(false)), config, tab_held_and_not_used: false,
+            lookup_tx, lookup_pending,
         })
     }
 }
@@ -252,19 +282,33 @@ impl InputMethodHost for EvdevHost {
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
                         if let Some(vk) = evdev_to_virtual(key) {
-                            // 【方案二：分离响应】
-                            // 1. 快速处理 buffer 变化并立即执行键盘模拟（出拼音）
-                            let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
-                            if let Ok(mut vkbd) = self.vkbd.lock() {
-                                execute_action(&mut *vkbd, fast_action);
-                            }
+                            let is_confirm_key = vk == VirtualKey::Space || vk == VirtualKey::Enter || (vk.to_u32() >= VirtualKey::Digit0.to_u32() && vk.to_u32() <= VirtualKey::Digit9.to_u32());
 
-                            // 2. 在字母打出后，补执行沉重的字典检索
-                            if let Some(commit_action) = p.lookup() {
-                                // 处理检索过程中可能触发的自动上屏（如全匹配唯一词）
-                                if let Ok(mut vkbd) = self.vkbd.lock() {
-                                    execute_action(&mut *vkbd, commit_action);
+                            if is_confirm_key {
+                                // 【慢车道：同步屏障】
+                                // 在处理确认键之前，必须等待后台检索完成
+                                drop(p);
+                                while self.lookup_pending.load(Ordering::SeqCst) {
+                                    std::thread::yield_now();
                                 }
+                                p = self.processor.lock().unwrap();
+                                
+                                // 同步执行完整的 handle_key (含检索)
+                                let action = p.handle_key_ext(vk, val, shift, ctrl, alt, true);
+                                if let Ok(mut vkbd) = self.vkbd.lock() {
+                                    execute_action(&mut *vkbd, action);
+                                }
+                            } else {
+                                // 【快车道：非阻塞字母输入】
+                                // 1. 立即计算并执行拼音预览 (不查字典)
+                                let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
+                                if let Ok(mut vkbd) = self.vkbd.lock() {
+                                    execute_action(&mut *vkbd, fast_action);
+                                }
+
+                                // 2. 发送异步检索请求
+                                self.lookup_pending.store(true, Ordering::SeqCst);
+                                let _ = self.lookup_tx.send(());
                             }
                         } else {
                             if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
@@ -287,64 +331,59 @@ impl InputMethodHost for EvdevHost {
 
 impl EvdevHost {
     fn update_gui(&self) {
-        if let Some(ref tx) = self.gui_tx {
-            let p = self.processor.lock().unwrap();
-            if p.buffer.is_empty() || !p.chinese_enabled { 
-                let _ = tx.send(GuiEvent::Update { 
-                    pinyin: "".into(), 
-                    candidates: vec![], 
-                    hints: vec![], 
-                    selected: 0, 
-                    sentence: "".into(),
-                    cursor_pos: 0,
-                    commit_mode: p.commit_mode.clone(),
-                }); 
-                return; 
-            }
-            
-            // 构造显示用的拼音串，包含 aux_filter (首字母大写)
-            let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
-                            if p.nav_mode {
-                                pinyin.push_str(" [H:左 J:下 K:上 L:右]");
-                            }            if !p.aux_filter.is_empty() {
-                let mut display_aux = String::new();
-                for (i, c) in p.aux_filter.chars().enumerate() {
-                    if i == 0 { display_aux.push(c.to_ascii_uppercase()); }
-                    else { display_aux.push(c.to_ascii_lowercase()); }
-                }
-                pinyin.push_str(&display_aux);
-            }
+        let p = self.processor.lock().unwrap();
+        update_gui_internal(&*p, &self.gui_tx);
+    }
+}
 
-            if !p.candidates.is_empty() || !p.joined_sentence.is_empty() {
-                let start = p.page; let end = (start + p.page_size).min(p.candidates.len());
-                for (abs_idx, cand) in p.candidates.iter().enumerate().skip(start).take(end - start) {
-                    let hint = p.candidate_hints.get(abs_idx).cloned().unwrap_or_default();
-                    if abs_idx == p.selected { 
-                        println!("[Candidate] {}.{} {}", (abs_idx % p.page_size)+1, cand, hint); 
-                    }
-                }
+fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
+    if let Some(ref tx) = gui_tx {
+        if p.buffer.is_empty() || !p.chinese_enabled { 
+            let _ = tx.send(GuiEvent::Update { 
+                pinyin: "".into(), 
+                candidates: vec![], 
+                hints: vec![], 
+                selected: 0, 
+                sentence: "".into(),
+                cursor_pos: 0,
+                commit_mode: p.commit_mode.clone(),
+            }); 
+            return; 
+        }
+        
+        let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
+        if p.nav_mode {
+            pinyin.push_str(" [H:左 J:下 K:上 L:右]");
+        }
+        if !p.aux_filter.is_empty() {
+            let mut display_aux = String::new();
+            for (i, c) in p.aux_filter.chars().enumerate() {
+                if i == 0 { display_aux.push(c.to_ascii_uppercase()); }
+                else { display_aux.push(c.to_ascii_lowercase()); }
             }
-            if p.show_candidates {
-                let _ = tx.send(GuiEvent::Update { 
-                    pinyin, 
-                    candidates: p.candidates.clone(), 
-                    hints: p.candidate_hints.clone(), 
-                    selected: p.selected, 
-                    sentence: p.joined_sentence.clone(),
-                    cursor_pos: p.cursor_pos,
-                    commit_mode: p.commit_mode.clone(),
-                });
-            } else { 
-                let _ = tx.send(GuiEvent::Update { 
-                    pinyin: "".into(), 
-                    candidates: vec![], 
-                    hints: vec![], 
-                    selected: 0, 
-                    sentence: "".into(),
-                    cursor_pos: 0,
-                    commit_mode: p.commit_mode.clone(),
-                }); 
-            }
+            pinyin.push_str(&display_aux);
+        }
+
+        if p.show_candidates {
+            let _ = tx.send(GuiEvent::Update { 
+                pinyin, 
+                candidates: p.candidates.clone(), 
+                hints: p.candidate_hints.clone(), 
+                selected: p.selected, 
+                sentence: p.joined_sentence.clone(),
+                cursor_pos: p.cursor_pos,
+                commit_mode: p.commit_mode.clone(),
+            });
+        } else { 
+            let _ = tx.send(GuiEvent::Update { 
+                pinyin: "".into(), 
+                candidates: vec![], 
+                hints: vec![], 
+                selected: 0, 
+                sentence: "".into(),
+                cursor_pos: 0,
+                commit_mode: p.commit_mode.clone(),
+            }); 
         }
     }
 }
