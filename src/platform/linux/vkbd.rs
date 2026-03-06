@@ -212,6 +212,11 @@ impl Vkbd {
     pub fn backspace(&mut self, count: usize) {
         if count == 0 { return; }
         
+        // HACK: 恢复 Firefox 补丁。在开始批量退格前，先发送一个空格再退格。
+        // 这能强行中断 Firefox 地址栏/搜索框的自动补全建议，防止出现多余字母。
+        self.tap(Key::KEY_SPACE);
+        self.tap(Key::KEY_BACKSPACE);
+
         for _ in 0..count {
             self.emit(Key::KEY_BACKSPACE, true);
             self.emit(Key::KEY_BACKSPACE, false);
