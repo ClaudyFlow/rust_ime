@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
 use crate::engine::scheme::{InputScheme, SchemeContext};
+use crate::engine::pipeline::{Pipeline, DefaultSegmentor, TableTranslator};
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,7 +117,7 @@ pub struct Processor {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: crate::config::FuzzyPinyinConfig,
     pub enable_traditional: bool,
-    pub user_dict: HashMap<String, HashMap<String, Vec<(String, u32)>>>, // 方案 -> 拼音 -> Vec<(词组, 词频)>
+    pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>, // 方案 -> 拼音 -> Vec<(词组, 词频)>
     pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
     // 连续选词记忆
@@ -127,8 +129,9 @@ pub struct Processor {
     pub quote_open: bool,
     pub single_quote_open: bool,
 
-    // 方案注册表
+    // 方案与流水线
     pub schemes: HashMap<String, Box<dyn InputScheme>>,
+    pub pipelines: HashMap<String, Pipeline>,
 }
 
 impl Processor {
@@ -138,6 +141,20 @@ impl Processor {
         punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
     ) -> Self {
         let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
+        let user_dict = Arc::new(Mutex::new(HashMap::new()));
+        
+        let mut pipelines = HashMap::new();
+        for (name, trie) in &tries {
+            let mut pipeline = Pipeline::new(Box::new(DefaultSegmentor));
+            pipeline.add_translator(Box::new(crate::engine::pipeline::UserDictTranslator { 
+                user_dict: user_dict.clone(), 
+                profile: name.clone() 
+            }));
+            pipeline.add_translator(Box::new(TableTranslator { trie: Arc::new(trie.clone()) }));
+            pipeline.add_filter(Box::new(crate::engine::pipeline::SortFilter));
+            pipeline.add_filter(Box::new(crate::engine::pipeline::TraditionalFilter));
+            pipelines.insert(name.clone(), pipeline);
+        }
 
         Self {
             state: ImeState::Direct, buffer: String::new(), tries, 
@@ -212,7 +229,7 @@ impl Processor {
                 custom_mappings: vec![],
             },
             enable_traditional: false,
-            user_dict: HashMap::new(),
+            user_dict,
             last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
@@ -227,6 +244,7 @@ impl Processor {
                 m.insert("japanese".to_string(), Box::new(crate::engine::schemes::JapaneseScheme::new()));
                 m
             },
+            pipelines,
         }
     }
 
@@ -240,7 +258,7 @@ impl Processor {
         self.fuzzy_config = conf.input.fuzzy_config.clone();
         self.enable_traditional = conf.input.enable_traditional;
         // 如果是初次加载或切换，可以从文件读取
-        if self.enable_user_dict && self.user_dict.is_empty() {
+        if self.enable_user_dict && self.user_dict.lock().unwrap().is_empty() {
             self.load_user_dict();
         }
         self.show_candidates = conf.appearance.show_candidates;
@@ -1008,11 +1026,35 @@ impl Processor {
         if self.buffer.is_empty() { self.reset(); return None; }
 
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
-        
-        // --- 方案化架构介入 ---
+        let config = crate::Config::load(); // TODO: 优化为从成员变量获取
+
+        // --- 新：流水线架构 (优先) ---
+        if let Some(pipeline) = self.pipelines.get(&current_profile) {
+            // 1. 切分音节
+            self.best_segmentation = pipeline.segmentor.segment(&self.buffer, &self.syllables);
+            
+            // 2. 执行流水线 (翻译 + 过滤)
+            let results = pipeline.run(&self.buffer, &self.syllables, &config);
+            
+            // 3. 将结果同步到 Processor 状态
+            self.candidates.clear();
+            self.candidate_hints.clear();
+            self.has_dict_match = !results.is_empty();
+            self.last_lookup_pinyin = self.buffer.clone();
+
+            for c in results {
+                self.candidates.push(c.text);
+                self.candidate_hints.push(c.hint);
+            }
+
+            self.selected = 0; self.page = 0; self.update_state();
+            return None;
+        }
+
+        // --- 旧：方案化架构 (回退) ---
         if let Some(scheme) = self.schemes.get(&current_profile) {
             let context = SchemeContext {
-                config: &crate::Config::load(), // 暂时每次创建，后续应优化为引用
+                config: &config,
                 tries: &self.tries,
                 syllables: &self.syllables,
                 _user_dict: &self.user_dict,
@@ -1062,37 +1104,6 @@ impl Processor {
                     hint.push_str(&c.stroke_aux);
                 }
                 self.candidate_hints.push(hint);
-            }
-
-            // --- 恢复：用户词库重排 (调频功能) ---
-            if self.enable_user_dict && !self.last_lookup_pinyin.is_empty() {
-                let mut combined_user_entries = Vec::new();
-                for profile in &self.active_profiles {
-                    if let Some(profile_dict) = self.user_dict.get(profile) {
-                        if let Some(entries) = profile_dict.get(&self.last_lookup_pinyin) {
-                            combined_user_entries.extend(entries.clone());
-                        }
-                    }
-                }
-                
-                if !combined_user_entries.is_empty() {
-                    combined_user_entries.sort_by(|a, b| b.1.cmp(&a.1));
-                    let insert_pos = if self.enable_fixed_first_candidate && !self.candidates.is_empty() { 1 } else { 0 };
-                    
-                    for (word, _count) in combined_user_entries.iter().rev() {
-                        if let Some(pos) = self.candidates.iter().position(|c| c == word) {
-                            if insert_pos == 1 && pos == 0 { continue; }
-                            let c = self.candidates.remove(pos);
-                            let h = self.candidate_hints.remove(pos);
-                            self.candidates.insert(insert_pos, c);
-                            self.candidate_hints.insert(insert_pos, h);
-                        } else if self.filter_mode == FilterMode::None {
-                            // 只有在非过滤模式下才把不在当前列表的词加回来，避免干扰过滤
-                            self.candidates.insert(insert_pos, word.clone());
-                            self.candidate_hints.insert(insert_pos, "★ 用户".to_string());
-                        }
-                    }
-                }
             }
 
             // --- 全局过滤逻辑增强：穿透声调符号 ---
@@ -1249,8 +1260,8 @@ impl Processor {
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
-                    self.user_dict = dict;
-                    println!("[Processor] User dictionary loaded ({} profiles).", self.user_dict.len());
+                    *self.user_dict.lock().unwrap() = dict;
+                    println!("[Processor] User dictionary loaded ({} profiles).", self.user_dict.lock().unwrap().len());
                 }
             }
         } else {
@@ -1277,9 +1288,9 @@ impl Processor {
         }
     }
 
-    fn save_user_dict(&self) {
+    pub fn save_user_dict(&self) {
         if let Some(ref tx) = self.user_dict_tx {
-            let _ = tx.send(self.user_dict.clone());
+            let _ = tx.send(self.user_dict.lock().unwrap().clone());
         }
     }
 
@@ -1288,10 +1299,10 @@ impl Processor {
         
         // 关键：获取当前活跃的第一个方案作为归属方案
         let profile = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
-        
-        let profile_dict = self.user_dict.entry(profile).or_insert_with(HashMap::new);
+
+        let mut dict = self.user_dict.lock().unwrap();
+        let profile_dict = dict.entry(profile).or_insert_with(HashMap::new);
         let entries = profile_dict.entry(pinyin.to_string()).or_insert_with(Vec::new);
-        
         if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
             entries[pos].1 += 1;
         } else {
@@ -1300,6 +1311,7 @@ impl Processor {
         
         // 简单的排序：按频率降序
         entries.sort_by(|a, b| b.1.cmp(&a.1));
+        drop(dict);
         self.save_user_dict();
     }
 }

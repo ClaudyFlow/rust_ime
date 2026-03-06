@@ -37,7 +37,7 @@ pub struct SchemeContext<'a> {
     pub config: &'a Config,
     pub tries: &'a HashMap<String, Trie>,
     pub syllables: &'a std::collections::HashSet<String>,
-    pub _user_dict: &'a HashMap<String, HashMap<String, Vec<(String, u32)>>>,
+    pub _user_dict: &'a std::sync::Arc<std::sync::Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
     pub active_profiles: &'a [String],
     pub candidate_count: usize,
     pub _filter_mode: FilterMode,
