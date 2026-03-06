@@ -43,17 +43,9 @@ impl CandidateDisplay for LinuxNotifyDisplay {
             let cand = &candidates[i];
             let hint = hints.get(i).cloned().unwrap_or_default();
             
-            let mut aux = String::new();
-            if !hint.is_empty() {
-                if hint.contains('/') {
-                    let parts: Vec<&str> = hint.split('/').collect();
-                    aux = parts[0].trim().to_string();
-                } else { aux = hint.clone(); }
-            }
-
             let display_idx = (i % page_size) + 1;
-            let entry = if !aux.is_empty() {
-                format!("{}.{}({})", display_idx, cand, aux)
+            let entry = if !hint.is_empty() {
+                format!("{}.{}({})", display_idx, cand, hint)
             } else {
                 format!("{}.{}", display_idx, cand)
             };

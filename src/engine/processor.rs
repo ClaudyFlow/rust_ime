@@ -157,6 +157,10 @@ impl Processor {
                 trie: Arc::new(trie.clone()),
                 syllables: syllables_arc.clone(),
             }));
+            pipeline.add_filter(Box::new(crate::engine::pipeline::AdaptiveFilter {
+                user_dict: user_dict.clone(),
+                profile: name.clone()
+            }));
             pipeline.add_filter(Box::new(crate::engine::pipeline::SortFilter));
             pipeline.add_filter(Box::new(crate::engine::pipeline::TraditionalFilter));
             pipelines.insert(name.clone(), pipeline);
@@ -464,8 +468,6 @@ impl Processor {
                                     if let Some(p_key) = get_punctuation_key(key, false) {
                                         if let Some(replacement) = self.punctuation_long_press_mappings.get(p_key).cloned() {
                                             self.long_press_triggered = true;
-                                            // 标点通常是直接上屏，或者是接在当前候选词后
-                                            // 我们复用 handle_punctuation 的一部分逻辑，但直接用 replacement
                                             let mut commit_text = if !self.joined_sentence.is_empty() { 
                                                 self.joined_sentence.trim_end().to_string() 
                                             } else if !self.candidates.is_empty() { 
@@ -516,7 +518,6 @@ impl Processor {
                 } else {
                     self.nav_mode = !self.nav_mode;
                     if self.nav_mode {
-                        // 进入导航模式时，自动跳到下一页
                         if self.page + self.page_size < self.candidates.len() {
                             self.page += self.page_size;
                             self.selected = self.page;
@@ -582,7 +583,6 @@ impl Processor {
             return Action::Consume;
         }
 
-        // 统一拦截 switch_mode 下的所有按键释放
         if self.switch_mode && is_release {
             return Action::Consume;
         }
@@ -600,7 +600,6 @@ impl Processor {
         }
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
-                // 检查当前方案是否有关联的键盘布局 (如俄语、希腊语)
                 let lang = self.active_profiles.get(0).cloned().unwrap_or_default().to_lowercase();
                 if let Some(layout) = self.keyboard_layouts.get(&lang) {
                     if let Some(mapped) = layout.get(&c.to_string()) {
@@ -624,24 +623,20 @@ impl Processor {
     }
 
     fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
-        let has_cand = !self.candidates.is_empty();
-        let now = Instant::now();
-
-        // 如果处于导航模式，映射 HJKL 为方向键
+        // --- 核心修复：HJKL 导航转换 ---
         if self.nav_mode {
             match key {
                 VirtualKey::H => key = VirtualKey::Left,
                 VirtualKey::L => key = VirtualKey::Right,
                 VirtualKey::K => key = VirtualKey::Up,
                 VirtualKey::J => key = VirtualKey::Down,
-                VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down 
-                | VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Home | VirtualKey::End 
-                | VirtualKey::Space | VirtualKey::Enter | VirtualKey::Grave => { /* 保持模式 */ }
-                _ => { self.nav_mode = false; } // 按其他键退出导航模式
+                _ => {} 
             }
         }
 
-        // 方案级特殊按键拦截（如双拼映射、笔画数字键等）
+        let has_cand = !self.candidates.is_empty();
+        let now = Instant::now();
+
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
         if let Some(scheme) = self.schemes.get(&current_profile) {
             let context = SchemeContext {
@@ -663,9 +658,7 @@ impl Processor {
             }
         }
 
-        // 1. 字母键优先处理 (筛选 或 双击)
         if is_letter(key) {
-            // A. 如果已经处于筛选模式，直接追加筛选码 (忽略双击)
             if self.filter_mode != FilterMode::None {
                 if let Some(c) = key_to_char(key, shift_pressed) {
                     self.aux_filter.push(c);
@@ -676,7 +669,6 @@ impl Processor {
                 }
             }
             
-            // B. 尝试双击逻辑 (仅在非 Shift 且开启时)
             if !shift_pressed && self.enable_double_tap {
                 if let Some(last_k) = self.last_tap_key {
                     if last_k == key {
@@ -698,7 +690,6 @@ impl Processor {
                         }
                     }
                 }
-                // 更新状态供下次双击判断
                 self.last_tap_key = Some(key);
                 self.last_tap_time = Some(now);
             } else {
@@ -738,11 +729,10 @@ impl Processor {
                 }
 
                 if self.buffer.is_empty() {
-                    self.commit_history.clear(); // 连续退格清空历史
+                    self.commit_history.clear();
                     return Action::PassThrough;
                 }
 
-                // 统一退格逻辑：逐字符删除。复杂的智能退格后续迁移至 Scheme。
                 self.buffer.pop();
 
                 if self.buffer.is_empty() {
@@ -798,15 +788,15 @@ impl Processor {
                 self.update_phantom_action()
             }
             VirtualKey::Enter => {
-                self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
-                self.last_lookup_pinyin.clear(); // 清空检索记录，确保不触发学习
+                self.commit_history.clear(); 
+                self.last_lookup_pinyin.clear();
                 if self.buffer.is_empty() { return Action::PassThrough; }
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out, 99); }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone(), 99) } else { let out = self.buffer.clone(); self.commit_candidate(out, 99) }
             }
             VirtualKey::Esc | VirtualKey::Delete => { 
-                self.commit_history.clear(); // 取消输入，清空历史
+                self.commit_history.clear();
                 let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } 
             }
 
@@ -819,7 +809,6 @@ impl Processor {
 
             VirtualKey::Slash if !self.buffer.is_empty() => {
                 let mut new_buffer = self.buffer.clone();
-                // 找到最后一个音节的起始位置（通常是空格后的部分，或者是整个 buffer）
                 let last_part_start = new_buffer.rfind(' ').map(|i| i + 1).unwrap_or(0);
                 let last_part = &new_buffer[last_part_start..];
                 
@@ -877,16 +866,10 @@ impl Processor {
     fn handle_punctuation(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
         let punc_key_owned = get_punctuation_key(key, shift_pressed)
             .map(|s| s.to_string())
-            .unwrap_or_else(|| {
-                log::warn!("无法获取标点符号键: key={:?}, shift={}", key, shift_pressed);
-                format!("{:?}", key)
-            });
+            .unwrap_or_else(|| format!("{:?}", key));
         let punc_key = punc_key_owned.as_str();
-        
-        // 查找当前语言方案的标点映射
         let lang = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
         
-        // 日语特有标点映射逻辑
         let zh_punc = if lang == "japanese" {
             match (punc_key, shift_pressed) {
                 (".", false) => "。".to_string(),
@@ -902,7 +885,7 @@ impl Processor {
             }
         } else {
             let zh_puncs = self.punctuations.get(&lang).and_then(|m| m.get(punc_key))
-                .or_else(|| self.punctuations.get("chinese").and_then(|m| m.get(punc_key))); // 回退到中文标点
+                .or_else(|| self.punctuations.get("chinese").and_then(|m| m.get(punc_key)));
             
             if let Some(entries) = zh_puncs {
                 if punc_key == "\"" {
@@ -931,7 +914,7 @@ impl Processor {
         commit_text.push_str(&zh_punc);
         let del_len = self.phantom_text.chars().count();
         self.clear_composing();
-        self.commit_history.clear(); // 标点断句，清空历史
+        self.commit_history.clear(); 
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
 
@@ -940,23 +923,14 @@ impl Processor {
         let py = self.last_lookup_pinyin.clone();
 
         if self.enable_user_dict && !py.is_empty() {
-            // 1. 记录单个词的频率
             self.record_usage(&py, &cand);
-
-            // 2. 尝试与历史记录合并组词
-            // 如果距离上次上屏超过 3 秒，清空历史
             if now.duration_since(self.last_commit_time) > Duration::from_secs(3) {
                 self.commit_history.clear();
             }
-
-            // 将当前词加入历史
             self.commit_history.push((py.clone(), cand.clone()));
-
-            // 尝试组合（取最近 2 到 4 个部分进行组合）
             if self.commit_history.len() >= 2 {
                 let start = if self.commit_history.len() > 4 { self.commit_history.len() - 4 } else { 0 };
                 let mut new_combinations = Vec::new();
-                
                 {
                     let history_slice = &self.commit_history[start..];
                     for i in 0..(history_slice.len() - 1) {
@@ -971,13 +945,10 @@ impl Processor {
                         }
                     }
                 }
-
-                // 统一写入词库
                 for (py, word) in new_combinations {
                     self.record_usage(&py, &word);
                 }
             }
-
             self.last_commit_time = now;
         }
 
@@ -987,8 +958,6 @@ impl Processor {
 
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
-
-        // 快捷切换模式下的提示优先
         if self.switch_mode {
             let target = "[方案切换]".to_string();
             if target == self.phantom_text { return Action::Consume; }
@@ -996,27 +965,19 @@ impl Processor {
             self.phantom_text = target.clone();
             return Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target };
         }
-
         let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].clone() } else { self.buffer.clone() };
         if target == self.phantom_text { return Action::Consume; }
-
         let old_phantom = self.phantom_text.clone();
         let old_chars: Vec<char> = old_phantom.chars().collect();
         let target_chars: Vec<char> = target.chars().collect();
-
-        // 核心优化：计算最小差异
-        // 1. 找到共同前缀
         let mut common_prefix_len = 0;
         for (c1, c2) in old_chars.iter().zip(target_chars.iter()) {
             if c1 == c2 { common_prefix_len += 1; }
             else { break; }
         }
-
         let delete_count = old_chars.len() - common_prefix_len;
         let insert_text: String = target_chars[common_prefix_len..].iter().collect();
-
         self.phantom_text = target;
-
         if delete_count == 0 && insert_text.is_empty() {
             Action::Consume
         } else if delete_count == 0 {
@@ -1027,34 +988,24 @@ impl Processor {
     }
     pub fn lookup(&mut self) -> Option<Action> {
         if self.buffer.is_empty() { self.reset(); return None; }
-
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
-        let config = crate::Config::load(); // TODO: 优化为从成员变量获取
+        let config = crate::Config::load(); 
 
-        // --- 新：流水线架构 (优先) ---
         if let Some(pipeline) = self.pipelines.get(&current_profile) {
-            // 1. 切分音节
             self.best_segmentation = pipeline.segmentor.segment(&self.buffer, &self.syllables);
-            
-            // 2. 执行流水线 (翻译 + 过滤)
             let results = pipeline.run(&self.buffer, &self.syllables, &config);
-            
-            // 3. 将结果同步到 Processor 状态
             self.candidates.clear();
             self.candidate_hints.clear();
             self.has_dict_match = !results.is_empty();
             self.last_lookup_pinyin = self.buffer.clone();
-
             for c in results {
                 self.candidates.push(c.text);
                 self.candidate_hints.push(c.hint);
             }
-
             self.selected = 0; self.page = 0; self.update_state();
             return None;
         }
 
-        // --- 旧：方案化架构 (回退) ---
         if let Some(scheme) = self.schemes.get(&current_profile) {
             let context = SchemeContext {
                 config: &config,
@@ -1066,50 +1017,30 @@ impl Processor {
                 _filter_mode: self.filter_mode.clone(),
                 _aux_filter: &self.aux_filter,
             };
-
-            // 1. 预处理
             let query = scheme.pre_process(&self.buffer, &context);
-            
-            // 2. 检索
             let mut candidates = scheme.lookup(&query, &context);
-            
-            // 3. 后处理
             scheme.post_process(&query, &mut candidates, &context);
-
-            // 4. 将结果同步到 Processor 状态
             self.candidates.clear();
             self.candidate_hints.clear();
             self.has_dict_match = !candidates.is_empty();
             self.last_lookup_pinyin = query.clone();
-
             for c in candidates {
                 let text = if self.enable_traditional { c.traditional } else { c.simplified };
                 self.candidates.push(text);
-
                 let mut hint = String::new();
-                
-                // 声调提示逻辑：仅在笔画模式或混合模式下显示
                 let is_chinese_pure = self.active_profiles.len() == 1 && self.active_profiles[0] == "chinese";
                 let is_stroke = current_profile == "stroke";
-                
-                if self.show_tone_hint && !c.tone.is_empty() && !is_chinese_pure {
-                    hint.push_str(&c.tone);
-                }
-
-                // 笔画模式下不显示英文翻译
+                if self.show_tone_hint && !c.tone.is_empty() && !is_chinese_pure { hint.push_str(&c.tone); }
                 if !is_stroke && !c.english.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.english);
                 }
-                // 笔画编码提示逻辑 (学习模式)：开启 show_stroke_aux 时显示
                 if self.show_stroke_aux && !c.stroke_aux.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.stroke_aux);
                 }
                 self.candidate_hints.push(hint);
             }
-
-            // --- 全局过滤逻辑增强：穿透声调符号 ---
             if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
                 let filter_lower = self.aux_filter.to_lowercase();
                 let mut fc = Vec::new();
@@ -1122,23 +1053,13 @@ impl Processor {
                         fh.push(hint.clone());
                     }
                 }
-                if !fc.is_empty() {
-                    self.candidates = fc;
-                    self.candidate_hints = fh;
-                }
+                if !fc.is_empty() { self.candidates = fc; self.candidate_hints = fh; }
             }
-
-            if self.candidates.is_empty() {
-                self.candidates.push(self.buffer.clone());
-                self.candidate_hints.push(String::new());
-            }
-
+            if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
             self.selected = 0; self.page = 0; self.update_state();
             return None;
         }
-        // --- 方案化架构结束 ---
 
-        // 2. 优先处理分页过滤模式
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
             let mut filtered_cands = Vec::new();
@@ -1148,27 +1069,15 @@ impl Processor {
                 let parts: Vec<&str> = hint_lower.split_whitespace().collect();
                 let mut matched = false;
                 for part in parts { if part.starts_with(&filter_lower) { matched = true; break; } }
-                if matched {
-                    filtered_cands.push(cand.clone());
-                    filtered_hints.push(hint.clone());
-                }
+                if matched { filtered_cands.push(cand.clone()); filtered_hints.push(hint.clone()); }
             }
             if !filtered_cands.is_empty() {
-                self.candidates = filtered_cands;
-                self.candidate_hints = filtered_hints;
-                if self.candidates.len() == 1 {
-                    let word = self.candidates[0].clone();
-                    return Some(self.commit_candidate(word, 0));
-                }
-            } else {
-                self.candidates.clear();
-                self.candidate_hints.clear();
-            }
-            self.selected = 0;
-            self.update_state();
+                self.candidates = filtered_cands; self.candidate_hints = filtered_hints;
+                if self.candidates.len() == 1 { let word = self.candidates[0].clone(); return Some(self.commit_candidate(word, 0)); }
+            } else { self.candidates.clear(); self.candidate_hints.clear(); }
+            self.selected = 0; self.update_state();
             return None;
         }
-
         if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
         self.selected = 0; self.page = 0; self.update_state();
         None
@@ -1220,33 +1129,14 @@ impl Processor {
         None
     }
 
-    /// 核心防呆逻辑：根据模式决定是否拦截非法拼音。
-    /// 返回 true 表示应该拦截并报警。
     fn should_block_invalid_input(&mut self, old_buffer: &str) -> bool {
-        if self.has_dict_match {
-            self.last_blocked_buffer.clear();
-            return false;
-        }
-
+        if self.has_dict_match { self.last_blocked_buffer.clear(); return false; }
         match self.anti_typo_mode {
             crate::config::AntiTypoMode::None => false,
-            crate::config::AntiTypoMode::Strict => {
-                self.buffer = old_buffer.to_string();
-                let _ = self.lookup();
-                true
-            }
+            crate::config::AntiTypoMode::Strict => { self.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
             crate::config::AntiTypoMode::Smart => {
-                // 如果当前 buffer 与上次被拦截的一样，说明用户坚持输入，放行
-                if !self.last_blocked_buffer.is_empty() && self.buffer == self.last_blocked_buffer {
-                    self.last_blocked_buffer.clear();
-                    false
-                } else {
-                    // 第一次拦截，记录状态
-                    self.last_blocked_buffer = self.buffer.clone();
-                    self.buffer = old_buffer.to_string();
-                    let _ = self.lookup();
-                    true
-                }
+                if !self.last_blocked_buffer.is_empty() && self.buffer == self.last_blocked_buffer { self.last_blocked_buffer.clear(); false }
+                else { self.last_blocked_buffer = self.buffer.clone(); self.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
             }
         }
     }
@@ -1267,22 +1157,15 @@ impl Processor {
                     println!("[Processor] User dictionary loaded ({} profiles).", self.user_dict.lock().unwrap().len());
                 }
             }
-        } else {
-            println!("[Processor] No user dictionary found.");
-        }
-
-        // 启动后台保存线程
+        } else { println!("[Processor] No user dictionary found."); }
         if self.user_dict_tx.is_none() {
             let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, HashMap<String, Vec<(String, u32)>>>>();
             self.user_dict_tx = Some(tx);
             std::thread::spawn(move || {
                 let path = std::path::PathBuf::from("data/user_dict.json");
                 while let Ok(dict_clone) = rx.recv() {
-                    // 简单的去重/节流：如果队列里还有更多，先清空，只存最后一次
                     let mut latest = dict_clone;
-                    while let Ok(next) = rx.try_recv() {
-                        latest = next;
-                    }
+                    while let Ok(next) = rx.try_recv() { latest = next; }
                     if let Ok(file) = std::fs::File::create(&path) {
                         let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &latest);
                     }
@@ -1299,20 +1182,12 @@ impl Processor {
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
-        
-        // 关键：获取当前活跃的第一个方案作为归属方案
         let profile = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
-
         let mut dict = self.user_dict.lock().unwrap();
         let profile_dict = dict.entry(profile).or_insert_with(HashMap::new);
         let entries = profile_dict.entry(pinyin.to_string()).or_insert_with(Vec::new);
-        if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
-            entries[pos].1 += 1;
-        } else {
-            entries.push((word.to_string(), 1));
-        }
-        
-        // 简单的排序：按频率降序
+        if let Some(pos) = entries.iter().position(|(w, _)| w == word) { entries[pos].1 += 1; }
+        else { entries.push((word.to_string(), 1)); }
         entries.sort_by(|a, b| b.1.cmp(&a.1));
         drop(dict);
         self.save_user_dict();
