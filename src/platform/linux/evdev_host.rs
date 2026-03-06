@@ -179,7 +179,6 @@ impl InputMethodHost for EvdevHost {
                             if !is_empty { p.reset(); }
                             drop(p);
                             if let Ok(mut vkbd) = self.vkbd.lock() { 
-                                if val == 1 { vkbd.release_all(); }
                                 let _ = vkbd.emit_raw(key, val); 
                             }
                             continue;

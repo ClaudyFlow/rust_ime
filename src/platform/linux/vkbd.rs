@@ -45,6 +45,8 @@ impl Vkbd {
         keys.insert(Key::KEY_RIGHTALT);
         keys.insert(Key::KEY_LEFTMETA);
         keys.insert(Key::KEY_RIGHTMETA);
+        keys.insert(Key::KEY_ENTER);
+        keys.insert(Key::KEY_KPENTER);
 
         let dev = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
