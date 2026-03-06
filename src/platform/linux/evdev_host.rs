@@ -133,7 +133,7 @@ impl EvdevHost {
                 let mut p = p_bg.lock().unwrap();
                 if let Some(commit_action) = p.lookup() {
                     if let Ok(mut vkbd) = v_bg.lock() {
-                        execute_action(&mut *vkbd, commit_action);
+                        execute_action(&mut *vkbd, commit_action, None);
                     }
                 }
                 update_gui_internal(&*p, &g_bg);
@@ -282,33 +282,35 @@ impl InputMethodHost for EvdevHost {
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
                         if let Some(vk) = evdev_to_virtual(key) {
-                            let is_confirm_key = vk == VirtualKey::Space || vk == VirtualKey::Enter || (vk.to_u32() >= VirtualKey::Digit0.to_u32() && vk.to_u32() <= VirtualKey::Digit9.to_u32());
+                            // 所有的确认、分页、选词、导航键都走“慢车道”，确保状态同步
+                            let is_sync_key = vk == VirtualKey::Space || vk == VirtualKey::Enter 
+                                || (vk.to_u32() >= VirtualKey::Digit0.to_u32() && vk.to_u32() <= VirtualKey::Digit9.to_u32())
+                                || matches!(vk, VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Up | VirtualKey::Down | VirtualKey::Left | VirtualKey::Right | VirtualKey::Minus | VirtualKey::Equal | VirtualKey::Comma | VirtualKey::Dot);
 
-                            if is_confirm_key {
-                                // 【慢车道：同步屏障】
-                                // 在处理确认键之前，必须等待后台检索完成
+                            if is_sync_key {
+                                // 【慢车道：等待检索完成】
                                 drop(p);
                                 while self.lookup_pending.load(Ordering::SeqCst) {
                                     std::thread::yield_now();
                                 }
                                 p = self.processor.lock().unwrap();
                                 
-                                // 同步执行完整的 handle_key (含检索)
                                 let action = p.handle_key_ext(vk, val, shift, ctrl, alt, true);
                                 if let Ok(mut vkbd) = self.vkbd.lock() {
-                                    execute_action(&mut *vkbd, action);
+                                    execute_action(&mut *vkbd, action, Some((key, val)));
                                 }
                             } else {
-                                // 【快车道：非阻塞字母输入】
-                                // 1. 立即计算并执行拼音预览 (不查字典)
+                                // 【快车道：非阻塞字母、退格、Esc】
                                 let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
                                 if let Ok(mut vkbd) = self.vkbd.lock() {
-                                    execute_action(&mut *vkbd, fast_action);
+                                    execute_action(&mut *vkbd, fast_action, Some((key, val)));
                                 }
 
-                                // 2. 发送异步检索请求
-                                self.lookup_pending.store(true, Ordering::SeqCst);
-                                let _ = self.lookup_tx.send(());
+                                // 如果是字母/退格且按下状态，发送异步检索请求
+                                if val != 0 {
+                                    self.lookup_pending.store(true, Ordering::SeqCst);
+                                    let _ = self.lookup_tx.send(());
+                                }
                             }
                         } else {
                             if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
@@ -388,12 +390,17 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
     }
 }
 
-fn execute_action(vkbd: &mut Vkbd, action: Action) {
+fn execute_action(vkbd: &mut Vkbd, action: Action, raw_key: Option<(Key, i32)>) {
     match action {
         Action::Emit(s) => { vkbd.send_text(&s); }
         Action::DeleteAndEmit { delete, insert } => {
             if delete > 0 { vkbd.backspace(delete); }
             if !insert.is_empty() { vkbd.send_text(&insert); }
+        }
+        Action::PassThrough => {
+            if let Some((k, v)) = raw_key {
+                let _ = vkbd.emit_raw(k, v);
+            }
         }
         Action::Alert => {
             let root = crate::find_project_root();
