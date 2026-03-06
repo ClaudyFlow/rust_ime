@@ -958,7 +958,7 @@ impl Processor {
 
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
-        
+
         // 快捷切换模式下的提示优先
         if self.switch_mode {
             let target = "[方案切换]".to_string();
@@ -970,13 +970,32 @@ impl Processor {
 
         let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].clone() } else { self.buffer.clone() };
         if target == self.phantom_text { return Action::Consume; }
-        let old_phantom = self.phantom_text.clone(); self.phantom_text = target.clone();
-        let old_chars: Vec<char> = old_phantom.chars().collect(); let target_chars: Vec<char> = target.chars().collect();
-        if target.starts_with(&old_phantom) { let added: String = target_chars[old_chars.len()..].iter().collect(); return Action::Emit(added); }
-        if old_phantom.starts_with(&target) { let count = old_chars.len() - target_chars.len(); return Action::DeleteAndEmit { delete: count, insert: "".into() }; }
-        Action::DeleteAndEmit { delete: old_chars.len(), insert: target }
-    }
 
+        let old_phantom = self.phantom_text.clone();
+        let old_chars: Vec<char> = old_phantom.chars().collect();
+        let target_chars: Vec<char> = target.chars().collect();
+
+        // 核心优化：计算最小差异
+        // 1. 找到共同前缀
+        let mut common_prefix_len = 0;
+        for (c1, c2) in old_chars.iter().zip(target_chars.iter()) {
+            if c1 == c2 { common_prefix_len += 1; }
+            else { break; }
+        }
+
+        let delete_count = old_chars.len() - common_prefix_len;
+        let insert_text: String = target_chars[common_prefix_len..].iter().collect();
+
+        self.phantom_text = target;
+
+        if delete_count == 0 && insert_text.is_empty() {
+            Action::Consume
+        } else if delete_count == 0 {
+            Action::Emit(insert_text)
+        } else {
+            Action::DeleteAndEmit { delete: delete_count, insert: insert_text }
+        }
+    }
     pub fn lookup(&mut self) -> Option<Action> {
         if self.buffer.is_empty() { self.reset(); return None; }
 

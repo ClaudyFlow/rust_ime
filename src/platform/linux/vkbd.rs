@@ -212,18 +212,12 @@ impl Vkbd {
     pub fn backspace(&mut self, count: usize) {
         if count == 0 { return; }
         
-        // HACK: 发送一个空格再补一个退格
-        // 这在 Firefox 搜索框中能强行打断自动补全建议，确保后续退格能删掉真实的字符
-        self.tap(Key::KEY_SPACE);
-        self.tap(Key::KEY_BACKSPACE);
-
         for _ in 0..count {
-            self.tap(Key::KEY_BACKSPACE);
-            // 物理间隔减小到 1ms
-            thread::sleep(Duration::from_millis(1));
+            self.emit(Key::KEY_BACKSPACE, true);
+            self.emit(Key::KEY_BACKSPACE, false);
+            // 极速模式：微量间隔确保内核处理
+            thread::sleep(Duration::from_micros(50));
         }
-        // 关键同步延迟减小
-        thread::sleep(Duration::from_millis(5));
     }
 
     fn send_via_fcitx(&self, text: &str) -> bool {
@@ -292,10 +286,9 @@ impl Vkbd {
 
     pub fn tap(&mut self, key: Key) {
         self.emit(key, true);
-        // 保持 1ms 按下，这是 Firefox 捕获信号的生命线
-        thread::sleep(Duration::from_millis(1));
+        thread::sleep(Duration::from_micros(100));
         self.emit(key, false);
-        thread::sleep(Duration::from_micros(500));
+        thread::sleep(Duration::from_micros(50));
     }
 
     #[allow(dead_code)]
