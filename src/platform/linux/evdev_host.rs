@@ -148,7 +148,7 @@ impl InputMethodHost for EvdevHost {
                 if let InputEventKind::Key(key) = ev.kind() {
                     let val = ev.value();
 
-                    // 1. 基础状态维护 (必须在最前面)
+                    // 1. 基础状态维护
                     if val == 1 { 
                         held_keys.insert(key); 
                         if key != Key::KEY_TAB { self.tab_held_and_not_used = false; }
@@ -156,35 +156,36 @@ impl InputMethodHost for EvdevHost {
                         held_keys.remove(&key); 
                     }
 
-                    // 2. 【核心修复】Enter 键绝对优先透传
-                    if key == Key::KEY_ENTER || key == Key::KEY_KPENTER {
+                    let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
+                    let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
+                    let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
+                    let has_mod = ctrl || alt || meta;
+
+                    // 2. 【核心修复】直接透传判断 (英文模式 或 Tab 键除外)
+                    {
                         let mut p = self.processor.lock().unwrap();
-                        let is_empty = p.buffer.is_empty();
                         let is_direct = !p.chinese_enabled;
+                        let is_empty = p.buffer.is_empty();
                         
-                        if is_direct || is_empty {
+                        // 如果处于直通(英文)模式，除 Tab 键外全部直接物理透传
+                        if is_direct && key != Key::KEY_TAB {
+                            drop(p);
+                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                            continue;
+                        }
+
+                        // 如果是 Enter 键且缓冲区为空，也直接透传
+                        if (key == Key::KEY_ENTER || key == Key::KEY_KPENTER) && is_empty {
                             if !is_empty { p.reset(); }
                             drop(p);
                             if let Ok(mut vkbd) = self.vkbd.lock() { 
-                                if val == 1 {
-                                    // 关键：在发送 Enter 按下之前，确保虚拟键盘的所有修饰键已释放
-                                    // 防止因 Shift 没释放导致发送了 Shift+Enter
-                                    vkbd.release_all();
-                                }
-                                if val != 2 {
-                                    println!("[Host] Enter Bypassed (Direct: {}, Val: {})", is_direct, val);
-                                }
+                                if val == 1 { vkbd.release_all(); }
                                 let _ = vkbd.emit_raw(key, val); 
                             }
                             continue;
                         }
                         drop(p);
                     }
-
-                    let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
-                    let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
-                    let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
-                    let has_mod = ctrl || alt || meta;
 
                     if key == Key::KEY_TAB && !has_mod {
                         if val == 1 { 
