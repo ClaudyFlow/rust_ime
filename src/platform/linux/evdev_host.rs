@@ -147,14 +147,35 @@ impl InputMethodHost for EvdevHost {
             for ev in events {
                 if let InputEventKind::Key(key) = ev.kind() {
                     let val = ev.value();
+
+                    // 1. 基础状态维护 (必须在最前面)
                     if val == 1 { 
                         held_keys.insert(key); 
-                        // 如果按下了除 Tab 以外的任何键，标记 Tab 已被使用
-                        if key != Key::KEY_TAB {
-                            self.tab_held_and_not_used = false;
-                        }
+                        if key != Key::KEY_TAB { self.tab_held_and_not_used = false; }
                     } else if val == 0 { 
                         held_keys.remove(&key); 
+                    }
+
+                    // 2. 【核心修复】Enter 键绝对优先透传
+                    if key == Key::KEY_ENTER || key == Key::KEY_KPENTER {
+                        let mut p = self.processor.lock().unwrap();
+                        // 只要满足以下任一条件就直接透传：
+                        // - 处于英文直通模式
+                        // - 拼音缓冲区为空
+                        let should_bypass = !p.chinese_enabled || p.buffer.is_empty();
+                        
+                        if should_bypass {
+                            if !p.buffer.is_empty() { p.reset(); }
+                            drop(p);
+                            if let Ok(mut vkbd) = self.vkbd.lock() { 
+                                if val != 2 { // 减少重复日志
+                                    println!("[Host] Enter Passthrough (Enabled: {}, Val: {})", !should_bypass, val);
+                                }
+                                let _ = vkbd.emit_raw(key, val); 
+                            }
+                            continue;
+                        }
+                        drop(p);
                     }
 
                     let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
@@ -227,13 +248,6 @@ impl InputMethodHost for EvdevHost {
                     let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
-                        // 【关键修复】特殊处理 Enter：如果缓冲区为空，直接透传物理按键，确保换行功能
-                        if (key == Key::KEY_ENTER || key == Key::KEY_KPENTER) && p.buffer.is_empty() {
-                            drop(p);
-                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
-                            continue;
-                        }
-
                         if let Some(vk) = evdev_to_virtual(key) {
                             match p.handle_key(vk, val, shift, ctrl, alt) {
                                 Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
