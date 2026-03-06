@@ -5,7 +5,6 @@ use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
 use crate::engine::scheme::{InputScheme, SchemeContext};
 use crate::engine::pipeline::{Pipeline, DefaultSegmentor, TableTranslator};
-use crate::ui::DisplayCandidate;
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,20 +41,34 @@ pub enum FilterMode {
 
 use crate::config::{AuxMode, PunctuationEntry};
 
-pub struct Processor {
-    pub state: ImeState,
+pub struct InputContext {
     pub buffer: String,
+    pub candidates: Vec<crate::engine::pipeline::Candidate>,
+    pub selected: usize,
+    pub page: usize,
+    pub cursor_pos: usize,
+    pub joined_sentence: String,
+    pub last_lookup_pinyin: String,
+    pub state: ImeState,
+    pub nav_mode: bool,
+    pub switch_mode: bool,
+    pub aux_filter: String,
+    pub filter_mode: FilterMode,
+    pub page_snapshot: Vec<crate::engine::pipeline::Candidate>,
+    pub shift_used_as_modifier: bool,
+}
+
+pub struct Processor {
+    pub ctx: InputContext,
+    
     pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
     pub punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, // Language -> Key -> Entries
     pub keyboard_layouts: HashMap<String, HashMap<String, String>>, // Layout Name -> Key -> Char
     pub syllables: std::collections::HashSet<String>,
-    pub candidates: Vec<DisplayCandidate>,
-    pub selected: usize,
-    pub page: usize,
+    
     pub chinese_enabled: bool,
     pub best_segmentation: Vec<String>,
-    pub joined_sentence: String,
     
     pub show_candidates: bool,
     pub show_english_translation: bool,
@@ -66,8 +79,6 @@ pub struct Processor {
     pub anti_typo_mode: crate::config::AntiTypoMode,
     pub last_blocked_buffer: String,
     pub commit_mode: String,
-    pub switch_mode: bool,
-    pub cursor_pos: usize,
     pub profile_keys: Vec<(String, String)>,
     pub page_size: usize,
     pub show_tone_hint: bool,
@@ -81,11 +92,6 @@ pub struct Processor {
     pub has_dict_match: bool,
     pub page_flipping_styles: Vec<String>,
     pub swap_arrow_keys: bool,
-    
-    // 筛选模式相关
-    pub aux_filter: String,
-    pub filter_mode: FilterMode,
-    pub page_snapshot: Vec<DisplayCandidate>, 
     
     pub enable_english_filter: bool,
     pub enable_caps_selection: bool,
@@ -107,8 +113,6 @@ pub struct Processor {
     pub key_press_info: Option<(VirtualKey, Instant)>,
     pub long_press_triggered: bool,
 
-    pub nav_mode: bool,
-
     // 用户个人词库相关
     pub enable_user_dict: bool,
     pub enable_fixed_first_candidate: bool,
@@ -118,8 +122,8 @@ pub struct Processor {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: crate::config::FuzzyPinyinConfig,
     pub enable_traditional: bool,
+    pub ranking: crate::config::RankingConfig,
     pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>, // 方案 -> 拼音 -> Vec<(词组, 词频)>
-    pub last_lookup_pinyin: String, // 记录最近一次检索的拼音串
     
     // 连续选词记忆
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
@@ -135,7 +139,103 @@ pub struct Processor {
     pub pipelines: HashMap<String, Pipeline>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Command {
+    NextPage,
+    PrevPage,
+    NextCandidate,
+    PrevCandidate,
+    Select(usize),
+    Commit,
+    Clear,
+}
+
 impl Processor {
+    pub fn execute_command(&mut self, cmd: Command) -> Action {
+        match cmd {
+            Command::NextPage => {
+                if !self.ctx.candidates.is_empty() {
+                    if self.ctx.page + self.page_size < self.ctx.candidates.len() {
+                        self.ctx.page += self.page_size;
+                        self.ctx.selected = self.ctx.page;
+                    } else {
+                        self.trigger_incremental_search();
+                        if self.ctx.page + self.page_size < self.ctx.candidates.len() {
+                            self.ctx.page += self.page_size;
+                            self.ctx.selected = self.ctx.page;
+                        }
+                    }
+                }
+                Action::Consume
+            }
+            Command::PrevPage => {
+                self.ctx.page = self.ctx.page.saturating_sub(self.page_size);
+                self.ctx.selected = self.ctx.page;
+                Action::Consume
+            }
+            Command::NextCandidate => {
+                if !self.ctx.candidates.is_empty() {
+                    self.preview_selected_candidate = true;
+                    if self.ctx.selected + 1 < self.ctx.candidates.len() {
+                        self.ctx.selected += 1;
+                    } else {
+                        // 尝试增量搜索
+                        self.trigger_incremental_search();
+                        if self.ctx.selected + 1 < self.ctx.candidates.len() {
+                            self.ctx.selected += 1;
+                        }
+                    }
+                    self.ctx.page = (self.ctx.selected / self.page_size) * self.page_size;
+                    return self.update_phantom_action();
+                }
+                Action::PassThrough
+            }
+            Command::PrevCandidate => {
+                if !self.ctx.candidates.is_empty() {
+                    self.preview_selected_candidate = true;
+                    if self.ctx.selected > 0 {
+                        self.ctx.selected -= 1;
+                    }
+                    self.ctx.page = (self.ctx.selected / self.page_size) * self.page_size;
+                    return self.update_phantom_action();
+                }
+                Action::PassThrough
+            }
+            Command::Select(idx) => {
+                let abs_idx = self.ctx.page + idx;
+                if let Some(cand) = self.ctx.candidates.get(abs_idx) {
+                    let word = cand.text.clone();
+                    return self.commit_candidate(word, abs_idx);
+                }
+                Action::Consume
+            }
+            Command::Commit => {
+                if self.ctx.buffer.is_empty() { return Action::PassThrough; }
+                if self.commit_mode == "single" {
+                    let out = self.ctx.buffer.clone();
+                    return self.commit_candidate(out, 99);
+                }
+                if self.preview_selected_candidate {
+                    if let Some(cand) = self.ctx.candidates.get(self.ctx.selected) {
+                        let word = cand.text.clone();
+                        return self.commit_candidate(word, self.ctx.selected);
+                    }
+                }
+                if !self.ctx.joined_sentence.is_empty() {
+                    self.commit_candidate(self.ctx.joined_sentence.clone(), 99)
+                } else {
+                    let out = self.ctx.buffer.clone();
+                    self.commit_candidate(out, 99)
+                }
+            }
+            Command::Clear => {
+                self.commit_history.clear();
+                let del = self.phantom_text.chars().count();
+                self.reset();
+                if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
+            }
+        }
+    }
     pub fn new(
         tries: HashMap<String, Trie>, 
         initial_profile: String, 
@@ -167,14 +267,29 @@ impl Processor {
         }
 
         Self {
-            state: ImeState::Direct, buffer: String::new(), tries, 
+            ctx: InputContext {
+                state: ImeState::Direct,
+                buffer: String::new(),
+                candidates: vec![],
+                selected: 0,
+                page: 0,
+                cursor_pos: 0,
+                joined_sentence: String::new(),
+                last_lookup_pinyin: String::new(),
+                nav_mode: false,
+                switch_mode: false,
+                aux_filter: String::new(),
+                filter_mode: FilterMode::None,
+                page_snapshot: Vec::new(),
+                shift_used_as_modifier: false,
+            },
+            tries, 
             active_profiles: vec![initial_profile],
             punctuations,
             keyboard_layouts: HashMap::new(),
             syllables,
-            candidates: vec![], selected: 0, page: 0, 
-            chinese_enabled: true, best_segmentation: vec![],
-            joined_sentence: String::new(),
+            chinese_enabled: true,
+            best_segmentation: vec![],
             show_candidates: true,
             show_english_translation: true,
             show_stroke_aux: true,
@@ -185,8 +300,6 @@ impl Processor {
             anti_typo_mode: crate::config::AntiTypoMode::None,
             last_blocked_buffer: String::new(),
             commit_mode: "single".to_string(),
-            switch_mode: false,
-            cursor_pos: 0,
             profile_keys: Vec::new(),
             auto_commit_unique_en_fuzhuma: false,
             auto_commit_unique_full_match: false,
@@ -201,9 +314,6 @@ impl Processor {
             aux_mode: AuxMode::English,
             page_flipping_styles: vec!["arrow".to_string()],
             swap_arrow_keys: false,
-            aux_filter: String::new(),
-            filter_mode: FilterMode::None,
-            page_snapshot: Vec::new(),
             
             enable_english_filter: true,
             enable_caps_selection: true,
@@ -222,13 +332,12 @@ impl Processor {
             punctuation_long_press_mappings: HashMap::new(),
             key_press_info: None,
             long_press_triggered: false,
-            nav_mode: false,
             enable_user_dict: true,
             enable_fixed_first_candidate: false,
             enable_smart_backspace: true,
             enable_double_pinyin: false,
             double_pinyin_scheme: crate::config::DoublePinyinScheme {
-                name: "小鹤双拼".into(),
+                name: "小鹤双拼".to_string(),
                 initials: [("v","zh"), ("u","sh"), ("i","ch")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(),
                 rimes: [("q","iu"), ("w","ei"), ("r","uan")].iter().map(|(k,v)| (k.to_string(), v.to_string())).collect(), 
             },
@@ -239,8 +348,13 @@ impl Processor {
                 custom_mappings: vec![],
             },
             enable_traditional: false,
+            ranking: crate::config::RankingConfig {
+                length_penalty: 50000.0,
+                user_dict_bonus: 10000000.0,
+                exact_match_bonus: 10000000.0,
+                single_char_bonus: 1000000.0,
+            },
             user_dict,
-            last_lookup_pinyin: String::new(),
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
             user_dict_tx: None,
@@ -329,7 +443,7 @@ impl Processor {
             PhantomMode::Pinyin
         };
 
-        if self.buffer.is_empty() {
+        if self.ctx.buffer.is_empty() {
             self.reset();
         } else {
             let _ = self.lookup();
@@ -371,8 +485,8 @@ impl Processor {
 
     #[allow(dead_code)]
     pub fn inject_text(&mut self, text: &str) -> Action {
-        self.buffer.push_str(text);
-        if self.state == ImeState::Direct { self.state = ImeState::Composing; }
+        self.ctx.buffer.push_str(text);
+        if self.ctx.state == ImeState::Direct { self.ctx.state = ImeState::Composing; }
         self.preview_selected_candidate = false;
         if let Some(act) = self.lookup() { return act; }
         if let Some(act) = self.check_auto_commit() { return act; }
@@ -380,25 +494,25 @@ impl Processor {
     }
 
     pub fn clear_composing(&mut self) {
-        self.buffer.clear();
-        self.candidates.clear();
+        self.ctx.buffer.clear();
+        self.ctx.candidates.clear();
         self.best_segmentation.clear();
-        self.joined_sentence.clear();
-        self.selected = 0;
-        self.page = 0;
-        self.state = ImeState::Direct;
+        self.ctx.joined_sentence.clear();
+        self.ctx.selected = 0;
+        self.ctx.page = 0;
+        self.ctx.state = ImeState::Direct;
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
-        self.cursor_pos = 0;
-        self.aux_filter.clear();
-        self.filter_mode = FilterMode::None;
-        self.page_snapshot.clear();
-        self.nav_mode = false;
+        self.ctx.cursor_pos = 0;
+        self.ctx.aux_filter.clear();
+        self.ctx.filter_mode = FilterMode::None;
+        self.ctx.page_snapshot.clear();
+        self.ctx.nav_mode = false;
     }
 
     pub fn reset(&mut self) {
         self.clear_composing();
-        self.switch_mode = false;
+        self.ctx.switch_mode = false;
         self.quote_open = false;
         self.single_quote_open = false;
     }
@@ -420,12 +534,12 @@ impl Processor {
         // --- 新增：Ctrl + 标点符号 -> 强制输出英文标点 ---
         if is_press && ctrl_pressed && !alt_pressed {
             if let Some(p_key) = get_punctuation_key(key, shift_pressed) {
-                let mut commit_text = if !self.joined_sentence.is_empty() { 
-                    self.joined_sentence.trim_end().to_string() 
-                } else if !self.candidates.is_empty() { 
-                    self.candidates[0].text.trim_end().to_string() 
+                let mut commit_text = if !self.ctx.joined_sentence.is_empty() { 
+                    self.ctx.joined_sentence.trim_end().to_string() 
+                } else if !self.ctx.candidates.is_empty() { 
+                    self.ctx.candidates[0].text.trim_end().to_string() 
                 } else { 
-                    self.buffer.trim_end().to_string() 
+                    self.ctx.buffer.trim_end().to_string() 
                 };
                 commit_text.push_str(p_key); 
                 let del_len = self.phantom_text.chars().count();
@@ -449,10 +563,10 @@ impl Processor {
                                     if let Some(c) = key_to_char(key, false) {
                                         if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
                                             self.long_press_triggered = true;
-                                            if !self.buffer.is_empty() {
-                                                if let Some(last_char) = self.buffer.chars().last() {
+                                            if !self.ctx.buffer.is_empty() {
+                                                if let Some(last_char) = self.ctx.buffer.chars().last() {
                                                     if last_char.to_string() == c.to_string() {
-                                                        self.buffer.pop();
+                                                        self.ctx.buffer.pop();
                                                     }
                                                 }
                                             }
@@ -463,12 +577,12 @@ impl Processor {
                                     if let Some(p_key) = get_punctuation_key(key, false) {
                                         if let Some(replacement) = self.punctuation_long_press_mappings.get(p_key).cloned() {
                                             self.long_press_triggered = true;
-                                            let mut commit_text = if !self.joined_sentence.is_empty() { 
-                                                self.joined_sentence.trim_end().to_string() 
-                                            } else if !self.candidates.is_empty() { 
-                                                self.candidates[0].text.trim_end().to_string() 
+                                            let mut commit_text = if !self.ctx.joined_sentence.is_empty() { 
+                                                self.ctx.joined_sentence.trim_end().to_string() 
+                                            } else if !self.ctx.candidates.is_empty() { 
+                                                self.ctx.candidates[0].text.trim_end().to_string() 
                                             } else { 
-                                                self.buffer.trim_end().to_string() 
+                                                self.ctx.buffer.trim_end().to_string() 
                                             };
                                             commit_text.push_str(&replacement);
                                             let del_len = self.phantom_text.chars().count();
@@ -491,31 +605,38 @@ impl Processor {
             }
         }
 
+        if is_press && key == VirtualKey::Shift {
+            self.ctx.shift_used_as_modifier = false;
+        }
+
         if is_release {
             if key == VirtualKey::CapsLock { return Action::Consume; }
-            if key == VirtualKey::Shift && !self.buffer.is_empty() {
-                self.start_global_filter();
+            if key == VirtualKey::Shift && !self.ctx.buffer.is_empty() {
+                if !self.ctx.shift_used_as_modifier {
+                    self.start_global_filter();
+                }
+                self.ctx.shift_used_as_modifier = false;
                 return Action::Consume;
             }
-            if self.buffer.is_empty() { return Action::PassThrough; }
+            if self.ctx.buffer.is_empty() { return Action::PassThrough; }
             return Action::Consume;
         }
 
         if key == VirtualKey::CapsLock {
             if is_press {
-                if self.buffer.is_empty() {
-                    self.switch_mode = !self.switch_mode;
-                    return if self.switch_mode { 
+                if self.ctx.buffer.is_empty() {
+                    self.ctx.switch_mode = !self.ctx.switch_mode;
+                    return if self.ctx.switch_mode { 
                         Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) 
                     } else { 
                         Action::Notify("快捷切换".into(), "已退出".into()) 
                     };
                 } else {
-                    self.nav_mode = !self.nav_mode;
-                    if self.nav_mode {
-                        if self.page + self.page_size < self.candidates.len() {
-                            self.page += self.page_size;
-                            self.selected = self.page;
+                    self.ctx.nav_mode = !self.ctx.nav_mode;
+                    if self.ctx.nav_mode {
+                        if self.ctx.page + self.page_size < self.ctx.candidates.len() {
+                            self.ctx.page += self.page_size;
+                            self.ctx.selected = self.ctx.page;
                         }
                     }
                     return Action::Consume;
@@ -528,22 +649,22 @@ impl Processor {
             return Action::PassThrough;
         }
 
-        if self.switch_mode && is_press {
+        if self.ctx.switch_mode && is_press {
             match key {
-                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
+                VirtualKey::Esc | VirtualKey::Space | VirtualKey::Enter => { self.ctx.switch_mode = false; return Action::Notify("快捷切换".into(), "已退出".into()); }
                 VirtualKey::E => {
-                    self.switch_mode = false;
+                    self.ctx.switch_mode = false;
                     if let Some((pinyin, word)) = self.commit_history.pop() {
                         let del_count = word.chars().count();
-                        self.buffer = pinyin;
-                        self.state = ImeState::Composing;
+                        self.ctx.buffer = pinyin;
+                        self.ctx.state = ImeState::Composing;
                         let _ = self.lookup();
                         return Action::DeleteAndEmit { delete: del_count, insert: "".into() };
                     }
                     return Action::Consume;
                 }
                 VirtualKey::Z => {
-                    self.switch_mode = false;
+                    self.ctx.switch_mode = false;
                     if let Some(_d) = self.tries.get("english") {
                         self.active_profiles = vec!["english".to_string()];
                         self.reset();
@@ -565,10 +686,10 @@ impl Processor {
                             let display = self.get_current_profile_display();
                             let short_display = self.get_short_display();
                             let _ = self.lookup();
-                            self.switch_mode = false;
+                            self.ctx.switch_mode = false;
                             return Action::Notify(short_display, format!("方案: {}", display));
                         } else {
-                            self.switch_mode = false;
+                            self.ctx.switch_mode = false;
                             return Action::Notify("❌".into(), format!("错误: 方案 [{}] 的词库未加载", p_str));
                         }
                     }
@@ -578,12 +699,12 @@ impl Processor {
             return Action::Consume;
         }
 
-        if self.switch_mode && is_release {
+        if self.ctx.switch_mode && is_release {
             return Action::Consume;
         }
 
-        if !self.buffer.is_empty() { return self.handle_composing(key, shift_pressed, perform_lookup); }
-        match self.state {
+        if !self.ctx.buffer.is_empty() { return self.handle_composing(key, shift_pressed, perform_lookup); }
+        match self.ctx.state {
             ImeState::Direct => self.handle_direct(key, shift_pressed, perform_lookup),
             _ => self.handle_composing(key, shift_pressed, perform_lookup)
         }
@@ -602,10 +723,10 @@ impl Processor {
                     }
                 }
 
-                self.buffer.push(c);
-                self.state = ImeState::Composing;
+                self.ctx.buffer.push(c);
+                self.ctx.state = ImeState::Composing;
                 if perform_lookup { if let Some(act) = self.lookup() { return act; } }
-                if self.should_block_invalid_input(&self.buffer.clone()) { return Action::Alert; }
+                if self.should_block_invalid_input(&self.ctx.buffer.clone()) { return Action::Alert; }
                 return self.update_phantom_action();
             }
         }
@@ -618,18 +739,40 @@ impl Processor {
     }
 
     fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
-        if self.nav_mode {
+        // 如果处于导航模式，映射 HJKL 为方向键
+        if self.ctx.nav_mode {
             match key {
-                VirtualKey::H => key = VirtualKey::Left,
-                VirtualKey::L => key = VirtualKey::Right,
-                VirtualKey::K => key = VirtualKey::Up,
-                VirtualKey::J => key = VirtualKey::Down,
-                _ => {} 
+                VirtualKey::H => return self.execute_command(Command::PrevCandidate),
+                VirtualKey::L => return self.execute_command(Command::NextCandidate),
+                VirtualKey::K => return self.execute_command(Command::PrevPage),
+                VirtualKey::J => return self.execute_command(Command::NextPage),
+                VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down 
+                | VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Home | VirtualKey::End 
+                | VirtualKey::Space | VirtualKey::Enter | VirtualKey::Grave => { /* 保持模式 */ }
+                _ => { self.ctx.nav_mode = false; } // 按其他键退出导航模式
             }
         }
 
-        let has_cand = !self.candidates.is_empty();
+        let has_cand = !self.ctx.candidates.is_empty();
         let now = Instant::now();
+
+        // --- Shift + Letter 辅助码过滤 / 精确选词 ---
+        if is_letter(key) && shift_pressed && !self.ctx.buffer.is_empty() {
+             if let Some(c) = key_to_char(key, false) {
+                 self.ctx.shift_used_as_modifier = true;
+                 // 第一次按下 Shift+字母，进入页面过滤模式 (保存快照)
+                 if self.ctx.filter_mode == FilterMode::None {
+                     self.ctx.filter_mode = FilterMode::Page;
+                     self.ctx.page_snapshot = self.ctx.candidates.clone();
+                     self.ctx.aux_filter = c.to_string();
+                 } else {
+                     self.ctx.aux_filter.push(c);
+                 }
+
+                 if let Some(act) = self.lookup() { return act; }
+                 return self.update_phantom_action();
+             }
+        }
 
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
         if let Some(scheme) = self.schemes.get(&current_profile) {
@@ -639,11 +782,11 @@ impl Processor {
                 syllables: &self.syllables,
                 _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
-                candidate_count: self.candidates.len(),
-                _filter_mode: self.filter_mode.clone(),
-                _aux_filter: &self.aux_filter,
+                candidate_count: self.ctx.candidates.len(),
+                _filter_mode: self.ctx.filter_mode.clone(),
+                _aux_filter: &self.ctx.aux_filter,
             };
-            if let Some(act) = scheme.handle_special_key(key, &mut self.buffer, &context) {
+            if let Some(act) = scheme.handle_special_key(key, &mut self.ctx.buffer, &context) {
                 if act == Action::Consume {
                     if perform_lookup { if let Some(lookup_act) = self.lookup() { return lookup_act; } }
                     return self.update_phantom_action();
@@ -653,11 +796,11 @@ impl Processor {
         }
 
         if is_letter(key) {
-            if self.filter_mode != FilterMode::None {
+            if self.ctx.filter_mode != FilterMode::None {
                 if let Some(c) = key_to_char(key, shift_pressed) {
-                    self.aux_filter.push(c);
-                    self.selected = 0;
-                    if self.filter_mode == FilterMode::Global { self.page = 0; }
+                    self.ctx.aux_filter.push(c);
+                    self.ctx.selected = 0;
+                    if self.ctx.filter_mode == FilterMode::Global { self.ctx.page = 0; }
                     if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
@@ -670,9 +813,9 @@ impl Processor {
                             if now.duration_since(last_t) <= self.double_tap_timeout {
                                 if let Some(c) = key_to_char(key, false) {
                                     if let Some(replacement) = self.double_taps.get(&c.to_string()) {
-                                        if self.buffer.ends_with(c) {
-                                            self.buffer.pop();
-                                            self.buffer.push_str(replacement);
+                                        if self.ctx.buffer.ends_with(c) {
+                                            self.ctx.buffer.pop();
+                                            self.ctx.buffer.push_str(replacement);
                                             self.last_tap_key = None;
                                             self.last_tap_time = None;
                                             if perform_lookup { if let Some(act) = self.lookup() { return act; } }
@@ -701,35 +844,35 @@ impl Processor {
         let flip_arrow = styles.contains(&"arrow".to_string());
 
         if key == VirtualKey::Semicolon && !shift_pressed {
-            self.buffer.push(';');
+            self.ctx.buffer.push(';');
             if perform_lookup { if let Some(act) = self.lookup() { return act; } }
             return self.update_phantom_action();
         }
 
         match key {
             VirtualKey::Backspace => {
-                if self.filter_mode != FilterMode::None {
-                    self.aux_filter.pop();
-                    if self.aux_filter.is_empty() {
-                        self.filter_mode = FilterMode::None;
-                        self.page_snapshot.clear();
-                        self.page = 0; 
+                if self.ctx.filter_mode != FilterMode::None {
+                    self.ctx.aux_filter.pop();
+                    if self.ctx.aux_filter.is_empty() {
+                        self.ctx.filter_mode = FilterMode::None;
+                        self.ctx.page_snapshot.clear();
+                        self.ctx.page = 0; 
                     } else {
-                        self.selected = 0;
-                        if self.filter_mode == FilterMode::Global { self.page = 0; }
+                        self.ctx.selected = 0;
+                        if self.ctx.filter_mode == FilterMode::Global { self.ctx.page = 0; }
                     }
                     if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
 
-                if self.buffer.is_empty() {
+                if self.ctx.buffer.is_empty() {
                     self.commit_history.clear();
                     return Action::PassThrough;
                 }
 
-                self.buffer.pop();
+                self.ctx.buffer.pop();
 
-                if self.buffer.is_empty() {
+                if self.ctx.buffer.is_empty() {
                     let del = self.phantom_text.chars().count(); self.reset();
                     if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
                 } else { 
@@ -737,10 +880,10 @@ impl Processor {
                     self.update_phantom_action() 
                 }
             }
-            VirtualKey::Minus if flip_me && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            VirtualKey::Equal if flip_me && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            VirtualKey::Comma if flip_cd && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            VirtualKey::Dot if flip_cd && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
+            VirtualKey::Minus if flip_me && has_cand => self.execute_command(Command::PrevPage),
+            VirtualKey::Equal if flip_me && has_cand => self.execute_command(Command::NextPage),
+            VirtualKey::Comma if flip_cd && has_cand => self.execute_command(Command::PrevPage),
+            VirtualKey::Dot if flip_cd && has_cand => self.execute_command(Command::NextPage),
 
             VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down => {
                 let (move_prev, move_next, page_prev, page_next) = if self.swap_arrow_keys {
@@ -750,59 +893,45 @@ impl Processor {
                 };
 
                 if key == move_prev {
-                    if has_cand { self.preview_selected_candidate = true; if self.selected > 0 { self.selected -= 1; } self.page = (self.selected / self.page_size) * self.page_size; self.update_phantom_action() } else { Action::PassThrough }
+                    self.execute_command(Command::PrevCandidate)
                 } else if key == move_next {
-                    if has_cand { self.preview_selected_candidate = true; if self.selected + 1 < self.candidates.len() { self.selected += 1; } self.page = (self.selected / self.page_size) * self.page_size; self.update_phantom_action() } else { Action::PassThrough }
+                    self.execute_command(Command::NextCandidate)
                 } else if key == page_prev && flip_arrow {
-                    self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume
+                    self.execute_command(Command::PrevPage)
                 } else if key == page_next && flip_arrow {
-                    if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume
+                    self.execute_command(Command::NextPage)
                 } else {
                     Action::PassThrough
                 }
             }
 
-            VirtualKey::PageUp => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
-            VirtualKey::PageDown => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
-            VirtualKey::Home => { if shift_pressed { self.selected = 0; self.page = 0; } else { self.selected = self.page; } Action::Consume }
-            VirtualKey::End => { if has_cand { if shift_pressed { self.selected = self.candidates.len() - 1; self.page = (self.selected / self.page_size) * self.page_size; } else { self.selected = (self.page + self.page_size - 1).min(self.candidates.len() - 1); } } Action::Consume }
+            VirtualKey::PageUp => self.execute_command(Command::PrevPage),
+            VirtualKey::PageDown => self.execute_command(Command::NextPage),
+            VirtualKey::Home => { if shift_pressed { self.ctx.selected = 0; self.ctx.page = 0; } else { self.ctx.selected = self.ctx.page; } Action::Consume }
+            VirtualKey::End => { if has_cand { if shift_pressed { self.ctx.selected = self.ctx.candidates.len() - 1; self.ctx.page = (self.ctx.selected / self.page_size) * self.page_size; } else { self.ctx.selected = (self.ctx.page + self.page_size - 1).min(self.ctx.candidates.len() - 1); } } Action::Consume }
 
             VirtualKey::Space => {
                 if shift_pressed {
-                    if let Some(cand) = self.candidates.get(self.selected) {
+                    if let Some(cand) = self.ctx.candidates.get(self.ctx.selected) {
                         if !cand.hint.is_empty() {
                             return self.commit_candidate(cand.hint.clone(), 99);
                         }
                     }
                 }
-                if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(cand) = self.candidates.get(self.selected) { let word = cand.text.clone(); let idx = self.selected; return self.commit_candidate(word, idx); } }
-                if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone(), 99); }
-                self.buffer.push(' '); self.preview_selected_candidate = false; 
-                if perform_lookup { if let Some(act) = self.lookup() { return act; } }
-                self.update_phantom_action()
+                self.execute_command(Command::Commit)
             }
-            VirtualKey::Enter => {
-                self.commit_history.clear(); 
-                self.last_lookup_pinyin.clear();
-                if self.buffer.is_empty() { return Action::PassThrough; }
-                if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out, 99); }
-                if self.preview_selected_candidate { if let Some(cand) = self.candidates.get(self.selected) { let word = cand.text.clone(); let idx = self.selected; return self.commit_candidate(word, idx); } }
-                if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone(), 99) } else { let out = self.buffer.clone(); self.commit_candidate(out, 99) }
-            }
-            VirtualKey::Esc | VirtualKey::Delete => { 
-                self.commit_history.clear();
-                let del = self.phantom_text.chars().count(); self.reset(); if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume } 
-            }
+            VirtualKey::Enter => self.execute_command(Command::Commit),
+            VirtualKey::Esc | VirtualKey::Delete => self.execute_command(Command::Clear),
 
             VirtualKey::Apostrophe if !shift_pressed => {
-                self.buffer.push('\'');
+                self.ctx.buffer.push('\'');
                 self.preview_selected_candidate = false;
                 if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                 self.update_phantom_action()
             }
 
-            VirtualKey::Slash if !self.buffer.is_empty() => {
-                let mut new_buffer = self.buffer.clone();
+            VirtualKey::Slash if !self.ctx.buffer.is_empty() => {
+                let mut new_buffer = self.ctx.buffer.clone();
                 let last_part_start = new_buffer.rfind(' ').map(|i| i + 1).unwrap_or(0);
                 let last_part = &new_buffer[last_part_start..];
                 
@@ -824,7 +953,7 @@ impl Processor {
 
                 if transformed != last_part {
                     new_buffer.replace_range(last_part_start.., &transformed);
-                    self.buffer = new_buffer;
+                    self.ctx.buffer = new_buffer;
                     if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
@@ -834,10 +963,9 @@ impl Processor {
             _ if is_digit(key) => {
                 let digit = key_to_digit(key).unwrap_or(0);
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
-                    let abs_idx = self.page + digit - 1;
-                    if let Some(cand) = self.candidates.get(abs_idx) { let word = cand.text.clone(); return self.commit_candidate(word, abs_idx); }
+                    return self.execute_command(Command::Select(digit as usize - 1));
                 }
-                let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); 
+                let old_buffer = self.ctx.buffer.clone(); self.ctx.buffer.push_str(&digit.to_string()); 
                 if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                 if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
@@ -846,8 +974,8 @@ impl Processor {
                 if get_punctuation_key(key, shift_pressed).is_some() {
                     self.handle_punctuation(key, shift_pressed)
                 } else if let Some(c) = key_to_char(key, shift_pressed) {
-                    let old_buffer = self.buffer.clone();
-                    self.buffer.push(c);
+                    let old_buffer = self.ctx.buffer.clone();
+                    self.ctx.buffer.push(c);
                     self.preview_selected_candidate = false; 
                     if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
@@ -898,12 +1026,12 @@ impl Processor {
             }
         };
 
-        let mut commit_text = if !self.joined_sentence.is_empty() { 
-            self.joined_sentence.trim_end().to_string() 
-        } else if !self.candidates.is_empty() { 
-            self.candidates[0].text.trim_end().to_string() 
+        let mut commit_text = if !self.ctx.joined_sentence.is_empty() { 
+            self.ctx.joined_sentence.trim_end().to_string() 
+        } else if !self.ctx.candidates.is_empty() { 
+            self.ctx.candidates[0].text.trim_end().to_string() 
         } else { 
-            self.buffer.trim_end().to_string() 
+            self.ctx.buffer.trim_end().to_string() 
         };
         commit_text.push_str(&zh_punc);
         let del_len = self.phantom_text.chars().count();
@@ -914,7 +1042,7 @@ impl Processor {
 
     fn commit_candidate(&mut self, mut cand: String, _index: usize) -> Action {
         let now = Instant::now();
-        let py = self.last_lookup_pinyin.clone();
+        let py = self.ctx.last_lookup_pinyin.clone();
 
         if self.enable_user_dict && !py.is_empty() {
             self.record_usage(&py, &cand);
@@ -952,14 +1080,14 @@ impl Processor {
 
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
-        if self.switch_mode {
+        if self.ctx.switch_mode {
             let target = "[方案切换]".to_string();
             if target == self.phantom_text { return Action::Consume; }
             let old_phantom = self.phantom_text.clone();
             self.phantom_text = target.clone();
             return Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target };
         }
-        let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].text.clone() } else { self.buffer.clone() };
+        let target = if self.preview_selected_candidate && !self.ctx.candidates.is_empty() { self.ctx.candidates[self.ctx.selected.min(self.ctx.candidates.len()-1)].text.clone() } else { self.ctx.buffer.clone() };
         if target == self.phantom_text { return Action::Consume; }
         let old_phantom = self.phantom_text.clone();
         let old_chars: Vec<char> = old_phantom.chars().collect();
@@ -981,35 +1109,84 @@ impl Processor {
         }
     }
     pub fn lookup(&mut self) -> Option<Action> {
-        if self.buffer.is_empty() { self.reset(); return None; }
+        self.lookup_with_limit(20)
+    }
+
+    pub fn trigger_incremental_search(&mut self) {
+        let current_len = self.ctx.candidates.len();
+        if current_len >= 200 { return; } // 避免无限搜索
+        self.lookup_with_limit(current_len + 50);
+    }
+
+    pub fn lookup_with_limit(&mut self, limit: usize) -> Option<Action> {
+        if self.ctx.buffer.is_empty() { self.reset(); return None; }
+
+        // 辅助函数：判断候选词是否匹配当前的辅助码过滤器
+        let matches_filter = |cand: &crate::engine::pipeline::Candidate, filter: &str| -> bool {
+            if filter.is_empty() { return true; }
+            let filter_lower = filter.to_lowercase();
+            let hint_lower = cand.hint.to_lowercase();
+            let hint_clean = strip_tones(&hint_lower);
+            
+            // 将 Hint 切分为多个部分（空格、斜杠、括号分隔）
+            let parts: Vec<&str> = hint_clean.split(|c| c == ' ' || c == '/' || c == '(' || c == ')' || c == ',').collect();
+            
+            // 逻辑：输入的辅助码必须匹配 Hint 中某一部分的开头
+            // 比如 Hint 是 "Code Dx", 输入 "c", "co", "cod", "code" 都能匹配
+            parts.iter().any(|p| p.starts_with(&filter_lower)) || hint_clean.starts_with(&filter_lower)
+        };
+
+        // 1. 优先处理分页过滤模式 (针对当前已有候选词的快照进行过滤)
+        if self.ctx.filter_mode == FilterMode::Page && !self.ctx.page_snapshot.is_empty() {
+            let mut filtered = Vec::new();
+            for c in &self.ctx.page_snapshot {
+                if matches_filter(c, &self.ctx.aux_filter) {
+                    filtered.push(c.clone());
+                }
+            }
+            
+            if !filtered.is_empty() {
+                self.ctx.candidates = filtered;
+                if self.ctx.candidates.len() == 1 { 
+                    let word = self.ctx.candidates[0].text.clone(); 
+                    return Some(self.commit_candidate(word, 0)); 
+                }
+            } else {
+                // 如果完全没匹配到，不清除候选词，保持上一次的结果，或者只显示缓冲区
+                // 这样用户输错辅助码时，不会看到一片空白
+                self.ctx.candidates.clear();
+            }
+            self.update_state();
+            return None;
+        }
+
         let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
         let config = crate::Config::load(); 
 
         if let Some(pipeline) = self.pipelines.get(&current_profile) {
-            self.best_segmentation = pipeline.segmentor.segment(&self.buffer, &self.syllables);
-            let results = pipeline.run(&self.buffer, &self.syllables, &config);
+            self.best_segmentation = pipeline.segmentor.segment(&self.ctx.buffer, &self.syllables);
+            let results = pipeline.run(&self.ctx.buffer, &self.syllables, &config, limit);
             
-            self.candidates.clear();
-            self.has_dict_match = !results.is_empty();
-            self.last_lookup_pinyin = self.buffer.clone();
+            self.ctx.candidates = results;
+            self.has_dict_match = !self.ctx.candidates.is_empty();
+            self.ctx.last_lookup_pinyin = self.ctx.buffer.clone();
 
-            for (i, c) in results.into_iter().enumerate() {
-                let label = format!("{}.", i + 1);
-                let full_display = if c.hint.is_empty() {
-                    format!("{}{}", label, c.text)
-                } else {
-                    format!("{}{}({})", label, c.text, c.hint)
-                };
-
-                self.candidates.push(DisplayCandidate {
-                    text: c.text,
-                    label,
-                    hint: c.hint,
-                    full_display,
-                });
+            // --- 全局过滤逻辑 (针对检索结果进行实时过滤) ---
+            if self.ctx.filter_mode == FilterMode::Global && !self.ctx.aux_filter.is_empty() {
+                let mut fc = Vec::new();
+                for c in &self.ctx.candidates {
+                    if matches_filter(c, &self.ctx.aux_filter) {
+                        fc.push(c.clone());
+                    }
+                }
+                self.ctx.candidates = fc;
+                if self.ctx.candidates.len() == 1 {
+                    let word = self.ctx.candidates[0].text.clone();
+                    return Some(self.commit_candidate(word, 0));
+                }
             }
 
-            self.selected = 0; self.page = 0; self.update_state();
+            self.update_state();
             return None;
         }
 
@@ -1020,19 +1197,19 @@ impl Processor {
                 syllables: &self.syllables,
                 _user_dict: &self.user_dict,
                 active_profiles: &self.active_profiles,
-                candidate_count: self.candidates.len(),
-                _filter_mode: self.filter_mode.clone(),
-                _aux_filter: &self.aux_filter,
+                candidate_count: self.ctx.candidates.len(),
+                _filter_mode: self.ctx.filter_mode.clone(),
+                _aux_filter: &self.ctx.aux_filter,
             };
-            let query = scheme.pre_process(&self.buffer, &context);
+            let query = scheme.pre_process(&self.ctx.buffer, &context);
             let mut candidates = scheme.lookup(&query, &context);
             scheme.post_process(&query, &mut candidates, &context);
-            self.candidates.clear();
-            self.has_dict_match = !candidates.is_empty();
-            self.last_lookup_pinyin = query.clone();
             
-            for (i, c) in candidates.into_iter().enumerate() {
-                let text = if self.enable_traditional { c.traditional } else { c.simplified };
+            self.ctx.candidates.clear();
+            self.has_dict_match = !candidates.is_empty();
+            self.ctx.last_lookup_pinyin = query.clone();
+            
+            for c in candidates {
                 let mut hint = String::new();
                 let is_chinese_pure = self.active_profiles.len() == 1 && self.active_profiles[0] == "chinese";
                 let is_stroke = current_profile == "stroke";
@@ -1046,72 +1223,61 @@ impl Processor {
                     hint.push_str(&c.stroke_aux);
                 }
                 
-                let label = format!("{}.", i + 1);
-                let full_display = if hint.is_empty() {
-                    format!("{}{}", label, text)
-                } else {
-                    format!("{}{}({})", label, text, hint)
-                };
-
-                self.candidates.push(DisplayCandidate {
-                    text,
-                    label,
+                self.ctx.candidates.push(crate::engine::pipeline::Candidate {
+                    text: if self.enable_traditional { c.traditional.clone() } else { c.simplified.clone() },
+                    simplified: c.simplified,
+                    traditional: c.traditional,
                     hint,
-                    full_display,
+                    source: "Scheme".into(),
+                    weight: c.weight as f64,
                 });
             }
             // --- 过滤逻辑 ---
-            if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
-                let filter_lower = self.aux_filter.to_lowercase();
+            if self.ctx.filter_mode == FilterMode::Global && !self.ctx.aux_filter.is_empty() {
+                let filter_lower = self.ctx.aux_filter.to_lowercase();
                 let mut fc = Vec::new();
-                for c in &self.candidates {
-                    let hint_clean = strip_tones(&c.hint.to_lowercase());
-                    let parts: Vec<&str> = hint_clean.split_whitespace().collect();
-                    if parts.iter().any(|p| p.starts_with(&filter_lower)) {
+                for c in &self.ctx.candidates {
+                    let hint_lower = c.hint.to_lowercase();
+                    let hint_clean = strip_tones(&hint_lower);
+                    let parts: Vec<&str> = hint_clean.split(|ch| ch == ' ' || ch == '/' || ch == '(' || ch == ')').collect();
+                    let is_match = parts.iter().any(|p| p.starts_with(&filter_lower)) || hint_clean.starts_with(&filter_lower) || hint_lower.starts_with(&filter_lower);
+                    if is_match {
                         fc.push(c.clone());
                     }
                 }
-                if !fc.is_empty() { self.candidates = fc; }
-            }
-            if self.candidates.is_empty() {
-                self.candidates.push(DisplayCandidate {
-                    text: self.buffer.clone(),
-                    label: "1.".into(),
-                    hint: "".into(),
-                    full_display: format!("1.{}", self.buffer),
-                });
-            }
-            self.selected = 0; self.page = 0; self.update_state();
-            return None;
-        }
-
-        if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
-            let filter_lower = self.aux_filter.to_lowercase();
-            let mut filtered = Vec::new();
-            for c in &self.page_snapshot {
-                let hint_lower = c.hint.to_lowercase();
-                let parts: Vec<&str> = hint_lower.split_whitespace().collect();
-                if parts.iter().any(|p| p.starts_with(&filter_lower)) {
-                    filtered.push(c.clone());
+                if !fc.is_empty() { 
+                    self.ctx.candidates = fc; 
+                    if self.ctx.candidates.len() == 1 {
+                        let word = self.ctx.candidates[0].text.clone();
+                        return Some(self.commit_candidate(word, 0));
+                    }
                 }
             }
-            if !filtered.is_empty() {
-                self.candidates = filtered;
-                if self.candidates.len() == 1 { let word = self.candidates[0].text.clone(); return Some(self.commit_candidate(word, 0)); }
-            } else { self.candidates.clear(); }
-            self.selected = 0;
+            if self.ctx.candidates.is_empty() {
+                self.ctx.candidates.push(crate::engine::pipeline::Candidate {
+                    text: self.ctx.buffer.clone(),
+                    simplified: self.ctx.buffer.clone(),
+                    traditional: self.ctx.buffer.clone(),
+                    hint: "".into(),
+                    source: "Raw".into(),
+                    weight: 0.0,
+                });
+            }
             self.update_state();
             return None;
         }
-        if self.candidates.is_empty() {
-            self.candidates.push(DisplayCandidate {
-                text: self.buffer.clone(),
-                label: "1.".into(),
+
+        if self.ctx.candidates.is_empty() {
+            self.ctx.candidates.push(crate::engine::pipeline::Candidate {
+                text: self.ctx.buffer.clone(),
+                simplified: self.ctx.buffer.clone(),
+                traditional: self.ctx.buffer.clone(),
                 hint: "".into(),
-                full_display: format!("1.{}", self.buffer),
+                source: "Raw".into(),
+                weight: 0.0,
             });
         }
-        self.selected = 0; self.page = 0; self.update_state();
+        self.update_state();
         None
     }
 
@@ -1122,8 +1288,8 @@ impl Processor {
     }
 
     fn update_state(&mut self) {
-        if self.buffer.is_empty() { self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
-        else { self.state = match self.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
+        if self.ctx.buffer.is_empty() { self.ctx.state = if self.ctx.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi }; }
+        else { self.ctx.state = match self.ctx.candidates.len() { 0 => ImeState::NoMatch, 1 => ImeState::Single, _ => ImeState::Multi }; }
     }
 
     pub fn next_profile(&mut self) -> String {
@@ -1151,13 +1317,13 @@ impl Processor {
     }
 
     fn check_auto_commit(&mut self) -> Option<Action> {
-        if !self.auto_commit_unique_full_match || self.candidates.len() != 1 || !self.has_dict_match || self.state == ImeState::NoMatch { return None; }
-        let raw_input = &self.buffer;
+        if !self.auto_commit_unique_full_match || self.ctx.candidates.len() != 1 || !self.has_dict_match || self.ctx.state == ImeState::NoMatch { return None; }
+        let raw_input = &self.ctx.buffer;
         let mut total_longer = 0;
         for p in &self.active_profiles {
             if let Some(d) = self.tries.get(p) { if d.has_longer_match(raw_input) { total_longer += 1; break; } }
         }
-        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].text.clone(), 0)); }
+        if total_longer == 0 { return Some(self.commit_candidate(self.ctx.candidates[0].text.clone(), 0)); }
         None
     }
 
@@ -1165,18 +1331,18 @@ impl Processor {
         if self.has_dict_match { self.last_blocked_buffer.clear(); return false; }
         match self.anti_typo_mode {
             crate::config::AntiTypoMode::None => false,
-            crate::config::AntiTypoMode::Strict => { self.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
+            crate::config::AntiTypoMode::Strict => { self.ctx.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
             crate::config::AntiTypoMode::Smart => {
-                if !self.last_blocked_buffer.is_empty() && self.buffer == self.last_blocked_buffer { self.last_blocked_buffer.clear(); false }
-                else { self.last_blocked_buffer = self.buffer.clone(); self.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
+                if !self.last_blocked_buffer.is_empty() && self.ctx.buffer == self.last_blocked_buffer { self.last_blocked_buffer.clear(); false }
+                else { self.last_blocked_buffer = self.ctx.buffer.clone(); self.ctx.buffer = old_buffer.to_string(); let _ = self.lookup(); true }
             }
         }
     }
 
     pub fn start_global_filter(&mut self) {
-        if self.state == ImeState::Direct { return; }
-        self.filter_mode = FilterMode::Global;
-        self.aux_filter.clear();
+        if self.ctx.state == ImeState::Direct { return; }
+        self.ctx.filter_mode = FilterMode::Global;
+        self.ctx.aux_filter.clear();
     }
 
     fn load_user_dict(&mut self) {

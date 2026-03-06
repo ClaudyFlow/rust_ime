@@ -127,6 +127,15 @@ pub struct Input {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: FuzzyPinyinConfig,
     pub enable_traditional: bool,
+    pub ranking: RankingConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct RankingConfig {
+    pub length_penalty: f64,
+    pub user_dict_bonus: f64,
+    pub exact_match_bonus: f64,
+    pub single_char_bonus: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -382,6 +391,12 @@ impl Config {
                     custom_mappings: vec![],
                 },
                 enable_traditional: false,
+                ranking: RankingConfig {
+                    length_penalty: 50000.0,
+                    user_dict_bonus: 10000000.0,
+                    exact_match_bonus: 10000000.0,
+                    single_char_bonus: 1000000.0,
+                },
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },

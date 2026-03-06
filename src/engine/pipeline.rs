@@ -27,7 +27,7 @@ pub trait Segmentor: Send {
 
 /// 3. 翻译器：音节到候选词的转换
 pub trait Translator: Send {
-    fn translate(&self, input: &str, segments: &[String], config: &Config) -> Vec<Candidate>;
+    fn translate(&self, input: &str, segments: &[String], config: &Config, limit: usize) -> Vec<Candidate>;
 }
 
 /// 4. 过滤器：对候选词列表的后期加工
@@ -44,10 +44,14 @@ impl Segmentor for DefaultSegmentor {
 
         while !remaining.is_empty() {
             let mut matched = false;
+            // 尝试最长匹配音节 (Max Match)
             for len in (1..=6).rev() {
                 if len <= remaining.len() {
                     let part = &remaining[..len];
                     if syllables.contains(part) {
+                        // 额外校验：如果这是一个音节，但输入后面还有内容，
+                        // 我们需要确保这不是一个简拼的情况（如 'nh'，'n' 是音节但 'nh' 不是）
+                        // 在基础实现中，我们先保留最长音节匹配
                         segments.push(part.to_string());
                         remaining = remaining[len..].to_string();
                         matched = true;
@@ -56,6 +60,7 @@ impl Segmentor for DefaultSegmentor {
                 }
             }
             if !matched {
+                // 如果没有任何音节匹配，按单字母切分（简拼或未知输入）
                 let first_char = remaining.chars().next().unwrap();
                 segments.push(first_char.to_string());
                 remaining = remaining[first_char.len_utf8()..].to_string();
@@ -71,41 +76,67 @@ pub struct TableTranslator {
     pub syllables: Arc<HashSet<String>>,
 }
 impl Translator for TableTranslator {
-    fn translate(&self, _input: &str, segments: &[String], config: &Config) -> Vec<Candidate> {
+    fn translate(&self, _input: &str, segments: &[String], config: &Config, limit: usize) -> Vec<Candidate> {
         if segments.is_empty() { return vec![]; }
         let query = segments.join("");
+        let mut candidates = Vec::new();
+
+        // 1. 尝试全拼精确匹配
+        if let Some(exact_results) = self.trie.get_all_exact(&query) {
+            for (text, trad, _tone, en, stroke_aux, weight) in exact_results {
+                let mut hint = String::new();
+                if config.appearance.show_english_aux && !en.is_empty() { hint.push_str(&en); }
+                if config.appearance.show_stroke_aux && !stroke_aux.is_empty() {
+                    if !hint.is_empty() { hint.push(' '); }
+                    hint.push_str(&stroke_aux);
+                }
+                candidates.push(Candidate {
+                    simplified: text.clone(),
+                    traditional: if trad.is_empty() { text.clone() } else { trad },
+                    text, hint, source: "Table (Exact)".into(),
+                    weight: weight as f64 + config.input.ranking.exact_match_bonus, 
+                });
+            }
+        }
         
-        // 1. 尝试全拼/前缀匹配 (最高优先级)
-        let mut results = self.trie.search_bfs(&query, 100);
-        let mut candidates: Vec<Candidate> = results.into_iter().map(|(text, en_aux, stroke_aux, _meaning, trad, weight)| {
+        // 2. 尝试前缀匹配
+        let results = self.trie.search_bfs(&query, limit);
+        for (text, trad, _tone, en, stroke_aux, weight) in results {
+            if candidates.iter().any(|c| c.simplified == text) { continue; }
             let mut hint = String::new();
-            if config.appearance.show_english_aux && !en_aux.is_empty() { hint.push_str(&en_aux); }
+            if config.appearance.show_english_aux && !en.is_empty() { hint.push_str(&en); }
             if config.appearance.show_stroke_aux && !stroke_aux.is_empty() {
                 if !hint.is_empty() { hint.push(' '); }
                 hint.push_str(&stroke_aux);
             }
-            Candidate {
+            candidates.push(Candidate {
                 simplified: text.clone(),
                 traditional: if trad.is_empty() { text.clone() } else { trad },
                 text, hint, source: "Table".into(),
                 weight: weight as f64,
-            }
-        }).collect();
+            });
+            if candidates.len() >= limit { break; }
+        }
         
-        // 2. 简拼匹配 (次高优先级，且引入大幅惩罚)
+        // 3. 简拼匹配 (如果结果较少)
         if candidates.len() < 10 && config.input.enable_abbreviation_matching {
-            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, 50);
+            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
                 if !candidates.iter().any(|r| r.simplified == ar.0) {
                     let mut hint = String::new();
-                    if config.appearance.show_english_aux && !ar.1.is_empty() { hint.push_str(&ar.1); }
+                    if config.appearance.show_english_aux && !ar.3.is_empty() { hint.push_str(&ar.3); }
+                    if config.appearance.show_stroke_aux && !ar.4.is_empty() {
+                        if !hint.is_empty() { hint.push(' '); }
+                        hint.push_str(&ar.4);
+                    }
                     candidates.push(Candidate {
                         simplified: ar.0.clone(),
-                        traditional: if ar.4.is_empty() { ar.0.clone() } else { ar.4 },
-                        text: ar.0, hint, source: "Table".into(),
-                        weight: (ar.5 as f64) - 5000.0, // 简拼结果大幅扣分，确保排在全拼后面
+                        traditional: if ar.1.is_empty() { ar.0.clone() } else { ar.1 },
+                        text: ar.0, hint, source: "Table (Abbr)".into(),
+                        weight: (ar.5 as f64) - 5000.0, 
                     });
                 }
+                if candidates.len() >= limit + 10 { break; }
             }
         }
         candidates
@@ -118,7 +149,7 @@ pub struct UserDictTranslator {
     pub profile: String,
 }
 impl Translator for UserDictTranslator {
-    fn translate(&self, _input: &str, segments: &[String], _config: &Config) -> Vec<Candidate> {
+    fn translate(&self, _input: &str, segments: &[String], _config: &Config, _limit: usize) -> Vec<Candidate> {
         let query = segments.join("");
         let dict = self.user_dict.lock().unwrap();
         let mut results = Vec::new();
@@ -165,11 +196,28 @@ impl Filter for AdaptiveFilter {
 /// 排序与去重过滤器
 pub struct SortFilter;
 impl Filter for SortFilter {
-    fn filter(&self, candidates: &mut Vec<Candidate>, _config: &Config) {
-        // 核心排序：评分 = 权重 - 长度惩罚
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
+        let ranking = &config.input.ranking;
+        // 核心排序：
+        // 1. 评分基础 = 权重
+        // 2. 来源加成：User 来源最优先
+        // 3. 长度惩罚：字数越多的词，惩罚越大
         candidates.sort_by(|a, b| {
-            let score_a = a.weight - (a.text.chars().count() as f64 * 1000.0);
-            let score_b = b.weight - (b.text.chars().count() as f64 * 1000.0);
+            let mut score_a = a.weight;
+            let mut score_b = b.weight;
+
+            if a.source == "User" { score_a += ranking.user_dict_bonus; }
+            if b.source == "User" { score_b += ranking.user_dict_bonus; }
+
+            // 针对拼音输入优化：
+            // 单字通常有更高的优先级
+            if a.text.chars().count() == 1 { score_a += ranking.single_char_bonus; }
+            if b.text.chars().count() == 1 { score_b += ranking.single_char_bonus; }
+
+            // 惩罚过长的词
+            score_a -= (a.text.chars().count() as f64) * ranking.length_penalty;
+            score_b -= (b.text.chars().count() as f64) * ranking.length_penalty;
+
             score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
         
@@ -219,11 +267,11 @@ impl Pipeline {
         false
     }
 
-    pub fn run(&self, input: &str, syllables: &HashSet<String>, config: &Config) -> Vec<Candidate> {
+    pub fn run(&self, input: &str, syllables: &HashSet<String>, config: &Config, limit: usize) -> Vec<Candidate> {
         let segments = self.segmentor.segment(input, syllables);
         let mut candidates = Vec::new();
         for t in &self.translators {
-            candidates.extend(t.translate(input, &segments, config));
+            candidates.extend(t.translate(input, &segments, config, limit));
         }
         for f in &self.filters {
             f.filter(&mut candidates, config);

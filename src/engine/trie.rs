@@ -118,7 +118,9 @@ impl Trie {
         if segments.is_empty() { return Vec::new(); }
         let mut results = Vec::new();
         
-        // 使用第一个片段作为 FST 检索的前缀，减少搜索范围
+        // 简拼检索：我们需要在 FST 中找到所有可能匹配 segments 的 Key
+        // 为了性能，我们仍然使用第一个 segment 作为前缀限制，
+        // 但要注意：如果 segments[0] 是 'zh'，它可能匹配 'zhao'，也可能匹配 'zhang'
         let first_seg = &segments[0];
         let matcher = fst::automaton::Str::new(first_seg).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
@@ -135,6 +137,10 @@ impl Trie {
                 }
             }
         }
+        
+        // 如果 segments[0] 很短（如 'z'），它可能匹配 'zh' 开头的音节
+        // 现在的逻辑已经涵盖了这种情况，因为 Str::new("z").starts_with() 会匹配 "zhao" 和 "zha"
+        
         results
     }
 
@@ -145,30 +151,43 @@ impl Trie {
 
     fn recursive_match(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
         if segments.is_empty() {
-            return key.is_empty(); 
+            return key.is_empty(); // 必须刚好消耗完 key，或者是最后一个音节匹配
         }
 
-        let seg = &segments[0];
-        let remaining_segs = &segments[1..];
+        if key.is_empty() {
+            return false;
+        }
 
+        // 简拼的核心：每个 segment 必须匹配 key 中一个完整音节的开头
         // 尝试从当前 key 的起始位置切分出一个合法音节
-        for (i, (byte_idx, c)) in key.char_indices().enumerate() {
-            if i >= 6 { break; }
-            let len = byte_idx + c.len_utf8();
-            let syl = &key[..len];
-            
-            if syllables.contains(syl) {
-                if syl.starts_with(seg) {
-                    if self.recursive_match(&key[len..], remaining_segs, syllables) {
-                        return true;
+        for len in (1..=6).rev() {
+            if len <= key.len() {
+                let syl = &key[..len];
+                if syllables.contains(syl) {
+                    // 如果这个音节以当前第一个 segment 开头
+                    if syl.starts_with(&segments[0]) {
+                        // 递归尝试匹配剩余部分
+                        if self.recursive_match(&key[len..], &segments[1..], syllables) {
+                            return true;
+                        }
                     }
                 }
             }
         }
         
-        // 特殊处理最后一个 segment 可能是音节的一部分
-        if segments.len() == 1 && key.starts_with(seg) {
-            return true;
+        // 特殊处理最后一个 segment：它可能只匹配了最后一个音节的前缀
+        if segments.len() == 1 {
+            // 找到 key 剩余部分能切分出的第一个音节
+            for len in (1..=6).rev() {
+                if len <= key.len() {
+                    let syl = &key[..len];
+                    if syllables.contains(syl) {
+                        if syl.starts_with(&segments[0]) && key.len() == len {
+                            return true;
+                        }
+                    }
+                }
+            }
         }
 
         false

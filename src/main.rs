@@ -169,6 +169,96 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--daemon" => { should_daemonize = true; }
             "--foreground" => { should_daemonize = false; }
+            "--test" => {
+                println!("[Test] 进入测试模式 (无 UI)...");
+                let root = find_project_root();
+                let syllables = load_syllables(&root);
+                let mut tries_map = HashMap::new();
+                if let Ok(entries) = std::fs::read_dir(root.join("data")) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            let dir_name = entry.file_name().to_string_lossy().to_string().to_lowercase();
+                            let trie_idx = entry.path().join("trie.index");
+                            let trie_dat = entry.path().join("trie.data");
+                            if trie_idx.exists() && trie_dat.exists() {
+                                if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
+                                    tries_map.insert(dir_name, trie);
+                                }
+                            }
+                        }
+                    }
+                }
+                let config = Config::load();
+                let mut processor = Processor::new(tries_map, config.input.default_profile.clone(), config.input.punctuations.clone(), syllables);
+                processor.apply_config(&config);
+                
+                use std::io::{self, Write};
+                let stdin = io::stdin();
+                println!("请输入拼音进行测试 (输入 'exit' 退出):");
+                loop {
+                    print!("> ");
+                    io::stdout().flush()?;
+                    let mut line = String::new();
+                    stdin.read_line(&mut line)?;
+                    let input = line.trim();
+                    if input == "exit" { break; }
+                    
+                    if (input.len() == 1 && input.chars().next().unwrap().is_alphabetic()) || (input.starts_with("SHIFT_") && input.len() == 7) {
+                        let (letter, shift) = if input.len() == 7 {
+                            (input.chars().last().unwrap(), true)
+                        } else {
+                            (input.chars().next().unwrap().to_ascii_uppercase(), false)
+                        };
+
+                        let key = match letter {
+                            'A' => engine::keys::VirtualKey::A,
+                            'B' => engine::keys::VirtualKey::B,
+                            'C' => engine::keys::VirtualKey::C,
+                            'D' => engine::keys::VirtualKey::D,
+                            'E' => engine::keys::VirtualKey::E,
+                            'F' => engine::keys::VirtualKey::F,
+                            'G' => engine::keys::VirtualKey::G,
+                            'H' => engine::keys::VirtualKey::H,
+                            'I' => engine::keys::VirtualKey::I,
+                            'J' => engine::keys::VirtualKey::J,
+                            'K' => engine::keys::VirtualKey::K,
+                            'L' => engine::keys::VirtualKey::L,
+                            'M' => engine::keys::VirtualKey::M,
+                            'N' => engine::keys::VirtualKey::N,
+                            'O' => engine::keys::VirtualKey::O,
+                            'P' => engine::keys::VirtualKey::P,
+                            'Q' => engine::keys::VirtualKey::Q,
+                            'R' => engine::keys::VirtualKey::R,
+                            'S' => engine::keys::VirtualKey::S,
+                            'T' => engine::keys::VirtualKey::T,
+                            'U' => engine::keys::VirtualKey::U,
+                            'V' => engine::keys::VirtualKey::V,
+                            'W' => engine::keys::VirtualKey::W,
+                            'X' => engine::keys::VirtualKey::X,
+                            'Y' => engine::keys::VirtualKey::Y,
+                            'Z' => engine::keys::VirtualKey::Z,
+                            _ => engine::keys::VirtualKey::A,
+                        };
+                        let action = processor.handle_key(key, 1, shift, false, false);
+                        println!("动作反馈: {:?}", action);
+                    } else if input == "BACKSPACE" {
+                        processor.handle_key(engine::keys::VirtualKey::Backspace, 1, false, false, false);
+                    } else {
+                        // 允许直接设置 buffer 进行快捷测试
+                        processor.ctx.buffer = input.to_string();
+                        processor.lookup();
+                    }
+                    
+                    println!("缓冲区: {}", processor.ctx.buffer);
+                    println!("辅助码过滤: {}", processor.ctx.aux_filter);
+                    println!("切分: {:?}", processor.best_segmentation);
+                    println!("候选词 (前 10 条):");
+                    for (i, cand) in processor.ctx.candidates.iter().take(10).enumerate() {
+                        println!("  {}. {} (hint: {}, source: {})", i+1, cand.text, cand.hint, cand.source);
+                    }
+                }
+                return Ok(());
+            }
             _ => {}
         }
     }
