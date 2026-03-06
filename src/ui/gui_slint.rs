@@ -75,6 +75,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
     let show_status_bar_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.show_status_bar));
     let random_highlight_atomic = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_random_highlight));
     let page_size_atomic = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(config.appearance.page_size));
+    let enable_notification_candidates = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(config.appearance.enable_notification_candidates));
     
     let current_color_shared = std::sync::Arc::new(std::sync::Mutex::new(parse_color(&config.appearance.window_highlight_color)));
     
@@ -152,64 +153,71 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
 
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
-            #[cfg(target_os = "linux")]
-            {
-                let (pinyin, candidates, hints, selected) = match &event {
-                    GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-                        (Some(pinyin.clone()), Some(candidates.clone()), Some(hints.clone()), Some(*selected))
-                    }
-                    GuiEvent::SyncState(state) => {
-                        (Some(state.pinyin.clone()), Some(state.candidates.clone()), Some(state.hints.clone()), Some(state.selected_index))
-                    }
-                    _ => (None, None, None, None),
-                };
-
-                if let (Some(py), Some(cands), Some(hnts), Some(sel)) = (pinyin, candidates, hints, selected) {
-                    if py.is_empty() {
-                        if let Some(h) = active_notification.take() {
-                            h.close();
-                        }
-                    } else {
-                        let page_size = page_size_atomic.load(std::sync::atomic::Ordering::SeqCst);
-                        let page = (sel / page_size) * page_size;
-                        let mut notify_body = String::new();
-                        for i in page..(page + page_size).min(cands.len()) {
-                            let cand = &cands[i];
-                            let display_idx = (i % page_size) + 1;
-                            if i == sel {
-                                notify_body.push_str(&format!("【{}.{}】 ", display_idx, cand));
-                            } else {
-                                notify_body.push_str(&format!("{}.{} ", display_idx, cand));
-                            }
-                        }
-
-                        if let Some(ref mut h) = active_notification {
-                            h.summary(&py);
-                            h.body(&notify_body);
-                            h.update();
-                        } else {
-                            active_notification = Notification::new()
-                                .summary(&py)
-                                .body(&notify_body)
-                                .appname("rust-ime")
-                                .timeout(0) // 设置为 0 表示不自动消失，由我们控制
-                                .show()
-                                .ok();
-                        }
-                    }
-                }
-            }
-
             let h = window_handle.clone();
             let s = status_bar_handle.clone();
             let show_candidates_for_loop = show_candidates.clone();
             let show_status_bar_for_loop = show_status_bar_atomic.clone();
             let random_highlight_for_loop = random_highlight_atomic.clone();
             let page_size_for_loop = page_size_atomic.clone();
+            let enable_notify_for_loop = enable_notification_candidates.clone();
             let last_pos_inner = last_pos_for_loop.clone();
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
-            
+
+            #[cfg(target_os = "linux")]
+            {
+                if enable_notify_for_loop.load(std::sync::atomic::Ordering::SeqCst) {
+                    let (pinyin, candidates, hints, selected) = match &event {
+                        GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
+                            (Some(pinyin.clone()), Some(candidates.clone()), Some(hints.clone()), Some(*selected))
+                        }
+                        GuiEvent::SyncState(state) => {
+                            (Some(state.pinyin.clone()), Some(state.candidates.clone()), Some(state.hints.clone()), Some(state.selected_index))
+                        }
+                        _ => (None, None, None, None),
+                    };
+
+                    if let (Some(py), Some(cands), Some(hnts), Some(sel)) = (pinyin, candidates, hints, selected) {
+                                            if py.is_empty() {
+                                                if let Some(h) = active_notification.take() {
+                                                    h.close();
+                                                }
+                                            } else {
+                                                let page_size = page_size_for_loop.load(std::sync::atomic::Ordering::SeqCst);
+                                                let page = (sel / page_size) * page_size;
+                        
+                            let mut notify_body = String::new();
+                            for i in page..(page + page_size).min(cands.len()) {
+                                let cand = &cands[i];
+                                let display_idx = (i % page_size) + 1;
+                                if i == sel {
+                                    notify_body.push_str(&format!("【{}.{}】 ", display_idx, cand));
+                                } else {
+                                    notify_body.push_str(&format!("{}.{} ", display_idx, cand));
+                                }
+                            }
+
+                            if let Some(ref mut h) = active_notification {
+                                h.summary(&py);
+                                h.body(&notify_body);
+                                h.update();
+                            } else {
+                                active_notification = Notification::new()
+                                    .summary(&py)
+                                    .body(&notify_body)
+                                    .appname("rust-ime")
+                                    .timeout(0) // 设置为 0 表示不自动消失，由我们控制
+                                    .show()
+                                    .ok();
+                            }
+                        }
+                    }
+                } else if let Some(h) = active_notification.take() {
+                    // 如果开关被关闭，立即移除当前通知
+                    h.close();
+                }
+            }
+
             let _ = slint::invoke_from_event_loop(move || {
                 match event {
                     GuiEvent::SyncState(state) => {
@@ -494,6 +502,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         show_status_bar_for_loop.store(new_conf.appearance.show_status_bar, std::sync::atomic::Ordering::SeqCst);
                         random_highlight_for_loop.store(new_conf.appearance.enable_random_highlight, std::sync::atomic::Ordering::SeqCst);
                         page_size_for_loop.store(new_conf.appearance.page_size, std::sync::atomic::Ordering::SeqCst);
+                        enable_notify_for_loop.store(new_conf.appearance.enable_notification_candidates, std::sync::atomic::Ordering::SeqCst);
                         
                         if let Some(w) = h.upgrade() {
                             w.set_show_english_aux(new_conf.appearance.show_english_aux);
