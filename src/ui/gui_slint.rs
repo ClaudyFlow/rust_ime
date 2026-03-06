@@ -201,12 +201,11 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                                 }
 
                                 let display_idx = (i % page_size) + 1;
-                                let mut entry = format!("{}.{}", display_idx, cand);
-                                if !english.is_empty() {
-                                    entry.push_str(&format!("({})", english));
-                                }
-
-                                if i == sel {
+                                                            let mut entry = format!("{}.{}", display_idx, cand);
+                                                            if !english.is_empty() {
+                                                                entry.push_str(&english);
+                                                            }
+                                                                if i == sel {
                                     notify_body.push_str(&format!("【{}】 ", entry));
                                 } else {
                                     notify_body.push_str(&format!("{} ", entry));
