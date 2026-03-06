@@ -1,5 +1,6 @@
 pub mod trie;
 pub mod processor;
+pub mod compositor;
 pub mod compiler;
 pub mod keys;
 pub mod scheme;

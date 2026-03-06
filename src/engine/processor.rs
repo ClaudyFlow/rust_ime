@@ -58,8 +58,17 @@ pub struct InputContext {
     pub shift_used_as_modifier: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModifierState {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
 pub struct Processor {
     pub ctx: InputContext,
+    pub key_map: HashMap<(VirtualKey, ModifierState), Command>,
     
     pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
@@ -282,6 +291,7 @@ impl Processor {
                 page_snapshot: Vec::new(),
                 shift_used_as_modifier: false,
             },
+            key_map: HashMap::new(),
             tries, 
             active_profiles: vec![initial_profile],
             punctuations,
@@ -441,6 +451,29 @@ impl Processor {
         } else {
             let _ = self.lookup();
         }
+        self.setup_default_keymap();
+    }
+
+    fn setup_default_keymap(&mut self) {
+        self.key_map.clear();
+        let none = ModifierState { shift: false, ctrl: false, alt: false, meta: false };
+        // let shift = ModifierState { shift: true, ctrl: false, alt: false, meta: false };
+
+        // 基础导航
+        self.key_map.insert((VirtualKey::Left, none), Command::PrevCandidate);
+        self.key_map.insert((VirtualKey::Right, none), Command::NextCandidate);
+        self.key_map.insert((VirtualKey::Up, none), Command::PrevPage);
+        self.key_map.insert((VirtualKey::Down, none), Command::NextPage);
+        self.key_map.insert((VirtualKey::PageUp, none), Command::PrevPage);
+        self.key_map.insert((VirtualKey::PageDown, none), Command::NextPage);
+        
+        self.key_map.insert((VirtualKey::Space, none), Command::Commit);
+        self.key_map.insert((VirtualKey::Enter, none), Command::Commit);
+        self.key_map.insert((VirtualKey::Esc, none), Command::Clear);
+        self.key_map.insert((VirtualKey::Delete, none), Command::Clear);
+
+        // HJKL 映射 (虽然目前是在 handle_composing 里根据 nav_mode 判断，但也可以预设)
+        // 这里的 key_map 目前还不支持“模式感知的映射”，暂时保持简单的静态映射
     }
 
     pub fn get_short_display(&self) -> String {
@@ -727,17 +760,41 @@ impl Processor {
     }
 
     fn handle_composing(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
-        // 如果处于导航模式，映射 HJKL 为方向键
+        let mods = ModifierState { shift: shift_pressed, ctrl: false, alt: false, meta: false };
+        
+        // 1. 优先尝试从 KeyMap 中获取统一指令
+        if let Some(cmd) = self.key_map.get(&(key, mods)).cloned() {
+            // 处理方向键交换逻辑 (如果是方向键且启用了交换)
+            let final_cmd = if self.swap_arrow_keys {
+                match (key, cmd.clone()) {
+                    (VirtualKey::Up, Command::PrevPage) => Command::PrevCandidate,
+                    (VirtualKey::Down, Command::NextPage) => Command::NextCandidate,
+                    (VirtualKey::Left, Command::PrevCandidate) => Command::PrevPage,
+                    (VirtualKey::Right, Command::NextCandidate) => Command::NextPage,
+                    _ => cmd
+                }
+            } else { cmd };
+            
+            // 特殊处理：Space 在 Shift 状态下有不同的 Commit 逻辑，
+            // 这里的静态 Map 可能覆盖不了，暂且在 execute_command 内部或这里二次处理。
+            if key == VirtualKey::Space && shift_pressed {
+                if let Some(cand) = self.ctx.candidates.get(self.ctx.selected) {
+                    if !cand.hint.is_empty() {
+                        return self.commit_candidate(cand.hint.clone(), 99);
+                    }
+                }
+            }
+            return self.execute_command(final_cmd);
+        }
+
+        // 2. 如果处于导航模式，映射 HJKL
         if self.ctx.nav_mode {
             match key {
                 VirtualKey::H => return self.execute_command(Command::PrevCandidate),
                 VirtualKey::L => return self.execute_command(Command::NextCandidate),
                 VirtualKey::K => return self.execute_command(Command::PrevPage),
                 VirtualKey::J => return self.execute_command(Command::NextPage),
-                VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down 
-                | VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Home | VirtualKey::End 
-                | VirtualKey::Space | VirtualKey::Enter | VirtualKey::Grave => { /* 保持模式 */ }
-                _ => { self.ctx.nav_mode = false; } // 按其他键退出导航模式
+                _ => { /* 继续处理其他按键，或退出模式 */ }
             }
         }
 
@@ -829,7 +886,6 @@ impl Processor {
         let styles = &self.page_flipping_styles;
         let flip_me = styles.contains(&"minus_equal".to_string());
         let flip_cd = styles.contains(&"comma_dot".to_string());
-        let flip_arrow = styles.contains(&"arrow".to_string());
 
         if key == VirtualKey::Semicolon && !shift_pressed {
             self.ctx.buffer.push(';');
@@ -873,43 +929,8 @@ impl Processor {
             VirtualKey::Comma if flip_cd && has_cand => self.execute_command(Command::PrevPage),
             VirtualKey::Dot if flip_cd && has_cand => self.execute_command(Command::NextPage),
 
-            VirtualKey::Left | VirtualKey::Right | VirtualKey::Up | VirtualKey::Down => {
-                let (move_prev, move_next, page_prev, page_next) = if self.swap_arrow_keys {
-                    (VirtualKey::Up, VirtualKey::Down, VirtualKey::Left, VirtualKey::Right)
-                } else {
-                    (VirtualKey::Left, VirtualKey::Right, VirtualKey::Up, VirtualKey::Down)
-                };
-
-                if key == move_prev {
-                    self.execute_command(Command::PrevCandidate)
-                } else if key == move_next {
-                    self.execute_command(Command::NextCandidate)
-                } else if key == page_prev && flip_arrow {
-                    self.execute_command(Command::PrevPage)
-                } else if key == page_next && flip_arrow {
-                    self.execute_command(Command::NextPage)
-                } else {
-                    Action::PassThrough
-                }
-            }
-
-            VirtualKey::PageUp => self.execute_command(Command::PrevPage),
-            VirtualKey::PageDown => self.execute_command(Command::NextPage),
             VirtualKey::Home => { if shift_pressed { self.ctx.selected = 0; self.ctx.page = 0; } else { self.ctx.selected = self.ctx.page; } Action::Consume }
             VirtualKey::End => { if has_cand { if shift_pressed { self.ctx.selected = self.ctx.candidates.len() - 1; self.ctx.page = (self.ctx.selected / self.page_size) * self.page_size; } else { self.ctx.selected = (self.ctx.page + self.page_size - 1).min(self.ctx.candidates.len() - 1); } } Action::Consume }
-
-            VirtualKey::Space => {
-                if shift_pressed {
-                    if let Some(cand) = self.ctx.candidates.get(self.ctx.selected) {
-                        if !cand.hint.is_empty() {
-                            return self.commit_candidate(cand.hint.clone(), 99);
-                        }
-                    }
-                }
-                self.execute_command(Command::Commit)
-            }
-            VirtualKey::Enter => self.execute_command(Command::Commit),
-            VirtualKey::Esc | VirtualKey::Delete => self.execute_command(Command::Clear),
 
             VirtualKey::Apostrophe if !shift_pressed => {
                 self.ctx.buffer.push('\'');
@@ -1068,14 +1089,9 @@ impl Processor {
 
     fn update_phantom_action(&mut self) -> Action {
         if self.phantom_mode == PhantomMode::None { return Action::Consume; }
-        if self.ctx.switch_mode {
-            let target = "[方案切换]".to_string();
-            if target == self.phantom_text { return Action::Consume; }
-            let old_phantom = self.phantom_text.clone();
-            self.phantom_text = target.clone();
-            return Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target };
-        }
-        let target = if self.preview_selected_candidate && !self.ctx.candidates.is_empty() { self.ctx.candidates[self.ctx.selected.min(self.ctx.candidates.len()-1)].text.clone() } else { self.ctx.buffer.clone() };
+        
+        let target = crate::engine::compositor::Compositor::get_phantom_text(self);
+
         if target == self.phantom_text { return Action::Consume; }
         let old_phantom = self.phantom_text.clone();
         let old_chars: Vec<char> = old_phantom.chars().collect();
@@ -1088,6 +1104,7 @@ impl Processor {
         let delete_count = old_chars.len() - common_prefix_len;
         let insert_text: String = target_chars[common_prefix_len..].iter().collect();
         self.phantom_text = target;
+        
         if delete_count == 0 && insert_text.is_empty() {
             Action::Consume
         } else if delete_count == 0 {

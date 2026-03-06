@@ -249,7 +249,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         processor.lookup();
                     }
                     
-                    println!("缓冲区: {}", processor.ctx.buffer);
+                    let display_preedit = engine::compositor::Compositor::get_preedit(&processor);
+                    println!("预编辑: {}", display_preedit);
                     println!("辅助码过滤: {}", processor.ctx.aux_filter);
                     println!("切分: {:?}", processor.best_segmentation);
                     println!("候选词 (前 10 条):");
