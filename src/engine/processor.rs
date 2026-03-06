@@ -219,22 +219,19 @@ impl Processor {
             }
             Command::Commit => {
                 if self.ctx.buffer.is_empty() { return Action::PassThrough; }
-                if self.commit_mode == "single" {
-                    let out = self.ctx.buffer.clone();
-                    return self.commit_candidate(out, 99);
-                }
-                if self.preview_selected_candidate {
-                    if let Some(cand) = self.ctx.candidates.get(self.ctx.selected) {
+                
+                // 优先尝试提交当前选中的候选词
+                if !self.ctx.candidates.is_empty() {
+                    let idx = self.ctx.selected;
+                    if let Some(cand) = self.ctx.candidates.get(idx) {
                         let word = cand.text.clone();
-                        return self.commit_candidate(word, self.ctx.selected);
+                        return self.commit_candidate(word, idx);
                     }
                 }
-                if !self.ctx.joined_sentence.is_empty() {
-                    self.commit_candidate(self.ctx.joined_sentence.clone(), 99)
-                } else {
-                    let out = self.ctx.buffer.clone();
-                    self.commit_candidate(out, 99)
-                }
+
+                // 如果完全没有候选词，才提交原始 buffer (例如未知输入)
+                let out = self.ctx.buffer.clone();
+                self.commit_candidate(out, 99)
             }
             Command::Clear => {
                 self.commit_history.clear();
