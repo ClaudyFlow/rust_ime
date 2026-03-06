@@ -56,6 +56,8 @@ impl Vkbd {
         let dev = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
             .with_keys(&keys)?
+            // 关键：声明支持同步物理扫描码事件
+            .with_relative_axes(&AttributeSet::new())? 
             .build()?;
 
         // 尝试建立 D-Bus 连接 (Fcitx5)
@@ -304,9 +306,11 @@ impl Vkbd {
     }
 
     pub fn emit_raw(&mut self, key: Key, value: i32) {
+        // MSC_SCAN 是物理键盘通常会发送的事件，许多底层应用依赖它来确认按键真实性
+        let msc = InputEvent::new(EventType::MISC, 4, key.code() as i32); // 4 = MSC_SCAN
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
         let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
-        let _ = self.dev.emit(&[ev, syn]);
+        let _ = self.dev.emit(&[msc, ev, syn]);
         thread::sleep(Duration::from_micros(300));
     }
 
