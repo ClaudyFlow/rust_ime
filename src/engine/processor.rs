@@ -426,8 +426,13 @@ impl Processor {
                                     if let Some(c) = key_to_char(key, false) {
                                         if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
                                             self.long_press_triggered = true;
-                                            if !self.buffer.is_empty() && self.buffer.ends_with(c) {
-                                                self.buffer.pop();
+                                            if !self.buffer.is_empty() {
+                                                // 检查最后一个字符是否为 c
+                                                if let Some(last_char) = self.buffer.chars().last() {
+                                                    if last_char.to_string() == c.to_string() {
+                                                        self.buffer.pop();
+                                                    }
+                                                }
                                             }
                                             return self.inject_text(&replacement);
                                         }

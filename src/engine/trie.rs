@@ -145,19 +145,20 @@ impl Trie {
 
     fn recursive_match(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
         if segments.is_empty() {
-            return true; // 所有片段都匹配完了
+            return key.is_empty(); 
         }
 
         let seg = &segments[0];
         let remaining_segs = &segments[1..];
 
         // 尝试从当前 key 的起始位置切分出一个合法音节
-        for len in 1..=6.min(key.len()) {
+        for (i, (byte_idx, c)) in key.char_indices().enumerate() {
+            if i >= 6 { break; }
+            let len = byte_idx + c.len_utf8();
             let syl = &key[..len];
+            
             if syllables.contains(syl) {
-                // 在简拼模式下，输入的片段必须是这个音节的前缀
                 if syl.starts_with(seg) {
-                    // 递归匹配剩余部分
                     if self.recursive_match(&key[len..], remaining_segs, syllables) {
                         return true;
                     }
