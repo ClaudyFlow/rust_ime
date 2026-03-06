@@ -159,17 +159,20 @@ impl InputMethodHost for EvdevHost {
                     // 2. 【核心修复】Enter 键绝对优先透传
                     if key == Key::KEY_ENTER || key == Key::KEY_KPENTER {
                         let mut p = self.processor.lock().unwrap();
-                        // 只要满足以下任一条件就直接透传：
-                        // - 处于英文直通模式
-                        // - 拼音缓冲区为空
-                        let should_bypass = !p.chinese_enabled || p.buffer.is_empty();
+                        let is_empty = p.buffer.is_empty();
+                        let is_direct = !p.chinese_enabled;
                         
-                        if should_bypass {
-                            if !p.buffer.is_empty() { p.reset(); }
+                        if is_direct || is_empty {
+                            if !is_empty { p.reset(); }
                             drop(p);
                             if let Ok(mut vkbd) = self.vkbd.lock() { 
-                                if val != 2 { // 减少重复日志
-                                    println!("[Host] Enter Passthrough (Enabled: {}, Val: {})", !should_bypass, val);
+                                if val == 1 {
+                                    // 关键：在发送 Enter 按下之前，确保虚拟键盘的所有修饰键已释放
+                                    // 防止因 Shift 没释放导致发送了 Shift+Enter
+                                    vkbd.release_all();
+                                }
+                                if val != 2 {
+                                    println!("[Host] Enter Bypassed (Direct: {}, Val: {})", is_direct, val);
                                 }
                                 let _ = vkbd.emit_raw(key, val); 
                             }

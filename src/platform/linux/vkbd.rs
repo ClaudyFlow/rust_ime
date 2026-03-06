@@ -37,21 +37,21 @@ impl Vkbd {
         
         // Ensure keys required for all paste modes are available
         keys.insert(Key::KEY_LEFTCTRL);
+        keys.insert(Key::KEY_RIGHTCTRL);
         keys.insert(Key::KEY_LEFTSHIFT);
+        keys.insert(Key::KEY_RIGHTSHIFT);
+        keys.insert(Key::KEY_LEFTALT);
+        keys.insert(Key::KEY_RIGHTALT);
+        keys.insert(Key::KEY_LEFTMETA);
         keys.insert(Key::KEY_V);
         keys.insert(Key::KEY_INSERT); 
         keys.insert(Key::KEY_U); 
         keys.insert(Key::KEY_ENTER);
         keys.insert(Key::KEY_KPENTER);
         keys.insert(Key::KEY_BACKSPACE);
-        
-        // Digits and hex letters for unicode input
-        keys.insert(Key::KEY_0); keys.insert(Key::KEY_1); keys.insert(Key::KEY_2);
-        keys.insert(Key::KEY_3); keys.insert(Key::KEY_4); keys.insert(Key::KEY_5);
-        keys.insert(Key::KEY_6); keys.insert(Key::KEY_7); keys.insert(Key::KEY_8);
-        keys.insert(Key::KEY_9);
-        keys.insert(Key::KEY_A); keys.insert(Key::KEY_B); keys.insert(Key::KEY_C);
-        keys.insert(Key::KEY_D); keys.insert(Key::KEY_E); keys.insert(Key::KEY_F);
+        keys.insert(Key::KEY_SPACE);
+        keys.insert(Key::KEY_ESC);
+        keys.insert(Key::KEY_TAB);
 
         let dev = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
@@ -149,8 +149,10 @@ impl Vkbd {
 
         // 2. 失败处理 (ydotool)
         if self.send_via_ydotool(text) {
+             self.release_all();
              return;
         }
+        self.release_all();
     }
 
     fn send_via_clipboard(&mut self, text: &str) -> bool {
