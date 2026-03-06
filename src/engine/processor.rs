@@ -381,6 +381,10 @@ impl Processor {
     }
 
     pub fn handle_key(&mut self, key: VirtualKey, val: i32, shift_pressed: bool, ctrl_pressed: bool, alt_pressed: bool) -> Action {
+        self.handle_key_ext(key, val, shift_pressed, ctrl_pressed, alt_pressed, true)
+    }
+
+    pub fn handle_key_ext(&mut self, key: VirtualKey, val: i32, shift_pressed: bool, ctrl_pressed: bool, alt_pressed: bool, perform_lookup: bool) -> Action {
         let now = Instant::now();
         let is_press = val == 1;
 
@@ -562,14 +566,14 @@ impl Processor {
             return Action::Consume;
         }
 
-        if !self.buffer.is_empty() { return self.handle_composing(key, shift_pressed); }
+        if !self.buffer.is_empty() { return self.handle_composing(key, shift_pressed, perform_lookup); }
         match self.state {
-            ImeState::Direct => self.handle_direct(key, shift_pressed),
-            _ => self.handle_composing(key, shift_pressed)
+            ImeState::Direct => self.handle_direct(key, shift_pressed, perform_lookup),
+            _ => self.handle_composing(key, shift_pressed, perform_lookup)
         }
     }
 
-    fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
+    fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
         if key == VirtualKey::Enter || key == VirtualKey::Space {
             return Action::PassThrough;
         }
@@ -585,7 +589,7 @@ impl Processor {
 
                 self.buffer.push(c);
                 self.state = ImeState::Composing;
-                if let Some(act) = self.lookup() { return act; }
+                if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                 if self.should_block_invalid_input(&self.buffer.clone()) { return Action::Alert; }
                 return self.update_phantom_action();
             }
@@ -598,7 +602,7 @@ impl Processor {
         Action::PassThrough
     }
 
-    fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool) -> Action {
+    fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
         let has_cand = !self.candidates.is_empty();
         let now = Instant::now();
 
@@ -631,7 +635,7 @@ impl Processor {
             };
             if let Some(act) = scheme.handle_special_key(key, &mut self.buffer, &context) {
                 if act == Action::Consume {
-                    if let Some(lookup_act) = self.lookup() { return lookup_act; }
+                    if perform_lookup { if let Some(lookup_act) = self.lookup() { return lookup_act; } }
                     return self.update_phantom_action();
                 }
                 return act;
@@ -646,7 +650,7 @@ impl Processor {
                     self.aux_filter.push(c);
                     self.selected = 0;
                     if self.filter_mode == FilterMode::Global { self.page = 0; }
-                    if let Some(act) = self.lookup() { return act; }
+                    if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
             }
@@ -664,7 +668,7 @@ impl Processor {
                                             self.buffer.push_str(replacement);
                                             self.last_tap_key = None;
                                             self.last_tap_time = None;
-                                            if let Some(act) = self.lookup() { return act; }
+                                            if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                                             return self.update_phantom_action();
                                         }
                                     }
@@ -692,7 +696,7 @@ impl Processor {
 
         if key == VirtualKey::Semicolon && !shift_pressed {
             self.buffer.push(';');
-            if let Some(act) = self.lookup() { return act; }
+            if perform_lookup { if let Some(act) = self.lookup() { return act; } }
             return self.update_phantom_action();
         }
 
@@ -708,7 +712,7 @@ impl Processor {
                         self.selected = 0;
                         if self.filter_mode == FilterMode::Global { self.page = 0; }
                     }
-                    if let Some(act) = self.lookup() { return act; }
+                    if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
 
@@ -723,7 +727,10 @@ impl Processor {
                 if self.buffer.is_empty() {
                     let del = self.phantom_text.chars().count(); self.reset();
                     if del > 0 { Action::DeleteAndEmit { delete: del, insert: "".into() } } else { Action::Consume }
-                } else { if let Some(act) = self.lookup() { return act; } self.update_phantom_action() }
+                } else { 
+                    if perform_lookup { if let Some(act) = self.lookup() { return act; } }
+                    self.update_phantom_action() 
+                }
             }
             VirtualKey::Minus if flip_me && has_cand => { self.page = self.page.saturating_sub(self.page_size); self.selected = self.page; Action::Consume }
             VirtualKey::Equal if flip_me && has_cand => { if self.page + self.page_size < self.candidates.len() { self.page += self.page_size; self.selected = self.page; } Action::Consume }
@@ -765,7 +772,9 @@ impl Processor {
                 }
                 if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
                 if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone(), 99); }
-                self.buffer.push(' '); self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; } self.update_phantom_action()
+                self.buffer.push(' '); self.preview_selected_candidate = false; 
+                if perform_lookup { if let Some(act) = self.lookup() { return act; } }
+                self.update_phantom_action()
             }
             VirtualKey::Enter => {
                 self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
@@ -783,7 +792,7 @@ impl Processor {
             VirtualKey::Apostrophe if !shift_pressed => {
                 self.buffer.push('\'');
                 self.preview_selected_candidate = false;
-                if let Some(act) = self.lookup() { return act; }
+                if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                 self.update_phantom_action()
             }
 
@@ -812,7 +821,7 @@ impl Processor {
                 if transformed != last_part {
                     new_buffer.replace_range(last_part_start.., &transformed);
                     self.buffer = new_buffer;
-                    if let Some(act) = self.lookup() { return act; }
+                    if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     return self.update_phantom_action();
                 }
                 Action::PassThrough
@@ -824,7 +833,8 @@ impl Processor {
                     let abs_idx = self.page + digit - 1;
                     if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
                 }
-                let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); if let Some(act) = self.lookup() { return act; }
+                let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); 
+                if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                 if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                 if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
             }
@@ -834,7 +844,8 @@ impl Processor {
                 } else if let Some(c) = key_to_char(key, shift_pressed) {
                     let old_buffer = self.buffer.clone();
                     self.buffer.push(c);
-                    self.preview_selected_candidate = false; if let Some(act) = self.lookup() { return act; }
+                    self.preview_selected_candidate = false; 
+                    if perform_lookup { if let Some(act) = self.lookup() { return act; } }
                     if self.should_block_invalid_input(&old_buffer) { return Action::Alert; }
                     if let Some(act) = self.check_auto_commit() { return act; } self.update_phantom_action()
                 } else { Action::PassThrough }

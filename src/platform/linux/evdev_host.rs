@@ -252,30 +252,19 @@ impl InputMethodHost for EvdevHost {
                     let mut p = self.processor.lock().unwrap();
                     if p.chinese_enabled && !has_mod {
                         if let Some(vk) = evdev_to_virtual(key) {
-                            match p.handle_key(vk, val, shift, ctrl, alt) {
-                                Action::Emit(s) => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(&s); } }
-                                Action::DeleteAndEmit { delete, insert } => { if let Ok(mut vkbd) = self.vkbd.lock() { if delete > 0 { vkbd.backspace(delete); } if !insert.is_empty() { let _ = vkbd.send_text(&insert); } } }
-                                Action::Notify(_, _) => { 
-                                    // 此处原本负责位置切换提示，现在已无处发送通知，仅保持逻辑通过
+                            // 【方案二：分离响应】
+                            // 1. 快速处理 buffer 变化并立即执行键盘模拟（出拼音）
+                            let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
+                            if let Ok(mut vkbd) = self.vkbd.lock() {
+                                execute_action(&mut *vkbd, fast_action);
+                            }
+
+                            // 2. 在字母打出后，补执行沉重的字典检索
+                            if let Some(commit_action) = p.lookup() {
+                                // 处理检索过程中可能触发的自动上屏（如全匹配唯一词）
+                                if let Ok(mut vkbd) = self.vkbd.lock() {
+                                    execute_action(&mut *vkbd, commit_action);
                                 }
-                                Action::Alert => { 
-                                    if self.config.read().unwrap().input.enable_error_sound { 
-                                        let root = crate::find_project_root();
-                                        let sound_path = root.join("sounds/beep.wav");
-                                        if sound_path.exists() {
-                                            let _ = std::process::Command::new("canberra-gtk-play")
-                                                .arg("-f")
-                                                .arg(sound_path)
-                                                .spawn();
-                                        } else {
-                                            let _ = std::process::Command::new("canberra-gtk-play")
-                                                .arg("--id=dialog-error")
-                                                .spawn();
-                                        }
-                                    } 
-                                }
-                                Action::PassThrough => { if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); } }
-                                _ => {}
                             }
                         } else {
                             if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
@@ -357,6 +346,31 @@ impl EvdevHost {
                 }); 
             }
         }
+    }
+}
+
+fn execute_action(vkbd: &mut Vkbd, action: Action) {
+    match action {
+        Action::Emit(s) => { vkbd.send_text(&s); }
+        Action::DeleteAndEmit { delete, insert } => {
+            if delete > 0 { vkbd.backspace(delete); }
+            if !insert.is_empty() { vkbd.send_text(&insert); }
+        }
+        Action::Alert => {
+            let root = crate::find_project_root();
+            let sound_path = root.join("sounds/beep.wav");
+            if sound_path.exists() {
+                let _ = std::process::Command::new("canberra-gtk-play")
+                    .arg("-f")
+                    .arg(sound_path)
+                    .spawn();
+            } else {
+                let _ = std::process::Command::new("canberra-gtk-play")
+                    .arg("--id=dialog-error")
+                    .spawn();
+            }
+        }
+        _ => {}
     }
 }
 
