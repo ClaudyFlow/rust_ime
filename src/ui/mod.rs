@@ -1,9 +1,35 @@
 pub mod tray;
 pub mod web;
 pub mod gui_slint;
+pub mod linux_notify;
+pub mod slint_window;
 pub use gui_slint as gui;
 
 use crate::config::Config;
+
+/// 核心显示接口：解耦 Slint 窗口与 Linux 桌面通知
+pub trait CandidateDisplay {
+    /// 更新候选词列表及拼音
+    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<String>, hints: Vec<String>, selected: usize);
+    
+    /// 更新状态栏显示（中/英模式文字）
+    fn update_status(&mut self, text: &str, chinese_enabled: bool);
+    
+    /// 移动显示位置（通常仅对窗口 UI 有效）
+    fn move_to(&mut self, x: i32, y: i32);
+    
+    /// 设置全局显隐状态
+    fn set_visible(&mut self, visible: bool);
+    
+    /// 应用配置更新
+    fn apply_config(&mut self, config: &Config);
+
+    /// 获取显示状态（可选，用于同步）
+    fn is_visible(&self) -> bool;
+
+    /// 销毁或关闭显示
+    fn close(&mut self);
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppState {
