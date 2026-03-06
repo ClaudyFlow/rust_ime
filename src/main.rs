@@ -242,7 +242,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let action = processor.handle_key(key, 1, shift, false, false);
                         println!("动作反馈: {:?}", action);
                     } else if input == "BACKSPACE" {
-                        processor.handle_key(engine::keys::VirtualKey::Backspace, 1, false, false, false);
+                        let action = processor.handle_key(engine::keys::VirtualKey::Backspace, 1, false, false, false);
+                        println!("动作反馈: {:?}", action);
+                    } else if line.starts_with(' ') {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Space, 1, false, false, false);
+                        println!("动作反馈: {:?}", action);
                     } else {
                         // 允许直接设置 buffer 进行快捷测试
                         processor.ctx.buffer = input.to_string();

@@ -34,6 +34,17 @@
                 <div class="info"><div class="title">启用个人词库</div><div class="desc">记录选词频率，实现自学习排序</div></div>
                 <label class="switch"><input type="checkbox" id="enable_user_dict"><span class="slider"></span></label>
             </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">编辑器预览模式</div>
+                    <div class="desc">在编辑器中实时展示的内容：无预览、汉字预览或拼音预览</div>
+                </div>
+                <select id="phantom_type" class="select-input">
+                    <option value="None">无预览 (None)</option>
+                    <option value="Hanzi">汉字预览 (Hanzi)</option>
+                    <option value="Pinyin">拼音预览 (Pinyin)</option>
+                </select>
+            </div>
         </div>
 
         <h2>按键功能开关</h2>
@@ -80,6 +91,7 @@
             bindInput('enable_user_dict', 'input');
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');
+            bindInput('phantom_type', 'input');
 
             bindPaging('flip-arrow', 'arrow');
             bindPaging('flip-minus-equal', 'minus_equal');

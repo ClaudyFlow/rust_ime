@@ -34,20 +34,29 @@ impl Compositor {
     }
 
     pub fn get_phantom_text(p: &Processor) -> String {
-        if p.ctx.state == ImeState::Direct { return String::new(); }
+        use crate::config::PhantomType;
+        if p.ctx.state == ImeState::Direct || p.phantom_type == PhantomType::None { 
+            return String::new(); 
+        }
         
         if p.ctx.switch_mode {
             return "[方案切换]".to_string();
         }
 
-        if p.preview_selected_candidate && !p.ctx.candidates.is_empty() {
-            p.ctx.candidates[p.ctx.selected.min(p.ctx.candidates.len() - 1)].text.clone()
-        } else if !p.ctx.joined_sentence.is_empty() {
-            p.ctx.joined_sentence.clone()
-        } else if !p.ctx.candidates.is_empty() {
-            p.ctx.candidates[0].text.clone()
-        } else {
-            p.ctx.buffer.clone()
+        match p.phantom_type {
+            PhantomType::Pinyin => p.ctx.buffer.clone(),
+            PhantomType::Hanzi => {
+                if p.preview_selected_candidate && !p.ctx.candidates.is_empty() {
+                    p.ctx.candidates[p.ctx.selected.min(p.ctx.candidates.len() - 1)].text.clone()
+                } else if !p.ctx.joined_sentence.is_empty() {
+                    p.ctx.joined_sentence.clone()
+                } else if !p.ctx.candidates.is_empty() {
+                    p.ctx.candidates[0].text.clone()
+                } else {
+                    p.ctx.buffer.clone()
+                }
+            }
+            _ => String::new(),
         }
     }
 }

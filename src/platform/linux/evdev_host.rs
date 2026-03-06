@@ -136,6 +136,14 @@ impl EvdevHost {
                         execute_action(&mut *vkbd, commit_action, None);
                     }
                 }
+                
+                // 【核心修复】检索完成后，重新计算并执行 Phantom Text 更新
+                // 这样能确保编辑器里的预览汉字和候选词窗口同步
+                let phantom_action = p.update_phantom_action();
+                if let Ok(mut vkbd) = v_bg.lock() {
+                    execute_action(&mut *vkbd, phantom_action, None);
+                }
+
                 update_gui_internal(&*p, &g_bg);
                 pending_bg.store(false, Ordering::SeqCst);
             }

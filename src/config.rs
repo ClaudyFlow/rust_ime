@@ -88,11 +88,19 @@ pub enum AntiTypoMode {
     Smart,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum PhantomType {
+    None,
+    Hanzi,
+    Pinyin,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Input {
     pub autostart: bool,
     pub commit_mode: String,
     pub default_profile: String,
+    pub phantom_type: PhantomType,
     pub clipboard_delay_ms: u64,
     pub anti_typo_mode: AntiTypoMode,
     pub enable_double_tap: bool,
@@ -332,7 +340,9 @@ impl Config {
                 autostart: true,
                 commit_mode: "single".to_string(),
                 default_profile: "chinese".to_string(),
-                clipboard_delay_ms: 10,
+                phantom_type: PhantomType::Hanzi,
+                clipboard_delay_ms: 50,
+
                 anti_typo_mode: AntiTypoMode::None,
                 enable_double_tap: false,
                 double_tap_timeout_ms: 250,

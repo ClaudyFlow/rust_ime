@@ -27,19 +27,13 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum PhantomMode {
-    None,
-    Pinyin,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum FilterMode {
     None,
     Global, // Shift + 字母 (全局筛选)
     Page,   // Caps + 字母 (当前页筛选)
 }
 
-use crate::config::{AuxMode, PunctuationEntry};
+use crate::config::{AuxMode, PunctuationEntry, PhantomType};
 
 pub struct InputContext {
     pub buffer: String,
@@ -82,7 +76,7 @@ pub struct Processor {
     pub show_candidates: bool,
     pub show_english_translation: bool,
     pub show_stroke_aux: bool,
-    pub phantom_mode: PhantomMode,
+    pub phantom_type: PhantomType,
     pub phantom_text: String,
     pub preview_selected_candidate: bool,
     pub anti_typo_mode: crate::config::AntiTypoMode,
@@ -247,7 +241,7 @@ impl Processor {
         punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
         syllables: HashSet<String>,
     ) -> Self {
-        let phantom_mode = if cfg!(target_os = "windows") { PhantomMode::None } else { PhantomMode::Pinyin };
+        let phantom_type = if cfg!(target_os = "windows") { PhantomType::None } else { PhantomType::Hanzi };
         let user_dict = Arc::new(Mutex::new(HashMap::new()));
         let syllables_arc = Arc::new(syllables.clone());
         
@@ -300,7 +294,7 @@ impl Processor {
             show_english_translation: true,
             show_stroke_aux: true,
 
-            phantom_mode,
+            phantom_type,
             phantom_text: String::new(),
             preview_selected_candidate: false,
             anti_typo_mode: crate::config::AntiTypoMode::None,
@@ -437,11 +431,11 @@ impl Processor {
             }
         }
 
-        self.phantom_mode = if cfg!(target_os = "windows") {
-            PhantomMode::None
-        } else {
-            PhantomMode::Pinyin
-        };
+        self.phantom_type = conf.input.phantom_type;
+        if cfg!(target_os = "windows") && self.phantom_type != PhantomType::None {
+            // Windows currently doesn't support phantom text via vkbd well
+            self.phantom_type = PhantomType::None;
+        }
 
         if self.ctx.buffer.is_empty() {
             self.reset();
@@ -1084,8 +1078,8 @@ impl Processor {
         let del = self.phantom_text.chars().count(); self.clear_composing(); Action::DeleteAndEmit { delete: del, insert: cand }
     }
 
-    fn update_phantom_action(&mut self) -> Action {
-        if self.phantom_mode == PhantomMode::None { return Action::Consume; }
+    pub fn update_phantom_action(&mut self) -> Action {
+        if self.phantom_type == crate::config::PhantomType::None { return Action::Consume; }
         
         let target = crate::engine::compositor::Compositor::get_phantom_text(self);
 
