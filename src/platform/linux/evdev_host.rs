@@ -14,7 +14,7 @@ fn evdev_to_virtual(key: Key) -> Option<VirtualKey> {
     match key {
         Key::KEY_A => Some(VirtualKey::A), Key::KEY_B => Some(VirtualKey::B), Key::KEY_C => Some(VirtualKey::C), Key::KEY_D => Some(VirtualKey::D), Key::KEY_E => Some(VirtualKey::E), Key::KEY_F => Some(VirtualKey::F), Key::KEY_G => Some(VirtualKey::G), Key::KEY_H => Some(VirtualKey::H), Key::KEY_I => Some(VirtualKey::I), Key::KEY_J => Some(VirtualKey::J), Key::KEY_K => Some(VirtualKey::K), Key::KEY_L => Some(VirtualKey::L), Key::KEY_M => Some(VirtualKey::M), Key::KEY_N => Some(VirtualKey::N), Key::KEY_O => Some(VirtualKey::O), Key::KEY_P => Some(VirtualKey::P), Key::KEY_Q => Some(VirtualKey::Q), Key::KEY_R => Some(VirtualKey::R), Key::KEY_S => Some(VirtualKey::S), Key::KEY_T => Some(VirtualKey::T), Key::KEY_U => Some(VirtualKey::U), Key::KEY_V => Some(VirtualKey::V), Key::KEY_W => Some(VirtualKey::W), Key::KEY_X => Some(VirtualKey::X), Key::KEY_Y => Some(VirtualKey::Y), Key::KEY_Z => Some(VirtualKey::Z),
         Key::KEY_0 => Some(VirtualKey::Digit0), Key::KEY_1 => Some(VirtualKey::Digit1), Key::KEY_2 => Some(VirtualKey::Digit2), Key::KEY_3 => Some(VirtualKey::Digit3), Key::KEY_4 => Some(VirtualKey::Digit4), Key::KEY_5 => Some(VirtualKey::Digit5), Key::KEY_6 => Some(VirtualKey::Digit6), Key::KEY_7 => Some(VirtualKey::Digit7), Key::KEY_8 => Some(VirtualKey::Digit8), Key::KEY_9 => Some(VirtualKey::Digit9),
-        Key::KEY_SPACE => Some(VirtualKey::Space), Key::KEY_ENTER => Some(VirtualKey::Enter), Key::KEY_TAB => Some(VirtualKey::Tab), Key::KEY_BACKSPACE => Some(VirtualKey::Backspace), Key::KEY_ESC => Some(VirtualKey::Esc), Key::KEY_CAPSLOCK => Some(VirtualKey::CapsLock),
+        Key::KEY_SPACE => Some(VirtualKey::Space), Key::KEY_ENTER | Key::KEY_KPENTER => Some(VirtualKey::Enter), Key::KEY_TAB => Some(VirtualKey::Tab), Key::KEY_BACKSPACE => Some(VirtualKey::Backspace), Key::KEY_ESC => Some(VirtualKey::Esc), Key::KEY_CAPSLOCK => Some(VirtualKey::CapsLock),
         Key::KEY_LEFTSHIFT | Key::KEY_RIGHTSHIFT => Some(VirtualKey::Shift),
         Key::KEY_LEFTCTRL | Key::KEY_RIGHTCTRL => Some(VirtualKey::Control),
         Key::KEY_LEFTALT | Key::KEY_RIGHTALT => Some(VirtualKey::Alt),
@@ -163,7 +163,10 @@ impl InputMethodHost for EvdevHost {
                     let has_mod = ctrl || alt || meta;
 
                     if key == Key::KEY_TAB && !has_mod {
-                        if val == 1 { self.tab_held_and_not_used = true; } 
+                        if val == 1 { 
+                            self.tab_held_and_not_used = true;
+                            continue;
+                        } 
                         else if val == 0 {
                             if self.tab_held_and_not_used {
                                 let mut p = self.processor.lock().unwrap();
@@ -180,8 +183,8 @@ impl InputMethodHost for EvdevHost {
                                 self.update_gui();
                             }
                             self.tab_held_and_not_used = false;
+                            continue;
                         }
-                        continue;
                     }
 
                     // 拦截 Shift 触发全局筛选
