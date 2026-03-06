@@ -146,6 +146,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
         });
     }
 
+    #[cfg(target_os = "windows")]
     let window_was_visible = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     #[cfg(target_os = "linux")]
@@ -161,6 +162,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
             let page_size_for_loop = page_size_atomic.clone();
             let enable_notify_for_loop = enable_notification_candidates.clone();
             let last_pos_inner = last_pos_for_loop.clone();
+            #[cfg(target_os = "windows")]
             let was_visible_atomic = window_was_visible.clone();
             let color_shared = current_color_shared.clone();
 
@@ -498,7 +500,7 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
                         if x == 0 && y == 0 { return; }
                         if let Ok(mut pos) = last_pos_inner.lock() { *pos = (x, y); }
                         if let Some(w) = h.upgrade() {
-                            let mut final_x = x; let mut final_y = y;
+                            let final_x = x; let final_y = y;
                             #[cfg(target_os = "windows")]
                             unsafe {
                                 let win_size = w.window().size();

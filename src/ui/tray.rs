@@ -1,7 +1,7 @@
 #[cfg(target_os = "linux")]
 use ksni::menu::{StandardItem, MenuItem};
 #[cfg(target_os = "linux")]
-use ksni::{Tray, ToolTip, TrayService, Handle};
+use ksni::{Tray, TrayService, Handle};
 use std::sync::mpsc::Sender;
 
 #[derive(Debug, Clone)]

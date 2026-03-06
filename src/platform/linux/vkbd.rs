@@ -51,6 +51,11 @@ impl Vkbd {
         let dev = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
             .with_keys(&keys)?
+            .with_msc(&{
+                let mut misc = AttributeSet::new();
+                misc.insert(evdev::MiscType::MSC_SCAN);
+                misc
+            })?
             .build()?;
 
         // 尝试建立 D-Bus 连接 (Fcitx5)
@@ -299,9 +304,10 @@ impl Vkbd {
     }
 
     pub fn emit_raw(&mut self, key: Key, value: i32) {
+        let msc = InputEvent::new(EventType::MISC, evdev::MiscType::MSC_SCAN.0, key.code() as i32);
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
         let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
-        let _ = self.dev.emit(&[ev, syn]);
+        let _ = self.dev.emit(&[msc, ev, syn]);
         thread::sleep(Duration::from_micros(300));
     }
 

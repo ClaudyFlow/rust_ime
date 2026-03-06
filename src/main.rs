@@ -37,13 +37,6 @@ use std::path::{Path, PathBuf};
 use std::env;
 use std::collections::HashMap;
 use std::io::BufReader;
-#[cfg(target_os = "linux")]
-use signal_hook::consts::signal::*;
-#[cfg(target_os = "linux")]
-use signal_hook::iterator::Signals;
-#[cfg(target_os = "linux")]
-use daemonize::Daemonize;
-
 use engine::{Processor, Trie};
 use platform::traits::InputMethodHost;
 pub use config::Config;
