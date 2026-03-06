@@ -29,13 +29,14 @@ impl Vkbd {
     pub fn new(phys_dev: &Device) -> Result<Self, Box<dyn std::error::Error>> {
         let mut keys = AttributeSet::new();
         
+        // 核心：直接克隆物理设备支持的所有按键，这样最稳妥
         if let Some(supported) = phys_dev.supported_keys() {
             for k in supported.iter() {
                 keys.insert(k);
             }
         }
         
-        // Ensure keys required for all paste modes are available
+        // 确保必要的修饰键
         keys.insert(Key::KEY_LEFTCTRL);
         keys.insert(Key::KEY_RIGHTCTRL);
         keys.insert(Key::KEY_LEFTSHIFT);
@@ -43,21 +44,11 @@ impl Vkbd {
         keys.insert(Key::KEY_LEFTALT);
         keys.insert(Key::KEY_RIGHTALT);
         keys.insert(Key::KEY_LEFTMETA);
-        keys.insert(Key::KEY_V);
-        keys.insert(Key::KEY_INSERT); 
-        keys.insert(Key::KEY_U); 
-        keys.insert(Key::KEY_ENTER);
-        keys.insert(Key::KEY_KPENTER);
-        keys.insert(Key::KEY_BACKSPACE);
-        keys.insert(Key::KEY_SPACE);
-        keys.insert(Key::KEY_ESC);
-        keys.insert(Key::KEY_TAB);
+        keys.insert(Key::KEY_RIGHTMETA);
 
         let dev = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
             .with_keys(&keys)?
-            // 关键：声明支持同步物理扫描码事件
-            .with_relative_axes(&AttributeSet::new())? 
             .build()?;
 
         // 尝试建立 D-Bus 连接 (Fcitx5)
@@ -306,11 +297,9 @@ impl Vkbd {
     }
 
     pub fn emit_raw(&mut self, key: Key, value: i32) {
-        // MSC_SCAN 是物理键盘通常会发送的事件，许多底层应用依赖它来确认按键真实性
-        let msc = InputEvent::new(EventType::MISC, 4, key.code() as i32); // 4 = MSC_SCAN
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
         let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
-        let _ = self.dev.emit(&[msc, ev, syn]);
+        let _ = self.dev.emit(&[ev, syn]);
         thread::sleep(Duration::from_micros(300));
     }
 
