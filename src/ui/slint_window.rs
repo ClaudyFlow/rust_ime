@@ -60,7 +60,7 @@ impl SlintDisplay {
 }
 
 impl CandidateDisplay for SlintDisplay {
-    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<String>, hints: Vec<String>, selected: usize) {
+    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<crate::ui::DisplayCandidate>, selected: usize) {
         if pinyin.is_empty() || !self.config.appearance.show_candidates {
             if self.window.window().is_visible() {
                 self.window.set_is_visible(false);
@@ -73,35 +73,14 @@ impl CandidateDisplay for SlintDisplay {
         self.window.set_selected_index(selected as i32);
         
         let mut cand_models = Vec::new();
-        let page_size = self.config.appearance.page_size;
-        let page_start = (selected / page_size) * page_size;
-        let page_end = (page_start + page_size).min(candidates.len());
-
-        for i in page_start..page_end {
-            let c = &candidates[i];
-            let hint = hints.get(i).cloned().unwrap_or_default();
-            
-            let mut english = String::new();
-            let mut stroke = String::new();
-            
-            if !hint.is_empty() {
-                if hint.contains('/') {
-                    let parts: Vec<&str> = hint.split('/').collect();
-                    english = parts[0].trim().to_string();
-                    if parts.len() > 1 { stroke = parts[1].trim().to_string(); }
-                } else {
-                    english = hint.clone();
-                }
-            }
-
+        for c in candidates {
             cand_models.push(CandidateData {
-                text: SharedString::from(c),
-                english_aux: SharedString::from(english),
-                stroke_aux: SharedString::from(stroke),
+                text: SharedString::from(c.text),
+                english_aux: SharedString::from(c.hint),
+                stroke_aux: SharedString::from(""), // 暂不独立显示笔画，统一在 hint 中
             });
         }
         self.window.set_candidates(ModelRc::from(std::rc::Rc::new(VecModel::from(cand_models))));
-        self.window.set_selected_index((selected % page_size) as i32);
         
         if !self.window.window().is_visible() {
             self.window.set_is_visible(true);

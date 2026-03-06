@@ -249,7 +249,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         is_ime_active: true, // 默认开启，等待 TSF 实际反馈
         pinyin: "".into(),
         candidates: vec![],
-        hints: vec![],
         selected_index: 0,
         status_text: "中".into(),
     }));

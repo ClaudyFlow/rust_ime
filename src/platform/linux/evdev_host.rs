@@ -344,7 +344,6 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
             let _ = tx.send(GuiEvent::Update { 
                 pinyin: "".into(), 
                 candidates: vec![], 
-                hints: vec![], 
                 selected: 0, 
                 sentence: "".into(),
                 cursor_pos: 0,
@@ -370,7 +369,6 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
             let _ = tx.send(GuiEvent::Update { 
                 pinyin, 
                 candidates: p.candidates.clone(), 
-                hints: p.candidate_hints.clone(), 
                 selected: p.selected, 
                 sentence: p.joined_sentence.clone(),
                 cursor_pos: p.cursor_pos,
@@ -380,7 +378,6 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
             let _ = tx.send(GuiEvent::Update { 
                 pinyin: "".into(), 
                 candidates: vec![], 
-                hints: vec![], 
                 selected: 0, 
                 sentence: "".into(),
                 cursor_pos: 0,

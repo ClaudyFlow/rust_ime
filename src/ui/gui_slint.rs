@@ -15,39 +15,37 @@ pub fn start_gui(rx: Receiver<GuiEvent>, config: Config, _tray_tx: Sender<TrayEv
     } else {
         Box::new(SlintDisplay::new(config.clone()))
     };
+while let Ok(event) = rx.recv() {
+    let mut latest_event = event;
 
-    while let Ok(event) = rx.recv() {
-        let mut latest_event = event;
-
-        // 【优化：事件折叠】
-        // 如果当前是更新类事件，尝试把队列里后续连续的更新事件全部消耗掉，只留最后一个
-        while let Ok(next_event) = rx.try_recv() {
-            match next_event {
-                GuiEvent::Update { .. } | GuiEvent::SyncState(_) => {
-                    latest_event = next_event;
-                }
-                _ => {
-                    // 如果碰到了非更新类事件（如 MoveTo, Exit），
-                    // 先处理掉当前的 latest_event，然后立即处理这个特殊事件。
-                    handle_single_event(&mut *display, latest_event);
-                    latest_event = next_event;
-                }
+    // 【优化：事件折叠】
+    // 如果当前是更新类事件，尝试把队列里后续连续的更新事件全部消耗掉，只留最后一个
+    while let Ok(next_event) = rx.try_recv() {
+        match next_event {
+            GuiEvent::Update { .. } | GuiEvent::SyncState(_) => {
+                latest_event = next_event;
+            }
+            _ => {
+                handle_single_event(&mut *display, latest_event);
+                latest_event = next_event;
             }
         }
-
-        handle_single_event(&mut *display, latest_event);
     }
+
+    handle_single_event(&mut *display, latest_event);
+}
 }
 
 fn handle_single_event(display: &mut dyn CandidateDisplay, event: GuiEvent) {
-    match event {
-        GuiEvent::Update { pinyin, candidates, hints, selected, .. } => {
-            display.update_candidates(&pinyin, candidates, hints, selected);
-        }
-        GuiEvent::SyncState(state) => {
-            display.update_status(&state.status_text, state.chinese_enabled);
-            display.update_candidates(&state.pinyin, state.candidates, state.hints, state.selected_index);
-        }
+match event {
+    GuiEvent::Update { pinyin, candidates, selected, .. } => {
+        display.update_candidates(&pinyin, candidates, selected);
+    }
+    GuiEvent::SyncState(state) => {
+        display.update_status(&state.status_text, state.chinese_enabled);
+        display.update_candidates(&state.pinyin, state.candidates, state.selected_index);
+    }
+
         GuiEvent::ShowStatus(text, chinese_enabled) => {
             display.update_status(&text, chinese_enabled);
         }

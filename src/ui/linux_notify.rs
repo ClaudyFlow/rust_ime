@@ -19,7 +19,7 @@ impl LinuxNotifyDisplay {
 }
 
 impl CandidateDisplay for LinuxNotifyDisplay {
-    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<String>, hints: Vec<String>, selected: usize) {
+    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<crate::ui::DisplayCandidate>, selected: usize) {
         if !self.config.linux.enable_notification_candidates {
             if let Some(h) = self.active_notification.take() {
                 h.close();
@@ -35,25 +35,12 @@ impl CandidateDisplay for LinuxNotifyDisplay {
             return;
         }
 
-        let page_size = self.config.appearance.page_size;
-        let page = (selected / page_size) * page_size;
-    
         let mut notify_body = String::new();
-        for i in page..(page + page_size).min(candidates.len()) {
-            let cand = &candidates[i];
-            let hint = hints.get(i).cloned().unwrap_or_default();
-            
-            let display_idx = (i % page_size) + 1;
-            let entry = if !hint.is_empty() {
-                format!("{}.{}({})", display_idx, cand, hint)
-            } else {
-                format!("{}.{}", display_idx, cand)
-            };
-
+        for (i, c) in candidates.iter().enumerate() {
             if i == selected {
-                notify_body.push_str(&format!("【{}】 ", entry));
+                notify_body.push_str(&format!("【{}】 ", c.full_display));
             } else {
-                notify_body.push_str(&format!("{} ", entry));
+                notify_body.push_str(&format!("{} ", c.full_display));
             }
         }
 

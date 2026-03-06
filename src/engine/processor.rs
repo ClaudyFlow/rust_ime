@@ -5,6 +5,7 @@ use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
 use crate::engine::scheme::{InputScheme, SchemeContext};
 use crate::engine::pipeline::{Pipeline, DefaultSegmentor, TableTranslator};
+use crate::ui::DisplayCandidate;
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,8 +50,7 @@ pub struct Processor {
     pub punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, // Language -> Key -> Entries
     pub keyboard_layouts: HashMap<String, HashMap<String, String>>, // Layout Name -> Key -> Char
     pub syllables: std::collections::HashSet<String>,
-    pub candidates: Vec<String>,
-    pub candidate_hints: Vec<String>, 
+    pub candidates: Vec<DisplayCandidate>,
     pub selected: usize,
     pub page: usize,
     pub chinese_enabled: bool,
@@ -85,7 +85,7 @@ pub struct Processor {
     // 筛选模式相关
     pub aux_filter: String,
     pub filter_mode: FilterMode,
-    pub page_snapshot: Vec<(String, String)>, // (candidate, hint)
+    pub page_snapshot: Vec<DisplayCandidate>, 
     
     pub enable_english_filter: bool,
     pub enable_caps_selection: bool,
@@ -172,7 +172,7 @@ impl Processor {
             punctuations,
             keyboard_layouts: HashMap::new(),
             syllables,
-            candidates: vec![], candidate_hints: vec![], selected: 0, page: 0, 
+            candidates: vec![], selected: 0, page: 0, 
             chinese_enabled: true, best_segmentation: vec![],
             joined_sentence: String::new(),
             show_candidates: true,
@@ -267,7 +267,6 @@ impl Processor {
         self.enable_fuzzy_pinyin = conf.input.enable_fuzzy_pinyin;
         self.fuzzy_config = conf.input.fuzzy_config.clone();
         self.enable_traditional = conf.input.enable_traditional;
-        // 如果是初次加载或切换，可以从文件读取
         if self.enable_user_dict && self.user_dict.lock().unwrap().is_empty() {
             self.load_user_dict();
         }
@@ -383,7 +382,6 @@ impl Processor {
     pub fn clear_composing(&mut self) {
         self.buffer.clear();
         self.candidates.clear();
-        self.candidate_hints.clear();
         self.best_segmentation.clear();
         self.joined_sentence.clear();
         self.selected = 0;
@@ -422,15 +420,14 @@ impl Processor {
         // --- 新增：Ctrl + 标点符号 -> 强制输出英文标点 ---
         if is_press && ctrl_pressed && !alt_pressed {
             if let Some(p_key) = get_punctuation_key(key, shift_pressed) {
-                // 如果当前有输入缓冲区，先上屏首位
                 let mut commit_text = if !self.joined_sentence.is_empty() { 
                     self.joined_sentence.trim_end().to_string() 
                 } else if !self.candidates.is_empty() { 
-                    self.candidates[0].trim_end().to_string() 
+                    self.candidates[0].text.trim_end().to_string() 
                 } else { 
                     self.buffer.trim_end().to_string() 
                 };
-                commit_text.push_str(p_key); // 英文标点直接用 p_key
+                commit_text.push_str(p_key); 
                 let del_len = self.phantom_text.chars().count();
                 self.clear_composing();
                 self.commit_history.clear(); 
@@ -453,7 +450,6 @@ impl Processor {
                                         if let Some(replacement) = self.long_press_mappings.get(&c.to_string()).cloned() {
                                             self.long_press_triggered = true;
                                             if !self.buffer.is_empty() {
-                                                // 检查最后一个字符是否为 c
                                                 if let Some(last_char) = self.buffer.chars().last() {
                                                     if last_char.to_string() == c.to_string() {
                                                         self.buffer.pop();
@@ -464,14 +460,13 @@ impl Processor {
                                         }
                                     }
                                 } else {
-                                    // 标点长按
                                     if let Some(p_key) = get_punctuation_key(key, false) {
                                         if let Some(replacement) = self.punctuation_long_press_mappings.get(p_key).cloned() {
                                             self.long_press_triggered = true;
                                             let mut commit_text = if !self.joined_sentence.is_empty() { 
                                                 self.joined_sentence.trim_end().to_string() 
                                             } else if !self.candidates.is_empty() { 
-                                                self.candidates[0].trim_end().to_string() 
+                                                self.candidates[0].text.trim_end().to_string() 
                                             } else { 
                                                 self.buffer.trim_end().to_string() 
                                             };
@@ -623,7 +618,6 @@ impl Processor {
     }
 
     fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
-        // --- 核心修复：HJKL 导航转换 ---
         if self.nav_mode {
             match key {
                 VirtualKey::H => key = VirtualKey::Left,
@@ -775,13 +769,13 @@ impl Processor {
 
             VirtualKey::Space => {
                 if shift_pressed {
-                    if let Some(hint) = self.candidate_hints.get(self.selected) {
-                        if !hint.is_empty() {
-                            return self.commit_candidate(hint.clone(), 99);
+                    if let Some(cand) = self.candidates.get(self.selected) {
+                        if !cand.hint.is_empty() {
+                            return self.commit_candidate(cand.hint.clone(), 99);
                         }
                     }
                 }
-                if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
+                if self.preview_selected_candidate || self.commit_mode == "single" { if let Some(cand) = self.candidates.get(self.selected) { let word = cand.text.clone(); let idx = self.selected; return self.commit_candidate(word, idx); } }
                 if self.buffer.ends_with(' ') && !self.joined_sentence.is_empty() { return self.commit_candidate(self.joined_sentence.clone(), 99); }
                 self.buffer.push(' '); self.preview_selected_candidate = false; 
                 if perform_lookup { if let Some(act) = self.lookup() { return act; } }
@@ -792,7 +786,7 @@ impl Processor {
                 self.last_lookup_pinyin.clear();
                 if self.buffer.is_empty() { return Action::PassThrough; }
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out, 99); }
-                if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
+                if self.preview_selected_candidate { if let Some(cand) = self.candidates.get(self.selected) { let word = cand.text.clone(); let idx = self.selected; return self.commit_candidate(word, idx); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone(), 99) } else { let out = self.buffer.clone(); self.commit_candidate(out, 99) }
             }
             VirtualKey::Esc | VirtualKey::Delete => { 
@@ -841,7 +835,7 @@ impl Processor {
                 let digit = key_to_digit(key).unwrap_or(0);
                 if self.enable_number_selection && self.commit_mode == "single" && digit >= 1 && digit <= self.page_size {
                     let abs_idx = self.page + digit - 1;
-                    if let Some(word) = self.candidates.get(abs_idx) { return self.commit_candidate(word.clone(), abs_idx); }
+                    if let Some(cand) = self.candidates.get(abs_idx) { let word = cand.text.clone(); return self.commit_candidate(word, abs_idx); }
                 }
                 let old_buffer = self.buffer.clone(); self.buffer.push_str(&digit.to_string()); 
                 if perform_lookup { if let Some(act) = self.lookup() { return act; } }
@@ -907,7 +901,7 @@ impl Processor {
         let mut commit_text = if !self.joined_sentence.is_empty() { 
             self.joined_sentence.trim_end().to_string() 
         } else if !self.candidates.is_empty() { 
-            self.candidates[0].trim_end().to_string() 
+            self.candidates[0].text.trim_end().to_string() 
         } else { 
             self.buffer.trim_end().to_string() 
         };
@@ -965,7 +959,7 @@ impl Processor {
             self.phantom_text = target.clone();
             return Action::DeleteAndEmit { delete: old_phantom.chars().count(), insert: target };
         }
-        let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].clone() } else { self.buffer.clone() };
+        let target = if self.preview_selected_candidate && !self.candidates.is_empty() { self.candidates[self.selected.min(self.candidates.len()-1)].text.clone() } else { self.buffer.clone() };
         if target == self.phantom_text { return Action::Consume; }
         let old_phantom = self.phantom_text.clone();
         let old_chars: Vec<char> = old_phantom.chars().collect();
@@ -994,14 +988,27 @@ impl Processor {
         if let Some(pipeline) = self.pipelines.get(&current_profile) {
             self.best_segmentation = pipeline.segmentor.segment(&self.buffer, &self.syllables);
             let results = pipeline.run(&self.buffer, &self.syllables, &config);
+            
             self.candidates.clear();
-            self.candidate_hints.clear();
             self.has_dict_match = !results.is_empty();
             self.last_lookup_pinyin = self.buffer.clone();
-            for c in results {
-                self.candidates.push(c.text);
-                self.candidate_hints.push(c.hint);
+
+            for (i, c) in results.into_iter().enumerate() {
+                let label = format!("{}.", i + 1);
+                let full_display = if c.hint.is_empty() {
+                    format!("{}{}", label, c.text)
+                } else {
+                    format!("{}{}({})", label, c.text, c.hint)
+                };
+
+                self.candidates.push(DisplayCandidate {
+                    text: c.text,
+                    label,
+                    hint: c.hint,
+                    full_display,
+                });
             }
+
             self.selected = 0; self.page = 0; self.update_state();
             return None;
         }
@@ -1021,12 +1028,11 @@ impl Processor {
             let mut candidates = scheme.lookup(&query, &context);
             scheme.post_process(&query, &mut candidates, &context);
             self.candidates.clear();
-            self.candidate_hints.clear();
             self.has_dict_match = !candidates.is_empty();
             self.last_lookup_pinyin = query.clone();
-            for c in candidates {
+            
+            for (i, c) in candidates.into_iter().enumerate() {
                 let text = if self.enable_traditional { c.traditional } else { c.simplified };
-                self.candidates.push(text);
                 let mut hint = String::new();
                 let is_chinese_pure = self.active_profiles.len() == 1 && self.active_profiles[0] == "chinese";
                 let is_stroke = current_profile == "stroke";
@@ -1039,46 +1045,72 @@ impl Processor {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(&c.stroke_aux);
                 }
-                self.candidate_hints.push(hint);
+                
+                let label = format!("{}.", i + 1);
+                let full_display = if hint.is_empty() {
+                    format!("{}{}", label, text)
+                } else {
+                    format!("{}{}({})", label, text, hint)
+                };
+
+                self.candidates.push(DisplayCandidate {
+                    text,
+                    label,
+                    hint,
+                    full_display,
+                });
             }
+            // --- 过滤逻辑 ---
             if self.filter_mode == FilterMode::Global && !self.aux_filter.is_empty() {
                 let filter_lower = self.aux_filter.to_lowercase();
                 let mut fc = Vec::new();
-                let mut fh = Vec::new();
-                for (i, hint) in self.candidate_hints.iter().enumerate() {
-                    let hint_clean = strip_tones(&hint.to_lowercase());
+                for c in &self.candidates {
+                    let hint_clean = strip_tones(&c.hint.to_lowercase());
                     let parts: Vec<&str> = hint_clean.split_whitespace().collect();
                     if parts.iter().any(|p| p.starts_with(&filter_lower)) {
-                        fc.push(self.candidates[i].clone());
-                        fh.push(hint.clone());
+                        fc.push(c.clone());
                     }
                 }
-                if !fc.is_empty() { self.candidates = fc; self.candidate_hints = fh; }
+                if !fc.is_empty() { self.candidates = fc; }
             }
-            if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
+            if self.candidates.is_empty() {
+                self.candidates.push(DisplayCandidate {
+                    text: self.buffer.clone(),
+                    label: "1.".into(),
+                    hint: "".into(),
+                    full_display: format!("1.{}", self.buffer),
+                });
+            }
             self.selected = 0; self.page = 0; self.update_state();
             return None;
         }
 
         if self.filter_mode == FilterMode::Page && !self.page_snapshot.is_empty() {
             let filter_lower = self.aux_filter.to_lowercase();
-            let mut filtered_cands = Vec::new();
-            let mut filtered_hints = Vec::new();
-            for (cand, hint) in &self.page_snapshot {
-                let hint_lower = hint.to_lowercase();
+            let mut filtered = Vec::new();
+            for c in &self.page_snapshot {
+                let hint_lower = c.hint.to_lowercase();
                 let parts: Vec<&str> = hint_lower.split_whitespace().collect();
-                let mut matched = false;
-                for part in parts { if part.starts_with(&filter_lower) { matched = true; break; } }
-                if matched { filtered_cands.push(cand.clone()); filtered_hints.push(hint.clone()); }
+                if parts.iter().any(|p| p.starts_with(&filter_lower)) {
+                    filtered.push(c.clone());
+                }
             }
-            if !filtered_cands.is_empty() {
-                self.candidates = filtered_cands; self.candidate_hints = filtered_hints;
-                if self.candidates.len() == 1 { let word = self.candidates[0].clone(); return Some(self.commit_candidate(word, 0)); }
-            } else { self.candidates.clear(); self.candidate_hints.clear(); }
-            self.selected = 0; self.update_state();
+            if !filtered.is_empty() {
+                self.candidates = filtered;
+                if self.candidates.len() == 1 { let word = self.candidates[0].text.clone(); return Some(self.commit_candidate(word, 0)); }
+            } else { self.candidates.clear(); }
+            self.selected = 0;
+            self.update_state();
             return None;
         }
-        if self.candidates.is_empty() { self.candidates.push(self.buffer.clone()); self.candidate_hints.push(String::new()); }
+        if self.candidates.is_empty() {
+            self.candidates.push(DisplayCandidate {
+                text: self.buffer.clone(),
+                label: "1.".into(),
+                hint: "".into(),
+                full_display: format!("1.{}", self.buffer),
+            });
+        }
         self.selected = 0; self.page = 0; self.update_state();
         None
     }
@@ -1125,7 +1157,7 @@ impl Processor {
         for p in &self.active_profiles {
             if let Some(d) = self.tries.get(p) { if d.has_longer_match(raw_input) { total_longer += 1; break; } }
         }
-        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].clone(), 0)); }
+        if total_longer == 0 { return Some(self.commit_candidate(self.candidates[0].text.clone(), 0)); }
         None
     }
 
@@ -1148,16 +1180,14 @@ impl Processor {
     }
 
     fn load_user_dict(&mut self) {
-        println!("[Processor] Loading profile-aware user dictionary...");
         let path = std::path::Path::new("data/user_dict.json");
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
                     *self.user_dict.lock().unwrap() = dict;
-                    println!("[Processor] User dictionary loaded ({} profiles).", self.user_dict.lock().unwrap().len());
                 }
             }
-        } else { println!("[Processor] No user dictionary found."); }
+        }
         if self.user_dict_tx.is_none() {
             let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, HashMap<String, Vec<(String, u32)>>>>();
             self.user_dict_tx = Some(tx);

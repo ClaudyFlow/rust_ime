@@ -7,10 +7,19 @@ pub use gui_slint as gui;
 
 use crate::config::Config;
 
+/// 预格式化的候选词信息，UI 应当直接显示这些字符串而不再做逻辑拼接
+#[derive(Debug, Clone, PartialEq)]
+pub struct DisplayCandidate {
+    pub text: String,         // 候选词文字 (如: "你好")
+    pub label: String,        // 序号标签 (如: "1.")
+    pub hint: String,         // 辅助提示 (如: "nh")
+    pub full_display: String, // 完整显示文本 (如: "1.你好(nh)")
+}
+
 /// 核心显示接口：解耦 Slint 窗口与 Linux 桌面通知
 pub trait CandidateDisplay {
     /// 更新候选词列表及拼音
-    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<String>, hints: Vec<String>, selected: usize);
+    fn update_candidates(&mut self, pinyin: &str, candidates: Vec<DisplayCandidate>, selected: usize);
     
     /// 更新状态栏显示（中/英模式文字）
     fn update_status(&mut self, text: &str, chinese_enabled: bool);
@@ -36,8 +45,7 @@ pub struct AppState {
     pub show_candidates_pref: bool,
     pub is_ime_active: bool, // 窗口是否获得焦点/输入法是否激活
     pub pinyin: String,
-    pub candidates: Vec<String>,
-    pub hints: Vec<String>,
+    pub candidates: Vec<DisplayCandidate>,
     pub selected_index: usize,
     pub status_text: String,
 }
@@ -49,8 +57,7 @@ pub enum GuiEvent {
     ForceStatusVisible(bool), // 强制、独立的状态栏显隐控制 (不受任何焦点影响)
     Update {
         pinyin: String,
-        candidates: Vec<String>,
-        hints: Vec<String>,
+        candidates: Vec<DisplayCandidate>,
         selected: usize,
         sentence: String,
         cursor_pos: usize,
@@ -64,4 +71,3 @@ pub enum GuiEvent {
     OpenTrayMenu { x: i32, y: i32, chinese_enabled: bool, active_profile: String },
     Exit,
 }
-    
