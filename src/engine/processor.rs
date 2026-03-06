@@ -122,7 +122,6 @@ pub struct Processor {
     pub enable_fuzzy_pinyin: bool,
     pub fuzzy_config: crate::config::FuzzyPinyinConfig,
     pub enable_traditional: bool,
-    pub ranking: crate::config::RankingConfig,
     pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>, // 方案 -> 拼音 -> Vec<(词组, 词频)>
     
     // 连续选词记忆
@@ -348,12 +347,6 @@ impl Processor {
                 custom_mappings: vec![],
             },
             enable_traditional: false,
-            ranking: crate::config::RankingConfig {
-                length_penalty: 50000.0,
-                user_dict_bonus: 10000000.0,
-                exact_match_bonus: 10000000.0,
-                single_char_bonus: 1000000.0,
-            },
             user_dict,
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
@@ -448,11 +441,6 @@ impl Processor {
         } else {
             let _ = self.lookup();
         }
-    }
-
-    pub fn set_syllables(&mut self, syllables: std::collections::HashSet<String>) {
-        println!("[Processor] 加载音节表成功，条目数: {}", syllables.len());
-        self.syllables = syllables;
     }
 
     pub fn get_short_display(&self) -> String {
@@ -738,7 +726,7 @@ impl Processor {
         Action::PassThrough
     }
 
-    fn handle_composing(&mut self, mut key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
+    fn handle_composing(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
         // 如果处于导航模式，映射 HJKL 为方向键
         if self.ctx.nav_mode {
             match key {

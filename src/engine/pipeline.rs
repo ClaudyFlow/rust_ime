@@ -2,7 +2,7 @@ use crate::Config;
 use std::collections::{HashSet, HashMap};
 use std::sync::{Arc, Mutex};
 use crate::engine::Trie;
-use crate::engine::keys::VirtualKey;
+// use crate::engine::keys::VirtualKey;
 
 /// 候选词元数据
 #[derive(Debug, Clone, PartialEq)]
@@ -15,10 +15,12 @@ pub struct Candidate {
     pub weight: f64,
 }
 
+/*
 /// 1. 预处理器：按键到字符串映射的转换
 pub trait Preprocessor: Send {
     fn process(&self, key: VirtualKey, shift: bool, buffer: &mut String) -> bool;
 }
+*/
 
 /// 2. 切分器：字符串到音节序列的转换
 pub trait Segmentor: Send {
@@ -240,7 +242,7 @@ impl Filter for TraditionalFilter {
 
 /// 核心流水线：管理并执行整个输入处理流程
 pub struct Pipeline {
-    pub preprocessors: Vec<Box<dyn Preprocessor>>,
+    // pub preprocessors: Vec<Box<dyn Preprocessor>>,
     pub segmentor: Box<dyn Segmentor>,
     pub translators: Vec<Box<dyn Translator>>,
     pub filters: Vec<Box<dyn Filter>>,
@@ -249,23 +251,27 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn new(segmentor: Box<dyn Segmentor>) -> Self {
         Self {
-            preprocessors: vec![],
+            // preprocessors: vec![],
             segmentor,
             translators: vec![],
             filters: vec![],
         }
     }
 
+    /*
     pub fn add_preprocessor(&mut self, p: Box<dyn Preprocessor>) { self.preprocessors.push(p); }
+    */
     pub fn add_translator(&mut self, t: Box<dyn Translator>) { self.translators.push(t); }
     pub fn add_filter(&mut self, f: Box<dyn Filter>) { self.filters.push(f); }
 
+    /*
     pub fn run_preprocessors(&self, key: VirtualKey, shift: bool, buffer: &mut String) -> bool {
         for p in &self.preprocessors {
             if p.process(key, shift, buffer) { return true; }
         }
         false
     }
+    */
 
     pub fn run(&self, input: &str, syllables: &HashSet<String>, config: &Config, limit: usize) -> Vec<Candidate> {
         let segments = self.segmentor.segment(input, syllables);

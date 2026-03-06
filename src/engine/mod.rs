@@ -8,4 +8,3 @@ pub mod pipeline;
 
 pub use trie::Trie;
 pub use processor::Processor;
-pub use pipeline::*;

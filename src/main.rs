@@ -430,7 +430,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
                 }
                 ui::tray::TrayEvent::ClearUserDict => {
-                    if let Ok(mut p) = processor_clone.lock() {
+                    if let Ok(p) = processor_clone.lock() {
                         p.user_dict.lock().unwrap().clear();
                         p.save_user_dict();
                     }
