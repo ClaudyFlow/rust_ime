@@ -568,6 +568,9 @@ impl Processor {
     }
 
     fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool) -> Action {
+        if key == VirtualKey::Enter || key == VirtualKey::Space {
+            return Action::PassThrough;
+        }
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
                 // 检查当前方案是否有关联的键盘布局 (如俄语、希腊语)
@@ -765,6 +768,7 @@ impl Processor {
             VirtualKey::Enter => {
                 self.commit_history.clear(); // 强制上屏原始拼音，中断组词历史
                 self.last_lookup_pinyin.clear(); // 清空检索记录，确保不触发学习
+                if self.buffer.is_empty() { return Action::PassThrough; }
                 if self.commit_mode == "single" { let out = self.buffer.clone(); return self.commit_candidate(out, 99); }
                 if self.preview_selected_candidate { if let Some(word) = self.candidates.get(self.selected) { let idx = self.selected; return self.commit_candidate(word.clone(), idx); } }
                 if !self.joined_sentence.is_empty() { self.commit_candidate(self.joined_sentence.clone(), 99) } else { let out = self.buffer.clone(); self.commit_candidate(out, 99) }
