@@ -140,8 +140,8 @@ impl Translator for TableTranslator {
             if candidates.len() >= limit { break; }
         }
         
-        // 3. 简拼匹配 (如果结果较少)
-        if candidates.len() < 10 && config.input.enable_abbreviation_matching {
+        // 3. 简拼匹配 (始终尝试，但权重略低)
+        if config.input.enable_abbreviation_matching {
             let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
                 if !candidates.iter().any(|r| r.simplified == ar.word) {
@@ -151,16 +151,25 @@ impl Translator for TableTranslator {
                         if !hint.is_empty() { hint.push(' '); }
                         hint.push_str(ar.stroke_aux);
                     }
+                    // 优化简拼权重：不再使用大额固定惩罚。
+                    // 而是根据其原始权重进行小额降权 (例如 -500)，使其能排在许多低频全拼词之前。
+                    // 对于高频词 (如 "什么", weight > 10000)，降权后的得分依然很高。
+                    let adjusted_weight = if ar.weight > 10000 {
+                        (ar.weight as f64) - 200.0 // 高频词简拼：几乎不降权
+                    } else {
+                        (ar.weight as f64) - 1000.0 // 普通词简拼：中等降权
+                    };
+
                     candidates.push(Candidate {
                         simplified: ar.word.to_string(),
                         traditional: if ar.trad.is_empty() { ar.word.to_string() } else { ar.trad.to_string() },
                         text: ar.word.to_string(), 
                         hint, 
                         source: "Table (Abbr)".into(),
-                        weight: (ar.weight as f64) - 5000.0, 
+                        weight: adjusted_weight, 
                     });
                 }
-                if candidates.len() >= limit + 10 { break; }
+                if candidates.len() >= limit + 50 { break; } // 搜索深度从 +20 增加到 +50
             }
         }
         candidates

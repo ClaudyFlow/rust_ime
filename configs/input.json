@@ -137,9 +137,9 @@
   },
   "enable_traditional": false,
   "ranking": {
-    "length_penalty": 50000.0,
+    "length_penalty": 200.0,
     "user_dict_bonus": 10000000.0,
-    "exact_match_bonus": 10000000.0,
-    "single_char_bonus": 1000000.0
+    "exact_match_bonus": 5000000.0,
+    "single_char_bonus": 1000.0
   }
 }
