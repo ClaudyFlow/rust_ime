@@ -120,16 +120,17 @@ impl Trie {
 
     pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<TrieRawResult> {
         if segments.is_empty() { return Vec::new(); }
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity(limit);
         
-        // 简拼检索：我们需要在 FST 中找到所有可能匹配 segments 的 Key
-        // 为了性能，我们仍然使用第一个 segment 作为前缀限制，
-        // 但要注意：如果 segments[0] 是 'zh'，它可能匹配 'zhao'，也可能匹配 'zhang'
         let first_seg = &segments[0];
+        // 性能优化：如果首个片段很长，可以利用它作为更精确的前缀
         let matcher = fst::automaton::Str::new(first_seg).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
 
         while let Some((key_bytes, offset)) = stream.next() {
+            // 快速失败：如果 key 的长度连 segment 的数量都凑不齐，直接跳过
+            if key_bytes.len() < segments.len() { continue; }
+
             let key = String::from_utf8_lossy(key_bytes);
             if self.matches_segments(&key, segments, syllables) {
                 let pairs = self.read_block(offset as usize);
@@ -141,10 +142,6 @@ impl Trie {
                 }
             }
         }
-        
-        // 如果 segments[0] 很短（如 'z'），它可能匹配 'zh' 开头的音节
-        // 现在的逻辑已经涵盖了这种情况，因为 Str::new("z").starts_with() 会匹配 "zhao" 和 "zha"
-        
         results
     }
 

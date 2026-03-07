@@ -137,7 +137,7 @@ impl Translator for TableTranslator {
         
         // 3. 简拼匹配 (如果结果较少)
         if candidates.len() < 10 && config.input.enable_abbreviation_matching {
-            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit * 10);
+            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
                 if !candidates.iter().any(|r| r.simplified == ar.0) {
                     let mut hint = String::new();
