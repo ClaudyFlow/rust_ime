@@ -458,11 +458,9 @@ impl SearchEngine {
             
             let mut final_results = results;
             if query.filter_mode == crate::engine::processor::FilterMode::Global && !query.aux_filter.is_empty() {
-                tracing::debug!("Applying global filter: {}", query.aux_filter);
                 final_results.retain(|c| self.matches_filter(c, query.aux_filter));
             }
             
-            tracing::info!(results_count = final_results.len(), "Search complete");
             return (final_results, segments);
         }
 
@@ -479,26 +477,25 @@ impl SearchEngine {
             };
             
             let pre_processed = scheme.pre_process(query.buffer, &context);
-            let mut candidates = scheme.lookup(&pre_processed, &context);
-            scheme.post_process(&pre_processed, &mut candidates, &context);
+            let mut scheme_candidates = scheme.lookup(&pre_processed, &context);
+            scheme.post_process(&pre_processed, &mut scheme_candidates, &context);
             
             let mut results = Vec::new();
-            for c in results {
-                candidates.push(Candidate {
-                    text: if query.config.input.enable_traditional { Arc::from(c.traditional) } else { Arc::from(c.simplified) },
-                    simplified: Arc::from(c.simplified),
-                    traditional: Arc::from(c.traditional),
-                    hint: Arc::from(c.tone),
+            for sc in scheme_candidates {
+                results.push(Candidate {
+                    text: if query.config.input.enable_traditional { Arc::from(sc.traditional.as_str()) } else { Arc::from(sc.simplified.as_str()) },
+                    simplified: Arc::from(sc.simplified.as_str()),
+                    traditional: Arc::from(sc.traditional.as_str()),
+                    hint: Arc::from(sc.tone.as_str()),
                     source: Arc::from("Engine"),
-                    weight: c.weight as f64,
+                    weight: sc.weight as f64,
                 });
             }
 
             if query.filter_mode == crate::engine::processor::FilterMode::Global && !query.aux_filter.is_empty() {
                 results.retain(|c| self.matches_filter(c, query.aux_filter));
             }
-
-            return (results, vec![]);
+            return (results, vec![]); 
         }
 
         (vec![], vec![])

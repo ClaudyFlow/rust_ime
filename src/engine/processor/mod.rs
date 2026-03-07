@@ -374,7 +374,7 @@ impl Processor {
         self.session.last_lookup_pinyin = self.session.buffer.clone();
 
         if self.session.candidates.len() == 1 && self.session.filter_mode == FilterMode::Global {
-            let word = self.session.candidates[0].text.to_string();
+            let word = self.session.candidates[0].text.clone();
             return Some(self.commit_candidate(word, 0));
         }
 
@@ -436,7 +436,7 @@ impl Processor {
         let mut total_longer = 0;
         for p in &self.active_profiles { if self.engine.has_longer_match(p, raw_input) { total_longer += 1; break; } }
         if total_longer == 0 { 
-            let word = self.session.candidates[0].text.to_string();
+            let word = self.session.candidates[0].text.clone();
             return Some(self.commit_candidate(word, 0)); 
         }
         None
