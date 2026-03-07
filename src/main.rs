@@ -443,8 +443,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Ok(p) = processor_clone.lock() {
                         p.config.learned_words.store(Arc::new(HashMap::new()));
                         p.config.usage_history.store(Arc::new(HashMap::new()));
-                        p.config.save_learned_words();
-                        p.config.save_usage_history();
+                        // 清空数据库中的数据
+                        if let Some(ref db) = p.config.db {
+                            let _ = db.clear();
+                        }
                     }
                 }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),
