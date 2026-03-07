@@ -103,10 +103,10 @@ fn compile_dict_for_path(src_dir: &str, out_stem: &str, is_english: bool) -> Res
     let mut entries: BTreeMap<String, Vec<DictEntry>> = BTreeMap::new();
     for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "json") {
-            if path.file_name().and_then(|n| n.to_str()).map_or(false, |n| n == "punctuation.json") { continue; }
+        if path.extension().is_some_and(|ext| ext == "json") {
+            if path.file_name().and_then(|n| n.to_str()) == Some("punctuation.json") { continue; }
             process_json_file(path, &mut entries, is_english)?;
-        } else if path.extension().map_or(false, |ext| ext == "yaml") {
+        } else if path.extension().is_some_and(|ext| ext == "yaml") {
             process_yaml_file(path, &mut entries)?;
         }
     }
@@ -184,7 +184,7 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut in_data = false;
-    for line in reader.lines().flatten() {
+    for line in reader.lines().map_while(Result::ok) {
         if !in_data { if line.starts_with("...") { in_data = true; } continue; }
         if line.starts_with('#') || line.trim().is_empty() { continue; }
         let parts: Vec<&str> = line.split('\t').collect();

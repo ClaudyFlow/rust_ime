@@ -17,7 +17,7 @@ impl std::fmt::Display for VirtualKey {
 }
 
 impl VirtualKey {
-    pub fn to_u32(&self) -> u32 {
-        *self as u32
+    pub fn to_u32(self) -> u32 {
+        self as u32
     }
 }

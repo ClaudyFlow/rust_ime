@@ -126,14 +126,14 @@ impl EvdevHost {
         let pending_bg = lookup_pending.clone();
 
         std::thread::spawn(move || {
-            while let Ok(_) = lookup_rx.recv() {
+            while lookup_rx.recv().is_ok() {
                 // 消耗掉积压的所有检索请求，只做最后一次
-                while let Ok(_) = lookup_rx.try_recv() {}
+                while lookup_rx.try_recv().is_ok() {}
 
                 let mut p = p_bg.lock().unwrap();
                 if let Some(commit_action) = p.lookup() {
                     if let Ok(mut vkbd) = v_bg.lock() {
-                        execute_action(&mut *vkbd, commit_action, None);
+                        execute_action(&mut vkbd, commit_action, None);
                     }
                 }
                 
@@ -141,10 +141,10 @@ impl EvdevHost {
                 // 这样能确保编辑器里的预览汉字和候选词窗口同步
                 let phantom_action = p.update_phantom_action();
                 if let Ok(mut vkbd) = v_bg.lock() {
-                    execute_action(&mut *vkbd, phantom_action, None);
+                    execute_action(&mut vkbd, phantom_action, None);
                 }
 
-                update_gui_internal(&*p, &g_bg);
+                update_gui_internal(&p, &g_bg);
                 pending_bg.store(false, Ordering::SeqCst);
             }
         });
@@ -160,8 +160,9 @@ impl EvdevHost {
 impl InputMethodHost for EvdevHost {
     fn set_preedit(&self, _text: &str, _cursor_pos: usize) {}
     fn commit_text(&self, text: &str) {
-        if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.send_text(text); }
+        if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.send_text(text); }
     }
+
     fn get_cursor_rect(&self) -> Option<Rect> { None }
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -208,7 +209,7 @@ impl InputMethodHost for EvdevHost {
                         // 如果处于直通(英文)模式，除 Tab 键外全部直接物理透传
                         if is_direct && key != Key::KEY_TAB {
                             drop(p);
-                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                            if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                             continue;
                         }
 
@@ -217,7 +218,7 @@ impl InputMethodHost for EvdevHost {
                             if !is_empty { p.reset(); }
                             drop(p);
                             if let Ok(mut vkbd) = self.vkbd.lock() { 
-                                let _ = vkbd.emit_raw(key, val); 
+                                vkbd.emit_raw(key, val); 
                             }
                             continue;
                         }
@@ -321,7 +322,7 @@ impl InputMethodHost for EvdevHost {
                                 }
                             }
                         } else {
-                            if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                            if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                         }
                         drop(p); if val != 0 { self.update_gui(); }
                     } else {
@@ -342,7 +343,7 @@ impl InputMethodHost for EvdevHost {
 impl EvdevHost {
     fn update_gui(&self) {
         let p = self.processor.lock().unwrap();
-        update_gui_internal(&*p, &self.gui_tx);
+        update_gui_internal(&p, &self.gui_tx);
     }
 }
 
@@ -415,7 +416,7 @@ fn execute_action(vkbd: &mut Vkbd, action: Action, raw_key: Option<(Key, i32)>) 
         }
         Action::PassThrough => {
             if let Some((k, v)) = raw_key {
-                let _ = vkbd.emit_raw(k, v);
+                vkbd.emit_raw(k, v);
             }
         }
         Action::Alert => {

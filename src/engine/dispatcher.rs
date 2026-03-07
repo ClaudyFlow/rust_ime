@@ -10,6 +10,7 @@ pub struct ModifierState {
     pub meta: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputEvent {
     Key {

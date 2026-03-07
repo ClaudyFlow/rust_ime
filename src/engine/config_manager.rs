@@ -3,6 +3,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use crate::config::{Config, AuxMode, AntiTypoMode, PhantomType, DoublePinyinScheme, FuzzyPinyinConfig, PunctuationEntry};
 
+pub type UserDictData = HashMap<String, HashMap<String, Vec<(String, u32)>>>;
+
 pub struct ConfigManager {
     pub master_config: Config,
     pub show_candidates: bool,
@@ -55,8 +57,8 @@ pub struct ConfigManager {
     pub enable_traditional: bool,
 
     // 用户个人词库相关逻辑也移至此处（可选，目前先放配置）
-    pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
-    pub user_dict_tx: Option<std::sync::mpsc::Sender<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
+    pub user_dict: Arc<Mutex<UserDictData>>,
+    pub user_dict_tx: Option<std::sync::mpsc::Sender<UserDictData>>,
 }
 
 impl ConfigManager {
@@ -177,7 +179,7 @@ impl ConfigManager {
             self.phantom_type = PhantomType::None;
         }
 
-        if self.enable_user_dict && self.user_dict.lock().unwrap().is_empty() {
+        if self.enable_user_dict && self.user_dict.lock().is_ok_and(|d| d.is_empty()) {
             self.load_user_dict();
         }
     }
@@ -187,12 +189,14 @@ impl ConfigManager {
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
-                    *self.user_dict.lock().unwrap() = dict;
+                    if let Ok(mut d) = self.user_dict.lock() {
+                        *d = dict;
+                    }
                 }
             }
         }
         if self.user_dict_tx.is_none() {
-            let (tx, rx) = std::sync::mpsc::channel::<HashMap<String, HashMap<String, Vec<(String, u32)>>>>();
+            let (tx, rx) = std::sync::mpsc::channel::<UserDictData>();
             self.user_dict_tx = Some(tx);
             std::thread::spawn(move || {
                 let path = std::path::PathBuf::from("data/user_dict.json");
@@ -209,7 +213,9 @@ impl ConfigManager {
 
     pub fn save_user_dict(&self) {
         if let Some(ref tx) = self.user_dict_tx {
-            let _ = tx.send(self.user_dict.lock().unwrap().clone());
+            if let Ok(dict) = self.user_dict.lock() {
+                let _ = tx.send(dict.clone());
+            }
         }
     }
 }

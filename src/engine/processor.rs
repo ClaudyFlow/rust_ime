@@ -27,7 +27,7 @@ pub enum Action {
     Notify(String, String), // Summary, Body
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FilterMode {
     None,
     Global, // Shift + 字母 (全局筛选)
@@ -77,11 +77,11 @@ impl Processor {
                     self.trigger_incremental_search();
                     self.session.next_candidate(page_size);
                 }
-                return self.update_phantom_action();
+                self.update_phantom_action()
             }
             Command::PrevCandidate => {
                 self.session.prev_candidate(page_size);
-                return self.update_phantom_action();
+                self.update_phantom_action()
             }
             Command::Select(idx) => {
                 let abs_idx = self.session.page + idx;
@@ -170,6 +170,7 @@ impl Processor {
 
     pub fn apply_config(&mut self, conf: &crate::config::Config) {
         self.config.apply_config(conf);
+        self.engine.clear_cache();
 
         if !conf.input.active_profiles.is_empty() {
             self.active_profiles = conf.input.active_profiles.iter().map(|p: &String| p.to_lowercase()).collect();
@@ -254,6 +255,8 @@ impl Processor {
     }
 
     pub fn handle_event(&mut self, event: InputEvent) -> Action {
+        let span = tracing::info_span!("handle_event", ?event);
+        let _enter = span.enter();
         match event {
             InputEvent::Key { key, val, shift, ctrl, alt } => {
                 self.handle_key_ext(key, val, shift, ctrl, alt, true)
@@ -343,7 +346,7 @@ impl Processor {
         }
         if is_letter(key) {
             if let Some(c) = key_to_char(key, shift_pressed) {
-                let lang = self.active_profiles.get(0).cloned().unwrap_or_default().to_lowercase();
+                let lang = self.active_profiles.first().cloned().unwrap_or_default().to_lowercase();
                 if let Some(layout) = self.config.keyboard_layouts.get(&lang) {
                     if let Some(mapped) = layout.get(&c.to_string()) {
                         return Action::Emit(mapped.clone());
@@ -417,7 +420,7 @@ impl Processor {
              }
         }
 
-        let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
+        let current_profile = self.active_profiles.first().cloned().unwrap_or_default();
         if let Some(scheme) = self.engine.schemes.get(&current_profile) {
             let context = SchemeContext {
                 config: &self.config.master_config,
@@ -429,7 +432,8 @@ impl Processor {
                 _filter_mode: self.session.filter_mode.clone(),
                 _aux_filter: &self.session.aux_filter,
             };
-            if let Some(act) = scheme.handle_special_key(key, &mut self.session.buffer, &context) {
+            let act_opt: Option<Action> = scheme.handle_special_key(key, &mut self.session.buffer, &context);
+            if let Some(act) = act_opt {
                 if act == Action::Consume {
                     if perform_lookup { if let Some(lookup_act) = self.lookup() { return lookup_act; } }
                     return self.update_phantom_action();
@@ -590,7 +594,7 @@ impl Processor {
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("{:?}", key));
         let punc_key = punc_key_owned.as_str();
-        let lang = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
+        let lang = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
         
         let zh_punc = if lang == "japanese" {
             match (punc_key, shift_pressed) {
@@ -611,11 +615,11 @@ impl Processor {
             
             if let Some(entries) = zh_puncs {
                 if punc_key == "\"" {
-                    let p = if self.session.quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
+                    let p = if self.session.quote_open { entries.get(1).or(entries.first()) } else { entries.first() };
                     self.session.quote_open = !self.session.quote_open;
                     p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
                 } else if punc_key == "'" {
-                    let p = if self.session.single_quote_open { entries.get(1).or(entries.get(0)) } else { entries.get(0) };
+                    let p = if self.session.single_quote_open { entries.get(1).or(entries.first()) } else { entries.first() };
                     self.session.single_quote_open = !self.session.single_quote_open;
                     p.map(|e| e.char.clone()).unwrap_or_else(|| punc_key.to_string())
                 } else {
@@ -715,6 +719,8 @@ impl Processor {
     }
 
     pub fn lookup_with_limit(&mut self, limit: usize) -> Option<Action> {
+        let span = tracing::debug_span!("lookup", buffer = %self.session.buffer, limit);
+        let _enter = span.enter();
         if self.session.buffer.is_empty() { self.reset(); return None; }
 
         // 1. 优先处理分页过滤模式 (针对当前已有候选词的快照进行过滤)
@@ -740,16 +746,17 @@ impl Processor {
         }
 
         // 2. 委派给 SearchEngine 进行全文/全词库搜索
-        let current_profile = self.active_profiles.get(0).cloned().unwrap_or_default();
-        let (results, segments) = self.engine.search(
-            &self.session.buffer,
-            &current_profile,
-            &self.syllables,
-            &self.config.master_config,
+        let current_profile = self.active_profiles.first().cloned().unwrap_or_default();
+        let query = crate::engine::pipeline::SearchQuery {
+            buffer: &self.session.buffer,
+            profile: &current_profile,
+            syllables: &self.syllables,
+            config: &self.config.master_config,
             limit,
-            self.session.filter_mode.clone(),
-            &self.session.aux_filter,
-        );
+            filter_mode: self.session.filter_mode.clone(),
+            aux_filter: &self.session.aux_filter,
+        };
+        let (results, segments) = self.engine.search(query);
 
         self.session.candidates = results;
         self.session.best_segmentation = segments;
@@ -797,7 +804,7 @@ impl Processor {
             self.reset();
             return next;
         }
-        let current = self.active_profiles.get(0).cloned().unwrap_or_default();
+        let current = self.active_profiles.first().cloned().unwrap_or_default();
         let idx = all.iter().position(|p| p == &current).unwrap_or(0);
         if idx + 1 < all.len() {
             let next = all[idx + 1].clone();
@@ -809,6 +816,7 @@ impl Processor {
             self.reset();
             "Mixed (All)".to_string()
         }
+
     }
 
     fn check_auto_commit(&mut self) -> Option<Action> {
@@ -846,10 +854,10 @@ impl Processor {
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.config.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
-        let profile = self.active_profiles.get(0).cloned().unwrap_or_else(|| "chinese".to_string());
+        let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
         let mut dict = self.config.user_dict.lock().unwrap();
-        let profile_dict = dict.entry(profile).or_insert_with(HashMap::new);
-        let entries = profile_dict.entry(pinyin.to_string()).or_insert_with(Vec::new);
+        let profile_dict = dict.entry(profile).or_default();
+        let entries = profile_dict.entry(pinyin.to_string()).or_default();
         if let Some(pos) = entries.iter().position(|(w, _)| w == word) { entries[pos].1 += 1; }
         else { entries.push((word.to_string(), 1)); }
         entries.sort_by(|a, b| b.1.cmp(&a.1));
@@ -896,8 +904,8 @@ impl Processor {
         let is_repeat = val == 2;
         let is_release = val == 0;
 
-        if (self.config.enable_long_press && is_letter(key)) || (self.config.enable_punctuation_long_press && get_punctuation_key(key, shift_pressed).is_some()) {
-            if !shift_pressed {
+        if ((self.config.enable_long_press && is_letter(key)) || (self.config.enable_punctuation_long_press && get_punctuation_key(key, shift_pressed).is_some()))
+            && !shift_pressed {
                 if val == 1 {
                     self.dispatcher.key_press_info = Some((key, now));
                     self.dispatcher.long_press_triggered = false;
@@ -919,23 +927,21 @@ impl Processor {
                                             return Some(self.inject_text(&replacement));
                                         }
                                     }
-                                } else {
-                                    if let Some(p_key) = get_punctuation_key(key, false) {
-                                        if let Some(replacement) = self.config.punctuation_long_press_mappings.get(p_key).cloned() {
-                                            self.dispatcher.long_press_triggered = true;
-                                            let mut commit_text = if !self.session.joined_sentence.is_empty() { 
-                                                self.session.joined_sentence.trim_end().to_string() 
-                                            } else if !self.session.candidates.is_empty() { 
-                                                self.session.candidates[0].text.trim_end().to_string() 
-                                            } else { 
-                                                self.session.buffer.trim_end().to_string() 
-                                            };
-                                            commit_text.push_str(&replacement);
-                                            let del_len = self.session.phantom_text.chars().count();
-                                            self.clear_composing();
-                                            self.commit_history.clear(); 
-                                            return Some(Action::DeleteAndEmit { delete: del_len, insert: commit_text });
-                                        }
+                                } else if let Some(p_key) = get_punctuation_key(key, false) {
+                                    if let Some(replacement) = self.config.punctuation_long_press_mappings.get(p_key).cloned() {
+                                        self.dispatcher.long_press_triggered = true;
+                                        let mut commit_text = if !self.session.joined_sentence.is_empty() { 
+                                            self.session.joined_sentence.trim_end().to_string() 
+                                        } else if !self.session.candidates.is_empty() { 
+                                            self.session.candidates[0].text.trim_end().to_string() 
+                                        } else { 
+                                            self.session.buffer.trim_end().to_string() 
+                                        };
+                                        commit_text.push_str(&replacement);
+                                        let del_len = self.session.phantom_text.chars().count();
+                                        self.clear_composing();
+                                        self.commit_history.clear(); 
+                                        return Some(Action::DeleteAndEmit { delete: del_len, insert: commit_text });
                                     }
                                 }
                             }
@@ -948,7 +954,6 @@ impl Processor {
                         return Some(Action::Consume); 
                     }
                 }
-            }
         }
         None
     }

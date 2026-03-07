@@ -4,6 +4,8 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
+pub type TrieRawResult = (String, String, String, String, String, u32);
+
 #[derive(Clone)]
 pub struct MmapData(Arc<Mmap>);
 impl AsRef<[u8]> for MmapData {
@@ -28,7 +30,8 @@ impl Trie {
         Ok(Self { index, data: data_data })
     }
 
-    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<(String, String, String, String, String, u32)>> {
+    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<TrieRawResult>> {
+        let _span = tracing::debug_span!("trie_exact", %pinyin).entered();
         let offset = self.index.get(pinyin)? as usize;
         Some(self.read_block(offset))
     }
@@ -43,14 +46,15 @@ impl Trie {
         let matcher = fst::automaton::Str::new(prefix).starts_with();
         let mut stream = self.index.search(matcher).into_stream();
         while let Some((key, _)) = stream.next() {
-            if key.len() > prefix.as_bytes().len() {
+            if key.len() > prefix.len() {
                 return true;
             }
         }
         false
     }
 
-    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
+    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<TrieRawResult> {
+        let _span = tracing::debug_span!("trie_bfs", %prefix, limit).entered();
         let mut results = Vec::new();
         
         // 支持通配符 z：将其转换为正则搜索
@@ -74,7 +78,7 @@ impl Trie {
     }
 
     /// 通配符搜索实现：z 匹配任意单个 a-y 字母
-    pub fn search_wildcard(&self, pattern: &str, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
+    pub fn search_wildcard(&self, pattern: &str, limit: usize) -> Vec<TrieRawResult> {
         let mut results = Vec::new();
         
         // 简单的 DFS 实现通配符匹配
@@ -114,7 +118,7 @@ impl Trie {
         true
     }
 
-    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<(String, String, String, String, String, u32)> {
+    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<TrieRawResult> {
         if segments.is_empty() { return Vec::new(); }
         let mut results = Vec::new();
         
@@ -181,10 +185,8 @@ impl Trie {
             for len in (1..=6).rev() {
                 if len <= key.len() {
                     let syl = &key[..len];
-                    if syllables.contains(syl) {
-                        if syl.starts_with(&segments[0]) && key.len() == len {
-                            return true;
-                        }
+                    if syllables.contains(syl) && syl.starts_with(&segments[0]) && key.len() == len {
+                        return true;
                     }
                 }
             }
@@ -214,7 +216,7 @@ impl Trie {
         None
     }
 
-    fn read_block(&self, offset: usize) -> Vec<(String, String, String, String, String, u32)> {
+    fn read_block(&self, offset: usize) -> Vec<TrieRawResult> {
         let data = self.data.as_ref();
         if offset + 4 > data.len() { return Vec::new(); }
         

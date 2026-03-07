@@ -86,7 +86,7 @@ pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
     if let Ok(f) = File::open(&path) {
         use std::io::BufRead;
         let reader = std::io::BufReader::new(f);
-        for line in reader.lines().flatten() {
+        for line in reader.lines().map_while(Result::ok) {
             let s = line.trim().to_lowercase();
             if !s.is_empty() {
                 set.insert(s);
@@ -97,6 +97,13 @@ pub fn load_syllables(root: &Path) -> std::collections::HashSet<String> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 初始化结构化日志
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
+        .with_target(false)
+        .with_thread_ids(true)
+        .init();
+
     // 强制使用 Skia 渲染后端以支持彩色 Emoji 和高质量文字渲染
     std::env::set_var("SLINT_BACKEND", "skia");
 
@@ -203,11 +210,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let input = line.trim();
                     if input == "exit" { break; }
                     
-                    if (input.len() == 1 && input.chars().next().unwrap().is_alphabetic()) || (input.starts_with("SHIFT_") && input.len() == 7) {
+                    if (input.len() == 1 && input.chars().next().is_some_and(|c| c.is_alphabetic())) || (input.starts_with("SHIFT_") && input.len() == 7) {
                         let (letter, shift) = if input.len() == 7 {
-                            (input.chars().last().unwrap(), true)
+                            (input.chars().last().unwrap_or('\0'), true)
                         } else {
-                            (input.chars().next().unwrap().to_ascii_uppercase(), false)
+                            (input.chars().next().map(|c| c.to_ascii_uppercase()).unwrap_or('\0'), false)
                         };
 
                         let key = match letter {
@@ -303,7 +310,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (gui_tx, gui_rx) = std::sync::mpsc::channel();
     let (tray_tx, tray_rx) = std::sync::mpsc::channel();
     
-    let gui_config = config.read().unwrap().clone();
+    let gui_config = config.read().map(|c| c.clone()).unwrap_or_else(|_| Config::default_config());
     let tray_tx_for_gui = tray_tx.clone();
     std::thread::spawn(move || { ui::gui::start_gui(gui_rx, gui_config, tray_tx_for_gui); });
 
@@ -331,16 +338,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);
 
-    let conf = config.read().unwrap();
-    let tray_handle = ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone());
-    drop(conf);
+    let tray_handle = if let Ok(conf) = config.read() {
+        ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone())
+    } else {
+        ui::tray::start_tray(false, "chinese".into(), true, crate::config::AntiTypoMode::None, false, "single".into(), "vertical".into(), tray_tx.clone())
+    };
 
     // 全局状态维护
     let app_state = Arc::new(Mutex::new(ui::AppState {
         chinese_enabled: true,
         active_profile: "".into(),
-        show_status_bar_pref: config.read().unwrap().appearance.show_status_bar,
-        show_candidates_pref: config.read().unwrap().appearance.show_candidates,
+        show_status_bar_pref: config.read().map(|c| c.appearance.show_status_bar).unwrap_or(true),
+        show_candidates_pref: config.read().map(|c| c.appearance.show_candidates).unwrap_or(true),
         is_ime_active: true, // 默认开启，等待 TSF 实际反馈
         pinyin: "".into(),
         candidates: vec![],
@@ -427,7 +436,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui::tray::TrayEvent::ReloadConfig => {
                     let new_conf = Config::load();
                     if let Ok(mut p) = processor_clone.lock() { p.apply_config(&new_conf); }
-                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(new_conf));
+                    let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(Box::new(new_conf)));
+
                 }
                 ui::tray::TrayEvent::ShowNotification(msg) => {
                     let mut state = app_state_tray.lock().unwrap();

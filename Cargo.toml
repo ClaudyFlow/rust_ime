@@ -19,11 +19,14 @@ reqwest = { version = "0.12", features = ["blocking"] }
 urlencoding = "2.1"
 open = "5.1"
 fst = "0.4"
+lru = "0.12"
 memmap2 = "0.9"
 rand = "0.8"
 bitflags = "2.4"
 image = "0.24"
 log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time", "local-time"] }
 raw-window-handle = "0.6"
 slint = "1.9"
 

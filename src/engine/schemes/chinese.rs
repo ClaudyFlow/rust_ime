@@ -39,7 +39,7 @@ impl ChineseScheme {
                 rest = &rest[stroke_end..];
             }
 
-            if !rest.is_empty() && rest.chars().next().map_or(false, |c| c.is_ascii_uppercase()) {
+            if !rest.is_empty() && rest.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
                 let english_end = rest.find(|c: char| c.is_ascii_digit()).unwrap_or(rest.len());
                 let e = &rest[..english_end];
                 if !e.is_empty() { english_aux = Some(e.to_string()); }
@@ -210,10 +210,10 @@ impl InputScheme for ChineseScheme {
         // 辅码过滤
         for m in last_matches_raw {
             let last_part = raw_parsed.last();
-            if let Some(ref aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
+            if let Some(aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
                 if !m.4.to_lowercase().starts_with(&aux.to_lowercase()) { continue; }
             }
-            if let Some(ref aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
+            if let Some(aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
                 let aux_lower = aux.to_lowercase();
                 if !m.3.to_lowercase().split(',').any(|part| part.trim().starts_with(&aux_lower)) { continue; }
             }
@@ -239,10 +239,10 @@ impl InputScheme for ChineseScheme {
                     let m = d.search_abbreviation(&modified_segments, context.syllables, 500);
                     for (w, tr, t, e, s, weight) in m {
                         let last_part = raw_parsed.last();
-                        if let Some(ref aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
+                        if let Some(aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
                             if !s.to_lowercase().starts_with(&aux.to_lowercase()) { continue; }
                         }
-                        if let Some(ref aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
+                        if let Some(aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
                             let aux_lower = aux.to_lowercase();
                             if !e.to_lowercase().split(',').any(|part| part.trim().starts_with(&aux_lower)) { continue; }
                         }
@@ -273,7 +273,7 @@ impl InputScheme for ChineseScheme {
                 let level = m.match_level as i64;
                 let weight = m.weight as i64;
                 let char_count = m.text.chars().count() as i64;
-                let mut score = if level == 3 { 40_000_000 } else { level as i64 * 10_000_000 };
+                let mut score = if level == 3 { 40_000_000 } else { level * 10_000_000 };
                 if level == 2 && char_count == input_syllables as i64 { score += 10_000_000; }
                 score += weight;
                 let len_diff = (char_count - input_syllables as i64).max(0);

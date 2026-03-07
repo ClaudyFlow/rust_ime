@@ -2,6 +2,18 @@ use crate::Config;
 use std::collections::{HashSet, HashMap};
 use std::sync::{Arc, Mutex};
 use crate::engine::Trie;
+use crate::engine::config_manager::UserDictData;
+use lru::LruCache;
+use std::num::NonZeroUsize;
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+struct SearchCacheKey {
+    profile: String,
+    buffer: String,
+    limit: usize,
+    filter_mode: crate::engine::processor::FilterMode,
+    aux_filter: String,
+}
 // use crate::engine::keys::VirtualKey;
 
 /// 候选词元数据
@@ -63,9 +75,12 @@ impl Segmentor for DefaultSegmentor {
             }
             if !matched {
                 // 如果没有任何音节匹配，按单字母切分（简拼或未知输入）
-                let first_char = remaining.chars().next().unwrap();
-                segments.push(first_char.to_string());
-                remaining = remaining[first_char.len_utf8()..].to_string();
+                if let Some(first_char) = remaining.chars().next() {
+                    segments.push(first_char.to_string());
+                    remaining = remaining[first_char.len_utf8()..].to_string();
+                } else {
+                    break;
+                }
             }
         }
         segments
@@ -147,26 +162,26 @@ impl Translator for TableTranslator {
 
 /// 用户词库翻译器 (仅处理用户自造词)
 pub struct UserDictTranslator {
-    pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
+    pub user_dict: Arc<Mutex<UserDictData>>,
     pub profile: String,
 }
 impl Translator for UserDictTranslator {
     fn translate(&self, _input: &str, segments: &[String], _config: &Config, _limit: usize) -> Vec<Candidate> {
         let query = segments.join("");
-        let dict = self.user_dict.lock().unwrap();
         let mut results = Vec::new();
-        
-        if let Some(profile_dict) = dict.get(&self.profile) {
-            if let Some(words) = profile_dict.get(&query) {
-                for (text, freq) in words {
-                    results.push(Candidate {
-                        simplified: text.clone(),
-                        traditional: text.clone(),
-                        text: text.clone(),
-                        hint: "★".into(),
-                        source: "User".into(),
-                        weight: (*freq as f64) + 10000.0, // 基础分
-                    });
+        if let Ok(dict) = self.user_dict.lock() {
+            if let Some(profile_dict) = dict.get(&self.profile) {
+                if let Some(words) = profile_dict.get(&query) {
+                    for (text, freq) in words {
+                        results.push(Candidate {
+                            simplified: text.clone(),
+                            traditional: text.clone(),
+                            text: text.clone(),
+                            hint: "★".into(),
+                            source: "User".into(),
+                            weight: (*freq as f64) + 10000.0, // 基础分
+                        });
+                    }
                 }
             }
         }
@@ -176,18 +191,19 @@ impl Translator for UserDictTranslator {
 
 /// 调频过滤器：根据用户历史频率对已有候选词进行动态评分加成
 pub struct AdaptiveFilter {
-    pub user_dict: Arc<Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
+    pub user_dict: Arc<Mutex<UserDictData>>,
     pub profile: String,
 }
 impl Filter for AdaptiveFilter {
     fn filter(&self, candidates: &mut Vec<Candidate>, _config: &Config) {
-        let dict = self.user_dict.lock().unwrap();
-        if let Some(profile_dict) = dict.get(&self.profile) {
-            for c in candidates.iter_mut() {
-                // 在用户历史中查找该词的出现频率 (调频)
-                for words in profile_dict.values() {
-                    if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
-                        c.weight += words[pos].1 as f64 * 1000.0; // 显著加成
+        if let Ok(dict) = self.user_dict.lock() {
+            if let Some(profile_dict) = dict.get(&self.profile) {
+                for c in candidates.iter_mut() {
+                    // 在用户历史中查找该词的出现频率 (调频)
+                    for words in profile_dict.values() {
+                        if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
+                            c.weight += words[pos].1 as f64 * 1000.0; // 显著加成
+                        }
                     }
                 }
             }
@@ -289,6 +305,17 @@ impl Pipeline {
 pub struct SearchEngine {
     pub pipelines: HashMap<String, Pipeline>,
     pub schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
+    cache: Mutex<LruCache<SearchCacheKey, (Vec<Candidate>, Vec<String>)>>,
+}
+
+pub struct SearchQuery<'a> {
+    pub buffer: &'a str,
+    pub profile: &'a str,
+    pub syllables: &'a HashSet<String>,
+    pub config: &'a crate::Config,
+    pub limit: usize,
+    pub filter_mode: crate::engine::processor::FilterMode,
+    pub aux_filter: &'a str,
 }
 
 impl SearchEngine {
@@ -296,61 +323,97 @@ impl SearchEngine {
         pipelines: HashMap<String, Pipeline>,
         schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
     ) -> Self {
-        Self { pipelines, schemes }
+        Self { 
+            pipelines, 
+            schemes,
+            cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())),
+        }
+    }
+
+    pub fn clear_cache(&self) {
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.clear();
+        }
     }
 
     pub fn search(
         &self,
-        buffer: &str,
-        profile: &str,
-        syllables: &HashSet<String>,
-        config: &crate::Config,
-        limit: usize,
-        filter_mode: crate::engine::processor::FilterMode,
-        aux_filter: &str,
+        query: SearchQuery,
     ) -> (Vec<Candidate>, Vec<String>) {
-        if let Some(pipeline) = self.pipelines.get(profile) {
-            let segments = pipeline.segmentor.segment(buffer, syllables);
-            let mut results = pipeline.run(buffer, syllables, config, limit);
-            
-            if filter_mode == crate::engine::processor::FilterMode::Global && !aux_filter.is_empty() {
-                results.retain(|c| self.matches_filter(c, aux_filter));
+        let key = SearchCacheKey {
+            profile: query.profile.to_string(),
+            buffer: query.buffer.to_string(),
+            limit: query.limit,
+            filter_mode: query.filter_mode.clone(),
+            aux_filter: query.aux_filter.to_string(),
+        };
+
+        if let Ok(mut cache) = self.cache.lock() {
+            if let Some(hit) = cache.get(&key) {
+                return hit.clone();
             }
-            
-            return (results, segments);
         }
 
-        if let Some(scheme) = self.schemes.get(profile) {
-            // 目前 Scheme 模式暂不支持复杂的 segments 返回，暂留空
+        let result = self.do_search(query);
+        
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.put(key, result.clone());
+        }
+        
+        result
+    }
+
+    fn do_search(
+        &self,
+        query: SearchQuery,
+    ) -> (Vec<Candidate>, Vec<String>) {
+        let span = tracing::info_span!("engine_search", profile = %query.profile, buffer = %query.buffer);
+        let _enter = span.enter();
+
+        if let Some(pipeline) = self.pipelines.get(query.profile) {
+            let segments = pipeline.segmentor.segment(query.buffer, query.syllables);
+            let results = pipeline.run(query.buffer, query.syllables, query.config, query.limit);
+            
+            let mut final_results = results;
+            if query.filter_mode == crate::engine::processor::FilterMode::Global && !query.aux_filter.is_empty() {
+                tracing::debug!("Applying global filter: {}", query.aux_filter);
+                final_results.retain(|c| self.matches_filter(c, query.aux_filter));
+            }
+            
+            tracing::info!(results_count = final_results.len(), "Search complete");
+            return (final_results, segments);
+        }
+
+        if let Some(scheme) = self.schemes.get(query.profile) {
             let context = crate::engine::scheme::SchemeContext {
-                config,
-                tries: &HashMap::new(), // 这里需要重构传参，暂简化
-                syllables,
+                config: query.config,
+                tries: &HashMap::new(),
+                syllables: query.syllables,
                 _user_dict: &Arc::new(Mutex::new(HashMap::new())),
-                active_profiles: &vec![profile.to_string()],
+                active_profiles: &vec![query.profile.to_string()],
                 candidate_count: 0,
-                _filter_mode: filter_mode.clone(),
-                _aux_filter: aux_filter,
+                _filter_mode: query.filter_mode.clone(),
+                _aux_filter: query.aux_filter,
             };
             
-            let query = scheme.pre_process(buffer, &context);
-            let mut candidates = scheme.lookup(&query, &context);
-            scheme.post_process(&query, &mut candidates, &context);
+            let pre_processed = scheme.pre_process(query.buffer, &context);
+            let mut candidates = scheme.lookup(&pre_processed, &context);
+            scheme.post_process(&pre_processed, &mut candidates, &context);
             
             let mut results = Vec::new();
             for c in candidates {
                 results.push(Candidate {
-                    text: if config.input.enable_traditional { c.traditional.clone() } else { c.simplified.clone() },
+                    text: if query.config.input.enable_traditional { c.traditional.clone() } else { c.simplified.clone() },
                     simplified: c.simplified,
                     traditional: c.traditional,
-                    hint: c.tone, // 简化处理
+                    hint: c.tone,
                     source: "Scheme".into(),
                     weight: c.weight as f64,
                 });
             }
 
-            if filter_mode == crate::engine::processor::FilterMode::Global && !aux_filter.is_empty() {
-                results.retain(|c| self.matches_filter(c, aux_filter));
+            if query.filter_mode == crate::engine::processor::FilterMode::Global && !query.aux_filter.is_empty() {
+                results.retain(|c| self.matches_filter(c, query.aux_filter));
             }
 
             return (results, vec![]);
@@ -364,7 +427,7 @@ impl SearchEngine {
         let filter_lower = filter.to_lowercase();
         let hint_lower = cand.hint.to_lowercase();
         let hint_clean = crate::engine::processor::strip_tones(&hint_lower);
-        let parts: Vec<&str> = hint_clean.split(|c| c == ' ' || c == '/' || c == '(' || c == ')' || c == ',').collect();
+        let parts: Vec<&str> = hint_clean.split([' ', '/', '(', ')', ',']).collect();
         parts.iter().any(|p| p.starts_with(&filter_lower)) || hint_clean.starts_with(&filter_lower)
     }
 }
