@@ -206,18 +206,19 @@ impl Translator for UserDictTranslator {
 
 /// 调频过滤器：根据用户历史频率对已有候选词进行动态评分加成
 pub struct AdaptiveFilter {
-    pub user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
+    pub usage_history: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub profile: String,
 }
 impl Filter for AdaptiveFilter {
-    fn filter(&self, candidates: &mut Vec<Candidate>, _config: &Config) {
-        let dict = self.user_dict.load();
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
+        if !config.input.enable_auto_reorder { return; }
+        let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
             for c in candidates.iter_mut() {
                 // 在用户历史中查找该词的出现频率 (调频)
                 for words in profile_dict.values() {
                     if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
-                        c.weight += words[pos].1 as f64 * 1000.0; // 显著加成
+                        c.weight += (words[pos].1 as f64) * 1000.0; // 显著加成
                     }
                 }
             }
@@ -319,7 +320,8 @@ impl Pipeline {
 pub struct SearchEngine {
     pub trie_paths: HashMap<String, (PathBuf, PathBuf)>,
     pub syllables: Arc<HashSet<String>>,
-    pub user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
+    pub learned_words: Arc<arc_swap::ArcSwap<UserDictData>>,
+    pub usage_history: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
     pipelines: RwLock<HashMap<String, Arc<Pipeline>>>,
     cache: Mutex<LruCache<SearchCacheKey, (Vec<Candidate>, Vec<String>)>>,
@@ -339,17 +341,30 @@ impl SearchEngine {
     pub fn new(
         trie_paths: HashMap<String, (PathBuf, PathBuf)>,
         syllables: Arc<HashSet<String>>,
-        user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
+        learned_words: Arc<arc_swap::ArcSwap<UserDictData>>,
+        usage_history: Arc<arc_swap::ArcSwap<UserDictData>>,
         schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
     ) -> Self {
         Self { 
             trie_paths, 
             syllables,
-            user_dict,
+            learned_words,
+            usage_history,
             schemes,
             pipelines: RwLock::new(HashMap::new()),
             cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())),
         }
+    }
+
+    pub fn has_exact_match(&self, profile: &str, pinyin: &str, word: &str) -> bool {
+        if let Some(paths) = self.trie_paths.get(profile) {
+            if let Ok(trie) = Trie::load(&paths.0, &paths.1) {
+                if let Some(exacts) = trie.get_all_exact(pinyin) {
+                    return exacts.iter().any(|tr| tr.word == word);
+                }
+            }
+        }
+        false
     }
 
     fn get_or_create_pipeline(&self, profile: &str) -> Option<Arc<Pipeline>> {
@@ -368,7 +383,7 @@ impl SearchEngine {
         
         let mut pipeline = Pipeline::new(Box::new(DefaultSegmentor));
         pipeline.add_translator(Box::new(UserDictTranslator { 
-            user_dict: self.user_dict.clone(), 
+            user_dict: self.learned_words.clone(), 
             profile: profile.to_string() 
         }));
         pipeline.add_translator(Box::new(TableTranslator { 
@@ -376,7 +391,7 @@ impl SearchEngine {
             syllables: self.syllables.clone(),
         }));
         pipeline.add_filter(Box::new(AdaptiveFilter {
-            user_dict: self.user_dict.clone(),
+            usage_history: self.usage_history.clone(),
             profile: profile.to_string()
         }));
         pipeline.add_filter(Box::new(SortFilter));

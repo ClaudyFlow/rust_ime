@@ -49,6 +49,8 @@ pub struct ConfigManager {
     pub phantom_type: PhantomType,
 
     pub enable_user_dict: bool,
+    pub enable_word_discovery: bool,
+    pub enable_auto_reorder: bool,
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
@@ -57,9 +59,11 @@ pub struct ConfigManager {
     pub fuzzy_config: FuzzyPinyinConfig,
     pub enable_traditional: bool,
 
-    // 用户个人词库相关逻辑也移至此处（可选，目前先放配置）
-    pub user_dict: Arc<ArcSwap<UserDictData>>,
-    pub user_dict_tx: Option<std::sync::mpsc::Sender<UserDictData>>,
+    // 用户词库相关逻辑：分离新词发现和调频历史
+    pub learned_words: Arc<ArcSwap<UserDictData>>,
+    pub usage_history: Arc<ArcSwap<UserDictData>>,
+
+    pub user_dict_tx: Option<std::sync::mpsc::Sender<(UserDictData, std::path::PathBuf)>>,
 }
 
 impl ConfigManager {
@@ -108,6 +112,8 @@ impl ConfigManager {
             keyboard_layouts: master.input.keyboard_layouts.clone(),
             phantom_type: if cfg!(target_os = "windows") { PhantomType::None } else { master.input.phantom_type },
             enable_user_dict: master.input.enable_user_dict,
+            enable_word_discovery: master.input.enable_word_discovery,
+            enable_auto_reorder: master.input.enable_auto_reorder,
             enable_fixed_first_candidate: master.input.enable_fixed_first_candidate,
             enable_smart_backspace: master.input.enable_smart_backspace,
             enable_double_pinyin: master.input.enable_double_pinyin,
@@ -115,7 +121,8 @@ impl ConfigManager {
             enable_fuzzy_pinyin: master.input.enable_fuzzy_pinyin,
             fuzzy_config: master.input.fuzzy_config.clone(),
             enable_traditional: master.input.enable_traditional,
-            user_dict: Arc::new(ArcSwap::from_pointee(HashMap::new())),
+            learned_words: Arc::new(ArcSwap::from_pointee(HashMap::new())),
+            usage_history: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             user_dict_tx: None,
         }
     }
@@ -123,6 +130,8 @@ impl ConfigManager {
     pub fn apply_config(&mut self, conf: &Config) {
         self.master_config = conf.clone();
         self.enable_user_dict = conf.input.enable_user_dict;
+        self.enable_word_discovery = conf.input.enable_word_discovery;
+        self.enable_auto_reorder = conf.input.enable_auto_reorder;
         self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
         self.enable_smart_backspace = conf.input.enable_smart_backspace;
         self.enable_double_pinyin = conf.input.enable_double_pinyin;
@@ -180,29 +189,36 @@ impl ConfigManager {
             self.phantom_type = PhantomType::None;
         }
 
-        if self.enable_user_dict && self.user_dict.load().is_empty() {
-            self.load_user_dict();
+        if self.enable_user_dict && (self.learned_words.load().is_empty() || self.usage_history.load().is_empty()) {
+            self.load_user_dicts();
         }
     }
 
-    pub fn load_user_dict(&mut self) {
-        let path = std::path::Path::new("data/user_dict.json");
-        if path.exists() {
-            if let Ok(file) = std::fs::File::open(path) {
-                if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
-                    self.user_dict.store(Arc::new(dict));
+    pub fn load_user_dicts(&mut self) {
+        let load_file = |name: &str| -> UserDictData {
+            let path = std::path::Path::new("data").join(format!("{}.json", name));
+            if path.exists() {
+                if let Ok(file) = std::fs::File::open(path) {
+                    return serde_json::from_reader(std::io::BufReader::new(file)).unwrap_or_default();
                 }
             }
-        }
+            HashMap::new()
+        };
+
+        self.learned_words.store(Arc::new(load_file("learned_words")));
+        self.usage_history.store(Arc::new(load_file("usage_history")));
+
         if self.user_dict_tx.is_none() {
-            let (tx, rx) = std::sync::mpsc::channel::<UserDictData>();
+            let (tx, rx) = std::sync::mpsc::channel::<(UserDictData, std::path::PathBuf)>();
             self.user_dict_tx = Some(tx);
             std::thread::spawn(move || {
-                let path = std::path::PathBuf::from("data/user_dict.json");
-                while let Ok(dict_clone) = rx.recv() {
-                    let mut latest = dict_clone;
-                    while let Ok(next) = rx.try_recv() { latest = next; }
-                    if let Ok(file) = std::fs::File::create(&path) {
+                while let Ok((dict, path)) = rx.recv() {
+                    let mut latest = dict;
+                    let mut latest_path = path;
+                    while let Ok((next, next_path)) = rx.try_recv() {
+                        if next_path == latest_path { latest = next; }
+                    }
+                    if let Ok(file) = std::fs::File::create(&latest_path) {
                         let _ = serde_json::to_writer_pretty(std::io::BufWriter::new(file), &latest);
                     }
                 }
@@ -210,9 +226,15 @@ impl ConfigManager {
         }
     }
 
-    pub fn save_user_dict(&self) {
+    pub fn save_learned_words(&self) {
         if let Some(ref tx) = self.user_dict_tx {
-            let _ = tx.send((**self.user_dict.load()).clone());
+            let _ = tx.send(((**self.learned_words.load()).clone(), std::path::PathBuf::from("data/learned_words.json")));
+        }
+    }
+
+    pub fn save_usage_history(&self) {
+        if let Some(ref tx) = self.user_dict_tx {
+            let _ = tx.send(((**self.usage_history.load()).clone(), std::path::PathBuf::from("data/usage_history.json")));
         }
     }
 }

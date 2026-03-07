@@ -432,11 +432,11 @@ async fn add_dict_entry(Json(req): Json<AddEntryRequest>) -> StatusCode {
 }
 
 async fn clear_user_dict(State((_, _, tray_tx)): State<WebState>) -> StatusCode {
-    let path = std::path::Path::new("data/user_dict.json");
-    if path.exists() {
-        if let Err(e) = std::fs::remove_file(path) {
-            eprintln!("[Web] Failed to delete user_dict.json: {}", e);
-            return StatusCode::INTERNAL_SERVER_ERROR;
+    let files = ["data/learned_words.json", "data/usage_history.json", "data/user_dict.json"];
+    for f in files {
+        let path = std::path::Path::new(f);
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
         }
     }
     // 通知主线程清空内存中的用户词典

@@ -87,7 +87,7 @@ pub fn handle_composing(processor: &mut Processor, key: VirtualKey, shift_presse
             config: &processor.config.master_config,
             tries: &std::collections::HashMap::new(), 
             syllables: &processor.syllables,
-            _user_dict: &processor.config.user_dict,
+            _user_dict: &processor.config.learned_words,
             active_profiles: &processor.active_profiles,
             candidate_count: processor.session.candidates.len(),
             _filter_mode: processor.session.filter_mode.clone(),

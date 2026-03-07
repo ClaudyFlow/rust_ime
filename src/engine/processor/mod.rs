@@ -67,7 +67,8 @@ impl Processor {
         let engine = crate::engine::pipeline::SearchEngine::new(
             trie_paths,
             syllables_arc,
-            config.user_dict.clone(),
+            config.learned_words.clone(),
+            config.usage_history.clone(),
             {
                 let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
                 m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
@@ -202,7 +203,8 @@ impl Processor {
     }
 
     pub fn save_user_dict(&self) {
-        self.config.save_user_dict();
+        self.config.save_learned_words();
+        self.config.save_usage_history();
     }
 
     pub fn handle_key_ext(&mut self, key: VirtualKey, val: i32, shift_pressed: bool, ctrl_pressed: bool, alt_pressed: bool, perform_lookup: bool) -> Action {
@@ -454,14 +456,47 @@ impl Processor {
     pub fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.config.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
         if std::env::args().any(|a| a == "--test") { return; }
+        
         let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
-        let mut dict_clone = (**self.config.user_dict.load()).clone();
-        let profile_dict = dict_clone.entry(profile).or_default();
-        let entries = profile_dict.entry(pinyin.to_string()).or_default();
-        if let Some(pos) = entries.iter().position(|(w, _)| w == word) { entries[pos].1 += 1; }
-        else { entries.push((word.to_string(), 1)); }
-        entries.sort_by(|a, b| b.1.cmp(&a.1));
-        self.config.user_dict.store(Arc::new(dict_clone));
-        self.config.save_user_dict();
+        let word_len = word.chars().count();
+
+        // 1. 记录调频记录 (Usage History)
+        if self.config.enable_auto_reorder {
+            let mut hist_clone = (**self.config.usage_history.load()).clone();
+            let profile_dict = hist_clone.entry(profile.clone()).or_default();
+            let entries = profile_dict.entry(pinyin.to_string()).or_default();
+            
+            if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
+                entries[pos].1 += 1;
+            } else {
+                entries.push((word.to_string(), 1));
+            }
+            entries.sort_by(|a, b| b.1.cmp(&a.1));
+            
+            self.config.usage_history.store(Arc::new(hist_clone));
+            self.config.save_usage_history();
+        }
+
+        // 2. 记录造词记录 (Word Discovery / Learned Words)
+        // 规则：字数 > 1 且 词库中搜不到该全拼匹配
+        if self.config.enable_word_discovery && word_len > 1 {
+            let is_new_word = !self.engine.has_exact_match(&profile, pinyin, word);
+            
+            if is_new_word {
+                let mut learned_clone = (**self.config.learned_words.load()).clone();
+                let profile_dict = learned_clone.entry(profile).or_default();
+                let entries = profile_dict.entry(pinyin.to_string()).or_default();
+                
+                if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
+                    entries[pos].1 += 1;
+                } else {
+                    entries.push((word.to_string(), 1));
+                }
+                entries.sort_by(|a, b| b.1.cmp(&a.1));
+                
+                self.config.learned_words.store(Arc::new(learned_clone));
+                self.config.save_learned_words();
+            }
+        }
     }
 }

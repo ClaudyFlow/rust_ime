@@ -41,6 +41,20 @@
             </div>
             <div class="setting-item">
                 <div class="info">
+                    <div class="title">自动造词</div>
+                    <div class="desc">记录词库中不存在的新组合（字数 > 1）。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_word_discovery"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info">
+                    <div class="title">自动调频</div>
+                    <div class="desc">根据输入记录，将常用词和刚输入的词排在前面。</div>
+                </div>
+                <label class="switch"><input type="checkbox" id="enable_auto_reorder"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+                <div class="info">
                     <div class="title">上屏模式</div>
                     <div class="desc">词模式：空格直接上屏；句模式：支持连续输入。</div>
                 </div>
@@ -111,6 +125,8 @@
 
             bindInput('enable_traditional', 'input');
             bindInput('enable_fixed_first_candidate', 'input');
+            bindInput('enable_word_discovery', 'input');
+            bindInput('enable_auto_reorder', 'input');
             bindInput('commit_mode', 'input');
             bindInput('autostart', 'input');
             

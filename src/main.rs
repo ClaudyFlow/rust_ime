@@ -441,8 +441,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 ui::tray::TrayEvent::ClearUserDict => {
                     if let Ok(p) = processor_clone.lock() {
-                        p.config.user_dict.store(Arc::new(HashMap::new()));
-                        p.save_user_dict();
+                        p.config.learned_words.store(Arc::new(HashMap::new()));
+                        p.config.usage_history.store(Arc::new(HashMap::new()));
+                        p.config.save_learned_words();
+                        p.config.save_usage_history();
                     }
                 }
                 ui::tray::TrayEvent::Exit => std::process::exit(0),

@@ -128,6 +128,8 @@ pub struct Input {
     pub enable_caps_selection: bool,
     pub enable_number_selection: bool,
     pub enable_user_dict: bool,
+    pub enable_word_discovery: bool, // 是否允许记录新词 (造词)
+    pub enable_auto_reorder: bool,   // 是否根据输入记录自动调频
     pub enable_fixed_first_candidate: bool,
     pub enable_smart_backspace: bool,
     pub enable_double_pinyin: bool,
@@ -381,6 +383,8 @@ impl Config {
                 enable_caps_selection: true,
                 enable_number_selection: true,
                 enable_user_dict: true,
+                enable_word_discovery: true,
+                enable_auto_reorder: true,
                 enable_fixed_first_candidate: false,
                 enable_smart_backspace: false,
                 enable_double_pinyin: false,
