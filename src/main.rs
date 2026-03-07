@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use std::env;
 use std::collections::HashMap;
 use std::io::BufReader;
-use engine::{Processor, Trie};
+use engine::Processor;
 use platform::traits::InputMethodHost;
 pub use config::Config;
 use ui::GuiEvent;

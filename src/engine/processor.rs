@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::collections::HashSet;
 use crate::engine::keys::VirtualKey;
 use crate::engine::scheme::InputScheme;
-use crate::engine::pipeline::Candidate;
 use crate::engine::{Command, ModifierState, InputEvent};
 
 use std::time::{Instant, Duration};
@@ -33,8 +32,6 @@ pub enum FilterMode {
     Global, // Shift + 字母 (全局筛选)
     Page,   // Caps + 字母 (当前页筛选)
 }
-
-use crate::config::PunctuationEntry;
 
 pub struct Processor {
     pub session: crate::engine::InputSession,

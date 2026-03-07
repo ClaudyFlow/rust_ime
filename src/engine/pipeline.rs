@@ -380,17 +380,6 @@ impl SearchEngine {
     }
 
     pub fn has_longer_match(&self, profile: &str, buffer: &str) -> bool {
-        // 先检查流水线是否已加载
-        if let Some(pipeline) = self.get_or_create_pipeline(profile) {
-            // 在 TableTranslator 中查找 Trie
-            // 简单起见，我们遍历它的 translators
-            for t in &pipeline.translators {
-                // 利用反射或特定的 Downcast 模式（由于是 Box<dyn> 比较困难）
-                // 暂时采用更直接的方案：SearchEngine 自己按需加载一次 Trie 来判断
-            }
-        }
-        
-        // 更稳妥的延迟加载方案：
         if let Some(paths) = self.trie_paths.get(profile) {
             if let Ok(trie) = Trie::load(&paths.0, &paths.1) {
                 return trie.has_longer_match(buffer);
