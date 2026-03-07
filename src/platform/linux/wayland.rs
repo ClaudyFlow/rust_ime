@@ -18,8 +18,7 @@ pub struct WaylandHost {
 
 struct WaylandState {
     seat: Option<wl_seat::WlSeat>,
-    found_im_manager: bool,
-    found_text_input: bool,
+    found_input_method: bool,
 }
 
 impl WaylandHost {
@@ -30,14 +29,12 @@ impl WaylandHost {
 
         let mut state = WaylandState {
             seat: None,
-            found_im_manager: false,
-            found_text_input: false,
+            found_input_method: false,
         };
 
         let display = conn.display();
         display.get_registry(&qh, ());
 
-        // 第一轮同步：搜集所有全局接口
         event_queue.roundtrip(&mut state)?;
 
         Ok(Self {
@@ -55,61 +52,28 @@ impl InputMethodHost for WaylandHost {
     fn get_cursor_rect(&self) -> Option<Rect> { None }
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("[WaylandHost] 原生协议服务已就绪。");
-        
-        if self.state.found_im_manager {
-            println!("[WaylandHost] 状态: 核心输入法接口已激活。");
-        } else if self.state.found_text_input {
-            println!("[WaylandHost] 状态: 仅探测到文本输入接口，可能需要 KDE 额外授权。");
+        println!("[WaylandHost] 原生探测模式已就绪。");
+        if self.state.found_input_method {
+            println!("[WaylandHost] 系统支持 input-method 协议接口。");
         } else {
-            println!("[WaylandHost] 状态: 未发现任何输入相关接口。");
+            println!("[WaylandHost] 警告：KWin 隐藏了 input-method 接口。请确认 KDE 设置或环境变量。");
         }
-
         loop {
             self.event_queue.blocking_dispatch(&mut self.state)?;
         }
     }
 }
 
-// 实现 Registry 监听
 impl Dispatch<wl_registry::WlRegistry, ()> for WaylandState {
-    fn event(
-        state: &mut Self,
-        proxy: &wl_registry::WlRegistry,
-        event: wl_registry::Event,
-        _: &(),
-        _: &Connection,
-        qh: &QueueHandle<Self>,
-    ) {
-        if let wl_registry::Event::Global { name, interface, version } = event {
-            match interface.as_str() {
-                "wl_seat" => {
-                    state.seat = Some(proxy.bind::<wl_seat::WlSeat, _, _>(name, version, qh, ()));
-                }
-                s if s.contains("input_method_manager") => {
-                    state.found_im_manager = true;
-                    println!("[Wayland Discovery] 确认核心特权接口: {}", s);
-                }
-                s if s.contains("text_input_manager") => {
-                    state.found_text_input = true;
-                    println!("[Wayland Discovery] 发现客户端接口: {}", s);
-                }
-                _ => {}
+    fn event(_: &mut Self, _: &wl_registry::WlRegistry, event: wl_registry::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
+        if let wl_registry::Event::Global { interface, .. } = event {
+            if interface.contains("input_method") {
+                println!("[Wayland Registry] 发现可用特权接口: {}", interface);
             }
         }
     }
 }
 
-// 实现 Seat 监听
 impl Dispatch<wl_seat::WlSeat, ()> for WaylandState {
-    fn event(
-        _: &mut Self,
-        _: &wl_seat::WlSeat,
-        _: wl_seat::Event,
-        _: &(),
-        _: &Connection,
-        _: &QueueHandle<Self>,
-    ) {
-        // 处理键盘/鼠标能力的动态增减
-    }
+    fn event(_: &mut Self, _: &wl_seat::WlSeat, _: wl_seat::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
 }
