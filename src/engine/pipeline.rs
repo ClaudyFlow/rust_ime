@@ -98,6 +98,10 @@ impl Translator for TableTranslator {
         if segments.is_empty() { return vec![]; }
         let query = segments.join("");
         let mut candidates = Vec::new();
+        
+        // 性能优化：在内部使用更大的搜索深度（如 500），以确保高频词能进入初选名单参与排序。
+        // 否则，如果 limit 很小（如 10），字典序靠后的高频词将永远无法排到前面。
+        let internal_limit = limit.max(500);
 
         // 1. 尝试全拼精确匹配
         if let Some(exact_results) = self.trie.get_all_exact(&query) {
@@ -113,12 +117,12 @@ impl Translator for TableTranslator {
             }
         }
         
-        // 判断是否为简拼输入：如果 segments 数量多于 1，且包含单个字母片段，则视为简拼。
+        // 判断是否为简拼输入
         let is_abbreviation = segments.len() > 1 && segments.iter().any(|s| s.len() == 1);
 
         if is_abbreviation && config.input.enable_abbreviation_matching {
-            // 2. 执行严格简拼搜索 (sm -> shen'me, 不再匹配 sm...)
-            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
+            // 2. 执行严格简拼搜索
+            let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, internal_limit);
             for ar in abbr_results {
                 if !candidates.iter().any(|r| r.simplified.as_ref() == ar.word) {
                     let mut hint = String::new();
@@ -128,7 +132,6 @@ impl Translator for TableTranslator {
                         hint.push_str(ar.stroke_aux);
                     }
                     
-                    // 对于高权重常用词（如 "什么"），保留更多原始权重
                     let adjusted_weight = if ar.weight > 5000 {
                         (ar.weight as f64) - 50.0 
                     } else {
@@ -144,11 +147,11 @@ impl Translator for TableTranslator {
                         weight: adjusted_weight, 
                     });
                 }
-                if candidates.len() >= limit + 100 { break; } 
+                if candidates.len() >= internal_limit { break; } 
             }
         } else {
-            // 3. 全拼前缀补全 (只有不是简拼时才执行)
-            let results = self.trie.search_bfs(&query, limit);
+            // 3. 全拼前缀补全
+            let results = self.trie.search_bfs(&query, internal_limit);
             for tr in results {
                 if candidates.iter().any(|c| c.simplified.as_ref() == tr.word) { continue; }
                 let mut hint = String::new();
@@ -165,7 +168,7 @@ impl Translator for TableTranslator {
                     source: Arc::from("Table"),
                     weight: tr.weight as f64,
                 });
-                if candidates.len() >= limit { break; }
+                if candidates.len() >= internal_limit { break; }
             }
         }
         candidates
@@ -309,6 +312,12 @@ impl Pipeline {
         for f in &self.filters {
             f.filter(&mut candidates, config, input);
         }
+        
+        // 在所有排序和过滤完成后，执行最终截断
+        if candidates.len() > limit {
+            candidates.truncate(limit);
+        }
+        
         candidates
     }
 }
