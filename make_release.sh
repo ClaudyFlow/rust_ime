@@ -11,7 +11,7 @@ echo "📦 Starting release packaging..."
 echo "🔨 Building Release..."
 cargo build --release
 echo "📚 Pre-compiling dictionaries..."
-cargo run --release --bin compile_dict
+cargo run --release -- --compile-only
 
 # 2. Create packaging directory
 echo "📂 Collecting files..."
