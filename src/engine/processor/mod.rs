@@ -264,7 +264,7 @@ impl Processor {
         punctuation::handle_punctuation(self, key, shift_pressed)
     }
 
-    pub fn commit_candidate(&mut self, mut cand: String, index: usize) -> Action {
+    pub fn commit_candidate(&mut self, mut cand: Arc<str>, index: usize) -> Action {
         let now = Instant::now();
         let py = self.session.last_lookup_pinyin.clone();
 
@@ -272,7 +272,7 @@ impl Processor {
             if now.duration_since(self.last_commit_time) > Duration::from_secs(3) {
                 self.commit_history.clear();
             }
-            self.commit_history.push((py.clone(), cand.clone()));
+            self.commit_history.push((py.clone(), cand.to_string()));
             self.record_usage(&py, &cand);
 
             let start = if self.commit_history.len() > 4 { self.commit_history.len() - 4 } else { 0 };
@@ -298,12 +298,14 @@ impl Processor {
         }
 
         if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { 
-            cand.push(' '); 
+            let mut s = cand.to_string();
+            s.push(' ');
+            cand = Arc::from(s);
         }
         
         let del = self.session.phantom_text.chars().count(); 
         self.clear_composing(); 
-        Action::DeleteAndEmit { delete: del, insert: cand }
+        Action::DeleteAndEmit { delete: del, insert: cand.to_string() }
     }
 
     pub fn update_phantom_action(&mut self) -> Action {
@@ -372,17 +374,18 @@ impl Processor {
         self.session.last_lookup_pinyin = self.session.buffer.clone();
 
         if self.session.candidates.len() == 1 && self.session.filter_mode == FilterMode::Global {
-            let word = self.session.candidates[0].text.clone();
+            let word = self.session.candidates[0].text.to_string();
             return Some(self.commit_candidate(word, 0));
         }
 
         if self.session.candidates.is_empty() {
+            let buf_arc: Arc<str> = Arc::from(self.session.buffer.as_str());
             self.session.candidates.push(crate::engine::pipeline::Candidate {
-                text: self.session.buffer.clone(),
-                simplified: self.session.buffer.clone(),
-                traditional: self.session.buffer.clone(),
-                hint: "".into(),
-                source: "Raw".into(),
+                text: buf_arc.clone(),
+                simplified: buf_arc.clone(),
+                traditional: buf_arc.clone(),
+                hint: Arc::from(""),
+                source: Arc::from("Raw"),
                 weight: 0.0,
             });
         }
@@ -432,7 +435,10 @@ impl Processor {
         let raw_input = &self.session.buffer;
         let mut total_longer = 0;
         for p in &self.active_profiles { if self.engine.has_longer_match(p, raw_input) { total_longer += 1; break; } }
-        if total_longer == 0 { return Some(self.commit_candidate(self.session.candidates[0].text.clone(), 0)); }
+        if total_longer == 0 { 
+            let word = self.session.candidates[0].text.to_string();
+            return Some(self.commit_candidate(word, 0)); 
+        }
         None
     }
 

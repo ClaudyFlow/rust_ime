@@ -47,11 +47,11 @@ impl Compositor {
             PhantomType::Pinyin => p.session.buffer.clone(),
             PhantomType::Hanzi => {
                 if p.session.preview_selected_candidate && !p.session.candidates.is_empty() {
-                    p.session.candidates[p.session.selected.min(p.session.candidates.len() - 1)].text.clone()
+                    p.session.candidates[p.session.selected.min(p.session.candidates.len() - 1)].text.to_string()
                 } else if !p.session.joined_sentence.is_empty() {
                     p.session.joined_sentence.clone()
                 } else if !p.session.candidates.is_empty() {
-                    p.session.candidates[0].text.clone()
+                    p.session.candidates[0].text.to_string()
                 } else {
                     p.session.buffer.clone()
                 }

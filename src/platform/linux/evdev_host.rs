@@ -377,9 +377,9 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
                     format!("{}{}({})", label, c.text, c.hint)
                 };
                 display_candidates.push(crate::ui::DisplayCandidate {
-                    text: c.text.clone(),
+                    text: c.text.to_string(),
                     label,
-                    hint: c.hint.clone(),
+                    hint: c.hint.to_string(),
                     full_display,
                 });
             }

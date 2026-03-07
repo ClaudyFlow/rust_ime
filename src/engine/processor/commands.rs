@@ -50,12 +50,12 @@ pub fn execute_command(processor: &mut Processor, cmd: Command) -> Action {
             }
 
             // 如果完全没有候选词，才提交原始 buffer (例如未知输入)
-            let out = processor.session.buffer.clone();
+            let out = Arc::from(processor.session.buffer.as_str());
             processor.commit_candidate(out, 99)
         }
         Command::CommitRaw => {
             if processor.session.buffer.is_empty() { return Action::PassThrough; }
-            let out = processor.session.buffer.clone();
+            let out = Arc::from(processor.session.buffer.as_str());
             processor.commit_candidate(out, 99)
         }
         Command::Clear => {

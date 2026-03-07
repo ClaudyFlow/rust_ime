@@ -20,11 +20,11 @@ struct SearchCacheKey {
 /// 候选词元数据
 #[derive(Debug, Clone, PartialEq)]
 pub struct Candidate {
-    pub text: String,
-    pub simplified: String,
-    pub traditional: String,
-    pub hint: String,
-    pub source: String, // 来源：如 "User", "Table", "Script"
+    pub text: Arc<str>,
+    pub simplified: Arc<str>,
+    pub traditional: Arc<str>,
+    pub hint: Arc<str>,
+    pub source: Arc<str>, // 来源：如 "User", "Table", "Script"
     pub weight: f64,
 }
 
@@ -109,11 +109,11 @@ impl Translator for TableTranslator {
                     hint.push_str(tr.stroke_aux);
                 }
                 candidates.push(Candidate {
-                    simplified: tr.word.to_string(),
-                    traditional: if tr.trad.is_empty() { tr.word.to_string() } else { tr.trad.to_string() },
-                    text: tr.word.to_string(), 
-                    hint, 
-                    source: "Table (Exact)".into(),
+                    simplified: Arc::from(tr.word),
+                    traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
+                    text: Arc::from(tr.word), 
+                    hint: Arc::from(hint), 
+                    source: Arc::from("Table (Exact)"),
                     weight: tr.weight as f64 + config.input.ranking.exact_match_bonus, 
                 });
             }
@@ -122,7 +122,7 @@ impl Translator for TableTranslator {
         // 2. 尝试前缀匹配
         let results = self.trie.search_bfs(&query, limit);
         for tr in results {
-            if candidates.iter().any(|c| c.simplified == tr.word) { continue; }
+            if candidates.iter().any(|c| c.simplified.as_ref() == tr.word) { continue; }
             let mut hint = String::new();
             if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
             if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
@@ -130,11 +130,11 @@ impl Translator for TableTranslator {
                 hint.push_str(tr.stroke_aux);
             }
             candidates.push(Candidate {
-                simplified: tr.word.to_string(),
-                traditional: if tr.trad.is_empty() { tr.word.to_string() } else { tr.trad.to_string() },
-                text: tr.word.to_string(), 
-                hint, 
-                source: "Table".into(),
+                simplified: Arc::from(tr.word),
+                traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
+                text: Arc::from(tr.word), 
+                hint: Arc::from(hint), 
+                source: Arc::from("Table"),
                 weight: tr.weight as f64,
             });
             if candidates.len() >= limit { break; }
@@ -144,7 +144,7 @@ impl Translator for TableTranslator {
         if config.input.enable_abbreviation_matching {
             let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
-                if !candidates.iter().any(|r| r.simplified == ar.word) {
+                if !candidates.iter().any(|r| r.simplified.as_ref() == ar.word) {
                     let mut hint = String::new();
                     if config.appearance.show_english_aux && !ar.en.is_empty() { hint.push_str(ar.en); }
                     if config.appearance.show_stroke_aux && !ar.stroke_aux.is_empty() {
@@ -161,11 +161,11 @@ impl Translator for TableTranslator {
                     };
 
                     candidates.push(Candidate {
-                        simplified: ar.word.to_string(),
-                        traditional: if ar.trad.is_empty() { ar.word.to_string() } else { ar.trad.to_string() },
-                        text: ar.word.to_string(), 
-                        hint, 
-                        source: "Table (Abbr)".into(),
+                        simplified: Arc::from(ar.word),
+                        traditional: if ar.trad.is_empty() { Arc::from(ar.word) } else { Arc::from(ar.trad) },
+                        text: Arc::from(ar.word), 
+                        hint: Arc::from(hint), 
+                        source: Arc::from("Table (Abbr)"),
                         weight: adjusted_weight, 
                     });
                 }
@@ -190,11 +190,11 @@ impl Translator for UserDictTranslator {
             if let Some(words) = profile_dict.get(&query) {
                 for (text, freq) in words {
                     results.push(Candidate {
-                        simplified: text.clone(),
-                        traditional: text.clone(),
-                        text: text.clone(),
-                        hint: "★".into(),
-                        source: "User".into(),
+                        simplified: Arc::from(text.as_str()),
+                        traditional: Arc::from(text.as_str()),
+                        text: Arc::from(text.as_str()),
+                        hint: Arc::from("★"),
+                        source: Arc::from("User"),
                         weight: (*freq as f64) + 10000.0, // 基础分
                     });
                 }
@@ -217,11 +217,11 @@ impl Filter for AdaptiveFilter {
             // 精准调频：只查找当前输入拼音下的历史
             if let Some(history_entries) = profile_dict.get(query) {
                 for c in candidates.iter_mut() {
-                    if let Some(pos) = history_entries.iter().position(|(w, _)| w == &c.simplified) {
-                        let count = history_entries[pos].1;
+                    if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
+                        let freq = history_entries[pos].1;
                         // 强效加成：使用百万级系数，确保用户常用词置顶
-                        c.weight += (count as f64) * 1000000.0;
-                        c.source = format!("{} (Hist)", c.source);
+                        c.weight += (freq as f64) * 1000000.0;
+                        c.source = format!("{} (Hist)", c.source).into();
                     }
                 }
             }
@@ -483,13 +483,13 @@ impl SearchEngine {
             scheme.post_process(&pre_processed, &mut candidates, &context);
             
             let mut results = Vec::new();
-            for c in candidates {
-                results.push(Candidate {
-                    text: if query.config.input.enable_traditional { c.traditional.clone() } else { c.simplified.clone() },
-                    simplified: c.simplified,
-                    traditional: c.traditional,
-                    hint: c.tone,
-                    source: "Scheme".into(),
+            for c in results {
+                candidates.push(Candidate {
+                    text: if query.config.input.enable_traditional { Arc::from(c.traditional) } else { Arc::from(c.simplified) },
+                    simplified: Arc::from(c.simplified),
+                    traditional: Arc::from(c.traditional),
+                    hint: Arc::from(c.tone),
+                    source: Arc::from("Engine"),
                     weight: c.weight as f64,
                 });
             }
