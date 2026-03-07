@@ -259,7 +259,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("切分: {:?}", processor.best_segmentation);
                     println!("候选词 (前 10 条):");
                     for (i, cand) in processor.ctx.candidates.iter().take(10).enumerate() {
-                        println!("  {}. {} (hint: {}, source: {})", i+1, cand.text, cand.hint, cand.source);
+                        println!("  {}. {} (hint: {}, source: {})", i + 1, cand.text, cand.hint, cand.source);
                     }
                 }
                 return Ok(());
@@ -436,7 +436,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 ui::tray::TrayEvent::ClearUserDict => {
                     if let Ok(p) = processor_clone.lock() {
-                        p.user_dict.lock().unwrap().clear();
+                        p.config.user_dict.lock().unwrap().clear();
                         p.save_user_dict();
                     }
                 }

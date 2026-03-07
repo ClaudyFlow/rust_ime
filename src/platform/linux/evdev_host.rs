@@ -355,15 +355,15 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
                 selected: 0, 
                 sentence: "".into(),
                 cursor_pos: 0,
-                commit_mode: p.commit_mode.clone(),
+                commit_mode: p.config.commit_mode.clone(),
             }); 
             return; 
         }
         
         let pinyin = crate::engine::compositor::Compositor::get_preedit(p);
 
-        if p.show_candidates {
-            let page_size = p.page_size;
+        if p.config.show_candidates {
+            let page_size = p.config.page_size;
             let start = p.ctx.page.min(p.ctx.candidates.len());
             let end = (start + page_size).min(p.ctx.candidates.len());
             
@@ -391,7 +391,7 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
                 selected: relative_selected, 
                 sentence: p.ctx.joined_sentence.clone(),
                 cursor_pos: p.ctx.cursor_pos,
-                commit_mode: p.commit_mode.clone(),
+                commit_mode: p.config.commit_mode.clone(),
             });
         } else { 
             let _ = tx.send(GuiEvent::Update { 
@@ -400,7 +400,7 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
                 selected: 0, 
                 sentence: "".into(),
                 cursor_pos: 0,
-                commit_mode: p.commit_mode.clone(),
+                commit_mode: p.config.commit_mode.clone(),
             }); 
         }
     }

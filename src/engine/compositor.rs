@@ -35,7 +35,7 @@ impl Compositor {
 
     pub fn get_phantom_text(p: &Processor) -> String {
         use crate::config::PhantomType;
-        if p.ctx.state == ImeState::Direct || p.phantom_type == PhantomType::None { 
+        if p.ctx.state == ImeState::Direct || p.config.phantom_type == PhantomType::None { 
             return String::new(); 
         }
         
@@ -43,7 +43,7 @@ impl Compositor {
             return "[方案切换]".to_string();
         }
 
-        match p.phantom_type {
+        match p.config.phantom_type {
             PhantomType::Pinyin => p.ctx.buffer.clone(),
             PhantomType::Hanzi => {
                 if p.preview_selected_candidate && !p.ctx.candidates.is_empty() {
