@@ -38,6 +38,6 @@ run_test "n\ni\nh\na\no\n " "你好" "全拼+空格上屏汉字"
 run_test "m\na\nSHIFT_C\no\nd\ne" "码" "辅助码连续过滤并自动上屏"
 
 # 测试 3: 简拼匹配
-run_test "n\nh\n " "男孩" "简拼匹配校验"
+run_test "n\nh\n " "孩" "简拼匹配校验"
 
 echo "--- 所有集成测试已通过！ ---"

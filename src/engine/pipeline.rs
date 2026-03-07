@@ -106,11 +106,19 @@ impl Translator for TableTranslator {
         // 1. 尝试全拼精确匹配
         if let Some(exact_results) = self.trie.get_all_exact(&query) {
             for tr in exact_results {
+                let mut hint = String::new();
+                if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
+                if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
+                    if !hint.is_empty() { hint.push(' '); }
+                    hint.push_str(tr.stroke_aux);
+                }
+                if hint.is_empty() { hint = tr.tone.to_string(); }
+
                 candidates.push(Candidate {
                     simplified: Arc::from(tr.word),
                     traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
                     text: Arc::from(tr.word), 
-                    hint: Arc::from(tr.tone), 
+                    hint: Arc::from(hint.as_str()), 
                     source: Arc::from("Table (Exact)"),
                     weight: tr.weight as f64 + config.input.ranking.exact_match_bonus, 
                 });
@@ -131,18 +139,21 @@ impl Translator for TableTranslator {
                         if !hint.is_empty() { hint.push(' '); }
                         hint.push_str(ar.stroke_aux);
                     }
+                    if hint.is_empty() { hint = ar.tone.to_string(); }
                     
-                    let adjusted_weight = if ar.weight > 5000 {
-                        (ar.weight as f64) - 50.0 
+                    let adjusted_weight = if ar.weight > 8000 {
+                        (ar.weight as f64) - 10.0 
+                    } else if ar.weight > 5000 {
+                        (ar.weight as f64) - 100.0
                     } else {
-                        (ar.weight as f64) - 500.0
+                        (ar.weight as f64) - 1000.0
                     };
 
                     candidates.push(Candidate {
                         simplified: Arc::from(ar.word),
                         traditional: if ar.trad.is_empty() { Arc::from(ar.word) } else { Arc::from(ar.trad) },
                         text: Arc::from(ar.word), 
-                        hint: Arc::from(hint), 
+                        hint: Arc::from(hint.as_str()), 
                         source: Arc::from("Table (Abbr)"),
                         weight: adjusted_weight, 
                     });
@@ -160,11 +171,13 @@ impl Translator for TableTranslator {
                     if !hint.is_empty() { hint.push(' '); }
                     hint.push_str(tr.stroke_aux);
                 }
+                if hint.is_empty() { hint = tr.tone.to_string(); }
+
                 candidates.push(Candidate {
                     simplified: Arc::from(tr.word),
                     traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
                     text: Arc::from(tr.word), 
-                    hint: Arc::from(hint), 
+                    hint: Arc::from(hint.as_str()), 
                     source: Arc::from("Table"),
                     weight: tr.weight as f64,
                 });

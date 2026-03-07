@@ -74,6 +74,11 @@ pub fn handle_composing(processor: &mut Processor, key: VirtualKey, shift_presse
     if is_letter(key) && shift_pressed && !processor.session.buffer.is_empty() {
          if let Some(c) = key_to_char(key, false) {
              processor.session.shift_used_as_modifier = true;
+             // 核心修复：直接设置过滤模式为 Global
+             if processor.session.filter_mode != FilterMode::Global {
+                 processor.session.filter_mode = FilterMode::Global;
+                 // 注意：这里不清除已有的 aux_filter，因为我们可能正在连续输入辅助码
+             }
              processor.session.handle_filter_char(c);
 
              if let Some(act) = processor.lookup() { return act; }
