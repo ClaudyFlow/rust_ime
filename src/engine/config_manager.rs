@@ -285,15 +285,26 @@ impl ConfigManager {
         }
     }
 
-    pub fn save_learned_words(&self) {
-        if let Some(ref tx) = self.user_dict_tx {
-            let _ = tx.send(((**self.learned_words.load()).clone(), std::path::PathBuf::from("data/learned_words.json")));
+    pub fn insert_learned(&self, profile: &str, pinyin: &str, entries: &[(String, u32)]) {
+        if let Some(ref db) = self.db {
+            let key = format!("learned:{}:{}", profile, pinyin);
+            if let Ok(val) = serde_json::to_vec(entries) {
+                let _ = db.insert(key, val);
+                // 暂时不强制 flush，让 sled 自动处理以换取性能
+            }
         }
     }
 
-    pub fn save_usage_history(&self) {
-        if let Some(ref tx) = self.user_dict_tx {
-            let _ = tx.send(((**self.usage_history.load()).clone(), std::path::PathBuf::from("data/usage_history.json")));
+    pub fn insert_usage(&self, profile: &str, pinyin: &str, entries: &[(String, u32)]) {
+        if let Some(ref db) = self.db {
+            let key = format!("usage:{}:{}", profile, pinyin);
+            if let Ok(val) = serde_json::to_vec(entries) {
+                let _ = db.insert(key, val);
+            }
         }
+    }
+
+    pub fn save_learned_words(&self) {
+        // ... (保持空或仅在需要强制持久化时使用)
     }
 }

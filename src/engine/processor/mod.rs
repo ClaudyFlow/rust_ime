@@ -457,40 +457,42 @@ impl Processor {
 
         // 1. 记录调频记录 (Usage History)
         if self.config.enable_auto_reorder {
-            let mut hist_clone = (**self.config.usage_history.load()).clone();
-            let profile_dict = hist_clone.entry(profile.clone()).or_default();
-            let entries = profile_dict.entry(pinyin.to_string()).or_default();
-            
-            if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
-                entries[pos].1 += 1;
-            } else {
-                entries.push((word.to_string(), 1));
-            }
-            entries.sort_by(|a, b| b.1.cmp(&a.1));
-            
-            self.config.usage_history.store(Arc::new(hist_clone));
-            self.config.save_usage_history();
-        }
-
-        // 2. 记录造词记录 (Word Discovery / Learned Words)
-        // 规则：字数 > 1 且 词库中搜不到该全拼匹配
-        if self.config.enable_word_discovery && word_len > 1 {
-            let is_new_word = !self.engine.has_exact_match(&profile, pinyin, word);
-            
-            if is_new_word {
-                let mut learned_clone = (**self.config.learned_words.load()).clone();
-                let profile_dict = learned_clone.entry(profile).or_default();
-                let entries = profile_dict.entry(pinyin.to_string()).or_default();
-                
+            let mut updated_entries = Vec::new();
+            self.config.usage_history.rcu(|hist| {
+                let mut hist_clone = (**hist).clone();
+                let entries = hist_clone.entry(profile.clone()).or_default().entry(pinyin.to_string()).or_default();
                 if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
                     entries[pos].1 += 1;
                 } else {
                     entries.push((word.to_string(), 1));
                 }
                 entries.sort_by(|a, b| b.1.cmp(&a.1));
-                
-                self.config.learned_words.store(Arc::new(learned_clone));
-                self.config.save_learned_words();
+                updated_entries = entries.clone();
+                Arc::new(hist_clone)
+            });
+            // 增量持久化到数据库
+            self.config.insert_usage(&profile, pinyin, &updated_entries);
+        }
+
+        // 2. 记录造词记录 (Learned Words)
+        if self.config.enable_word_discovery && word_len > 1 {
+            let is_new_word = !self.engine.has_exact_match(&profile, pinyin, word);
+            if is_new_word {
+                let mut updated_entries = Vec::new();
+                self.config.learned_words.rcu(|learned| {
+                    let mut learned_clone = (**learned).clone();
+                    let entries = learned_clone.entry(profile.clone()).or_default().entry(pinyin.to_string()).or_default();
+                    if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
+                        entries[pos].1 += 1;
+                    } else {
+                        entries.push((word.to_string(), 1));
+                    }
+                    entries.sort_by(|a, b| b.1.cmp(&a.1));
+                    updated_entries = entries.clone();
+                    Arc::new(learned_clone)
+                });
+                // 增量持久化到数据库
+                self.config.insert_learned(&profile, pinyin, &updated_entries);
             }
         }
     }
