@@ -47,7 +47,7 @@ pub trait Translator: Send + Sync {
 
 /// 4. 过滤器：对候选词列表的后期加工
 pub trait Filter: Send + Sync {
-    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config);
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config, query: &str);
 }
 
 /// 默认切分器实现 (Max Match)
@@ -210,15 +210,18 @@ pub struct AdaptiveFilter {
     pub profile: String,
 }
 impl Filter for AdaptiveFilter {
-    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config, query: &str) {
         if !config.input.enable_auto_reorder { return; }
         let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
-            for c in candidates.iter_mut() {
-                // 在用户历史中查找该词的出现频率 (调频)
-                for words in profile_dict.values() {
-                    if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
-                        c.weight += (words[pos].1 as f64) * 1000.0; // 显著加成
+            // 精准调频：只查找当前输入拼音下的历史
+            if let Some(history_entries) = profile_dict.get(query) {
+                for c in candidates.iter_mut() {
+                    if let Some(pos) = history_entries.iter().position(|(w, _)| w == &c.simplified) {
+                        let count = history_entries[pos].1;
+                        // 强效加成：使用百万级系数，确保用户常用词置顶
+                        c.weight += (count as f64) * 1000000.0;
+                        c.source = format!("{} (Hist)", c.source);
                     }
                 }
             }
@@ -229,21 +232,18 @@ impl Filter for AdaptiveFilter {
 /// 排序与去重过滤器
 pub struct SortFilter;
 impl Filter for SortFilter {
-    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config, _query: &str) {
         let ranking = &config.input.ranking;
-        // 核心排序：
-        // 1. 评分基础 = 权重
-        // 2. 来源加成：User 来源最优先
-        // 3. 长度惩罚：字数越多的词，惩罚越大
+        // 核心排序逻辑
         candidates.sort_by(|a, b| {
             let mut score_a = a.weight;
             let mut score_b = b.weight;
 
-            if a.source == "User" { score_a += ranking.user_dict_bonus; }
-            if b.source == "User" { score_b += ranking.user_dict_bonus; }
+            // 用户自造词或历史常用词获得额外加成
+            if a.source.contains("User") || a.source.contains("Hist") { score_a += ranking.user_dict_bonus; }
+            if b.source.contains("User") || b.source.contains("Hist") { score_b += ranking.user_dict_bonus; }
 
-            // 针对拼音输入优化：
-            // 单字通常有更高的优先级
+            // 针对拼音输入优化：单字加成
             if a.text.chars().count() == 1 { score_a += ranking.single_char_bonus; }
             if b.text.chars().count() == 1 { score_b += ranking.single_char_bonus; }
 
@@ -254,8 +254,8 @@ impl Filter for SortFilter {
             score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
         
-        // 去重
-        let mut seen = HashSet::new();
+        // 去重逻辑：保留最高分的那一个
+        let mut seen = std::collections::HashSet::new();
         candidates.retain(|c| seen.insert(c.simplified.clone()));
     }
 }
@@ -263,7 +263,7 @@ impl Filter for SortFilter {
 /// 繁简转换过滤器
 pub struct TraditionalFilter;
 impl Filter for TraditionalFilter {
-    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config) {
+    fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config, _query: &str) {
         let use_trad = config.input.enable_traditional;
         for c in candidates.iter_mut() {
             c.text = if use_trad { c.traditional.clone() } else { c.simplified.clone() };
@@ -311,7 +311,7 @@ impl Pipeline {
             candidates.extend(t.translate(input, &segments, config, limit));
         }
         for f in &self.filters {
-            f.filter(&mut candidates, config);
+            f.filter(&mut candidates, config, input);
         }
         candidates
     }

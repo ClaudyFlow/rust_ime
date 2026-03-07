@@ -48,7 +48,6 @@ pub struct ConfigManager {
 
     pub phantom_type: PhantomType,
 
-    pub enable_user_dict: bool,
     pub enable_word_discovery: bool,
     pub enable_auto_reorder: bool,
     pub enable_fixed_first_candidate: bool,
@@ -111,7 +110,6 @@ impl ConfigManager {
             punctuations: master.input.punctuations.clone(),
             keyboard_layouts: master.input.keyboard_layouts.clone(),
             phantom_type: if cfg!(target_os = "windows") { PhantomType::None } else { master.input.phantom_type },
-            enable_user_dict: master.input.enable_user_dict,
             enable_word_discovery: master.input.enable_word_discovery,
             enable_auto_reorder: master.input.enable_auto_reorder,
             enable_fixed_first_candidate: master.input.enable_fixed_first_candidate,
@@ -129,7 +127,6 @@ impl ConfigManager {
 
     pub fn apply_config(&mut self, conf: &Config) {
         self.master_config = conf.clone();
-        self.enable_user_dict = conf.input.enable_user_dict;
         self.enable_word_discovery = conf.input.enable_word_discovery;
         self.enable_auto_reorder = conf.input.enable_auto_reorder;
         self.enable_fixed_first_candidate = conf.input.enable_fixed_first_candidate;
@@ -189,7 +186,7 @@ impl ConfigManager {
             self.phantom_type = PhantomType::None;
         }
 
-        if self.enable_user_dict && (self.learned_words.load().is_empty() || self.usage_history.load().is_empty()) {
+        if (self.enable_word_discovery || self.enable_auto_reorder) && (self.learned_words.load().is_empty() || self.usage_history.load().is_empty()) {
             self.load_user_dicts();
         }
     }
@@ -214,7 +211,7 @@ impl ConfigManager {
             std::thread::spawn(move || {
                 while let Ok((dict, path)) = rx.recv() {
                     let mut latest = dict;
-                    let mut latest_path = path;
+                    let latest_path = path;
                     while let Ok((next, next_path)) = rx.try_recv() {
                         if next_path == latest_path { latest = next; }
                     }

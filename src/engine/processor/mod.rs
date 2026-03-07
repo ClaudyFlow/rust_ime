@@ -202,11 +202,6 @@ impl Processor {
         }
     }
 
-    pub fn save_user_dict(&self) {
-        self.config.save_learned_words();
-        self.config.save_usage_history();
-    }
-
     pub fn handle_key_ext(&mut self, key: VirtualKey, val: i32, shift_pressed: bool, ctrl_pressed: bool, alt_pressed: bool, perform_lookup: bool) -> Action {
         let now = Instant::now();
         let is_press = val == 1;
@@ -273,7 +268,7 @@ impl Processor {
         let now = Instant::now();
         let py = self.session.last_lookup_pinyin.clone();
 
-        if self.config.enable_user_dict && !py.is_empty() && index != 99 {
+        if !py.is_empty() && index != 99 {
             if now.duration_since(self.last_commit_time) > Duration::from_secs(3) {
                 self.commit_history.clear();
             }
@@ -454,7 +449,7 @@ impl Processor {
     }
 
     pub fn record_usage(&mut self, pinyin: &str, word: &str) {
-        if !self.config.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
+        if pinyin.is_empty() || word.is_empty() { return; }
         if std::env::args().any(|a| a == "--test") { return; }
         
         let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
