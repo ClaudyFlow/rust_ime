@@ -32,12 +32,16 @@ impl SchemeCandidate {
     }
 }
 
+use std::sync::Arc;
+use crate::engine::config_manager::UserDictData;
+use arc_swap::ArcSwap;
+
 /// 方案执行时的上下文环境
 pub struct SchemeContext<'a> {
     pub config: &'a Config,
     pub tries: &'a HashMap<String, Trie>,
     pub syllables: &'a std::collections::HashSet<String>,
-    pub _user_dict: &'a std::sync::Arc<std::sync::Mutex<HashMap<String, HashMap<String, Vec<(String, u32)>>>>>,
+    pub _user_dict: &'a Arc<ArcSwap<UserDictData>>,
     pub active_profiles: &'a [String],
     pub candidate_count: usize,
     pub _filter_mode: FilterMode,

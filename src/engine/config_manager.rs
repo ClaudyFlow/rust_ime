@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use arc_swap::ArcSwap;
 use std::time::Duration;
 use crate::config::{Config, AuxMode, AntiTypoMode, PhantomType, DoublePinyinScheme, FuzzyPinyinConfig, PunctuationEntry};
 
@@ -57,7 +58,7 @@ pub struct ConfigManager {
     pub enable_traditional: bool,
 
     // 用户个人词库相关逻辑也移至此处（可选，目前先放配置）
-    pub user_dict: Arc<Mutex<UserDictData>>,
+    pub user_dict: Arc<ArcSwap<UserDictData>>,
     pub user_dict_tx: Option<std::sync::mpsc::Sender<UserDictData>>,
 }
 
@@ -114,7 +115,7 @@ impl ConfigManager {
             enable_fuzzy_pinyin: master.input.enable_fuzzy_pinyin,
             fuzzy_config: master.input.fuzzy_config.clone(),
             enable_traditional: master.input.enable_traditional,
-            user_dict: Arc::new(Mutex::new(HashMap::new())),
+            user_dict: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             user_dict_tx: None,
         }
     }
@@ -179,7 +180,7 @@ impl ConfigManager {
             self.phantom_type = PhantomType::None;
         }
 
-        if self.enable_user_dict && self.user_dict.lock().is_ok_and(|d| d.is_empty()) {
+        if self.enable_user_dict && self.user_dict.load().is_empty() {
             self.load_user_dict();
         }
     }
@@ -189,9 +190,7 @@ impl ConfigManager {
         if path.exists() {
             if let Ok(file) = std::fs::File::open(path) {
                 if let Ok(dict) = serde_json::from_reader(std::io::BufReader::new(file)) {
-                    if let Ok(mut d) = self.user_dict.lock() {
-                        *d = dict;
-                    }
+                    self.user_dict.store(Arc::new(dict));
                 }
             }
         }
@@ -213,9 +212,7 @@ impl ConfigManager {
 
     pub fn save_user_dict(&self) {
         if let Some(ref tx) = self.user_dict_tx {
-            if let Ok(dict) = self.user_dict.lock() {
-                let _ = tx.send(dict.clone());
-            }
+            let _ = tx.send((**self.user_dict.load()).clone());
         }
     }
 }

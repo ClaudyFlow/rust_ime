@@ -855,13 +855,15 @@ impl Processor {
     fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.config.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
         let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
-        let mut dict = self.config.user_dict.lock().unwrap();
-        let profile_dict = dict.entry(profile).or_default();
+        
+        let mut dict_clone = (**self.config.user_dict.load()).clone();
+        let profile_dict = dict_clone.entry(profile).or_default();
         let entries = profile_dict.entry(pinyin.to_string()).or_default();
         if let Some(pos) = entries.iter().position(|(w, _)| w == word) { entries[pos].1 += 1; }
         else { entries.push((word.to_string(), 1)); }
         entries.sort_by(|a, b| b.1.cmp(&a.1));
-        drop(dict);
+        
+        self.config.user_dict.store(Arc::new(dict_clone));
         self.save_user_dict();
     }
 

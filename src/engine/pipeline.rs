@@ -162,26 +162,25 @@ impl Translator for TableTranslator {
 
 /// 用户词库翻译器 (仅处理用户自造词)
 pub struct UserDictTranslator {
-    pub user_dict: Arc<Mutex<UserDictData>>,
+    pub user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub profile: String,
 }
 impl Translator for UserDictTranslator {
     fn translate(&self, _input: &str, segments: &[String], _config: &Config, _limit: usize) -> Vec<Candidate> {
         let query = segments.join("");
         let mut results = Vec::new();
-        if let Ok(dict) = self.user_dict.lock() {
-            if let Some(profile_dict) = dict.get(&self.profile) {
-                if let Some(words) = profile_dict.get(&query) {
-                    for (text, freq) in words {
-                        results.push(Candidate {
-                            simplified: text.clone(),
-                            traditional: text.clone(),
-                            text: text.clone(),
-                            hint: "★".into(),
-                            source: "User".into(),
-                            weight: (*freq as f64) + 10000.0, // 基础分
-                        });
-                    }
+        let dict = self.user_dict.load();
+        if let Some(profile_dict) = dict.get(&self.profile) {
+            if let Some(words) = profile_dict.get(&query) {
+                for (text, freq) in words {
+                    results.push(Candidate {
+                        simplified: text.clone(),
+                        traditional: text.clone(),
+                        text: text.clone(),
+                        hint: "★".into(),
+                        source: "User".into(),
+                        weight: (*freq as f64) + 10000.0, // 基础分
+                    });
                 }
             }
         }
@@ -191,19 +190,18 @@ impl Translator for UserDictTranslator {
 
 /// 调频过滤器：根据用户历史频率对已有候选词进行动态评分加成
 pub struct AdaptiveFilter {
-    pub user_dict: Arc<Mutex<UserDictData>>,
+    pub user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub profile: String,
 }
 impl Filter for AdaptiveFilter {
     fn filter(&self, candidates: &mut Vec<Candidate>, _config: &Config) {
-        if let Ok(dict) = self.user_dict.lock() {
-            if let Some(profile_dict) = dict.get(&self.profile) {
-                for c in candidates.iter_mut() {
-                    // 在用户历史中查找该词的出现频率 (调频)
-                    for words in profile_dict.values() {
-                        if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
-                            c.weight += words[pos].1 as f64 * 1000.0; // 显著加成
-                        }
+        let dict = self.user_dict.load();
+        if let Some(profile_dict) = dict.get(&self.profile) {
+            for c in candidates.iter_mut() {
+                // 在用户历史中查找该词的出现频率 (调频)
+                for words in profile_dict.values() {
+                    if let Some(pos) = words.iter().position(|(w, _)| w == &c.simplified) {
+                        c.weight += words[pos].1 as f64 * 1000.0; // 显著加成
                     }
                 }
             }
@@ -389,7 +387,7 @@ impl SearchEngine {
                 config: query.config,
                 tries: &HashMap::new(),
                 syllables: query.syllables,
-                _user_dict: &Arc::new(Mutex::new(HashMap::new())),
+                _user_dict: &Arc::new(arc_swap::ArcSwap::from_pointee(HashMap::new())),
                 active_profiles: &vec![query.profile.to_string()],
                 candidate_count: 0,
                 _filter_mode: query.filter_mode.clone(),
