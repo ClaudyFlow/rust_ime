@@ -4,7 +4,15 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-pub type TrieRawResult = (String, String, String, String, String, u32);
+#[derive(Clone, Copy)]
+pub struct TrieResult<'a> {
+    pub word: &'a str,
+    pub trad: &'a str,
+    pub tone: &'a str,
+    pub en: &'a str,
+    pub stroke_aux: &'a str,
+    pub weight: u32,
+}
 
 #[derive(Clone)]
 pub struct MmapData(Arc<Mmap>);
@@ -30,7 +38,7 @@ impl Trie {
         Ok(Self { index, data: data_data })
     }
 
-    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<TrieRawResult>> {
+    pub fn get_all_exact(&self, pinyin: &str) -> Option<Vec<TrieResult<'_>>> {
         let _span = tracing::debug_span!("trie_exact", %pinyin).entered();
         let offset = self.index.get(pinyin)? as usize;
         Some(self.read_block(offset))
@@ -53,7 +61,7 @@ impl Trie {
         false
     }
 
-    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<TrieRawResult> {
+    pub fn search_bfs(&self, prefix: &str, limit: usize) -> Vec<TrieResult<'_>> {
         let _span = tracing::debug_span!("trie_bfs", %prefix, limit).entered();
         let mut results = Vec::new();
         
@@ -68,7 +76,7 @@ impl Trie {
         while let Some((_, offset)) = stream.next() {
             let pairs = self.read_block(offset as usize);
             for pair in pairs {
-                if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
+                if !results.iter().any(|tr: &TrieResult| tr.word == pair.word) {
                     results.push(pair);
                     if results.len() >= limit { return results; }
                 }
@@ -78,7 +86,7 @@ impl Trie {
     }
 
     /// 通配符搜索实现：z 匹配任意单个 a-y 字母
-    pub fn search_wildcard(&self, pattern: &str, limit: usize) -> Vec<TrieRawResult> {
+    pub fn search_wildcard(&self, pattern: &str, limit: usize) -> Vec<TrieResult<'_>> {
         let mut results = Vec::new();
         
         // 简单的 DFS 实现通配符匹配
@@ -88,7 +96,7 @@ impl Trie {
             if self.wildcard_match(pattern, &key) {
                 let pairs = self.read_block(offset as usize);
                 for pair in pairs {
-                    if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
+                    if !results.iter().any(|tr: &TrieResult| tr.word == pair.word) {
                         results.push(pair);
                         if results.len() >= limit { return results; }
                     }
@@ -118,7 +126,7 @@ impl Trie {
         true
     }
 
-    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<TrieRawResult> {
+    pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<TrieResult<'_>> {
         if segments.is_empty() { return Vec::new(); }
         let mut results = Vec::with_capacity(limit);
         
@@ -135,7 +143,7 @@ impl Trie {
             if self.matches_segments(&key, segments, syllables) {
                 let pairs = self.read_block(offset as usize);
                 for pair in pairs {
-                    if !results.iter().any(|(w, _, _, _, _, _)| w == &pair.0) {
+                    if !results.iter().any(|tr: &TrieResult| tr.word == pair.word) {
                         results.push(pair);
                         if results.len() >= limit { return results; }
                     }
@@ -193,7 +201,7 @@ impl Trie {
     }
 
     #[allow(dead_code)]
-    pub fn get_random_entry(&self) -> Option<(String, String, String, String, String, u32)> {
+    pub fn get_random_entry(&self) -> Option<TrieResult<'_>> {
         let len = self.index.len();
         if len == 0 { return None; }
         
@@ -206,14 +214,14 @@ impl Trie {
         while let Some((_, offset)) = stream.next() {
             if current == target_idx {
                 let pairs = self.read_block(offset as usize);
-                return pairs.first().cloned();
+                return pairs.first().copied();
             }
             current += 1;
         }
         None
     }
 
-    fn read_block(&self, offset: usize) -> Vec<TrieRawResult> {
+    fn read_block(&self, offset: usize) -> Vec<TrieResult<'_>> {
         let data = self.data.as_ref();
         if offset + 4 > data.len() { return Vec::new(); }
         
@@ -226,42 +234,42 @@ impl Trie {
             let w_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
             if cursor + w_len > data.len() { break; }
-            let word = String::from_utf8_lossy(&data[cursor..cursor+w_len]).to_string();
+            let word = std::str::from_utf8(&data[cursor..cursor+w_len]).unwrap_or("");
             cursor += w_len;
 
             if cursor + 2 > data.len() { break; }
             let tr_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
             if cursor + tr_len > data.len() { break; }
-            let trad = String::from_utf8_lossy(&data[cursor..cursor+tr_len]).to_string();
+            let trad = std::str::from_utf8(&data[cursor..cursor+tr_len]).unwrap_or("");
             cursor += tr_len;
             
             if cursor + 2 > data.len() { break; }
             let t_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
             if cursor + t_len > data.len() { break; }
-            let tone = String::from_utf8_lossy(&data[cursor..cursor+t_len]).to_string();
+            let tone = std::str::from_utf8(&data[cursor..cursor+t_len]).unwrap_or("");
             cursor += t_len;
 
             if cursor + 2 > data.len() { break; }
             let e_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
             if cursor + e_len > data.len() { break; }
-            let en = String::from_utf8_lossy(&data[cursor..cursor+e_len]).to_string();
+            let en = std::str::from_utf8(&data[cursor..cursor+e_len]).unwrap_or("");
             cursor += e_len;
 
             if cursor + 2 > data.len() { break; }
             let s_len = u16::from_le_bytes(data[cursor..cursor+2].try_into().unwrap_or([0; 2])) as usize;
             cursor += 2;
             if cursor + s_len > data.len() { break; }
-            let stroke_aux = String::from_utf8_lossy(&data[cursor..cursor+s_len]).to_string();
+            let stroke_aux = std::str::from_utf8(&data[cursor..cursor+s_len]).unwrap_or("");
             cursor += s_len;
 
             if cursor + 4 > data.len() { break; }
             let weight = u32::from_le_bytes(data[cursor..cursor+4].try_into().unwrap_or([0; 4]));
             cursor += 4;
             
-            results.push((word, trad, tone, en, stroke_aux, weight));
+            results.push(TrieResult { word, trad, tone, en, stroke_aux, weight });
         }
         results
     }

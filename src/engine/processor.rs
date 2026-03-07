@@ -107,6 +107,11 @@ impl Processor {
                 let out = self.session.buffer.clone();
                 self.commit_candidate(out, 99)
             }
+            Command::CommitRaw => {
+                if self.session.buffer.is_empty() { return Action::PassThrough; }
+                let out = self.session.buffer.clone();
+                self.commit_candidate(out, 99)
+            }
             Command::Clear => {
                 self.commit_history.clear();
                 let del = self.session.phantom_text.chars().count();
@@ -202,7 +207,7 @@ impl Processor {
         self.dispatcher.key_map.insert((VirtualKey::PageDown, none), Command::NextPage);
         
         self.dispatcher.key_map.insert((VirtualKey::Space, none), Command::Commit);
-        self.dispatcher.key_map.insert((VirtualKey::Enter, none), Command::Commit);
+        self.dispatcher.key_map.insert((VirtualKey::Enter, none), Command::CommitRaw);
         self.dispatcher.key_map.insert((VirtualKey::Esc, none), Command::Clear);
         self.dispatcher.key_map.insert((VirtualKey::Delete, none), Command::Clear);
     }
@@ -643,43 +648,47 @@ impl Processor {
         self.commit_history.clear(); 
         Action::DeleteAndEmit { delete: del_len, insert: commit_text }
     }
-
-    fn commit_candidate(&mut self, mut cand: String, _index: usize) -> Action {
+    fn commit_candidate(&mut self, mut cand: String, index: usize) -> Action {
         let now = Instant::now();
         let py = self.session.last_lookup_pinyin.clone();
 
-        if self.config.enable_user_dict && !py.is_empty() {
-            self.record_usage(&py, &cand);
+        if self.config.enable_user_dict && !py.is_empty() && index != 99 {
             if now.duration_since(self.last_commit_time) > Duration::from_secs(3) {
                 self.commit_history.clear();
             }
             self.commit_history.push((py.clone(), cand.clone()));
-            if self.commit_history.len() >= 2 {
-                let start = if self.commit_history.len() > 4 { self.commit_history.len() - 4 } else { 0 };
-                let mut new_combinations = Vec::new();
-                {
-                    let history_slice = &self.commit_history[start..];
-                    for i in 0..(history_slice.len() - 1) {
-                        let mut combined_py = String::new();
-                        let mut combined_word = String::new();
-                        for j in i..history_slice.len() {
-                            combined_py.push_str(&history_slice[j].0);
-                            combined_word.push_str(&history_slice[j].1);
-                        }
-                        if combined_word.chars().count() <= 8 {
-                            new_combinations.push((combined_py, combined_word));
-                        }
+            self.record_usage(&py, &cand);
+
+            // 连打组合记忆逻辑
+            let start = if self.commit_history.len() > 4 { self.commit_history.len() - 4 } else { 0 };
+            let mut new_combinations = Vec::new();
+            {
+                let history_slice = &self.commit_history[start..];
+                for i in 0..(history_slice.len() - 1) {
+                    let mut combined_py = String::new();
+                    let mut combined_word = String::new();
+                    for j in i..history_slice.len() {
+                        combined_py.push_str(&history_slice[j].0);
+                        combined_word.push_str(&history_slice[j].1);
+                    }
+                    if combined_word.chars().count() <= 8 {
+                        new_combinations.push((combined_py, combined_word));
                     }
                 }
-                for (py, word) in new_combinations {
-                    self.record_usage(&py, &word);
-                }
+            }
+            for (py_c, word_c) in new_combinations {
+                self.record_usage(&py_c, &word_c);
             }
             self.last_commit_time = now;
         }
 
-        if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { cand.push(' '); }
-        let del = self.session.phantom_text.chars().count(); self.clear_composing(); Action::DeleteAndEmit { delete: del, insert: cand }
+        if self.active_profiles.len() == 1 && self.active_profiles[0] == "english" && !cand.is_empty() && cand.chars().last().unwrap_or(' ').is_alphanumeric() { 
+            cand.push(' '); 
+        }
+        
+        let del = self.session.phantom_text.chars().count(); 
+        self.clear_composing(); 
+        Action::DeleteAndEmit { delete: del, insert: cand }
     }
 
     pub fn update_phantom_action(&mut self) -> Action {
@@ -854,6 +863,7 @@ impl Processor {
 
     fn record_usage(&mut self, pinyin: &str, word: &str) {
         if !self.config.enable_user_dict || pinyin.is_empty() || word.is_empty() { return; }
+        if std::env::args().any(|a| a == "--test") { return; }
         let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
         
         let mut dict_clone = (**self.config.user_dict.load()).clone();

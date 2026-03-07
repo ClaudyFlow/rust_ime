@@ -67,24 +67,24 @@ impl InputScheme for StrokeScheme {
                 // 1. 如果包含通配符，使用搜索方法
                 if has_wildcard {
                     let matches = trie.search_wildcard(query, 50);
-                    for (w, tr, t, e, s, weight) in matches {
-                        let mut cand = SchemeCandidate::new(w, weight);
-                        cand.traditional = tr;
-                        cand.tone = t;
-                        cand.english = e;
-                        cand.stroke_aux = s;
+                    for tr in matches {
+                        let mut cand = SchemeCandidate::new(tr.word.to_string(), tr.weight);
+                        cand.traditional = tr.trad.to_string();
+                        cand.tone = tr.tone.to_string();
+                        cand.english = tr.en.to_string();
+                        cand.stroke_aux = tr.stroke_aux.to_string();
                         cand.match_level = 2; // 通配匹配设为 2
                         results.push(cand);
                     }
                 } else {
                     // 2. 无通配符，执行常规精确 + 前缀匹配
                     if let Some(matches) = trie.get_all_exact(query) {
-                        for (w, tr, t, e, s, weight) in matches {
-                            let mut cand = SchemeCandidate::new(w, weight);
-                            cand.traditional = tr;
-                            cand.tone = t;
-                            cand.english = e;
-                            cand.stroke_aux = s;
+                        for tr in matches {
+                            let mut cand = SchemeCandidate::new(tr.word.to_string(), tr.weight);
+                            cand.traditional = tr.trad.to_string();
+                            cand.tone = tr.tone.to_string();
+                            cand.english = tr.en.to_string();
+                            cand.stroke_aux = tr.stroke_aux.to_string();
                             cand.match_level = 3;
                             results.push(cand);
                         }
@@ -92,12 +92,12 @@ impl InputScheme for StrokeScheme {
                     
                     if context.config.input.enable_prefix_matching {
                         let matches = trie.search_bfs(query, 50);
-                        for (w, tr, t, e, s, weight) in matches {
-                            let mut cand = SchemeCandidate::new(w, weight);
-                            cand.traditional = tr;
-                            cand.tone = t;
-                            cand.english = e;
-                            cand.stroke_aux = s;
+                        for tr in matches {
+                            let mut cand = SchemeCandidate::new(tr.word.to_string(), tr.weight);
+                            cand.traditional = tr.trad.to_string();
+                            cand.tone = tr.tone.to_string();
+                            cand.english = tr.en.to_string();
+                            cand.stroke_aux = tr.stroke_aux.to_string();
                             cand.match_level = 1;
                             results.push(cand);
                         }

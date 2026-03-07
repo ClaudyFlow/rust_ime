@@ -100,37 +100,41 @@ impl Translator for TableTranslator {
 
         // 1. 尝试全拼精确匹配
         if let Some(exact_results) = self.trie.get_all_exact(&query) {
-            for (text, trad, _tone, en, stroke_aux, weight) in exact_results {
+            for tr in exact_results {
                 let mut hint = String::new();
-                if config.appearance.show_english_aux && !en.is_empty() { hint.push_str(&en); }
-                if config.appearance.show_stroke_aux && !stroke_aux.is_empty() {
+                if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
+                if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
                     if !hint.is_empty() { hint.push(' '); }
-                    hint.push_str(&stroke_aux);
+                    hint.push_str(tr.stroke_aux);
                 }
                 candidates.push(Candidate {
-                    simplified: text.clone(),
-                    traditional: if trad.is_empty() { text.clone() } else { trad },
-                    text, hint, source: "Table (Exact)".into(),
-                    weight: weight as f64 + config.input.ranking.exact_match_bonus, 
+                    simplified: tr.word.to_string(),
+                    traditional: if tr.trad.is_empty() { tr.word.to_string() } else { tr.trad.to_string() },
+                    text: tr.word.to_string(), 
+                    hint, 
+                    source: "Table (Exact)".into(),
+                    weight: tr.weight as f64 + config.input.ranking.exact_match_bonus, 
                 });
             }
         }
         
         // 2. 尝试前缀匹配
         let results = self.trie.search_bfs(&query, limit);
-        for (text, trad, _tone, en, stroke_aux, weight) in results {
-            if candidates.iter().any(|c| c.simplified == text) { continue; }
+        for tr in results {
+            if candidates.iter().any(|c| c.simplified == tr.word) { continue; }
             let mut hint = String::new();
-            if config.appearance.show_english_aux && !en.is_empty() { hint.push_str(&en); }
-            if config.appearance.show_stroke_aux && !stroke_aux.is_empty() {
+            if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
+            if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
                 if !hint.is_empty() { hint.push(' '); }
-                hint.push_str(&stroke_aux);
+                hint.push_str(tr.stroke_aux);
             }
             candidates.push(Candidate {
-                simplified: text.clone(),
-                traditional: if trad.is_empty() { text.clone() } else { trad },
-                text, hint, source: "Table".into(),
-                weight: weight as f64,
+                simplified: tr.word.to_string(),
+                traditional: if tr.trad.is_empty() { tr.word.to_string() } else { tr.trad.to_string() },
+                text: tr.word.to_string(), 
+                hint, 
+                source: "Table".into(),
+                weight: tr.weight as f64,
             });
             if candidates.len() >= limit { break; }
         }
@@ -139,18 +143,20 @@ impl Translator for TableTranslator {
         if candidates.len() < 10 && config.input.enable_abbreviation_matching {
             let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
-                if !candidates.iter().any(|r| r.simplified == ar.0) {
+                if !candidates.iter().any(|r| r.simplified == ar.word) {
                     let mut hint = String::new();
-                    if config.appearance.show_english_aux && !ar.3.is_empty() { hint.push_str(&ar.3); }
-                    if config.appearance.show_stroke_aux && !ar.4.is_empty() {
+                    if config.appearance.show_english_aux && !ar.en.is_empty() { hint.push_str(ar.en); }
+                    if config.appearance.show_stroke_aux && !ar.stroke_aux.is_empty() {
                         if !hint.is_empty() { hint.push(' '); }
-                        hint.push_str(&ar.4);
+                        hint.push_str(ar.stroke_aux);
                     }
                     candidates.push(Candidate {
-                        simplified: ar.0.clone(),
-                        traditional: if ar.1.is_empty() { ar.0.clone() } else { ar.1 },
-                        text: ar.0, hint, source: "Table (Abbr)".into(),
-                        weight: (ar.5 as f64) - 5000.0, 
+                        simplified: ar.word.to_string(),
+                        traditional: if ar.trad.is_empty() { ar.word.to_string() } else { ar.trad.to_string() },
+                        text: ar.word.to_string(), 
+                        hint, 
+                        source: "Table (Abbr)".into(),
+                        weight: (ar.weight as f64) - 5000.0, 
                     });
                 }
                 if candidates.len() >= limit + 10 { break; }

@@ -32,6 +32,7 @@ pub enum Command {
     PrevCandidate,
     Select(usize),
     Commit,
+    CommitRaw,
     Clear,
 }
 

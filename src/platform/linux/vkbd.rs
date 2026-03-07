@@ -3,8 +3,9 @@ use evdev::{AttributeSet, InputEvent, Key, Device, EventType};
 use std::thread;
 use std::time::Duration;
 use std::process::Command;
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Arc, Mutex};
 use zbus::blocking::Connection;
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PasteMode {
@@ -18,25 +19,28 @@ pub enum PasteMode {
     Fcitx5,     // Native D-Bus CommitString method
 }
 
+enum VkbdTask {
+    SendText(String, bool), // text, highlight
+    Backspace(usize),
+}
+
 pub struct Vkbd {
-    pub dev: VirtualDevice,
-    pub paste_mode: PasteMode,
-    pub clipboard_delay_ms: u64,
-    dbus_conn: Option<Connection>,
+    pub dev: Arc<Mutex<VirtualDevice>>,
+    pub paste_mode: Arc<Mutex<PasteMode>>,
+    pub clipboard_delay_ms: Arc<Mutex<u64>>,
+    task_tx: Sender<VkbdTask>,
 }
 
 impl Vkbd {
     pub fn new(phys_dev: &Device) -> Result<Self, Box<dyn std::error::Error>> {
         let mut keys = AttributeSet::new();
         
-        // 核心：直接克隆物理设备支持的所有按键，这样最稳妥
         if let Some(supported) = phys_dev.supported_keys() {
             for k in supported.iter() {
                 keys.insert(k);
             }
         }
         
-        // 确保必要的修饰键
         keys.insert(Key::KEY_LEFTCTRL);
         keys.insert(Key::KEY_RIGHTCTRL);
         keys.insert(Key::KEY_LEFTSHIFT);
@@ -48,7 +52,7 @@ impl Vkbd {
         keys.insert(Key::KEY_ENTER);
         keys.insert(Key::KEY_KPENTER);
 
-        let dev = VirtualDeviceBuilder::new()? 
+        let dev_raw = VirtualDeviceBuilder::new()? 
             .name("rust-ime-v2")
             .with_keys(&keys)?
             .with_msc(&{
@@ -58,20 +62,45 @@ impl Vkbd {
             })?
             .build()?;
 
-        // 尝试建立 D-Bus 连接 (Fcitx5)
+        let dev = Arc::new(Mutex::new(dev_raw));
+        let paste_mode = Arc::new(Mutex::new(PasteMode::ShiftInsert));
+        let clipboard_delay_ms = Arc::new(Mutex::new(50));
         let dbus_conn = Connection::session().ok();
+
+        let (task_tx, task_rx) = mpsc::channel::<VkbdTask>();
+
+        // 启动后台工作线程
+        let dev_bg = dev.clone();
+        let paste_mode_bg = paste_mode.clone();
+        let delay_bg = clipboard_delay_ms.clone();
+
+        thread::spawn(move || {
+            while let Ok(task) = task_rx.recv() {
+                match task {
+                    VkbdTask::SendText(text, highlight) => {
+                        let p_mode = *paste_mode_bg.lock().unwrap();
+                        let delay = *delay_bg.lock().unwrap();
+                        Self::do_send_text(&dev_bg, p_mode, delay, &dbus_conn, &text, highlight);
+                    }
+                    VkbdTask::Backspace(count) => {
+                        Self::do_backspace(&dev_bg, count);
+                    }
+                }
+            }
+        });
 
         Ok(Self { 
             dev,
-            paste_mode: PasteMode::ShiftInsert, // Standard universal mode
-            clipboard_delay_ms: 50,
-            dbus_conn,
+            paste_mode,
+            clipboard_delay_ms,
+            task_tx,
         })
     }
 
     #[allow(dead_code)]
     pub fn cycle_paste_mode(&mut self) -> String {
-        self.paste_mode = match self.paste_mode {
+        let mut mode_lock = self.paste_mode.lock().unwrap();
+        *mode_lock = match *mode_lock {
             PasteMode::ShiftInsert => PasteMode::CtrlV,
             PasteMode::CtrlV => PasteMode::CtrlShiftV,
             PasteMode::CtrlShiftV => PasteMode::UnicodeHex,
@@ -79,9 +108,10 @@ impl Vkbd {
             PasteMode::Fcitx5 => PasteMode::ShiftInsert,
         };
         
-        println!("[Vkbd] Manually switched paste mode to: {:?}", self.paste_mode);
+        let new_mode = *mode_lock;
+        println!("[Vkbd] Manually switched paste mode to: {:?}", new_mode);
         
-        match self.paste_mode {
+        match new_mode {
             PasteMode::ShiftInsert => "通用模式 (Shift+Insert)".to_string(),
             PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
             PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
@@ -90,261 +120,153 @@ impl Vkbd {
         }
     }
 
-    pub fn send_text(&mut self, text: &str) {
-        self.send_text_internal(text, false);
+    pub fn send_text(&self, text: &str) {
+        let _ = self.task_tx.send(VkbdTask::SendText(text.to_string(), false));
     }
 
-    #[allow(dead_code)]
-    pub fn send_text_highlighted(&mut self, text: &str) {
-        self.send_text_internal(text, true);
+    pub fn backspace(&self, count: usize) {
+        let _ = self.task_tx.send(VkbdTask::Backspace(count));
     }
 
-    fn send_text_internal(&mut self, text: &str, highlight: bool) {
+    pub fn emit_raw(&self, key: Key, value: i32) {
+        Self::do_emit_raw(&self.dev, key, value);
+    }
+
+    // --- 同步工作逻辑 (由后台线程调用) ---
+
+    fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
         if text.is_empty() { return; }
 
         // FAST PATH: Only for supported lowercase, digits and basic punctuation
         if !highlight && text.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || " /'.,;[]\\-=`".contains(c)) {
             for c in text.chars() {
                 if let Some(key) = char_to_key(c) {
-                    self.tap(key);
-                    // 极小延迟防止粘连
+                    Self::do_tap(dev, key);
                     thread::sleep(Duration::from_micros(200));
                 }
             }
             return;
         }
 
-        println!("[IME] Emitting text via heavy path: {} (highlight={})", text, highlight);
+        println!("[Vkbd BG] Emitting text via heavy path: {} (mode={:?})", text, mode);
 
-        // If using UnicodeHex mode, skip clipboard and type directly
-        if self.paste_mode == PasteMode::UnicodeHex {
+        if mode == PasteMode::UnicodeHex {
             for c in text.chars() {
-                self.send_char_via_unicode(c);
+                Self::do_send_char_via_unicode(dev, c);
             }
             return;
         }
 
-        // 0. 优先尝试 Fcitx5
-        if self.paste_mode == PasteMode::Fcitx5 {
-            if self.send_via_fcitx(text) {
-                return;
-            }
-            println!("[Vkbd] Fcitx5 fallback to clipboard...");
+        if mode == PasteMode::Fcitx5 {
+            if Self::do_send_via_fcitx(dbus, text) { return; }
         }
 
-        // 1. 优先尝试剪贴板
-        if self.send_via_clipboard(text) {
-            if highlight {
-                let count = text.chars().count();
-                thread::sleep(Duration::from_millis(150));
-                self.emit(Key::KEY_LEFTSHIFT, true);
-                for _ in 0..count {
-                    self.tap(Key::KEY_LEFT);
-                    thread::sleep(Duration::from_millis(2));
-                }
-                self.emit(Key::KEY_LEFTSHIFT, false);
-            }
+        if Self::do_send_via_clipboard(dev, mode, delay, text) {
             return;
         }
 
-        // 2. 失败处理 (ydotool)
-        if self.send_via_ydotool(text) {
-             self.release_all();
-             return;
-        }
-        self.release_all();
+        let _ = Self::do_send_via_ydotool(text);
     }
 
-    fn send_via_clipboard(&mut self, text: &str) -> bool {
+    fn do_send_via_clipboard(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode, delay: u64, text: &str) -> bool {
         use arboard::Clipboard;
-        
         let mut cb = match Clipboard::new() {
             Ok(c) => c,
-            Err(e) => {
-                eprintln!("[Error] Failed to initialize clipboard (arboard): {}", e);
-                return false;
-            }
+            Err(_) => return false,
         };
 
-        if let Err(e) = cb.set_text(text.to_string()) {
-            eprintln!("[Error] Failed to set clipboard text: {}", e);
-            return false;
-        }
-
-        // 使用配置的延迟时间，确保应用感知到剪贴板变化
-        thread::sleep(Duration::from_millis(self.clipboard_delay_ms));
+        if cb.set_text(text.to_string()).is_err() { return false; }
+        thread::sleep(Duration::from_millis(delay));
         
-        match self.paste_mode {
+        match mode {
             PasteMode::CtrlV => {
-                println!("[Vkbd] Injecting via Ctrl+V");
-                self.emit(Key::KEY_LEFTCTRL, true);
+                Self::do_emit(dev, Key::KEY_LEFTCTRL, true);
                 thread::sleep(Duration::from_millis(15));
-                self.tap(Key::KEY_V);
+                Self::do_tap(dev, Key::KEY_V);
                 thread::sleep(Duration::from_millis(15));
-                self.emit(Key::KEY_LEFTCTRL, false);
-            },
-            PasteMode::CtrlShiftV => {
-                println!("[Vkbd] Injecting via Ctrl+Shift+V");
-                self.emit(Key::KEY_LEFTCTRL, true);
-                self.emit(Key::KEY_LEFTSHIFT, true);
-                thread::sleep(Duration::from_millis(15));
-                self.tap(Key::KEY_V);
-                thread::sleep(Duration::from_millis(15));
-                self.emit(Key::KEY_LEFTSHIFT, false);
-                self.emit(Key::KEY_LEFTCTRL, false);
+                Self::do_emit(dev, Key::KEY_LEFTCTRL, false);
             },
             PasteMode::ShiftInsert => {
-                println!("[Vkbd] Injecting via Shift+Insert");
-                // 粘贴前增加微量同步延迟
-                thread::sleep(Duration::from_millis(10));
-                self.emit(Key::KEY_LEFTSHIFT, true);
+                Self::do_emit(dev, Key::KEY_LEFTSHIFT, true);
                 thread::sleep(Duration::from_millis(15));
-                self.tap(Key::KEY_INSERT);
+                Self::do_tap(dev, Key::KEY_INSERT);
                 thread::sleep(Duration::from_millis(15));
-                self.emit(Key::KEY_LEFTSHIFT, false);
+                Self::do_emit(dev, Key::KEY_LEFTSHIFT, false);
             },
-            PasteMode::UnicodeHex | PasteMode::Fcitx5 => {} // No-op
+            PasteMode::CtrlShiftV => {
+                Self::do_emit(dev, Key::KEY_LEFTCTRL, true);
+                Self::do_emit(dev, Key::KEY_LEFTSHIFT, true);
+                thread::sleep(Duration::from_millis(15));
+                Self::do_tap(dev, Key::KEY_V);
+                thread::sleep(Duration::from_millis(15));
+                Self::do_emit(dev, Key::KEY_LEFTSHIFT, false);
+                Self::do_emit(dev, Key::KEY_LEFTCTRL, false);
+            },
+            _ => {}
         }
-        
         true
     }
-    
-    pub fn backspace(&mut self, count: usize) {
-        if count == 0 { return; }
-        
-        // HACK: 仅在批量删除时使用 Firefox 补丁，单次退格直接发送。
-        if count > 1 {
-            self.tap(Key::KEY_SPACE);
-            self.tap(Key::KEY_BACKSPACE);
-        }
 
+    fn do_backspace(dev: &Arc<Mutex<VirtualDevice>>, count: usize) {
+        if count == 0 { return; }
+        if count > 1 {
+            Self::do_tap(dev, Key::KEY_SPACE);
+            Self::do_tap(dev, Key::KEY_BACKSPACE);
+        }
         for _ in 0..count {
-            self.emit(Key::KEY_BACKSPACE, true);
-            self.emit(Key::KEY_BACKSPACE, false);
+            Self::do_emit_raw(dev, Key::KEY_BACKSPACE, 1);
+            Self::do_emit_raw(dev, Key::KEY_BACKSPACE, 0);
             thread::sleep(Duration::from_micros(50));
         }
     }
 
-    fn send_via_fcitx(&self, text: &str) -> bool {
-        if let Some(ref conn) = self.dbus_conn {
-            let res = conn.call_method(
-                Some("org.fcitx.Fcitx5"),
-                "/controller",
-                Some("org.fcitx.Fcitx.Controller1"),
-                "CommitString",
-                &(text),
-            );
-
-            match res {
-                Ok(_) => true,
-                Err(e) => {
-                    if e.to_string().contains("UnknownMethod") {
-                        eprintln!("[Vkbd] Fcitx5 CommitString 接口未找到。请在 Fcitx5 配置中开启 'Remote Control' (远程控制) 插件。");
-                    } else {
-                        eprintln!("[Vkbd] Native Fcitx5 D-Bus call failed: {}", e);
-                    }
-                    false
-                }
-            }
-        } else {
-            false
-        }
+    fn do_send_via_fcitx(dbus: &Option<Connection>, text: &str) -> bool {
+        if let Some(ref conn) = dbus {
+            conn.call_method(Some("org.fcitx.Fcitx5"), "/controller", Some("org.fcitx.Fcitx.Controller1"), "CommitString", &(text)).is_ok()
+        } else { false }
     }
 
-    fn send_via_ydotool(&self, text: &str) -> bool {
-        let status = Command::new("ydotool")
-            .arg("type")
-            .arg(text)
-            .status();
-        match status {
-            Ok(s) => s.success(),
-            Err(_) => false,
-        }
+    fn do_send_via_ydotool(text: &str) -> bool {
+        Command::new("ydotool").arg("type").arg(text).status().map_or(false, |s| s.success())
     }
 
-    fn send_char_via_unicode(&mut self, ch: char) -> bool {
-        self.emit(Key::KEY_LEFTCTRL, true);
-        self.emit(Key::KEY_LEFTSHIFT, true);
-        self.tap(Key::KEY_U);
-        self.emit(Key::KEY_LEFTCTRL, false);
-        self.emit(Key::KEY_LEFTSHIFT, false);
-
-        // 减小初始化延迟
+    fn do_send_char_via_unicode(dev: &Arc<Mutex<VirtualDevice>>, ch: char) {
+        Self::do_emit(dev, Key::KEY_LEFTCTRL, true);
+        Self::do_emit(dev, Key::KEY_LEFTSHIFT, true);
+        Self::do_tap(dev, Key::KEY_U);
+        Self::do_emit(dev, Key::KEY_LEFTCTRL, false);
+        Self::do_emit(dev, Key::KEY_LEFTSHIFT, false);
         thread::sleep(Duration::from_millis(15));
-
         let hex_str = format!("{:x}", ch as u32);
         for hex_char in hex_str.chars() {
-             if let Some(key) = hex_char_to_key(hex_char) {
-                 self.tap(key);
-                 // 物理延迟降至最低
-                 thread::sleep(Duration::from_micros(500));
-             } else {
-                 return false;
-             }
+             if let Some(key) = hex_char_to_key(hex_char) { Self::do_tap(dev, key); thread::sleep(Duration::from_micros(500)); }
         }
-
-        self.tap(Key::KEY_ENTER);
-        // 减小结束延迟
+        Self::do_tap(dev, Key::KEY_ENTER);
         thread::sleep(Duration::from_millis(10));
-        true
     }
 
-    pub fn tap(&mut self, key: Key) {
-        self.emit(key, true);
+    fn do_tap(dev: &Arc<Mutex<VirtualDevice>>, key: Key) {
+        Self::do_emit(dev, key, true);
         thread::sleep(Duration::from_micros(100));
-        self.emit(key, false);
+        Self::do_emit(dev, key, false);
         thread::sleep(Duration::from_micros(50));
     }
 
-    #[allow(dead_code)]
-    pub fn send_key(&mut self, key: Key, value: i32) {
-        self.emit_raw(key, value);
-    }
-
-    pub fn emit_raw(&mut self, key: Key, value: i32) {
+    fn do_emit_raw(dev: &Arc<Mutex<VirtualDevice>>, key: Key, value: i32) {
         let msc = InputEvent::new(EventType::MISC, evdev::MiscType::MSC_SCAN.0, key.code() as i32);
         let ev = InputEvent::new(EventType::KEY, key.code(), value);
-        let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0); // SYN_REPORT
-        let _ = self.dev.emit(&[msc, ev, syn]);
+        let syn = InputEvent::new(EventType::SYNCHRONIZATION, 0, 0);
+        if let Ok(mut d) = dev.lock() { let _ = d.emit(&[msc, ev, syn]); }
         thread::sleep(Duration::from_micros(300));
     }
 
-    pub fn emit(&mut self, key: Key, down: bool) {
-        let val = if down { 1 } else { 0 };
-        self.emit_raw(key, val);
-    }
-
-    #[allow(dead_code)]
-    pub fn release_all(&mut self) {
-        let modifiers = [
-            Key::KEY_LEFTSHIFT, Key::KEY_RIGHTSHIFT,
-            Key::KEY_LEFTCTRL, Key::KEY_RIGHTCTRL,
-            Key::KEY_LEFTALT, Key::KEY_RIGHTALT,
-            Key::KEY_LEFTMETA, Key::KEY_RIGHTMETA,
-        ];
-        for k in modifiers {
-            self.emit(k, false);
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn copy_selection(&mut self) {
-        self.emit(Key::KEY_LEFTCTRL, true);
-        self.tap(Key::KEY_C);
-        self.emit(Key::KEY_LEFTCTRL, false);
-        thread::sleep(Duration::from_millis(150)); 
-    }
-
-    #[allow(dead_code)]
-    pub fn get_clipboard_text(&self) -> Option<String> {
-        use arboard::Clipboard;
-        let mut cb = Clipboard::new().ok()?;
-        cb.get_text().ok()
+    fn do_emit(dev: &Arc<Mutex<VirtualDevice>>, key: Key, down: bool) {
+        Self::do_emit_raw(dev, key, if down { 1 } else { 0 });
     }
 
     pub fn apply_config(&mut self, config: &crate::config::Config) {
-        self.clipboard_delay_ms = config.input.clipboard_delay_ms;
-        self.paste_mode = match config.linux.paste_method.as_str() {
+        *self.clipboard_delay_ms.lock().unwrap() = config.input.clipboard_delay_ms;
+        *self.paste_mode.lock().unwrap() = match config.linux.paste_method.as_str() {
             "ctrl_v" => PasteMode::CtrlV,
             "ctrl_shift_v" => PasteMode::CtrlShiftV,
             "unicode" => PasteMode::UnicodeHex,
@@ -353,8 +275,6 @@ impl Vkbd {
         };
     }
 }
-
-
 
 fn char_to_key(c: char) -> Option<Key> {
     match c.to_ascii_lowercase() {

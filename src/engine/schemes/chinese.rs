@@ -194,12 +194,12 @@ impl InputScheme for ChineseScheme {
                 if let Some(d) = context.tries.get(profile) {
                     for py in &pinyin_variants {
                         if let Some(m) = d.get_all_exact(py) {
-                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 3)); }
+                            for tr in m { matches.push((tr.word.to_string(), tr.trad.to_string(), tr.tone.to_string(), tr.en.to_string(), tr.stroke_aux.to_string(), tr.weight, 3)); }
                         }
                         if context.config.input.enable_prefix_matching && !py.is_empty() {
                             let limit = if part.stroke_aux.is_some() || part.english_aux.is_some() { 50 } else if py.len() > 3 { 5 } else { 20 };
                             let m = d.search_bfs(py, limit);
-                            for (w, tr, t, e, s, weight) in m { matches.push((w, tr, t, e, s, weight, 1)); }
+                            for tr in m { matches.push((tr.word.to_string(), tr.trad.to_string(), tr.tone.to_string(), tr.en.to_string(), tr.stroke_aux.to_string(), tr.weight, 1)); }
                         }
                     }
                 }
@@ -215,7 +215,7 @@ impl InputScheme for ChineseScheme {
             }
             if let Some(aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
                 let aux_lower = aux.to_lowercase();
-                if !m.3.to_lowercase().split(',').any(|part| part.trim().starts_with(&aux_lower)) { continue; }
+                if !m.3.to_lowercase().split(',').any(|part: &str| part.trim().starts_with(&aux_lower)) { continue; }
             }
 
             if seen.insert(m.0.clone()) {
@@ -237,21 +237,21 @@ impl InputScheme for ChineseScheme {
                 modified_segments[0] = v1.clone();
                 if let Some(d) = context.tries.get("chinese") {
                     let m = d.search_abbreviation(&modified_segments, context.syllables, 500);
-                    for (w, tr, t, e, s, weight) in m {
+                    for tr in m {
                         let last_part = raw_parsed.last();
                         if let Some(aux) = last_part.and_then(|p| p.stroke_aux.as_ref()) {
-                            if !s.to_lowercase().starts_with(&aux.to_lowercase()) { continue; }
+                            if !tr.stroke_aux.to_lowercase().starts_with(&aux.to_lowercase()) { continue; }
                         }
                         if let Some(aux) = last_part.and_then(|p| p.english_aux.as_ref()) {
                             let aux_lower = aux.to_lowercase();
-                            if !e.to_lowercase().split(',').any(|part| part.trim().starts_with(&aux_lower)) { continue; }
+                            if !tr.en.to_lowercase().split(',').any(|part: &str| part.trim().starts_with(&aux_lower)) { continue; }
                         }
-                        if seen.insert(w.clone()) {
-                            let mut cand = SchemeCandidate::new(w, weight);
-                            cand.traditional = tr;
-                            cand.tone = t;
-                            cand.english = e;
-                            cand.stroke_aux = s;
+                        if seen.insert(tr.word.to_string()) {
+                            let mut cand = SchemeCandidate::new(tr.word.to_string(), tr.weight);
+                            cand.traditional = tr.trad.to_string();
+                            cand.tone = tr.tone.to_string();
+                            cand.english = tr.en.to_string();
+                            cand.stroke_aux = tr.stroke_aux.to_string();
                             cand.match_level = 2;
                             final_results.push(cand);
                         }

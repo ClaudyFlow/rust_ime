@@ -132,16 +132,16 @@ impl EvdevHost {
 
                 let mut p = p_bg.lock().unwrap();
                 if let Some(commit_action) = p.lookup() {
-                    if let Ok(mut vkbd) = v_bg.lock() {
-                        execute_action(&mut vkbd, commit_action, None);
+                    if let Ok(vkbd) = v_bg.lock() {
+                        execute_action(&vkbd, commit_action, None);
                     }
                 }
                 
                 // 【核心修复】检索完成后，重新计算并执行 Phantom Text 更新
                 // 这样能确保编辑器里的预览汉字和候选词窗口同步
                 let phantom_action = p.update_phantom_action();
-                if let Ok(mut vkbd) = v_bg.lock() {
-                    execute_action(&mut vkbd, phantom_action, None);
+                if let Ok(vkbd) = v_bg.lock() {
+                    execute_action(&vkbd, phantom_action, None);
                 }
 
                 update_gui_internal(&p, &g_bg);
@@ -160,7 +160,7 @@ impl EvdevHost {
 impl InputMethodHost for EvdevHost {
     fn set_preedit(&self, _text: &str, _cursor_pos: usize) {}
     fn commit_text(&self, text: &str) {
-        if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.send_text(text); }
+        if let Ok(vkbd) = self.vkbd.lock() { vkbd.send_text(text); }
     }
 
     fn get_cursor_rect(&self) -> Option<Rect> { None }
@@ -209,7 +209,7 @@ impl InputMethodHost for EvdevHost {
                         // 如果处于直通(英文)模式，除 Tab 键外全部直接物理透传
                         if is_direct && key != Key::KEY_TAB {
                             drop(p);
-                            if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
+                            if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                             continue;
                         }
 
@@ -217,7 +217,7 @@ impl InputMethodHost for EvdevHost {
                         if (key == Key::KEY_ENTER || key == Key::KEY_KPENTER) && is_empty {
                             if !is_empty { p.reset(); }
                             drop(p);
-                            if let Ok(mut vkbd) = self.vkbd.lock() { 
+                            if let Ok(vkbd) = self.vkbd.lock() { 
                                 vkbd.emit_raw(key, val); 
                             }
                             continue;
@@ -305,14 +305,14 @@ impl InputMethodHost for EvdevHost {
                                 p = self.processor.lock().unwrap();
                                 
                                 let action = p.handle_key_ext(vk, val, shift, ctrl, alt, true);
-                                if let Ok(mut vkbd) = self.vkbd.lock() {
-                                    execute_action(&mut *vkbd, action, Some((key, val)));
+                                if let Ok(vkbd) = self.vkbd.lock() {
+                                    execute_action(&vkbd, action, Some((key, val)));
                                 }
                             } else {
                                 // 【快车道：非阻塞字母、退格、Esc】
                                 let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
-                                if let Ok(mut vkbd) = self.vkbd.lock() {
-                                    execute_action(&mut *vkbd, fast_action, Some((key, val)));
+                                if let Ok(vkbd) = self.vkbd.lock() {
+                                    execute_action(&vkbd, fast_action, Some((key, val)));
                                 }
 
                                 // 如果是字母/退格且按下状态，发送异步检索请求
@@ -322,12 +322,12 @@ impl InputMethodHost for EvdevHost {
                                 }
                             }
                         } else {
-                            if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
+                            if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                         }
                         drop(p); if val != 0 { self.update_gui(); }
                     } else {
-                        if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { let del = p.session.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
-                        drop(p); if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                        if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { let del = p.session.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
+                        drop(p); if let Ok(vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
 
                     if val == 1 {
@@ -407,7 +407,7 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
     }
 }
 
-fn execute_action(vkbd: &mut Vkbd, action: Action, raw_key: Option<(Key, i32)>) {
+fn execute_action(vkbd: &Vkbd, action: Action, raw_key: Option<(Key, i32)>) {
     match action {
         Action::Emit(s) => { vkbd.send_text(&s); }
         Action::DeleteAndEmit { delete, insert } => {
