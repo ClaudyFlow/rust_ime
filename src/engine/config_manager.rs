@@ -61,6 +61,7 @@ pub struct ConfigManager {
     // 用户词库相关逻辑：分离新词发现和调频历史
     pub learned_words: Arc<ArcSwap<UserDictData>>,
     pub usage_history: Arc<ArcSwap<UserDictData>>,
+    pub db: Option<sled::Db>,
 
     pub user_dict_tx: Option<std::sync::mpsc::Sender<(UserDictData, std::path::PathBuf)>>,
 }
@@ -68,6 +69,11 @@ pub struct ConfigManager {
 impl ConfigManager {
     pub fn new() -> Self {
         let master = Config::default_config();
+        let db = sled::open("data/user_data.db").ok();
+        if db.is_some() {
+            println!("[ConfigManager] 成功初始化用户数据 KV 存储 (sled)。");
+        }
+
         Self {
             master_config: master.clone(),
             show_candidates: master.appearance.show_candidates,
@@ -121,6 +127,7 @@ impl ConfigManager {
             enable_traditional: master.input.enable_traditional,
             learned_words: Arc::new(ArcSwap::from_pointee(HashMap::new())),
             usage_history: Arc::new(ArcSwap::from_pointee(HashMap::new())),
+            db,
             user_dict_tx: None,
         }
     }
