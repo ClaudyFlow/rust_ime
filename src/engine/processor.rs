@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::collections::HashSet;
-use crate::engine::trie::Trie;
 use crate::engine::keys::VirtualKey;
-use crate::engine::scheme::{InputScheme, SchemeContext};
-use crate::engine::pipeline::{Pipeline, DefaultSegmentor, TableTranslator};
+use crate::engine::scheme::InputScheme;
+use crate::engine::pipeline::Candidate;
 use crate::engine::{Command, ModifierState, InputEvent};
+
 use std::time::{Instant, Duration};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +42,6 @@ pub struct Processor {
     pub dispatcher: crate::engine::KeyDispatcher,
     pub engine: crate::engine::pipeline::SearchEngine,
     
-    pub tries: HashMap<String, Trie>,
     pub active_profiles: Vec<String>,
     pub syllables: std::collections::HashSet<String>,
     
@@ -121,50 +120,32 @@ impl Processor {
         }
     }
     pub fn new(
-        tries: HashMap<String, Trie>, 
-        initial_profile: String, 
-        _punctuations: HashMap<String, HashMap<String, Vec<PunctuationEntry>>>, 
+        trie_paths: HashMap<String, (std::path::PathBuf, std::path::PathBuf)>, 
         syllables: HashSet<String>,
     ) -> Self {
         let config = crate::engine::ConfigManager::new();
         let syllables_arc = Arc::new(syllables.clone());
         
-        let mut pipelines = HashMap::new();
-        for (name, trie) in &tries {
-            let mut pipeline = Pipeline::new(Box::new(DefaultSegmentor));
-            pipeline.add_translator(Box::new(crate::engine::pipeline::UserDictTranslator { 
-                user_dict: config.user_dict.clone(), 
-                profile: name.clone() 
-            }));
-            pipeline.add_translator(Box::new(TableTranslator { 
-                trie: Arc::new(trie.clone()),
-                syllables: syllables_arc.clone(),
-            }));
-            pipeline.add_filter(Box::new(crate::engine::pipeline::AdaptiveFilter {
-                user_dict: config.user_dict.clone(),
-                profile: name.clone()
-            }));
-            pipeline.add_filter(Box::new(crate::engine::pipeline::SortFilter));
-            pipeline.add_filter(Box::new(crate::engine::pipeline::TraditionalFilter));
-            pipelines.insert(name.clone(), pipeline);
-        }
-
-        let engine = crate::engine::pipeline::SearchEngine::new(pipelines, {
-            let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
-            m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
-            m.insert("english".to_string(), Box::new(crate::engine::schemes::EnglishScheme::new()));
-            m.insert("chinese".to_string(), Box::new(crate::engine::schemes::ChineseScheme::new()));
-            m.insert("japanese".to_string(), Box::new(crate::engine::schemes::JapaneseScheme::new()));
-            m
-        });
+        let engine = crate::engine::pipeline::SearchEngine::new(
+            trie_paths,
+            syllables_arc,
+            config.user_dict.clone(),
+            {
+                let mut m: HashMap<String, Box<dyn InputScheme>> = HashMap::new();
+                m.insert("stroke".to_string(), Box::new(crate::engine::schemes::StrokeScheme::new()));
+                m.insert("english".to_string(), Box::new(crate::engine::schemes::EnglishScheme::new()));
+                m.insert("chinese".to_string(), Box::new(crate::engine::schemes::ChineseScheme::new()));
+                m.insert("japanese".to_string(), Box::new(crate::engine::schemes::JapaneseScheme::new()));
+                m
+            }
+        );
 
         Self {
             session: crate::engine::InputSession::new(),
             config,
             dispatcher: crate::engine::KeyDispatcher::new(),
             engine,
-            tries, 
-            active_profiles: vec![initial_profile],
+            active_profiles: Vec::new(),
             syllables,
             chinese_enabled: true,
             
@@ -181,7 +162,7 @@ impl Processor {
             self.active_profiles = conf.input.active_profiles.iter().map(|p: &String| p.to_lowercase()).collect();
         } else {
             let new_profile = conf.input.default_profile.to_lowercase();
-            if !new_profile.is_empty() && self.tries.contains_key(&new_profile) {
+            if !new_profile.is_empty() && self.engine.trie_paths.contains_key(&new_profile) {
                 self.active_profiles = vec![new_profile];
             }
         }
@@ -427,9 +408,9 @@ impl Processor {
 
         let current_profile = self.active_profiles.first().cloned().unwrap_or_default();
         if let Some(scheme) = self.engine.schemes.get(&current_profile) {
-            let context = SchemeContext {
+            let context = crate::engine::scheme::SchemeContext {
                 config: &self.config.master_config,
-                tries: &self.tries,
+                tries: &HashMap::new(), // 已移至 engine 管理
                 syllables: &self.syllables,
                 _user_dict: &self.config.user_dict,
                 active_profiles: &self.active_profiles,
@@ -804,7 +785,7 @@ impl Processor {
     }
 
     pub fn next_profile(&mut self) -> String {
-        let mut all: Vec<String> = self.tries.keys().cloned().collect();
+        let mut all: Vec<String> = self.engine.trie_paths.keys().cloned().collect();
         if all.is_empty() { return String::new(); }
         all.sort();
         if self.active_profiles.len() > 1 {
@@ -833,7 +814,7 @@ impl Processor {
         let raw_input = &self.session.buffer;
         let mut total_longer = 0;
         for p in &self.active_profiles {
-            if let Some(d) = self.tries.get(p) { if d.has_longer_match(raw_input) { total_longer += 1; break; } }
+            if self.engine.has_longer_match(p, raw_input) { total_longer += 1; break; }
         }
         if total_longer == 0 { return Some(self.commit_candidate(self.session.candidates[0].text.clone(), 0)); }
         None
@@ -992,7 +973,7 @@ impl Processor {
                 }
                 VirtualKey::Z => {
                     self.session.switch_mode = false;
-                    if let Some(_d) = self.tries.get("english") {
+                    if self.engine.trie_paths.contains_key("english") {
                         self.active_profiles = vec!["english".to_string()];
                         self.reset();
                         return Some(Action::Notify("英".into(), "已切换至英语方案".into()));
@@ -1007,7 +988,7 @@ impl Processor {
                     }
 
                     if let Some(p_str) = target_profile {
-                        let profiles: Vec<String> = p_str.split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty() && self.tries.contains_key(s)).collect();
+                        let profiles: Vec<String> = p_str.split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty() && self.engine.trie_paths.contains_key(s)).collect();
                         if !profiles.is_empty() {
                             self.active_profiles = profiles;
                             let display = self.get_current_profile_display();

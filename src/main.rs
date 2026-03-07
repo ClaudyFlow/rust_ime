@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("[Test] 进入测试模式 (无 UI)...");
                 let root = find_project_root();
                 let syllables = load_syllables(&root);
-                let mut tries_map = HashMap::new();
+                let mut trie_paths = HashMap::new();
                 if let Ok(entries) = std::fs::read_dir(root.join("data")) {
                     for entry in entries.flatten() {
                         if entry.path().is_dir() {
@@ -188,15 +188,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let trie_idx = entry.path().join("trie.index");
                             let trie_dat = entry.path().join("trie.data");
                             if trie_idx.exists() && trie_dat.exists() {
-                                if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
-                                    tries_map.insert(dir_name, trie);
-                                }
+                                trie_paths.insert(dir_name, (trie_idx, trie_dat));
                             }
                         }
                     }
                 }
                 let config = Config::load();
-                let mut processor = Processor::new(tries_map, config.input.default_profile.clone(), config.input.punctuations.clone(), syllables);
+                let mut processor = Processor::new(trie_paths, syllables);
                 processor.apply_config(&config);
                 
                 use std::io::{self, Write};
@@ -314,7 +312,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tray_tx_for_gui = tray_tx.clone();
     std::thread::spawn(move || { ui::gui::start_gui(gui_rx, gui_config, tray_tx_for_gui); });
 
-    let mut tries_map = HashMap::new();
+    let mut trie_paths = HashMap::new();
     if let Ok(entries) = std::fs::read_dir(root.join("data")) {
         for entry in entries.flatten() {
             if entry.path().is_dir() {
@@ -322,18 +320,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let trie_idx = entry.path().join("trie.index");
                 let trie_dat = entry.path().join("trie.data");
                 if trie_idx.exists() && trie_dat.exists() {
-                    if let Ok(trie) = Trie::load(&trie_idx, &trie_dat) {
-                        tries_map.insert(dir_name, trie);
-                    }
+                    trie_paths.insert(dir_name, (trie_idx, trie_dat));
                 }
             }
         }
     }
 
     let conf_guard = config.read().unwrap();
-    let default_p = conf_guard.input.default_profile.clone();
     let syllables = load_syllables(&root);
-    let mut processor_obj = Processor::new(tries_map, default_p, conf_guard.input.punctuations.clone(), syllables);
+    let mut processor_obj = Processor::new(trie_paths, syllables);
     processor_obj.apply_config(&conf_guard);
     let processor = Arc::new(Mutex::new(processor_obj));
     drop(conf_guard);

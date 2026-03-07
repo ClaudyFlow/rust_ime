@@ -1,6 +1,7 @@
 use crate::Config;
 use std::collections::{HashSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, RwLock};
 use crate::engine::Trie;
 use crate::engine::config_manager::UserDictData;
 use lru::LruCache;
@@ -35,17 +36,17 @@ pub trait Preprocessor: Send {
 */
 
 /// 2. 切分器：字符串到音节序列的转换
-pub trait Segmentor: Send {
+pub trait Segmentor: Send + Sync {
     fn segment(&self, input: &str, syllables: &HashSet<String>) -> Vec<String>;
 }
 
 /// 3. 翻译器：音节到候选词的转换
-pub trait Translator: Send {
+pub trait Translator: Send + Sync {
     fn translate(&self, input: &str, segments: &[String], config: &Config, limit: usize) -> Vec<Candidate>;
 }
 
 /// 4. 过滤器：对候选词列表的后期加工
-pub trait Filter: Send {
+pub trait Filter: Send + Sync {
     fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config);
 }
 
@@ -307,8 +308,11 @@ impl Pipeline {
 }
 
 pub struct SearchEngine {
-    pub pipelines: HashMap<String, Pipeline>,
+    pub trie_paths: HashMap<String, (PathBuf, PathBuf)>,
+    pub syllables: Arc<HashSet<String>>,
+    pub user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
+    pipelines: RwLock<HashMap<String, Arc<Pipeline>>>,
     cache: Mutex<LruCache<SearchCacheKey, (Vec<Candidate>, Vec<String>)>>,
 }
 
@@ -324,14 +328,75 @@ pub struct SearchQuery<'a> {
 
 impl SearchEngine {
     pub fn new(
-        pipelines: HashMap<String, Pipeline>,
+        trie_paths: HashMap<String, (PathBuf, PathBuf)>,
+        syllables: Arc<HashSet<String>>,
+        user_dict: Arc<arc_swap::ArcSwap<UserDictData>>,
         schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
     ) -> Self {
         Self { 
-            pipelines, 
+            trie_paths, 
+            syllables,
+            user_dict,
             schemes,
+            pipelines: RwLock::new(HashMap::new()),
             cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())),
         }
+    }
+
+    fn get_or_create_pipeline(&self, profile: &str) -> Option<Arc<Pipeline>> {
+        // 1. 尝试读取现有
+        {
+            let p_map = self.pipelines.read().ok()?;
+            if let Some(p) = p_map.get(profile) {
+                return Some(p.clone());
+            }
+        }
+
+        // 2. 如果不存在，尝试创建
+        let paths = self.trie_paths.get(profile)?;
+        tracing::info!(%profile, "Lazy loading dictionary...");
+        let trie = Trie::load(&paths.0, &paths.1).ok()?;
+        
+        let mut pipeline = Pipeline::new(Box::new(DefaultSegmentor));
+        pipeline.add_translator(Box::new(UserDictTranslator { 
+            user_dict: self.user_dict.clone(), 
+            profile: profile.to_string() 
+        }));
+        pipeline.add_translator(Box::new(TableTranslator { 
+            trie: Arc::new(trie),
+            syllables: self.syllables.clone(),
+        }));
+        pipeline.add_filter(Box::new(AdaptiveFilter {
+            user_dict: self.user_dict.clone(),
+            profile: profile.to_string()
+        }));
+        pipeline.add_filter(Box::new(SortFilter));
+        pipeline.add_filter(Box::new(TraditionalFilter));
+
+        let arc_p = Arc::new(pipeline);
+        let mut p_map = self.pipelines.write().ok()?;
+        p_map.insert(profile.to_string(), arc_p.clone());
+        Some(arc_p)
+    }
+
+    pub fn has_longer_match(&self, profile: &str, buffer: &str) -> bool {
+        // 先检查流水线是否已加载
+        if let Some(pipeline) = self.get_or_create_pipeline(profile) {
+            // 在 TableTranslator 中查找 Trie
+            // 简单起见，我们遍历它的 translators
+            for t in &pipeline.translators {
+                // 利用反射或特定的 Downcast 模式（由于是 Box<dyn> 比较困难）
+                // 暂时采用更直接的方案：SearchEngine 自己按需加载一次 Trie 来判断
+            }
+        }
+        
+        // 更稳妥的延迟加载方案：
+        if let Some(paths) = self.trie_paths.get(profile) {
+            if let Ok(trie) = Trie::load(&paths.0, &paths.1) {
+                return trie.has_longer_match(buffer);
+            }
+        }
+        false
     }
 
     pub fn clear_cache(&self) {
@@ -374,7 +439,7 @@ impl SearchEngine {
         let span = tracing::info_span!("engine_search", profile = %query.profile, buffer = %query.buffer);
         let _enter = span.enter();
 
-        if let Some(pipeline) = self.pipelines.get(query.profile) {
+        if let Some(pipeline) = self.get_or_create_pipeline(query.profile) {
             let segments = pipeline.segmentor.segment(query.buffer, query.syllables);
             let results = pipeline.run(query.buffer, query.syllables, query.config, query.limit);
             
