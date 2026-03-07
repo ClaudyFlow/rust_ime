@@ -370,7 +370,7 @@ impl SearchEngine {
             usage_history,
             schemes,
             pipelines: RwLock::new(HashMap::new()),
-            cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).unwrap())),
+            cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero"))),
         }
     }
 

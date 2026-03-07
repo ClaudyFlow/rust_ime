@@ -64,7 +64,7 @@ fn parse_key(s: &str) -> Vec<Vec<Vec<Key>>> {
 pub struct EvdevHost {
     processor: Arc<Mutex<Processor>>,
     vkbd: Arc<Mutex<Vkbd>>,
-    dev: Arc<Mutex<Device>>, // 修改为 Arc 以便在 Guard 中共享
+    dev: Arc<Mutex<Device>>, 
     gui_tx: Option<Sender<GuiEvent>>,
     tray_tx: Sender<crate::ui::tray::TrayEvent>,
     should_exit: Arc<AtomicBool>,
@@ -82,7 +82,7 @@ impl GrabGuard {
     fn new(device: Arc<Mutex<Device>>) -> Self {
         if let Ok(mut dev) = device.lock() {
             if let Err(e) = dev.grab() {
-                eprintln!("[EvdevHost] 警告: 无法锁定键盘设备: {}", e);
+                eprintln!("[EvdevHost] 警告: 无法锁定键盘设备: {e}");
             } else {
                 println!("[EvdevHost] 已成功锁定键盘硬件拦截。");
             }
@@ -112,8 +112,14 @@ impl EvdevHost {
         let vkbd_raw = Vkbd::new(&dev)?;
         let vkbd = Arc::new(Mutex::new(vkbd_raw));
         {
-            let conf = config.read().unwrap();
-            vkbd.lock().unwrap().apply_config(&conf);
+            let conf_res = config.read();
+            if let Ok(conf) = conf_res {
+                if let Ok(mut vk) = vkbd.lock() {
+                    vk.apply_config(&conf);
+                }
+            } else {
+                eprintln!("[EvdevHost] 初始加载时无法读取配置。");
+            }
         }
 
         let (lookup_tx, lookup_rx) = std::sync::mpsc::channel::<()>();
@@ -130,21 +136,20 @@ impl EvdevHost {
                 // 消耗掉积压的所有检索请求，只做最后一次
                 while lookup_rx.try_recv().is_ok() {}
 
-                let mut p = p_bg.lock().unwrap();
-                if let Some(commit_action) = p.lookup() {
-                    if let Ok(vkbd) = v_bg.lock() {
-                        execute_action(&vkbd, commit_action, None);
+                if let Ok(mut p) = p_bg.lock() {
+                    if let Some(commit_action) = p.lookup() {
+                        if let Ok(vkbd) = v_bg.lock() {
+                            execute_action(&vkbd, commit_action, None);
+                        }
                     }
-                }
-                
-                // 【核心修复】检索完成后，重新计算并执行 Phantom Text 更新
-                // 这样能确保编辑器里的预览汉字和候选词窗口同步
-                let phantom_action = p.update_phantom_action();
-                if let Ok(vkbd) = v_bg.lock() {
-                    execute_action(&vkbd, phantom_action, None);
-                }
+                    
+                    let phantom_action = p.update_phantom_action();
+                    if let Ok(vkbd) = v_bg.lock() {
+                        execute_action(&vkbd, phantom_action, None);
+                    }
 
-                update_gui_internal(&p, &g_bg);
+                    update_gui_internal(&p, &g_bg);
+                }
                 pending_bg.store(false, Ordering::SeqCst);
             }
         });
@@ -200,9 +205,8 @@ impl InputMethodHost for EvdevHost {
                     let meta = held_keys.contains(&Key::KEY_LEFTMETA) || held_keys.contains(&Key::KEY_RIGHTMETA);
                     let has_mod = ctrl || alt || meta;
 
-                    // 2. 【核心修复】直接透传判断 (英文模式 或 Tab 键除外)
-                    {
-                        let mut p = self.processor.lock().unwrap();
+                    // 2. 直接透传判断 (英文模式 或 Tab 键除外)
+                    if let Ok(mut p) = self.processor.lock() {
                         let is_direct = !p.chinese_enabled;
                         let is_empty = p.session.buffer.is_empty();
                         
@@ -222,7 +226,6 @@ impl InputMethodHost for EvdevHost {
                             }
                             continue;
                         }
-                        drop(p);
                     }
 
                     if key == Key::KEY_TAB && !has_mod {
@@ -232,18 +235,19 @@ impl InputMethodHost for EvdevHost {
                         } 
                         else if val == 0 {
                             if self.tab_held_and_not_used {
-                                let mut p = self.processor.lock().unwrap();
-                                p.toggle();
-                                let enabled = p.chinese_enabled;
-                                let profile = p.get_current_profile_display();
-                                drop(p);
+                                if let Ok(mut p) = self.processor.lock() {
+                                    let _ = p.toggle();
+                                    let enabled = p.chinese_enabled;
+                                    let profile = p.get_current_profile_display();
+                                    drop(p);
 
-                                let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
-                                    chinese_enabled: enabled, 
-                                    active_profile: profile 
-                                });
+                                    let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                                        chinese_enabled: enabled, 
+                                        active_profile: profile 
+                                    });
 
-                                self.update_gui();
+                                    self.update_gui();
+                                }
                             }
                             self.tab_held_and_not_used = false;
                             continue;
@@ -253,82 +257,99 @@ impl InputMethodHost for EvdevHost {
                     // 拦截 Shift 触发全局筛选
                     if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod
                         && val == 1 {
-                            let mut p = self.processor.lock().unwrap();
-                            if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Direct {
-                                println!("[Host] Triggering Global Filter");
-                                p.start_global_filter();
-                                drop(p);
-                                self.update_gui();
-                                continue; 
+                            if let Ok(mut p) = self.processor.lock() {
+                                if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Direct {
+                                    p.start_global_filter();
+                                    drop(p);
+                                    self.update_gui();
+                                    continue; 
+                                }
                             }
                         }
 
                     if val == 1 {
-                        let toggle_main = {
-                            let conf = self.config.read().unwrap();
+                        let toggle_main = if let Ok(conf) = self.config.read() {
                             parse_key(&conf.hotkeys.switch_language.key)
-                        };
+                        } else { vec![] };
                         
                         if is_combo(&held_keys, &toggle_main) {
-                            let mut p = self.processor.lock().unwrap(); p.toggle();
-                            let enabled = p.chinese_enabled;
-                            let profile = p.get_current_profile_display();
-                            drop(p);
+                            if let Ok(mut p) = self.processor.lock() {
+                                let _ = p.toggle();
+                                let enabled = p.chinese_enabled;
+                                let profile = p.get_current_profile_display();
+                                drop(p);
 
-                            let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
-                                chinese_enabled: enabled, 
-                                active_profile: profile 
-                            });
+                                let _ = self.tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { 
+                                    chinese_enabled: enabled, 
+                                    active_profile: profile 
+                                });
 
-                            self.update_gui(); continue;
+                                self.update_gui(); 
+                            }
+                            continue;
                         }
                     }
 
                     let shift = held_keys.contains(&Key::KEY_LEFTSHIFT) || held_keys.contains(&Key::KEY_RIGHTSHIFT);
                     let ctrl = held_keys.contains(&Key::KEY_LEFTCTRL) || held_keys.contains(&Key::KEY_RIGHTCTRL);
                     let alt = held_keys.contains(&Key::KEY_LEFTALT) || held_keys.contains(&Key::KEY_RIGHTALT);
-                    let mut p = self.processor.lock().unwrap();
-                    if p.chinese_enabled && !has_mod {
-                        if let Some(vk) = evdev_to_virtual(key) {
-                            // 所有的确认、分页、选词、导航键都走“慢车道”，确保状态同步
-                            let is_sync_key = vk == VirtualKey::Space || vk == VirtualKey::Enter 
-                                || (vk.to_u32() >= VirtualKey::Digit0.to_u32() && vk.to_u32() <= VirtualKey::Digit9.to_u32())
-                                || matches!(vk, VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Up | VirtualKey::Down | VirtualKey::Left | VirtualKey::Right | VirtualKey::Minus | VirtualKey::Equal | VirtualKey::Comma | VirtualKey::Dot);
+                    
+                    if let Ok(mut p) = self.processor.lock() {
+                        if p.chinese_enabled && !has_mod {
+                            if let Some(vk) = evdev_to_virtual(key) {
+                                // 所有的确认、分页、选词、导航键都走“慢车道”，确保状态同步
+                                let is_sync_key = vk == VirtualKey::Space || vk == VirtualKey::Enter 
+                                    || (vk.to_u32() >= VirtualKey::Digit0.to_u32() && vk.to_u32() <= VirtualKey::Digit9.to_u32())
+                                    || matches!(vk, VirtualKey::PageUp | VirtualKey::PageDown | VirtualKey::Up | VirtualKey::Down | VirtualKey::Left | VirtualKey::Right | VirtualKey::Minus | VirtualKey::Equal | VirtualKey::Comma | VirtualKey::Dot);
 
-                            if is_sync_key {
-                                // 【慢车道：等待检索完成】
-                                drop(p);
-                                while self.lookup_pending.load(Ordering::SeqCst) {
-                                    std::thread::yield_now();
-                                }
-                                p = self.processor.lock().unwrap();
-                                
-                                let action = p.handle_key_ext(vk, val, shift, ctrl, alt, true);
-                                if let Ok(vkbd) = self.vkbd.lock() {
-                                    execute_action(&vkbd, action, Some((key, val)));
+                                if is_sync_key {
+                                    // 【慢车道：等待检索完成】
+                                    drop(p);
+                                    while self.lookup_pending.load(Ordering::SeqCst) {
+                                        std::thread::yield_now();
+                                    }
+                                    if let Ok(mut p_locked) = self.processor.lock() {
+                                        let action = p_locked.handle_key_ext(vk, val, shift, ctrl, alt, true);
+                                        if let Ok(vkbd) = self.vkbd.lock() {
+                                            execute_action(&vkbd, action, Some((key, val)));
+                                        }
+                                        if val != 0 {
+                                            drop(p_locked);
+                                            self.update_gui();
+                                        }
+                                    }
+                                } else {
+                                    // 【快车道：非阻塞字母、退格、Esc】
+                                    let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
+                                    if let Ok(vkbd) = self.vkbd.lock() {
+                                        execute_action(&vkbd, fast_action, Some((key, val)));
+                                    }
+
+                                    // 如果是字母/退格且按下状态，发送异步检索请求
+                                    if val != 0 {
+                                        self.lookup_pending.store(true, Ordering::SeqCst);
+                                        let _ = self.lookup_tx.send(());
+                                        drop(p);
+                                        self.update_gui();
+                                    }
                                 }
                             } else {
-                                // 【快车道：非阻塞字母、退格、Esc】
-                                let fast_action = p.handle_key_ext(vk, val, shift, ctrl, alt, false);
-                                if let Ok(vkbd) = self.vkbd.lock() {
-                                    execute_action(&vkbd, fast_action, Some((key, val)));
+                                if let Ok(vkbd) = self.vkbd.lock() { 
+                                    vkbd.emit_raw(key, val); 
                                 }
-
-                                // 如果是字母/退格且按下状态，发送异步检索请求
-                                if val != 0 {
-                                    self.lookup_pending.store(true, Ordering::SeqCst);
-                                    let _ = self.lookup_tx.send(());
-                                }
+                                drop(p);
                             }
-                        } else if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
-                        drop(p); if val != 0 { self.update_gui(); }
-                    } else {
-                        if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { let del = p.session.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
-                        drop(p); if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
-                    }
-
-                    if val == 1 {
-                        // 逻辑已移至 Processor::handle_key
+                        } else {
+                            if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { 
+                                let del = p.session.phantom_text.chars().count(); 
+                                p.reset(); 
+                                if del > 0 { 
+                                    if let Ok(vkbd) = self.vkbd.lock() { vkbd.backspace(del); } 
+                                } 
+                            }
+                            drop(p); 
+                            if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
+                        }
                     }
                 }
             }
@@ -339,8 +360,9 @@ impl InputMethodHost for EvdevHost {
 
 impl EvdevHost {
     fn update_gui(&self) {
-        let p = self.processor.lock().unwrap();
-        update_gui_internal(&p, &self.gui_tx);
+        if let Ok(p) = self.processor.lock() {
+            update_gui_internal(&p, &self.gui_tx);
+        }
     }
 }
 
@@ -369,9 +391,9 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
             for (i, c) in p.session.candidates[start..end].iter().enumerate() {
                 let label = format!("{}.", i + 1);
                 let full_display = if c.hint.is_empty() {
-                    format!("{}{}", label, c.text)
+                    format!("{label}{}", c.text)
                 } else {
-                    format!("{}{}({})", label, c.text, c.hint)
+                    format!("{label}{}({})", c.text, c.hint)
                 };
                 display_candidates.push(crate::ui::DisplayCandidate {
                     text: c.text.to_string(),
@@ -434,9 +456,6 @@ fn execute_action(vkbd: &Vkbd, action: Action, raw_key: Option<(Key, i32)>) {
     }
 }
 
-/// combinations 层: OR (备选方案)
-/// requirements 层: AND (必须同时按下的按键组)
-/// keys 层: OR (按键组内的可选按键，如 LShift/RShift)
 fn is_combo(held: &HashSet<Key>, combinations: &[Vec<Vec<Key>>]) -> bool {
     if combinations.is_empty() { return false; }
     combinations.iter().any(|requirements| {

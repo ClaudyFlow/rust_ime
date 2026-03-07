@@ -26,30 +26,30 @@ impl IBusEngine {
         _keycode: u32,
         state: u32,
     ) -> bool {
-        let mut p = self.processor.lock().unwrap();
-        
-        // 将 IBus/X11 的 keyval 转换为我们的 VirtualKey
-        // 这里需要一个映射表，暂时先处理基础字母
-        let vk = match keyval {
-            0x61..=0x7a => Some(unsafe { std::mem::transmute::<u32, VirtualKey>(keyval - 0x61) }), // a-z
-            0xff08 => Some(VirtualKey::Backspace),
-            0x20 => Some(VirtualKey::Space),
-            0xff0d => Some(VirtualKey::Enter),
-            _ => None,
-        };
+        if let Ok(mut p) = self.processor.lock() {
+            // 将 IBus/X11 的 keyval 转换为我们的 VirtualKey
+            // 这里需要一个映射表，暂时先处理基础字母
+            let vk = match keyval {
+                0x61..=0x7a => Some(unsafe { std::mem::transmute::<u32, VirtualKey>(keyval - 0x61) }), // a-z
+                0xff08 => Some(VirtualKey::Backspace),
+                0x20 => Some(VirtualKey::Space),
+                0xff0d => Some(VirtualKey::Enter),
+                _ => None,
+            };
 
-        if let Some(key) = vk {
-            let shift = (state & 1) != 0;
-            let action = p.handle_key(key, 1, shift, false, false);
-            
-            match action {
-                Action::DeleteAndEmit { insert, .. } | Action::Emit(insert) => {
-                    // TODO: 调用 IBus 的 CommitText 信号回传文字
-                    println!("[IBus Engine] 提交文字: {}", insert);
-                    return true;
+            if let Some(key) = vk {
+                let shift = (state & 1) != 0;
+                let action = p.handle_key(key, 1, shift, false, false);
+                
+                match action {
+                    Action::DeleteAndEmit { insert, .. } | Action::Emit(insert) => {
+                        // TODO: 调用 IBus 的 CommitText 信号回传文字
+                        println!("[IBus Engine] 提交文字: {insert}");
+                        return true;
+                    }
+                    Action::Consume => return true,
+                    _ => return false,
                 }
-                Action::Consume => return true,
-                _ => return false,
             }
         }
         false

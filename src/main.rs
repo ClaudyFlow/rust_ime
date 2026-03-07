@@ -45,6 +45,7 @@ use serde_json::Value;
 
 static WEB_SERVER_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+#[must_use]
 pub fn find_project_root() -> PathBuf {
     if let Ok(mut exe_path) = env::current_exe() {
         exe_path.pop();
@@ -59,6 +60,7 @@ pub fn find_project_root() -> PathBuf {
     env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
+#[must_use]
 pub fn load_punctuation_dict(p: &str) -> HashMap<String, Vec<config::PunctuationEntry>> {
     let mut m = HashMap::new();
     if let Ok(f) = File::open(p) { 
@@ -143,7 +145,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = find_project_root();
     env::set_current_dir(&root)?;
 
-    let args: Vec<String> = env::args().collect();
     let mut should_daemonize = true;
 
     if args.len() > 1 {
@@ -153,24 +154,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = engine::compiler::check_and_compile_all();
                 return Ok(());
             }
-            "--register" => {
+            "--register" | "--unregister" => {
                 #[cfg(target_os = "windows")]
                 {
                     unsafe { windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?; }
-                    let mut dll_path = std::env::current_exe()?;
-                    dll_path.set_file_name("rust_ime_tsf_v3.dll");
-                    let path_str = dll_path.to_str().ok_or("Path error")?;
-                    unsafe { registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(path_str))?; }
-                    println!("✅ TSF 注册成功。");
-                }
-                return Ok(());
-            }
-            "--unregister" => {
-                #[cfg(target_os = "windows")]
-                {
-                    unsafe { windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED)?; }
-                    unsafe { registry::unregister_server(&IME_ID)?; }
-                    println!("✅ TSF 注销成功。");
+                    if args[1] == "--register" {
+                        let mut dll_path = std::env::current_exe()?;
+                        dll_path.set_file_name("rust_ime_tsf_v3.dll");
+                        let path_str = dll_path.to_str().ok_or("Path error")?;
+                        unsafe { registry::register_server(windows::Win32::Foundation::HINSTANCE(0), &IME_ID, "Rust IME", Some(path_str))?; }
+                        println!("✅ TSF 注册成功。");
+                    } else {
+                        unsafe { registry::unregister_server(&IME_ID)?; }
+                        println!("✅ TSF 注销成功。");
+                    }
                 }
                 return Ok(());
             }
@@ -202,17 +199,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("请输入拼音进行测试 (输入 'exit' 退出):");
                 loop {
                     print!("> ");
-                    io::stdout().flush()?;
+                    let _ = io::stdout().flush();
                     let mut line = String::new();
-                    stdin.read_line(&mut line)?;
+                    if stdin.read_line(&mut line).is_err() { break; }
                     let input = line.trim();
                     if input == "exit" { break; }
                     
-                    if (input.len() == 1 && input.chars().next().is_some_and(|c| c.is_alphabetic())) || (input.starts_with("SHIFT_") && input.len() == 7) {
+                    if (input.len() == 1 && input.chars().next().is_some_and(char::is_alphabetic)) || (input.starts_with("SHIFT_") && input.len() == 7) {
                         let (letter, shift) = if input.len() == 7 {
                             (input.chars().last().unwrap_or('\0'), true)
                         } else {
-                            (input.chars().next().map(|c| c.to_ascii_uppercase()).unwrap_or('\0'), false)
+                            (input.chars().next().map_or('\0', |c| c.to_ascii_uppercase()), false)
                         };
 
                         let key = match letter {
@@ -245,21 +242,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             _ => engine::keys::VirtualKey::A,
                         };
                         let action = processor.handle_key(key, 1, shift, false, false);
-                        println!("动作反馈: {:?}", action);
+                        println!("动作反馈: {action:?}");
                     } else if input == "BACKSPACE" {
                         let action = processor.handle_key(engine::keys::VirtualKey::Backspace, 1, false, false, false);
-                        println!("动作反馈: {:?}", action);
+                        println!("动作反馈: {action:?}");
                     } else if line.starts_with(' ') {
                         let action = processor.handle_key(engine::keys::VirtualKey::Space, 1, false, false, false);
-                        println!("动作反馈: {:?}", action);
+                        println!("动作反馈: {action:?}");
                     } else {
                         // 允许直接设置 buffer 进行快捷测试
                         processor.session.buffer = input.to_string();
-                        processor.lookup();
+                        let _ = processor.lookup();
                     }
                     
                     let display_preedit = engine::compositor::Compositor::get_preedit(&processor);
-                    println!("预编辑: {}", display_preedit);
+                    println!("预编辑: {display_preedit}");
                     println!("辅助码过滤: {}", processor.session.aux_filter);
                     println!("切分: {:?}", processor.session.best_segmentation);
                     println!("候选词 (前 10 条):");
@@ -308,7 +305,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (gui_tx, gui_rx) = std::sync::mpsc::channel();
     let (tray_tx, tray_rx) = std::sync::mpsc::channel();
     
-    let gui_config = config.read().map(|c| c.clone()).unwrap_or_else(|_| Config::default_config());
+    let gui_config = config.read().map_or_else(|_| Config::default_config(), |c| c.clone());
     let tray_tx_for_gui = tray_tx.clone();
     std::thread::spawn(move || { ui::gui::start_gui(gui_rx, gui_config, tray_tx_for_gui); });
 
@@ -326,12 +323,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let conf_guard = config.read().unwrap();
     let syllables = load_syllables(&root);
     let mut processor_obj = Processor::new(trie_paths, syllables);
-    processor_obj.apply_config(&conf_guard);
+    if let Ok(conf) = config.read() {
+        processor_obj.apply_config(&conf);
+    }
     let processor = Arc::new(Mutex::new(processor_obj));
-    drop(conf_guard);
 
     let tray_handle = if let Ok(conf) = config.read() {
         ui::tray::start_tray(ui::tray::TrayParams {
@@ -351,9 +348,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = Arc::new(Mutex::new(ui::AppState {
         chinese_enabled: true,
         active_profile: "".into(),
-        show_status_bar_pref: config.read().map(|c| c.appearance.show_status_bar).unwrap_or(true),
-        show_candidates_pref: config.read().map(|c| c.appearance.show_candidates).unwrap_or(true),
-        is_ime_active: true, // 默认开启，等待 TSF 实际反馈
+        show_status_bar_pref: config.read().map_or(true, |c| c.appearance.show_status_bar),
+        show_candidates_pref: config.read().map_or(true, |c| c.appearance.show_candidates),
+        is_ime_active: true, 
         pinyin: "".into(),
         candidates: vec![],
         selected_index: 0,
@@ -370,28 +367,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(event) = tray_rx.recv() {
             match event {
                 ui::tray::TrayEvent::ToggleIme => {
-                    let mut p = processor_clone.lock().unwrap();
-                    p.toggle();
-                    let enabled = p.chinese_enabled;
-                    let short = p.get_short_display();
-                    tray_handle.update(move |t| t.chinese_enabled = enabled);
-                    
-                    let mut state = app_state_tray.lock().unwrap();
-                    state.chinese_enabled = enabled;
-                    state.status_text = if enabled { short } else { "英".into() };
-                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                    if let Ok(mut p) = processor_clone.lock() {
+                        p.toggle();
+                        let enabled = p.chinese_enabled;
+                        let short = p.get_short_display();
+                        tray_handle.update(move |t| t.chinese_enabled = enabled);
+                        
+                        if let Ok(mut state) = app_state_tray.lock() {
+                            state.chinese_enabled = enabled;
+                            state.status_text = if enabled { short } else { "英".into() };
+                            let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                        }
+                    }
                 }
                 ui::tray::TrayEvent::NextProfile => {
-                    let mut p = processor_clone.lock().unwrap();
-                    let profile = p.next_profile();
-                    let enabled = p.chinese_enabled;
-                    let short = p.get_short_display();
-                    tray_handle.update(move |t| t.active_profile = profile);
-                    
-                    let mut state = app_state_tray.lock().unwrap();
-                    state.status_text = if enabled { short } else { "英".into() };
-                    state.chinese_enabled = enabled;
-                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                    if let Ok(mut p) = processor_clone.lock() {
+                        let profile = p.next_profile();
+                        let enabled = p.chinese_enabled;
+                        let short = p.get_short_display();
+                        tray_handle.update(move |t| t.active_profile = profile);
+                        
+                        if let Ok(mut state) = app_state_tray.lock() {
+                            state.status_text = if enabled { short } else { "英".into() };
+                            state.chinese_enabled = enabled;
+                            let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                        }
+                    }
                 }
                 ui::tray::TrayEvent::ToggleStatusBar => {
                     let mut new_show = false;
@@ -402,16 +403,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     tray_handle.update(move |t| t.show_status_bar = new_show);
                     
-                    let mut state = app_state_tray.lock().unwrap();
-                    state.show_status_bar_pref = new_show;
-                    // 发送强力显隐信号
-                    let _ = gui_tx_tray.send(GuiEvent::ForceStatusVisible(new_show));
+                    if let Ok(mut state) = app_state_tray.lock() {
+                        state.show_status_bar_pref = new_show;
+                        let _ = gui_tx_tray.send(GuiEvent::ForceStatusVisible(new_show));
+                    }
                 }
                 ui::tray::TrayEvent::SyncStatus { chinese_enabled, active_profile } => {
-                    let mut state = app_state_tray.lock().unwrap();
-                    state.chinese_enabled = chinese_enabled;
-                    state.active_profile = active_profile;
-                    // 这里不强制同步 GUI，因为 TSF 那边会处理更细致的更新
+                    if let Ok(mut state) = app_state_tray.lock() {
+                        state.chinese_enabled = chinese_enabled;
+                        state.active_profile = active_profile;
+                    }
                 }
                 ui::tray::TrayEvent::OpenConfig => {
                     if !WEB_SERVER_RUNNING.load(std::sync::atomic::Ordering::SeqCst) {
@@ -440,18 +441,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let new_conf = Config::load();
                     if let Ok(mut p) = processor_clone.lock() { p.apply_config(&new_conf); }
                     let _ = gui_tx_tray.send(GuiEvent::ApplyConfig(Box::new(new_conf)));
-
                 }
                 ui::tray::TrayEvent::ShowNotification(msg) => {
-                    let mut state = app_state_tray.lock().unwrap();
-                    state.status_text = msg;
-                    let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                    if let Ok(mut state) = app_state_tray.lock() {
+                        state.status_text = msg;
+                        let _ = gui_tx_tray.send(GuiEvent::SyncState(state.clone()));
+                    }
                 }
                 ui::tray::TrayEvent::ClearUserDict => {
                     if let Ok(p) = processor_clone.lock() {
                         p.config.learned_words.store(Arc::new(HashMap::new()));
                         p.config.usage_history.store(Arc::new(HashMap::new()));
-                        // 清空数据库中的数据
                         if let Some(ref db) = p.config.db {
                             let _ = db.clear();
                         }
@@ -470,7 +470,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(target_os = "linux")]
     {
-        let dev_path = config.read().unwrap().linux.device_path.clone();
+        let dev_path = config.read().map_or_else(|_| "/dev/input/event0".into(), |c| c.linux.device_path.clone());
         let force_wayland = args.iter().any(|a| a == "--backend=wayland" || a == "wayland");
         let force_evdev = args.iter().any(|a| a == "--backend=evdev" || a == "evdev");
         let force_ibus = args.iter().any(|a| a == "--backend=ibus" || a == "ibus");
@@ -495,7 +495,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     host.run()?;
                 }
                 Err(e) => {
-                    println!("[Main] Evdev 启动失败 ({:?})，尝试回落到 IBus 伪装模式...", e);
+                    println!("[Main] Evdev 启动失败 ({e:?})，尝试回落到 IBus 模式...");
                     let mut host = platform::linux::ibus_host::IBusHost::new(processor, Some(gui_tx));
                     host.run()?;
                 }

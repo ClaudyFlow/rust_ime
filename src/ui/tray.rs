@@ -234,7 +234,7 @@ unsafe extern "system" fn tray_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lp
                 
                 if let Some(state_arc) = (&raw const TRAY_STATE).as_ref().and_then(|opt| opt.as_ref()) {
                     if let Ok(state) = state_arc.lock() {
-                        let h_menu = CreatePopupMenu().unwrap();
+                        let h_menu = CreatePopupMenu().expect("Failed to create popup menu");
                         
                         let activated_label = format!("输入法: {}", if state.chinese_enabled { "激活 (中)" } else { "未激活 (英)" });
                         let mut activated_w: Vec<u16> = activated_label.encode_utf16().collect();

@@ -56,7 +56,7 @@ impl Vkbd {
             .name("rust-ime-v2")
             .with_keys(&keys)?
             .with_msc(&{
-                let mut misc = AttributeSet::new();
+                let mut misc = AttributeSet::<evdev::MiscType>::new();
                 misc.insert(evdev::MiscType::MSC_SCAN);
                 misc
             })?
@@ -78,8 +78,8 @@ impl Vkbd {
             while let Ok(task) = task_rx.recv() {
                 match task {
                     VkbdTask::SendText(text, highlight) => {
-                        let p_mode = *paste_mode_bg.lock().unwrap();
-                        let delay = *delay_bg.lock().unwrap();
+                        let p_mode = match paste_mode_bg.lock() { Ok(m) => *m, Err(_) => PasteMode::ShiftInsert };
+                        let delay = match delay_bg.lock() { Ok(d) => *d, Err(_) => 50 };
                         Self::do_send_text(&dev_bg, p_mode, delay, &dbus_conn, &text, highlight);
                     }
                     VkbdTask::Backspace(count) => {
@@ -99,24 +99,27 @@ impl Vkbd {
 
     #[allow(dead_code)]
     pub fn cycle_paste_mode(&mut self) -> String {
-        let mut mode_lock = self.paste_mode.lock().unwrap();
-        *mode_lock = match *mode_lock {
-            PasteMode::ShiftInsert => PasteMode::CtrlV,
-            PasteMode::CtrlV => PasteMode::CtrlShiftV,
-            PasteMode::CtrlShiftV => PasteMode::UnicodeHex,
-            PasteMode::UnicodeHex => PasteMode::Fcitx5,
-            PasteMode::Fcitx5 => PasteMode::ShiftInsert,
-        };
-        
-        let new_mode = *mode_lock;
-        println!("[Vkbd] Manually switched paste mode to: {:?}", new_mode);
-        
-        match new_mode {
-            PasteMode::ShiftInsert => "通用模式 (Shift+Insert)".to_string(),
-            PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
-            PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
-            PasteMode::UnicodeHex => "Unicode编码输入 (Ctrl+Shift+U)".to_string(),
-            PasteMode::Fcitx5 => "Fcitx5 接口".to_string(),
+        if let Ok(mut mode_lock) = self.paste_mode.lock() {
+            *mode_lock = match *mode_lock {
+                PasteMode::ShiftInsert => PasteMode::CtrlV,
+                PasteMode::CtrlV => PasteMode::CtrlShiftV,
+                PasteMode::CtrlShiftV => PasteMode::UnicodeHex,
+                PasteMode::UnicodeHex => PasteMode::Fcitx5,
+                PasteMode::Fcitx5 => PasteMode::ShiftInsert,
+            };
+            
+            let new_mode = *mode_lock;
+            println!("[Vkbd] Manually switched paste mode to: {new_mode:?}");
+            
+            match new_mode {
+                PasteMode::ShiftInsert => "通用模式 (Shift+Insert)".to_string(),
+                PasteMode::CtrlV => "标准模式 (Ctrl+V)".to_string(),
+                PasteMode::CtrlShiftV => "终端模式 (Ctrl+Shift+V)".to_string(),
+                PasteMode::UnicodeHex => "Unicode编码输入 (Ctrl+Shift+U)".to_string(),
+                PasteMode::Fcitx5 => "Fcitx5 接口".to_string(),
+            }
+        } else {
+            "无法切换模式 (锁中毒)".to_string()
         }
     }
 
@@ -148,7 +151,7 @@ impl Vkbd {
             return;
         }
 
-        println!("[Vkbd BG] Emitting text via heavy path: {} (mode={:?})", text, mode);
+        println!("[Vkbd BG] Emitting text via heavy path: {text} (mode={mode:?})");
 
         if mode == PasteMode::UnicodeHex {
             for c in text.chars() {
@@ -264,14 +267,18 @@ impl Vkbd {
     }
 
     pub fn apply_config(&mut self, config: &crate::config::Config) {
-        *self.clipboard_delay_ms.lock().unwrap() = config.input.clipboard_delay_ms;
-        *self.paste_mode.lock().unwrap() = match config.linux.paste_method.as_str() {
-            "ctrl_v" => PasteMode::CtrlV,
-            "ctrl_shift_v" => PasteMode::CtrlShiftV,
-            "unicode" => PasteMode::UnicodeHex,
-            "fcitx5" => PasteMode::Fcitx5,
-            _ => PasteMode::ShiftInsert,
-        };
+        if let Ok(mut delay) = self.clipboard_delay_ms.lock() {
+            *delay = config.input.clipboard_delay_ms;
+        }
+        if let Ok(mut mode) = self.paste_mode.lock() {
+            *mode = match config.linux.paste_method.as_str() {
+                "ctrl_v" => PasteMode::CtrlV,
+                "ctrl_shift_v" => PasteMode::CtrlShiftV,
+                "unicode" => PasteMode::UnicodeHex,
+                "fcitx5" => PasteMode::Fcitx5,
+                _ => PasteMode::ShiftInsert,
+            };
+        }
     }
 }
 

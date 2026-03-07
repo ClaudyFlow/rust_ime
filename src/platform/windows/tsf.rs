@@ -21,39 +21,57 @@ impl TsfHost {
 
 fn update_gui_impl(gui_tx: &Option<Sender<GuiEvent>>, processor: &Arc<Mutex<Processor>>, app_state: &Arc<Mutex<crate::ui::AppState>>) {
     if let Some(ref tx) = gui_tx {
-        let p = processor.lock().unwrap();
-        let short_display = p.get_short_display();
-        let chinese_enabled = p.chinese_enabled;
-        
-        let mut state = app_state.lock().unwrap();
-        state.chinese_enabled = chinese_enabled;
-        
-        // 关键修复：只有在不是正在显示临时通知（如“快捷切换”）的情况下，才同步短图标
-        // 或者：如果 buffer 有内容，强制显示当前的方案图标
-        if !p.buffer.is_empty() || !state.status_text.contains("...") {
-                state.status_text = if chinese_enabled { short_display } else { "英".into() };
-        }
-        
-        if p.buffer.is_empty() || !p.chinese_enabled { 
-            state.pinyin = "".into();
-            state.candidates = vec![];
-            state.hints = vec![];
-            state.selected_index = 0;
-        } else {
-            let mut pinyin = if p.best_segmentation.is_empty() { p.buffer.clone() } else { p.best_segmentation.join(" ") };
-            if p.nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
-            if !p.aux_filter.is_empty() {
-                let mut display_aux = String::new();
-                for (i, c) in p.aux_filter.chars().enumerate() { if i == 0 { display_aux.push(c.to_ascii_uppercase()); } else { display_aux.push(c.to_ascii_lowercase()); } }
-                pinyin.push_str(&display_aux);
+        let (short_display, chinese_enabled, buffer_empty, buffer, best_segmentation, nav_mode, aux_filter, candidates, candidate_hints, selected) = {
+            if let Ok(p) = processor.lock() {
+                (
+                    p.get_short_display(),
+                    p.chinese_enabled,
+                    p.session.buffer.is_empty(),
+                    p.session.buffer.clone(),
+                    p.session.best_segmentation.clone(),
+                    p.session.nav_mode,
+                    p.session.aux_filter.clone(),
+                    p.session.candidates.clone(),
+                    p.session.candidates.iter().map(|c| c.hint.to_string()).collect::<Vec<_>>(),
+                    p.session.selected,
+                )
+            } else {
+                return;
             }
-            state.pinyin = pinyin;
-            state.candidates = p.candidates.clone();
-            state.hints = p.candidate_hints.clone();
-            state.selected_index = p.selected;
-        }
+        };
         
-        let _ = tx.send(GuiEvent::SyncState(state.clone()));
+        if let Ok(mut state) = app_state.lock() {
+            state.chinese_enabled = chinese_enabled;
+            
+            if !buffer_empty || !state.status_text.contains("...") {
+                state.status_text = if chinese_enabled { short_display } else { "英".into() };
+            }
+            
+            if buffer_empty || !chinese_enabled { 
+                state.pinyin = "".into();
+                state.candidates = vec![];
+                // Note: state.hints was in original code, but AppState might have changed
+                state.selected_index = 0;
+            } else {
+                let mut pinyin = if best_segmentation.is_empty() { buffer } else { best_segmentation.join(" ") };
+                if nav_mode { pinyin.push_str(" [H:左 J:下 K:上 L:右]"); }
+                if !aux_filter.is_empty() {
+                    let mut display_aux = String::new();
+                    for (i, c) in aux_filter.chars().enumerate() { if i == 0 { display_aux.push(c.to_ascii_uppercase()); } else { display_aux.push(c.to_ascii_lowercase()); } }
+                    pinyin.push_str(&display_aux);
+                }
+                state.pinyin = pinyin;
+                state.candidates = candidates.iter().map(|c| crate::ui::DisplayCandidate {
+                    text: c.text.to_string(),
+                    label: "".into(), // Will be filled by UI or during pre-format
+                    hint: c.hint.to_string(),
+                    group: false,
+                }).collect();
+                state.selected_index = selected;
+            }
+            
+            let _ = tx.send(GuiEvent::SyncState(state.clone()));
+        }
     }
 }
 
@@ -102,7 +120,7 @@ impl InputMethodHost for TsfHost {
                     loop {
                         unsafe {
                             let sa = SECURITY_ATTRIBUTES { nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32, lpSecurityDescriptor: sd_ptr as *mut _, bInheritHandle: false.into() };
-                            let h = CreateNamedPipeW(PCWSTR(pipe_name_u16.as_ptr()), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
+                            let h = CreateNamedPipeW(PCWSTR(pipe_name_u16.as_ptr()), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 1024, 1024, 0, Some(&sa));
                             if h.is_invalid() { std::thread::sleep(std::time::Duration::from_millis(100)); continue; }
                             let connect_res = ConnectNamedPipe(h, None);
                             if connect_res.is_ok() || connect_res.err().map_or(false, |e| e.code() == windows::Win32::Foundation::ERROR_PIPE_CONNECTED.to_hresult()) {
@@ -126,7 +144,7 @@ fn is_hk_match(config_key: &str, pressed_key_code: u32, ctrl: bool, alt: bool, s
     let mut req_ctrl = false; let mut req_alt = false; let mut req_shift = false; let mut target_key = "";
     for part in parts { match part { "ctrl" => req_ctrl = true, "alt" => req_alt = true, "shift" => req_shift = true, _ => target_key = part } }
     if req_ctrl != ctrl || req_alt != alt || req_shift != shift { return false; }
-    let target_code = match target_key { "space" => 0x20, "tab" => 0x09, "backspace" => 0x08, "enter" => 0x0D, "esc" => 0x1B, s if s.len() == 1 => s.chars().next().unwrap().to_ascii_uppercase() as u32, _ => 0 };
+    let target_code = match target_key { "space" => 0x20, "tab" => 0x09, "backspace" => 0x08, "enter" => 0x0D, "esc" => 0x1B, s if s.len() == 1 => s.chars().next().map_or(0, |c| c.to_ascii_uppercase() as u32), _ => 0 };
     pressed_key_code == target_code
 }
 
@@ -148,12 +166,13 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         if msg_type == 5 {
             let active = key_code != 0;
             {
-                let mut state = app_state.lock().unwrap();
-                state.is_ime_active = active;
-                // 停用时清理拼音
-                if !active {
-                    state.pinyin = "".into();
-                    state.candidates = vec![];
+                if let Ok(mut state) = app_state.lock() {
+                    state.is_ime_active = active;
+                    // 停用时清理拼音
+                    if !active {
+                        state.pinyin = "".into();
+                        state.candidates = vec![];
+                    }
                 }
             }
             update_gui_impl(&gui_tx, &processor, &app_state);
@@ -165,13 +184,16 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
             let mut x = i32::from_le_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
             let mut y = i32::from_le_bytes([buffer[10], buffer[11], buffer[12], buffer[13]]);
             if x == 0 && y == 0 { if let Some((sx, sy)) = get_system_cursor_pos() { x = sx; y = sy; } }
-            if (x != 0 || y != 0) && gui_tx.is_some() { let _ = gui_tx.as_ref().unwrap().send(crate::ui::GuiEvent::MoveTo { x, y }); }
+            if (x != 0 || y != 0) && gui_tx.is_some() { let _ = gui_tx.as_ref().expect("gui_tx is some").send(crate::ui::GuiEvent::MoveTo { x, y }); }
         }
 
         // 核心热键判定
         let (enable_tab, enable_ctrl_space, switch_key) = {
-            let c = config.read().unwrap();
-            (c.hotkeys.enable_tab_toggle, c.hotkeys.enable_ctrl_space_toggle, c.hotkeys.switch_language.key.clone())
+            if let Ok(c) = config.read() {
+                (c.hotkeys.enable_tab_toggle, c.hotkeys.enable_ctrl_space_toggle, c.hotkeys.switch_language.key.clone())
+            } else {
+                (false, false, "".into())
+            }
         };
 
         let is_tab_match = enable_tab && is_hk_match(&switch_key, key_code, ctrl, alt, shift);
@@ -179,19 +201,21 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
 
         if is_tab_match || is_ctrl_space_match {
             if msg_type == 1 {
-                let mut p = processor.lock().unwrap(); p.toggle();
-                let enabled = p.chinese_enabled; let _short = p.get_short_display(); let profile = p.get_current_profile_display();
-                drop(p);
-                let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
-                update_gui_impl(&gui_tx, &processor, &app_state);
+                if let Ok(mut p) = processor.lock() {
+                    let _ = p.toggle();
+                    let enabled = p.chinese_enabled; let profile = p.get_current_profile_display();
+                    drop(p);
+                    let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: enabled, active_profile: profile });
+                    update_gui_impl(&gui_tx, &processor, &app_state);
+                }
             }
             let _ = WriteFile(handle, Some(&[2u8]), Some(&mut 0), None); continue;
         }
 
         // Ctrl/Alt 快捷键放行逻辑 (当没输入拼音时)
         if (ctrl || alt) && !is_ctrl_space_match {
-            let p = processor.lock().unwrap();
-            if p.buffer.is_empty() {
+            let buffer_empty = processor.lock().map(|p| p.session.buffer.is_empty()).unwrap_or(true);
+            if buffer_empty {
                 let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None);
                 continue;
             }
@@ -213,33 +237,46 @@ unsafe fn handle_client(handle: windows::Win32::Foundation::HANDLE, processor: s
         if let Some(key) = key {
             let mut response = Vec::new();
             if msg_type == 1 || msg_type == 3 {
-                let mut p = processor.lock().unwrap();
-                let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift, ctrl, alt);
-                drop(p);
-                match action {
-                    Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
-                    Action::DeleteAndEmit { delete, insert } => { if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); } response.extend_from_slice(insert.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
-                    Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
-                    Action::Alert => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
-                    Action::Notify(summary, _body) => {
-                        let (active, profile) = { let p = processor.lock().unwrap(); (p.chinese_enabled, p.get_current_profile_display()) };
-                        {
-                            let mut state = app_state.lock().unwrap();
-                            state.status_text = summary;
-                            state.chinese_enabled = active;
+                if let Ok(mut p) = processor.lock() {
+                    let action = p.handle_key(key, if msg_type == 1 { 1 } else { 0 }, shift, ctrl, alt);
+                    drop(p);
+                    match action {
+                        Action::Emit(txt) => { response.push(1); response.extend_from_slice(txt.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
+                        Action::DeleteAndEmit { delete, insert } => { if delete > 0 { response.push(3); response.push(delete as u8); } else { response.push(1); } response.extend_from_slice(insert.as_bytes()); update_gui_impl(&gui_tx, &processor, &app_state); }
+                        Action::Consume => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
+                        Action::Alert => { response.push(2); update_gui_impl(&gui_tx, &processor, &app_state); }
+                        Action::Notify(summary, _body) => {
+                            let (active, profile) = { 
+                                if let Ok(p) = processor.lock() { 
+                                    (p.chinese_enabled, p.get_current_profile_display()) 
+                                } else { 
+                                    (true, "chinese".into()) 
+                                } 
+                            };
+                            {
+                                if let Ok(mut state) = app_state.lock() {
+                                    state.status_text = summary;
+                                    state.chinese_enabled = active;
+                                }
+                            }
+                            let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: active, active_profile: profile });
+                            update_gui_impl(&gui_tx, &processor, &app_state);
+                            response.push(2); 
                         }
-                        let _ = tray_tx.send(crate::ui::tray::TrayEvent::SyncStatus { chinese_enabled: active, active_profile: profile });
-                        update_gui_impl(&gui_tx, &processor, &app_state);
-                        response.push(2); 
+                        _ => { response.push(0); }
                     }
-                    _ => { response.push(0); }
+                } else {
+                    response.push(0);
                 }
             } else {
-                let p = processor.lock().unwrap();
-                let is_letter = key_code >= 0x41 && key_code <= 0x5A;
-                let is_special = key_code == 0x14;
-                let is_punct = match key_code { 0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true, 0x30..=0x39 if shift => true, _ => false };
-                if p.chinese_enabled && (!p.buffer.is_empty() || is_letter || is_punct || is_special) { response.push(2); } else { response.push(0); }
+                if let Ok(p) = processor.lock() {
+                    let is_letter = key_code >= 0x41 && key_code <= 0x5A;
+                    let is_special = key_code == 0x14;
+                    let is_punct = match key_code { 0x20 | 0xC0 | 0xBD | 0xBB | 0xDB | 0xDD | 0xDC | 0xBA | 0xDE | 0xBC | 0xBE | 0xBF => true, 0x30..=0x39 if shift => true, _ => false };
+                    if p.chinese_enabled && (!p.session.buffer.is_empty() || is_letter || is_punct || is_special) { response.push(2); } else { response.push(0); }
+                } else {
+                    response.push(0);
+                }
             }
             let _ = WriteFile(handle, Some(&response), Some(&mut 0), None);
         } else { let _ = WriteFile(handle, Some(&[0u8]), Some(&mut 0), None); }

@@ -155,12 +155,15 @@ impl ITfTextInputProcessor_Impl for TextService {
     fn Activate(&self, thread_mgr: Option<&ITfThreadMgr>, client_id: u32) -> Result<()> {
         self.client_id.store(client_id, Ordering::SeqCst);
         if let Some(mgr) = thread_mgr {
-            let mut lock = self.thread_mgr.write().expect("Failed to lock thread_mgr for write");
-            *lock = Some(mgr.clone());
-            unsafe {
-                let keystroke_mgr: ITfKeystrokeMgr = mgr.cast()?;
-                let sink: ITfKeyEventSink = self.cast()?;
-                keystroke_mgr.AdviseKeyEventSink(client_id, &sink, true)?;
+            if let Ok(mut lock) = self.thread_mgr.write() {
+                *lock = Some(mgr.clone());
+                unsafe {
+                    let keystroke_mgr: ITfKeystrokeMgr = mgr.cast()?;
+                    let sink: ITfKeyEventSink = self.cast()?;
+                    keystroke_mgr.AdviseKeyEventSink(client_id, &sink, true)?;
+                }
+            } else {
+                log("RustIME Error: thread_mgr lock poisoned in Activate");
             }
         }
         Ok(())
@@ -170,8 +173,12 @@ impl ITfTextInputProcessor_Impl for TextService {
         log("RustIME: TextService::Deactivate");
         
         let mgr_opt = {
-            let mut lock = self.thread_mgr.write().expect("Failed to lock thread_mgr for write in Deactivate");
-            lock.take()
+            if let Ok(mut lock) = self.thread_mgr.write() {
+                lock.take()
+            } else {
+                log("RustIME Error: thread_mgr lock poisoned in Deactivate");
+                None
+            }
         };
 
         if let Some(mgr) = mgr_opt {
