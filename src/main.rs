@@ -461,8 +461,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "linux")]
     {
         let dev_path = config.read().unwrap().linux.device_path.clone();
-        let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &dev_path, Some(gui_tx), config.clone(), tray_tx)?;
-        host.run()?;
+        
+        // 尝试启动硬件拦截模式 (需要 Root)
+        match platform::linux::evdev_host::EvdevHost::new(processor.clone(), &dev_path, Some(gui_tx.clone()), config.clone(), tray_tx.clone()) {
+            Ok(mut host) => {
+                println!("[Main] 成功启动 Evdev 拦截模式。");
+                host.run()?;
+            }
+            Err(e) => {
+                println!("[Main] Evdev 启动失败 ({:?})，尝试回落到原生 Wayland 协议模式...", e);
+                // 回落到 Wayland 模式 (不需要 Root)
+                let mut host = platform::linux::wayland::WaylandHost::new(processor, Some(gui_tx))?;
+                println!("[Main] 成功启动 Wayland 原生协议模式 (免 Root)。");
+                host.run()?;
+            }
+        }
     }
 
     Ok(())
