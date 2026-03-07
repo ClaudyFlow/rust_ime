@@ -52,12 +52,7 @@ impl InputMethodHost for WaylandHost {
     fn get_cursor_rect(&self) -> Option<Rect> { None }
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("[WaylandHost] 原生探测模式已就绪。");
-        if self.state.found_input_method {
-            println!("[WaylandHost] 系统支持 input-method 协议接口。");
-        } else {
-            println!("[WaylandHost] 警告：KWin 隐藏了 input-method 接口。请确认 KDE 设置或环境变量。");
-        }
+        println!("[WaylandHost] 原生探测服务已就绪。");
         loop {
             self.event_queue.blocking_dispatch(&mut self.state)?;
         }
@@ -68,7 +63,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for WaylandState {
     fn event(_: &mut Self, _: &wl_registry::WlRegistry, event: wl_registry::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
         if let wl_registry::Event::Global { interface, .. } = event {
             if interface.contains("input_method") {
-                println!("[Wayland Registry] 发现可用特权接口: {}", interface);
+                println!("[Wayland Discovery] 发现特权接口: {}", interface);
             }
         }
     }
