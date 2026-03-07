@@ -17,6 +17,12 @@ pub enum TrayEvent {
     ClearUserDict,
 }
 
+pub struct TrayParams {
+    pub active_profile: String,
+    pub show_status_bar: bool,
+    pub tx: Sender<TrayEvent>,
+}
+
 #[cfg(target_os = "linux")]
 pub struct ImeTray {
     pub chinese_enabled: bool,
@@ -91,19 +97,12 @@ impl LinuxTrayHandle {
 }
 
 #[cfg(target_os = "linux")]
-pub fn start_tray(
-    _is_linux: bool, active_profile: String, show_status_bar: bool,
-    _anti_typo_mode: crate::config::AntiTypoMode,
-    _double_pinyin: bool,
-    _commit_mode: String,
-    _candidate_layout: String,
-    tx: Sender<TrayEvent>
-) -> LinuxTrayHandle {
+pub fn start_tray(params: TrayParams) -> LinuxTrayHandle {
     let tray = ImeTray {
         chinese_enabled: true,
-        active_profile,
-        show_status_bar,
-        tx,
+        active_profile: params.active_profile,
+        show_status_bar: params.show_status_bar,
+        tx: params.tx,
     };
     let service = TrayService::new(tray);
     let handle = service.handle();
@@ -154,21 +153,16 @@ impl WindowsTrayHandle {
 }
 
 #[cfg(target_os = "windows")]
-pub fn start_tray(
-    _is_linux: bool, active_profile: String, show_status_bar: bool,
-    _anti_typo_mode: crate::config::AntiTypoMode,
-    _double_pinyin: bool,
-    _commit_mode: String,
-    _candidate_layout: String,
-    event_tx: Sender<TrayEvent>
-) -> WindowsTrayHandle {
+pub fn start_tray(params: TrayParams) -> WindowsTrayHandle {
     let state = Arc::new(Mutex::new(ImeTrayStub {
-        chinese_enabled: true, active_profile, show_status_bar,
+        chinese_enabled: true, 
+        active_profile: params.active_profile, 
+        show_status_bar: params.show_status_bar,
     }));
 
     unsafe {
         TRAY_STATE = Some(state.clone());
-        TRAY_TX = Some(event_tx);
+        TRAY_TX = Some(params.tx);
     }
 
     let (tx, rx) = std::sync::mpsc::channel();

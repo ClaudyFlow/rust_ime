@@ -32,11 +32,10 @@ pub fn process_modifiers(processor: &mut Processor, key: VirtualKey, is_press: b
             } else { 
                 Action::Notify("快捷切换".into(), "已退出".into()) 
             });
-        } else {
-            let page_size = processor.config.page_size;
-            processor.session.toggle_nav_mode(page_size);
-            return Some(Action::Consume);
         }
+        let page_size = processor.config.page_size;
+        processor.session.toggle_nav_mode(page_size);
+        return Some(Action::Consume);
     }
     
     None

@@ -279,12 +279,12 @@ impl Processor {
             let mut new_combinations = Vec::new();
             {
                 let history_slice = &self.commit_history[start..];
-                for i in 0..(history_slice.len() - 1) {
+                for i in 0..(history_slice.len().saturating_sub(1)) {
                     let mut combined_py = String::new();
                     let mut combined_word = String::new();
-                    for j in i..history_slice.len() {
-                        combined_py.push_str(&history_slice[j].0);
-                        combined_word.push_str(&history_slice[j].1);
+                    for entry in history_slice.iter().skip(i) {
+                        combined_py.push_str(&entry.0);
+                        combined_word.push_str(&entry.1);
                     }
                     if combined_word.chars().count() <= 8 {
                         new_combinations.push((combined_py, combined_word));

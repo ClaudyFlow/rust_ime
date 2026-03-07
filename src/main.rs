@@ -334,9 +334,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(conf_guard);
 
     let tray_handle = if let Ok(conf) = config.read() {
-        ui::tray::start_tray(false, conf.input.default_profile.clone(), conf.appearance.show_status_bar, conf.input.anti_typo_mode, conf.input.enable_double_pinyin, conf.input.commit_mode.clone(), conf.appearance.candidate_layout.clone(), tray_tx.clone())
+        ui::tray::start_tray(ui::tray::TrayParams {
+            active_profile: conf.input.default_profile.clone(),
+            show_status_bar: conf.appearance.show_status_bar,
+            tx: tray_tx.clone(),
+        })
     } else {
-        ui::tray::start_tray(false, "chinese".into(), true, crate::config::AntiTypoMode::None, false, "single".into(), "vertical".into(), tray_tx.clone())
+        ui::tray::start_tray(ui::tray::TrayParams {
+            active_profile: "chinese".into(),
+            show_status_bar: true,
+            tx: tray_tx.clone(),
+        })
     };
 
     // 全局状态维护
