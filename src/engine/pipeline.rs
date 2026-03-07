@@ -102,46 +102,22 @@ impl Translator for TableTranslator {
         // 1. 尝试全拼精确匹配
         if let Some(exact_results) = self.trie.get_all_exact(&query) {
             for tr in exact_results {
-                let mut hint = String::new();
-                if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
-                if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
-                    if !hint.is_empty() { hint.push(' '); }
-                    hint.push_str(tr.stroke_aux);
-                }
                 candidates.push(Candidate {
                     simplified: Arc::from(tr.word),
                     traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
                     text: Arc::from(tr.word), 
-                    hint: Arc::from(hint), 
+                    hint: Arc::from(tr.tone), 
                     source: Arc::from("Table (Exact)"),
                     weight: tr.weight as f64 + config.input.ranking.exact_match_bonus, 
                 });
             }
         }
         
-        // 2. 尝试前缀匹配
-        let results = self.trie.search_bfs(&query, limit);
-        for tr in results {
-            if candidates.iter().any(|c| c.simplified.as_ref() == tr.word) { continue; }
-            let mut hint = String::new();
-            if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
-            if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
-                if !hint.is_empty() { hint.push(' '); }
-                hint.push_str(tr.stroke_aux);
-            }
-            candidates.push(Candidate {
-                simplified: Arc::from(tr.word),
-                traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
-                text: Arc::from(tr.word), 
-                hint: Arc::from(hint), 
-                source: Arc::from("Table"),
-                weight: tr.weight as f64,
-            });
-            if candidates.len() >= limit { break; }
-        }
-        
-        // 3. 简拼匹配 (始终尝试，但权重略低)
-        if config.input.enable_abbreviation_matching {
+        // 判断是否为简拼输入：如果 segments 数量多于 1，且包含单个字母片段，则视为简拼。
+        let is_abbreviation = segments.len() > 1 && segments.iter().any(|s| s.len() == 1);
+
+        if is_abbreviation && config.input.enable_abbreviation_matching {
+            // 2. 执行严格简拼搜索 (sm -> shen'me, 不再匹配 sm...)
             let abbr_results = self.trie.search_abbreviation(segments, &self.syllables, limit);
             for ar in abbr_results {
                 if !candidates.iter().any(|r| r.simplified.as_ref() == ar.word) {
@@ -151,13 +127,12 @@ impl Translator for TableTranslator {
                         if !hint.is_empty() { hint.push(' '); }
                         hint.push_str(ar.stroke_aux);
                     }
-                    // 优化简拼权重：不再使用大额固定惩罚。
-                    // 而是根据其原始权重进行小额降权 (例如 -500)，使其能排在许多低频全拼词之前。
-                    // 对于高频词 (如 "什么", weight > 10000)，降权后的得分依然很高。
-                    let adjusted_weight = if ar.weight > 10000 {
-                        (ar.weight as f64) - 200.0 // 高频词简拼：几乎不降权
+                    
+                    // 对于高权重常用词（如 "什么"），保留更多原始权重
+                    let adjusted_weight = if ar.weight > 5000 {
+                        (ar.weight as f64) - 50.0 
                     } else {
-                        (ar.weight as f64) - 1000.0 // 普通词简拼：中等降权
+                        (ar.weight as f64) - 500.0
                     };
 
                     candidates.push(Candidate {
@@ -169,7 +144,28 @@ impl Translator for TableTranslator {
                         weight: adjusted_weight, 
                     });
                 }
-                if candidates.len() >= limit + 50 { break; } // 搜索深度从 +20 增加到 +50
+                if candidates.len() >= limit + 100 { break; } 
+            }
+        } else {
+            // 3. 全拼前缀补全 (只有不是简拼时才执行)
+            let results = self.trie.search_bfs(&query, limit);
+            for tr in results {
+                if candidates.iter().any(|c| c.simplified.as_ref() == tr.word) { continue; }
+                let mut hint = String::new();
+                if config.appearance.show_english_aux && !tr.en.is_empty() { hint.push_str(tr.en); }
+                if config.appearance.show_stroke_aux && !tr.stroke_aux.is_empty() {
+                    if !hint.is_empty() { hint.push(' '); }
+                    hint.push_str(tr.stroke_aux);
+                }
+                candidates.push(Candidate {
+                    simplified: Arc::from(tr.word),
+                    traditional: if tr.trad.is_empty() { Arc::from(tr.word) } else { Arc::from(tr.trad) },
+                    text: Arc::from(tr.word), 
+                    hint: Arc::from(hint), 
+                    source: Arc::from("Table"),
+                    weight: tr.weight as f64,
+                });
+                if candidates.len() >= limit { break; }
             }
         }
         candidates

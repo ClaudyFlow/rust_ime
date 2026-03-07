@@ -128,8 +128,9 @@ impl Trie {
 
     pub fn search_abbreviation(&self, segments: &[String], syllables: &std::collections::HashSet<String>, limit: usize) -> Vec<TrieResult<'_>> {
         if segments.is_empty() { return Vec::new(); }
-        // 内部扩大搜索范围，避免字典序靠后的词被埋没
-        let internal_scan_limit = limit.max(500);
+        // 进一步扩大扫描上限。对于 's' 开头的词，500 个远远不够，
+        // 字典序中 'sai', 'san', 'sao' 可能就占用了上千个坑位。
+        let internal_scan_limit = 3000; 
         let mut results = Vec::with_capacity(limit);
         
         let first_seg = &segments[0];
@@ -137,35 +138,34 @@ impl Trie {
         let mut stream = self.index.search(matcher).into_stream();
 
         while let Some((key_bytes, offset)) = stream.next() {
-            if key_bytes.len() < segments.len() { continue; }
-
             let key = String::from_utf8_lossy(key_bytes);
-            if self.matches_segments(&key, segments, syllables) {
+            
+            // 严格匹配：
+            // 1. 每一个 segment 必须匹配一个音节的开头
+            // 2. 必须刚好匹配完所有 segment 且 耗尽 key 中的所有音节
+            if self.matches_strict_jianpin(&key, segments, syllables) {
                 let pairs = self.read_block(offset as usize);
                 for pair in pairs {
                     if !results.iter().any(|tr: &TrieResult| tr.word == pair.word) {
                         results.push(pair);
-                        // 达到内部扫描上限才停止
                         if results.len() >= internal_scan_limit { break; }
                     }
                 }
             }
             if results.len() >= internal_scan_limit { break; }
         }
-        
-        // 外部只需要 limit 个，但我们可以返回全部供上层排序，上层会取前 limit
         results
     }
 
-    fn matches_segments(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
-        if segments.is_empty() { return false; }
-        self.recursive_match(key, segments, syllables)
+    /// 严格简拼匹配：输入 segments 数量必须等于词组音节数
+    fn matches_strict_jianpin(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
+        self.recursive_strict_match(key, segments, syllables)
     }
 
-    fn recursive_match(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
+    fn recursive_strict_match(&self, key: &str, segments: &[String], syllables: &std::collections::HashSet<String>) -> bool {
+        // 如果 segments 耗尽，则 key 也必须耗尽（确保音节数一致）
         if segments.is_empty() {
-            // 所有片段都已匹配，如果此时 key 刚好耗尽，或者是多音节词的部分匹配，返回 true
-            return true;
+            return key.is_empty();
         }
 
         if key.is_empty() {
@@ -173,44 +173,22 @@ impl Trie {
         }
 
         let first_seg = &segments[0];
-        if first_seg.is_empty() { return self.recursive_match(key, &segments[1..], syllables); }
-
-        // 简拼的核心：当前第一个 segment 必须匹配 key 中一个音节的开头
-        // 尝试从当前 key 的起始位置切分出一个合法音节
-        let mut found_match = false;
+        
+        // 尝试从 key 的当前位置切分出一个合法音节
         for len in (1..=6).rev() {
             if len <= key.len() {
                 let syl = &key[..len];
-                // 如果这是一个已知音节
                 if syllables.contains(syl) {
-                    // 如果这个音节以当前第一个 segment 开头
+                    // 声母必须匹配
                     if syl.starts_with(first_seg) {
-                        // 递归尝试匹配剩余部分
-                        if self.recursive_match(&key[len..], &segments[1..], syllables) {
-                            found_match = true;
-                            break;
+                        // 递归匹配剩余音节
+                        if self.recursive_strict_match(&key[len..], &segments[1..], syllables) {
+                            return true;
                         }
                     }
                 }
             }
         }
-        
-        if found_match { return true; }
-
-        // 兜底逻辑：如果由于音节切分不规范导致匹配不到，尝试单字母前缀匹配
-        // 如果 key[0..1] 与 first_seg[0..1] 匹配，且 key 后续部分能被递归处理
-        // (这应对了一些不规范的全拼或分隔符场景)
-        if key.starts_with(&first_seg[..1]) {
-            // 跳过 key 中当前的这一个字母，继续寻找下一个音节的匹配
-            // 注意：这里需要谨慎处理，以防退化为子串匹配
-            // 在输入法语境下，我们通常寻找音节切分点
-            // 这里我们尝试找到下一个元音后的辅音作为可能的切分点
-            let next_start = key.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
-            if self.recursive_match(&key[next_start..], &segments[1..], syllables) {
-                return true;
-            }
-        }
-
         false
     }
 
