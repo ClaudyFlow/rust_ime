@@ -285,3 +285,86 @@ impl Pipeline {
         candidates
     }
 }
+
+pub struct SearchEngine {
+    pub pipelines: HashMap<String, Pipeline>,
+    pub schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
+}
+
+impl SearchEngine {
+    pub fn new(
+        pipelines: HashMap<String, Pipeline>,
+        schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
+    ) -> Self {
+        Self { pipelines, schemes }
+    }
+
+    pub fn search(
+        &self,
+        buffer: &str,
+        profile: &str,
+        syllables: &HashSet<String>,
+        config: &crate::Config,
+        limit: usize,
+        filter_mode: crate::engine::processor::FilterMode,
+        aux_filter: &str,
+    ) -> (Vec<Candidate>, Vec<String>) {
+        if let Some(pipeline) = self.pipelines.get(profile) {
+            let segments = pipeline.segmentor.segment(buffer, syllables);
+            let mut results = pipeline.run(buffer, syllables, config, limit);
+            
+            if filter_mode == crate::engine::processor::FilterMode::Global && !aux_filter.is_empty() {
+                results.retain(|c| self.matches_filter(c, aux_filter));
+            }
+            
+            return (results, segments);
+        }
+
+        if let Some(scheme) = self.schemes.get(profile) {
+            // 目前 Scheme 模式暂不支持复杂的 segments 返回，暂留空
+            let context = crate::engine::scheme::SchemeContext {
+                config,
+                tries: &HashMap::new(), // 这里需要重构传参，暂简化
+                syllables,
+                _user_dict: &Arc::new(Mutex::new(HashMap::new())),
+                active_profiles: &vec![profile.to_string()],
+                candidate_count: 0,
+                _filter_mode: filter_mode.clone(),
+                _aux_filter: aux_filter,
+            };
+            
+            let query = scheme.pre_process(buffer, &context);
+            let mut candidates = scheme.lookup(&query, &context);
+            scheme.post_process(&query, &mut candidates, &context);
+            
+            let mut results = Vec::new();
+            for c in candidates {
+                results.push(Candidate {
+                    text: if config.input.enable_traditional { c.traditional.clone() } else { c.simplified.clone() },
+                    simplified: c.simplified,
+                    traditional: c.traditional,
+                    hint: c.tone, // 简化处理
+                    source: "Scheme".into(),
+                    weight: c.weight as f64,
+                });
+            }
+
+            if filter_mode == crate::engine::processor::FilterMode::Global && !aux_filter.is_empty() {
+                results.retain(|c| self.matches_filter(c, aux_filter));
+            }
+
+            return (results, vec![]);
+        }
+
+        (vec![], vec![])
+    }
+
+    pub fn matches_filter(&self, cand: &Candidate, filter: &str) -> bool {
+        if filter.is_empty() { return true; }
+        let filter_lower = filter.to_lowercase();
+        let hint_lower = cand.hint.to_lowercase();
+        let hint_clean = crate::engine::processor::strip_tones(&hint_lower);
+        let parts: Vec<&str> = hint_clean.split(|c| c == ' ' || c == '/' || c == '(' || c == ')' || c == ',').collect();
+        parts.iter().any(|p| p.starts_with(&filter_lower)) || hint_clean.starts_with(&filter_lower)
+    }
+}

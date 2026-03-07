@@ -4,23 +4,23 @@ pub struct Compositor;
 
 impl Compositor {
     pub fn get_preedit(p: &Processor) -> String {
-        if p.ctx.buffer.is_empty() || !p.chinese_enabled {
+        if p.session.buffer.is_empty() || !p.chinese_enabled {
             return String::new();
         }
 
-        let mut pinyin = if p.best_segmentation.is_empty() {
-            p.ctx.buffer.clone()
+        let mut pinyin = if p.session.best_segmentation.is_empty() {
+            p.session.buffer.clone()
         } else {
-            p.best_segmentation.join(" ")
+            p.session.best_segmentation.join(" ")
         };
 
-        if p.ctx.nav_mode {
+        if p.session.nav_mode {
             pinyin.push_str(" [H:左 J:下 K:上 L:右]");
         }
 
-        if !p.ctx.aux_filter.is_empty() {
+        if !p.session.aux_filter.is_empty() {
             let mut display_aux = String::new();
-            for (i, c) in p.ctx.aux_filter.chars().enumerate() {
+            for (i, c) in p.session.aux_filter.chars().enumerate() {
                 if i == 0 {
                     for uc in c.to_uppercase() { display_aux.push(uc); }
                 } else {
@@ -35,25 +35,25 @@ impl Compositor {
 
     pub fn get_phantom_text(p: &Processor) -> String {
         use crate::config::PhantomType;
-        if p.ctx.state == ImeState::Direct || p.config.phantom_type == PhantomType::None { 
+        if p.session.state == ImeState::Direct || p.config.phantom_type == PhantomType::None { 
             return String::new(); 
         }
         
-        if p.ctx.switch_mode {
+        if p.session.switch_mode {
             return "[方案切换]".to_string();
         }
 
         match p.config.phantom_type {
-            PhantomType::Pinyin => p.ctx.buffer.clone(),
+            PhantomType::Pinyin => p.session.buffer.clone(),
             PhantomType::Hanzi => {
-                if p.preview_selected_candidate && !p.ctx.candidates.is_empty() {
-                    p.ctx.candidates[p.ctx.selected.min(p.ctx.candidates.len() - 1)].text.clone()
-                } else if !p.ctx.joined_sentence.is_empty() {
-                    p.ctx.joined_sentence.clone()
-                } else if !p.ctx.candidates.is_empty() {
-                    p.ctx.candidates[0].text.clone()
+                if p.session.preview_selected_candidate && !p.session.candidates.is_empty() {
+                    p.session.candidates[p.session.selected.min(p.session.candidates.len() - 1)].text.clone()
+                } else if !p.session.joined_sentence.is_empty() {
+                    p.session.joined_sentence.clone()
+                } else if !p.session.candidates.is_empty() {
+                    p.session.candidates[0].text.clone()
                 } else {
-                    p.ctx.buffer.clone()
+                    p.session.buffer.clone()
                 }
             }
             _ => String::new(),

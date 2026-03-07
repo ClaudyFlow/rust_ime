@@ -249,16 +249,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("动作反馈: {:?}", action);
                     } else {
                         // 允许直接设置 buffer 进行快捷测试
-                        processor.ctx.buffer = input.to_string();
+                        processor.session.buffer = input.to_string();
                         processor.lookup();
                     }
                     
                     let display_preedit = engine::compositor::Compositor::get_preedit(&processor);
                     println!("预编辑: {}", display_preedit);
-                    println!("辅助码过滤: {}", processor.ctx.aux_filter);
-                    println!("切分: {:?}", processor.best_segmentation);
+                    println!("辅助码过滤: {}", processor.session.aux_filter);
+                    println!("切分: {:?}", processor.session.best_segmentation);
                     println!("候选词 (前 10 条):");
-                    for (i, cand) in processor.ctx.candidates.iter().take(10).enumerate() {
+                    for (i, cand) in processor.session.candidates.iter().take(10).enumerate() {
                         println!("  {}. {} (hint: {}, source: {})", i + 1, cand.text, cand.hint, cand.source);
                     }
                 }

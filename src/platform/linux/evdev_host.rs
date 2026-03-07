@@ -203,7 +203,7 @@ impl InputMethodHost for EvdevHost {
                     {
                         let mut p = self.processor.lock().unwrap();
                         let is_direct = !p.chinese_enabled;
-                        let is_empty = p.ctx.buffer.is_empty();
+                        let is_empty = p.session.buffer.is_empty();
                         
                         // 如果处于直通(英文)模式，除 Tab 键外全部直接物理透传
                         if is_direct && key != Key::KEY_TAB {
@@ -253,7 +253,7 @@ impl InputMethodHost for EvdevHost {
                     if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
                         if val == 1 {
                             let mut p = self.processor.lock().unwrap();
-                            if p.chinese_enabled && p.ctx.state != crate::engine::processor::ImeState::Direct {
+                            if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Direct {
                                 println!("[Host] Triggering Global Filter");
                                 p.start_global_filter();
                                 drop(p);
@@ -325,7 +325,7 @@ impl InputMethodHost for EvdevHost {
                         }
                         drop(p); if val != 0 { self.update_gui(); }
                     } else {
-                        if has_mod && p.ctx.state != crate::engine::processor::ImeState::Direct { let del = p.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
+                        if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { let del = p.session.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(mut vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
                         drop(p); if let Ok(mut vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
                     }
 
@@ -348,7 +348,7 @@ impl EvdevHost {
 
 fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
     if let Some(ref tx) = gui_tx {
-        if p.ctx.buffer.is_empty() || !p.chinese_enabled { 
+        if p.session.buffer.is_empty() || !p.chinese_enabled { 
             let _ = tx.send(GuiEvent::Update { 
                 pinyin: "".into(), 
                 candidates: vec![], 
@@ -364,11 +364,11 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
 
         if p.config.show_candidates {
             let page_size = p.config.page_size;
-            let start = p.ctx.page.min(p.ctx.candidates.len());
-            let end = (start + page_size).min(p.ctx.candidates.len());
+            let start = p.session.page.min(p.session.candidates.len());
+            let end = (start + page_size).min(p.session.candidates.len());
             
             let mut display_candidates = Vec::new();
-            for (i, c) in p.ctx.candidates[start..end].iter().enumerate() {
+            for (i, c) in p.session.candidates[start..end].iter().enumerate() {
                 let label = format!("{}.", i + 1);
                 let full_display = if c.hint.is_empty() {
                     format!("{}{}", label, c.text)
@@ -383,14 +383,14 @@ fn update_gui_internal(p: &Processor, gui_tx: &Option<Sender<GuiEvent>>) {
                 });
             }
 
-            let relative_selected = p.ctx.selected.saturating_sub(start);
+            let relative_selected = p.session.selected.saturating_sub(start);
 
             let _ = tx.send(GuiEvent::Update { 
                 pinyin, 
                 candidates: display_candidates, 
                 selected: relative_selected, 
-                sentence: p.ctx.joined_sentence.clone(),
-                cursor_pos: p.ctx.cursor_pos,
+                sentence: p.session.joined_sentence.clone(),
+                cursor_pos: p.session.cursor_pos,
                 commit_mode: p.config.commit_mode.clone(),
             });
         } else { 
