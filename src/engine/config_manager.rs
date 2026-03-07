@@ -303,8 +303,4 @@ impl ConfigManager {
             }
         }
     }
-
-    pub fn save_learned_words(&self) {
-        // ... (保持空或仅在需要强制持久化时使用)
-    }
 }
