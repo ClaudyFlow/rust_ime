@@ -199,18 +199,73 @@ impl ConfigManager {
     }
 
     pub fn load_user_dicts(&mut self) {
-        let load_file = |name: &str| -> UserDictData {
-            let path = std::path::Path::new("data").join(format!("{}.json", name));
-            if path.exists() {
-                if let Ok(file) = std::fs::File::open(path) {
-                    return serde_json::from_reader(std::io::BufReader::new(file)).unwrap_or_default();
+        let mut learned = UserDictData::new();
+        let mut usage = UserDictData::new();
+
+        // 1. 尝试从数据库加载 (Sled)
+        if let Some(ref db) = self.db {
+            println!("[ConfigManager] 正在从 KV 存储加载用户数据...");
+            for item in db.iter() {
+                if let Ok((key_bytes, val_bytes)) = item {
+                    let key = String::from_utf8_lossy(&key_bytes);
+                    if let Ok(entries) = serde_json::from_slice::<Vec<(String, u32)>>(&val_bytes) {
+                        let parts: Vec<&str> = key.split(':').collect();
+                        if parts.len() == 3 {
+                            let (prefix, profile, pinyin) = (parts[0], parts[1], parts[2]);
+                            match prefix {
+                                "learned" => learned.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
+                                "usage" => usage.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
+                                _ => None,
+                            };
+                        }
+                    }
                 }
             }
-            HashMap::new()
-        };
+        }
 
-        self.learned_words.store(Arc::new(load_file("learned_words")));
-        self.usage_history.store(Arc::new(load_file("usage_history")));
+        // 2. 如果数据库是空的，或者强制迁移，检查旧 JSON
+        if learned.is_empty() && usage.is_empty() {
+            println!("[ConfigManager] 检测到全新存储，尝试迁移旧 JSON 数据...");
+            let load_file = |name: &str| -> UserDictData {
+                let path = std::path::Path::new("data").join(format!("{}.json", name));
+                if path.exists() {
+                    if let Ok(file) = std::fs::File::open(&path) {
+                        return serde_json::from_reader(std::io::BufReader::new(file)).unwrap_or_default();
+                    }
+                }
+                HashMap::new()
+            };
+
+            let old_learned = load_file("learned_words");
+            let old_usage = load_file("usage_history");
+
+            // 将旧数据同步进数据库
+            if let Some(ref db) = self.db {
+                for (profile, pinyins) in &old_learned {
+                    for (pinyin, entries) in pinyins {
+                        let key = format!("learned:{}:{}", profile, pinyin);
+                        if let Ok(val) = serde_json::to_vec(entries) {
+                            let _ = db.insert(key, val);
+                        }
+                    }
+                }
+                for (profile, pinyins) in &old_usage {
+                    for (pinyin, entries) in pinyins {
+                        let key = format!("usage:{}:{}", profile, pinyin);
+                        if let Ok(val) = serde_json::to_vec(entries) {
+                            let _ = db.insert(key, val);
+                        }
+                    }
+                }
+                let _ = db.flush();
+                println!("[ConfigManager] 旧 JSON 数据已成功迁移至 KV 数据库。");
+            }
+            learned = old_learned;
+            usage = old_usage;
+        }
+
+        self.learned_words.store(Arc::new(learned));
+        self.usage_history.store(Arc::new(usage));
 
         if self.user_dict_tx.is_none() {
             let (tx, rx) = std::sync::mpsc::channel::<(UserDictData, std::path::PathBuf)>();
