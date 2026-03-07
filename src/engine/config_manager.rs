@@ -205,19 +205,17 @@ impl ConfigManager {
         // 1. 尝试从数据库加载 (Sled)
         if let Some(ref db) = self.db {
             println!("[ConfigManager] 正在从 KV 存储加载用户数据...");
-            for item in db.iter() {
-                if let Ok((key_bytes, val_bytes)) = item {
-                    let key = String::from_utf8_lossy(&key_bytes);
-                    if let Ok(entries) = serde_json::from_slice::<Vec<(String, u32)>>(&val_bytes) {
-                        let parts: Vec<&str> = key.split(':').collect();
-                        if parts.len() == 3 {
-                            let (prefix, profile, pinyin) = (parts[0], parts[1], parts[2]);
-                            match prefix {
-                                "learned" => learned.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
-                                "usage" => usage.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
-                                _ => None,
-                            };
-                        }
+            for (key_bytes, val_bytes) in db.iter().flatten() {
+                let key = String::from_utf8_lossy(&key_bytes);
+                if let Ok(entries) = serde_json::from_slice::<Vec<(String, u32)>>(&val_bytes) {
+                    let parts: Vec<&str> = key.split(':').collect();
+                    if parts.len() == 3 {
+                        let (prefix, profile, pinyin) = (parts[0], parts[1], parts[2]);
+                        match prefix {
+                            "learned" => learned.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
+                            "usage" => usage.entry(profile.to_string()).or_default().insert(pinyin.to_string(), entries),
+                            _ => None,
+                        };
                     }
                 }
             }

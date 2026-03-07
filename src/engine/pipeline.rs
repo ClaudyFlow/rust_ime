@@ -488,7 +488,7 @@ impl SearchEngine {
                 tries: &HashMap::new(),
                 syllables: query.syllables,
                 _user_dict: &Arc::new(arc_swap::ArcSwap::from_pointee(HashMap::new())),
-                active_profiles: &vec![query.profile.to_string()],
+                active_profiles: &[query.profile.to_string()],
                 candidate_count: 0,
                 _filter_mode: query.filter_mode.clone(),
                 _aux_filter: query.aux_filter,

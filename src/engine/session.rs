@@ -121,12 +121,11 @@ impl InputSession {
     }
 
     pub fn next_page(&mut self, page_size: usize) {
-        if !self.candidates.is_empty() {
-            if self.page + page_size < self.candidates.len() {
+        if !self.candidates.is_empty()
+            && self.page + page_size < self.candidates.len() {
                 self.page += page_size;
                 self.selected = self.page;
             }
-        }
     }
 
     pub fn prev_page(&mut self, page_size: usize) {
@@ -136,12 +135,11 @@ impl InputSession {
 
     pub fn toggle_nav_mode(&mut self, page_size: usize) {
         self.nav_mode = !self.nav_mode;
-        if self.nav_mode {
-            if self.page + page_size < self.candidates.len() {
+        if self.nav_mode
+            && self.page + page_size < self.candidates.len() {
                 self.page += page_size;
                 self.selected = self.page;
             }
-        }
     }
 
     pub fn handle_filter_char(&mut self, c: char) {

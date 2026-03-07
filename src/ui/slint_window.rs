@@ -98,15 +98,13 @@ impl CandidateDisplay for SlintDisplay {
             if !self.status_bar.window().is_visible() {
                 let _ = self.status_bar.window().show();
             }
-        } else {
-            if self.status_bar.window().is_visible() {
-                let _ = self.status_bar.window().hide();
-            }
+        } else if self.status_bar.window().is_visible() {
+            let _ = self.status_bar.window().hide();
         }
     }
 
     fn move_to(&mut self, x: i32, y: i32) {
-        let _ = self.window.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(x, y)));
+        self.window.window().set_position(slint::WindowPosition::Physical(slint::PhysicalPosition::new(x, y)));
     }
 
     fn set_visible(&mut self, visible: bool) {

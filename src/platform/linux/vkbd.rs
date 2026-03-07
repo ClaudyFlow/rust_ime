@@ -157,9 +157,8 @@ impl Vkbd {
             return;
         }
 
-        if mode == PasteMode::Fcitx5 {
-            if Self::do_send_via_fcitx(dbus, text) { return; }
-        }
+        if mode == PasteMode::Fcitx5
+            && Self::do_send_via_fcitx(dbus, text) { return; }
 
         if Self::do_send_via_clipboard(dev, mode, delay, text) {
             return;
@@ -227,7 +226,7 @@ impl Vkbd {
     }
 
     fn do_send_via_ydotool(text: &str) -> bool {
-        Command::new("ydotool").arg("type").arg(text).status().map_or(false, |s| s.success())
+        Command::new("ydotool").arg("type").arg(text).status().is_ok_and(|s| s.success())
     }
 
     fn do_send_char_via_unicode(dev: &Arc<Mutex<VirtualDevice>>, ch: char) {

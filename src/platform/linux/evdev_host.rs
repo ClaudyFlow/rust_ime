@@ -251,8 +251,8 @@ impl InputMethodHost for EvdevHost {
                     }
 
                     // 拦截 Shift 触发全局筛选
-                    if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod {
-                        if val == 1 {
+                    if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod
+                        && val == 1 {
                             let mut p = self.processor.lock().unwrap();
                             if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Direct {
                                 println!("[Host] Triggering Global Filter");
@@ -262,7 +262,6 @@ impl InputMethodHost for EvdevHost {
                                 continue; 
                             }
                         }
-                    }
 
                     if val == 1 {
                         let toggle_main = {
@@ -321,13 +320,11 @@ impl InputMethodHost for EvdevHost {
                                     let _ = self.lookup_tx.send(());
                                 }
                             }
-                        } else {
-                            if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
-                        }
+                        } else if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                         drop(p); if val != 0 { self.update_gui(); }
                     } else {
                         if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { let del = p.session.phantom_text.chars().count(); p.reset(); if del > 0 { if let Ok(vkbd) = self.vkbd.lock() { vkbd.backspace(del); } } }
-                        drop(p); if let Ok(vkbd) = self.vkbd.lock() { let _ = vkbd.emit_raw(key, val); }
+                        drop(p); if let Ok(vkbd) = self.vkbd.lock() { vkbd.emit_raw(key, val); }
                     }
 
                     if val == 1 {

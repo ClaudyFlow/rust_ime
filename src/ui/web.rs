@@ -318,7 +318,7 @@ async fn search_dict(axum::extract::Query(query): axum::extract::Query<SearchQue
     let root = "dicts";
     let entries = walkdir::WalkDir::new(root);
     for entry in entries.into_iter().filter_map(|e| e.ok()) {
-        if entry.path().extension().map_or(false, |ext| ext == "json") {
+        if entry.path().extension().is_some_and(|ext| ext == "json") {
             let path_str = entry.path().to_string_lossy().to_string();
             if let Ok(f) = std::fs::File::open(entry.path()) {
                 if let Ok(json) = serde_json::from_reader::<_, serde_json::Value>(std::io::BufReader::new(f)) {

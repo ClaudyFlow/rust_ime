@@ -266,33 +266,33 @@ impl Config {
         let config_dir = Self::get_config_dir();
         if !config_dir.exists() { std::fs::create_dir_all(&config_dir)?; }
 
-        let save_appearance = {
+        {
             let p = config_dir.join("appearance.json");
             let f = std::fs::File::create(p)?;
             serde_json::to_writer_pretty(f, &self.appearance)?;
         };
-        let _ = save_appearance;
+        ();
 
-        let save_input = {
+        {
             let p = config_dir.join("input.json");
             let f = std::fs::File::create(p)?;
             serde_json::to_writer_pretty(f, &self.input)?;
         };
-        let _ = save_input;
+        ();
 
-        let save_hotkeys = {
+        {
             let p = config_dir.join("hotkeys.json");
             let f = std::fs::File::create(p)?;
             serde_json::to_writer_pretty(f, &self.hotkeys)?;
         };
-        let _ = save_hotkeys;
+        ();
 
-        let save_files = {
+        {
             let p = config_dir.join("files.json");
             let f = std::fs::File::create(p)?;
             serde_json::to_writer_pretty(f, &self.files)?;
         };
-        let _ = save_files;
+        ();
 
         Ok(())
     }
