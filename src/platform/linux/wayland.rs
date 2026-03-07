@@ -17,8 +17,8 @@ pub struct WaylandHost {
 }
 
 struct WaylandState {
-    seat: Option<wl_seat::WlSeat>,
-    found_input_method: bool,
+    _seat: Option<wl_seat::WlSeat>,
+    _found_input_method: bool,
 }
 
 impl WaylandHost {
@@ -28,8 +28,8 @@ impl WaylandHost {
         let qh = event_queue.handle();
 
         let mut state = WaylandState {
-            seat: None,
-            found_input_method: false,
+            _seat: None,
+            _found_input_method: false,
         };
 
         let display = conn.display();
@@ -53,6 +53,11 @@ impl InputMethodHost for WaylandHost {
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("[WaylandHost] 原生探测服务已就绪。");
+        if self.state._found_input_method {
+            println!("[WaylandHost] 系统支持 input-method 协议接口。");
+        } else {
+            println!("[WaylandHost] 警告：KWin 隐藏了 input-method 接口。请确认 KDE 设置或环境变量。");
+        }
         loop {
             self.event_queue.blocking_dispatch(&mut self.state)?;
         }
@@ -60,10 +65,17 @@ impl InputMethodHost for WaylandHost {
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for WaylandState {
-    fn event(_: &mut Self, _: &wl_registry::WlRegistry, event: wl_registry::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
-        if let wl_registry::Event::Global { interface, .. } = event {
-            if interface.contains("input_method") {
-                println!("[Wayland Discovery] 发现特权接口: {}", interface);
+    fn event(state: &mut Self, proxy: &wl_registry::WlRegistry, event: wl_registry::Event, _: &(), _: &Connection, qh: &QueueHandle<Self>) {
+        if let wl_registry::Event::Global { interface, name, version, .. } = event {
+            match interface.as_str() {
+                "wl_seat" => {
+                    state._seat = Some(proxy.bind::<wl_seat::WlSeat, _, _>(name, version, qh, ()));
+                }
+                s if s.contains("input_method") => {
+                    println!("[Wayland Discovery] 发现可用特权接口: {}", s);
+                    state._found_input_method = true;
+                }
+                _ => {}
             }
         }
     }
