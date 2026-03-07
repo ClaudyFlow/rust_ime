@@ -463,10 +463,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let dev_path = config.read().unwrap().linux.device_path.clone();
         let force_wayland = args.iter().any(|a| a == "--backend=wayland" || a == "wayland");
         let force_evdev = args.iter().any(|a| a == "--backend=evdev" || a == "evdev");
+        let force_ibus = args.iter().any(|a| a == "--backend=ibus" || a == "ibus");
 
         if force_wayland {
             println!("[Main] 强制启动 Wayland 原生协议模式...");
             let mut host = platform::linux::wayland::WaylandHost::new(processor, Some(gui_tx))?;
+            host.run()?;
+        } else if force_ibus {
+            println!("[Main] 强制启动 IBus 伪装模式 (免 Root)...");
+            let mut host = platform::linux::ibus_host::IBusHost::new(processor, Some(gui_tx));
             host.run()?;
         } else if force_evdev {
             println!("[Main] 强制启动 Evdev 拦截模式...");
@@ -480,9 +485,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     host.run()?;
                 }
                 Err(e) => {
-                    println!("[Main] Evdev 启动失败 ({:?})，尝试回落到原生 Wayland 协议模式...", e);
-                    let mut host = platform::linux::wayland::WaylandHost::new(processor, Some(gui_tx))?;
-                    println!("[Main] 成功启动 Wayland 原生协议模式 (免 Root)。");
+                    println!("[Main] Evdev 启动失败 ({:?})，尝试回落到 IBus 伪装模式...", e);
+                    let mut host = platform::linux::ibus_host::IBusHost::new(processor, Some(gui_tx));
                     host.run()?;
                 }
             }
