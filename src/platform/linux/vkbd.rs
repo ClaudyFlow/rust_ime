@@ -143,9 +143,17 @@ impl Vkbd {
     fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
         if text.is_empty() { return; }
 
-        // 0. PRIORITY PATH: wtype for Wayland Unicode
+        // 0. PRIORITY PATH: wtype (Wayland Protocol)
         if is_wayland && !highlight {
             if Self::do_send_via_wtype(text) {
+                return;
+            }
+        }
+
+        // 1. SECONDARY PATH: ydotool (uinput based, works globally)
+        if !highlight {
+            if Self::do_send_via_ydotool(text) {
+                // println!("[Vkbd] ydotool 注入成功");
                 return;
             }
         }
@@ -161,7 +169,7 @@ impl Vkbd {
             return;
         }
 
-        println!("[Vkbd BG] Emitting text via heavy path: {text} (mode={mode:?})");
+        println!("[Vkbd BG] 正在通过重型路径发送文字: {text} (模式={mode:?})");
 
         if mode == PasteMode::UnicodeHex {
             for c in text.chars() {
@@ -173,14 +181,42 @@ impl Vkbd {
         if mode == PasteMode::Fcitx5
             && Self::do_send_via_fcitx(dbus, text) { return; }
 
-        if Self::do_send_via_clipboard(dev, mode, delay, text) {
+        if Self::do_send_via_clipboard_cmd(dev, is_wayland, mode, delay, text) {
             return;
         }
 
-        let _ = Self::do_send_via_ydotool(text);
+        // 最后的兜底：尝试使用 arboard 库
+        let _ = Self::do_send_via_clipboard_lib(dev, mode, delay, text);
     }
 
-    fn do_send_via_clipboard(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode, delay: u64, text: &str) -> bool {
+    /// 使用命令行工具 wl-copy 或 xclip (更稳定)
+    fn do_send_via_clipboard_cmd(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, text: &str) -> bool {
+        let cmd = if is_wayland { "wl-copy" } else { "xclip" };
+        let mut child = if is_wayland {
+            Command::new(cmd).arg(text).spawn()
+        } else {
+            Command::new(cmd).arg("-selection").arg("clipboard").spawn()
+        };
+
+        match child {
+            Ok(mut c) => {
+                if !is_wayland {
+                    // xclip 需要通过 stdin 写入
+                    if let Some(mut stdin) = c.stdin.take() {
+                        use std::io::Write;
+                        let _ = stdin.write_all(text.as_bytes());
+                    }
+                }
+                let _ = c.wait();
+                thread::sleep(Duration::from_millis(delay));
+                Self::perform_paste(dev, mode);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    fn do_send_via_clipboard_lib(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode, delay: u64, text: &str) -> bool {
         use arboard::Clipboard;
         let mut cb = match Clipboard::new() {
             Ok(c) => c,
@@ -189,7 +225,11 @@ impl Vkbd {
 
         if cb.set_text(text.to_string()).is_err() { return false; }
         thread::sleep(Duration::from_millis(delay));
-        
+        Self::perform_paste(dev, mode);
+        true
+    }
+
+    fn perform_paste(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode) {
         match mode {
             PasteMode::CtrlV => {
                 Self::do_emit(dev, Key::KEY_LEFTCTRL, true);
@@ -216,7 +256,6 @@ impl Vkbd {
             },
             _ => {}
         }
-        true
     }
 
     fn do_backspace(dev: &Arc<Mutex<VirtualDevice>>, count: usize) {
