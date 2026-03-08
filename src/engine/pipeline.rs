@@ -224,35 +224,32 @@ impl Filter for AdaptiveFilter {
         if !config.input.enable_auto_reorder { return; }
         let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
-            // 1. 建立当前 Profile 下所有词的全局计数表 (优化简拼匹配)
-            let mut global_counts = HashMap::new();
-            for entries in profile_dict.values() {
-                for (word, count) in entries {
-                    let e = global_counts.entry(word.as_str()).or_insert(0u32);
-                    if *count > *e { *e = *count; }
-                }
-            }
-
-            // 2. 获取精准匹配拼音下的历史
+            // 获取当前拼音下的历史
             let empty_vec = Vec::new();
             let history_entries = profile_dict.get(query).unwrap_or(&empty_vec);
 
             for c in candidates.iter_mut() {
                 let mut bonus = 0.0;
                 
-                // 路径 A: 精准拼音匹配加成 (最高权重)
+                // 1. 精准匹配加成 (大幅度提升，确保打过就有效)
                 if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
-                    bonus += (history_entries[pos].1 as f64) * 10_000_000.0;
+                    let freq = history_entries[pos].1;
+                    // 指数级初期加成：前 5 次输入提升最快
+                    let factor = if freq <= 5 { (freq as f64) * 20_000_000.0 } else { 100_000_000.0 + (freq as f64) * 1_000_000.0 };
+                    bonus += factor;
                 }
                 
-                // 路径 B: 全局词频加成 (解决简拼、拼写变体问题)
-                if let Some(&count) = global_counts.get(c.simplified.as_ref()) {
-                    bonus += (count as f64) * 2_000_000.0;
+                // 2. 检查该词是否为该拼音下的“最后一次使用”
+                // (此处逻辑简化：如果在历史列表中排第一，且频率 > 0，给予额外热点加成)
+                if !history_entries.is_empty() && history_entries[0].0 == c.simplified.as_ref() {
+                    bonus += 50_000_000.0; // 热点置顶加成
                 }
 
                 if bonus > 0.0 {
                     c.weight += bonus;
-                    c.source = format!("{} (Hist)", c.source).into();
+                    if !c.source.contains("(Hist)") {
+                        c.source = format!("{} (Hist)", c.source).into();
+                    }
                 }
             }
         }
