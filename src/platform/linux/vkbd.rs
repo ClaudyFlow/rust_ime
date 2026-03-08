@@ -268,7 +268,18 @@ impl Vkbd {
     }
 
     fn do_send_via_ydotool(text: &str) -> bool {
-        Command::new("ydotool").arg("type").arg(text).status().is_ok_and(|s| s.success())
+        let mut cmd = Command::new("ydotool");
+        
+        // 自动检测常见的 Socket 路径并设置环境变量
+        let socket_paths = ["/tmp/.ydotool_socket", "/run/ydotool.socket"];
+        for path in socket_paths {
+            if std::path::Path::new(path).exists() {
+                cmd.env("YDOTOOL_SOCKET", path);
+                break;
+            }
+        }
+
+        cmd.arg("type").arg(text).status().is_ok_and(|s| s.success())
     }
 
     fn do_send_char_via_unicode(dev: &Arc<Mutex<VirtualDevice>>, ch: char) {
