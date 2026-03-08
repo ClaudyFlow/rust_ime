@@ -44,6 +44,18 @@ impl Trie {
         Some(self.read_block(offset))
     }
 
+    /// 预热词库：读取前 limit 条记录以填充 Page Cache
+    pub fn prewarm(&self, limit: usize) {
+        let mut stream = self.index.stream();
+        let mut count = 0;
+        while let Some((_, offset)) = fst::Streamer::next(&mut stream) {
+            // 仅仅通过读取该偏移量的块数据，就能让 OS 将对应的文件页载入 RAM
+            let _ = self.read_block(offset as usize);
+            count += 1;
+            if count >= limit { break; }
+        }
+    }
+
     #[allow(dead_code)]
     pub fn has_prefix(&self, prefix: &str) -> bool {
         let matcher = fst::automaton::Str::new(prefix).starts_with();

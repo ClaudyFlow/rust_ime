@@ -99,13 +99,17 @@ impl Processor {
             let new_profile = conf.input.default_profile.to_lowercase();
             if !new_profile.is_empty() && self.engine.trie_paths.contains_key(&new_profile) {
                 self.active_profiles = vec![new_profile];
+            } else {
+                self.active_profiles = vec!["chinese".to_string()];
             }
         }
 
-        if self.session.buffer.is_empty() {
-            self.reset();
-        } else {
-            let _ = self.lookup();
+        // 异步预热核心词库
+        for profile in self.active_profiles.clone() {
+            let engine = self.engine.clone();
+            std::thread::spawn(move || {
+                engine.prewarm_profile(&profile);
+            });
         }
         self.setup_default_keymap();
     }

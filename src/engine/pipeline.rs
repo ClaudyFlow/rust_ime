@@ -60,13 +60,11 @@ impl Segmentor for DefaultSegmentor {
         while !remaining.is_empty() {
             let mut matched = false;
             // 尝试最长匹配音节 (Max Match)
-            for len in (1..=6).rev() {
+            // 提高上限到 12 以涵盖长词组 Key (如 zhuomian)
+            for len in (1..=12).rev() {
                 if len <= remaining.len() {
                     let part = &remaining[..len];
                     if syllables.contains(part) {
-                        // 额外校验：如果这是一个音节，但输入后面还有内容，
-                        // 我们需要确保这不是一个简拼的情况（如 'nh'，'n' 是音节但 'nh' 不是）
-                        // 在基础实现中，我们先保留最长音节匹配
                         segments.push(part.to_string());
                         remaining = remaining[len..].to_string();
                         matched = true;
@@ -335,14 +333,15 @@ impl Pipeline {
     }
 }
 
+#[derive(Clone)]
 pub struct SearchEngine {
     pub trie_paths: HashMap<String, (PathBuf, PathBuf)>,
     pub syllables: Arc<HashSet<String>>,
     pub learned_words: Arc<arc_swap::ArcSwap<UserDictData>>,
     pub usage_history: Arc<arc_swap::ArcSwap<UserDictData>>,
-    pub schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
-    pipelines: RwLock<HashMap<String, Arc<Pipeline>>>,
-    cache: Mutex<LruCache<SearchCacheKey, (Vec<Candidate>, Vec<String>)>>,
+    pub schemes: Arc<HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>>,
+    pipelines: Arc<RwLock<HashMap<String, Arc<Pipeline>>>>,
+    cache: Arc<Mutex<LruCache<SearchCacheKey, (Vec<Candidate>, Vec<String>)>>>,
 }
 
 pub struct SearchQuery<'a> {
@@ -363,16 +362,17 @@ impl SearchEngine {
         usage_history: Arc<arc_swap::ArcSwap<UserDictData>>,
         schemes: HashMap<String, Box<dyn crate::engine::scheme::InputScheme>>,
     ) -> Self {
-        Self { 
-            trie_paths, 
+        Self {
+            trie_paths,
             syllables,
             learned_words,
             usage_history,
-            schemes,
-            pipelines: RwLock::new(HashMap::new()),
-            cache: Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero"))),
+            schemes: Arc::new(schemes),
+            pipelines: Arc::new(RwLock::new(HashMap::new())),
+            cache: Arc::new(Mutex::new(LruCache::new(std::num::NonZeroUsize::new(1000).unwrap()))),
         }
     }
+
 
     pub fn has_exact_match(&self, profile: &str, pinyin: &str, word: &str) -> bool {
         if let Some(paths) = self.trie_paths.get(profile) {
@@ -433,6 +433,20 @@ impl SearchEngine {
     pub fn clear_cache(&self) {
         if let Ok(mut cache) = self.cache.lock() {
             cache.clear();
+        }
+    }
+
+    /// 预热指定方案的词库
+    pub fn prewarm_profile(&self, profile: &str) {
+        if let Some(pipeline) = self.get_or_create_pipeline(profile) {
+            // 获取第一个 TableTranslator 并执行预热
+            if !pipeline.translators.is_empty() {
+                if let Some(paths) = self.trie_paths.get(profile) {
+                    if let Ok(trie) = Trie::load(&paths.0, &paths.1) {
+                        trie.prewarm(5000); // 预热前 5000 个词条
+                    }
+                }
+            }
         }
     }
 

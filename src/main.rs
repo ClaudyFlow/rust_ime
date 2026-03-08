@@ -110,6 +110,122 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("SLINT_BACKEND", "skia");
 
     let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "--bench" {
+        println!("--- Rust-IME 核心引擎性能基准测试 ---");
+        let root = find_project_root();
+        
+        let mut trie_paths = HashMap::new();
+        trie_paths.insert("chinese".to_string(), (
+            root.join("data/chinese/trie.index"),
+            root.join("data/chinese/trie.data")
+        ));
+        
+        let mut syllables = load_syllables(&root);
+        // 暴力注入测试
+        syllables.insert("zhuo".to_string());
+        syllables.insert("mian".to_string());
+        syllables.insert("zhuomian".to_string());
+
+        let start_load = std::time::Instant::now();
+        let mut processor = Processor::new(trie_paths, syllables);
+        processor.apply_config(&Config::load());
+        processor.active_profiles = vec!["chinese".to_string()];
+        
+        println!("词库加载完成，正在等待后台预热 (1s)...");
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        println!("预热等待结束，开始测试。");
+
+        println!("[Bench] 检查 FST 中是否存在 \"zhuomian\"...");
+        let has_zm = processor.engine.trie_paths.get("chinese").and_then(|_| {
+            // 这里我们需要通过反射或暴露接口来访问 Trie 内部
+            // 简单起见，我们直接调用 trie.has_prefix("zhuomian")
+            if processor.engine.schemes.get("chinese").is_some() {
+                // 模拟直接搜索
+                let found = !processor.engine.search(engine::pipeline::SearchQuery {
+                    buffer: "zhuomian",
+                    profile: "chinese",
+                    syllables: &processor.syllables,
+                    config: &processor.config.master_config,
+                    limit: 10,
+                    filter_mode: engine::processor::FilterMode::None,
+                    aux_filter: "",
+                }).0.is_empty();
+                Some(found)
+            } else { None }
+        }).unwrap_or(false);
+        println!("FST 中直接搜索 \"zhuomian\" 结果: {}", has_zm);
+        for _ in 0..100 { processor.handle_key(engine::keys::VirtualKey::N, 1, false, false, false); processor.reset(); }
+
+        println!("[Bench] 正在测试击键延迟 (Latency)...");
+        let test_keys = vec![
+            engine::keys::VirtualKey::N, engine::keys::VirtualKey::I, engine::keys::VirtualKey::H, engine::keys::VirtualKey::A, engine::keys::VirtualKey::O,
+            engine::keys::VirtualKey::Z, engine::keys::VirtualKey::H, engine::keys::VirtualKey::O, engine::keys::VirtualKey::N, engine::keys::VirtualKey::G,
+        ];
+
+        let mut total_latency = std::time::Duration::ZERO;
+        let iterations = 1000;
+        for _ in 0..iterations {
+            processor.reset();
+            for &key in &test_keys {
+                let start = std::time::Instant::now();
+                processor.handle_key(key, 1, false, false, false);
+                total_latency += start.elapsed();
+            }
+        }
+        let avg_latency = total_latency / (iterations * test_keys.len() as u32);
+        println!("平均单次按键处理延迟: {:?} (约 {:.2} 微秒)", avg_latency, avg_latency.as_micros() as f64);
+
+        println!("[Bench] 正在测试吞吐量 (Throughput)...");
+        let start_thru = std::time::Instant::now();
+        let thru_iterations = 5000;
+        for _ in 0..thru_iterations {
+            processor.reset();
+            processor.handle_key(engine::keys::VirtualKey::P, 1, false, false, false);
+            processor.handle_key(engine::keys::VirtualKey::I, 1, false, false, false);
+            processor.handle_key(engine::keys::VirtualKey::N, 1, false, false, false);
+            processor.handle_key(engine::keys::VirtualKey::Y, 1, false, false, false);
+            processor.handle_key(engine::keys::VirtualKey::I, 1, false, false, false);
+            processor.handle_key(engine::keys::VirtualKey::N, 1, false, false, false);
+        }
+        println!("[Bench] 正在专项测试 \"zhuomian\"...");
+        processor.reset();
+        let zm_keys = vec![
+            engine::keys::VirtualKey::Z, engine::keys::VirtualKey::H, engine::keys::VirtualKey::U, engine::keys::VirtualKey::O,
+            engine::keys::VirtualKey::M, engine::keys::VirtualKey::I, engine::keys::VirtualKey::A, engine::keys::VirtualKey::N,
+        ];
+        
+        // 1. 冷查找测试
+        processor.engine.clear_cache();
+        let start_cold = std::time::Instant::now();
+        for &k in &zm_keys { processor.handle_key(k, 1, false, false, false); }
+        let cold_time = start_cold.elapsed();
+        println!("冷查找耗时 (第一次输入): {:?}", cold_time);
+        println!("切分结果: {:?}", processor.session.best_segmentation);
+        println!("匹配到的候选词数量: {}", processor.session.candidates.len());
+        for (i, cand) in processor.session.candidates.iter().take(5).enumerate() {
+            println!("  [{}] {} (Source: {}, Weight: {})", i, cand.text, cand.source, cand.weight);
+        }
+
+        // 2. 热查找测试
+        processor.reset();
+        let start_hot = std::time::Instant::now();
+        for &k in &zm_keys { processor.handle_key(k, 1, false, false, false); }
+        let hot_time = start_hot.elapsed();
+        println!("热查找耗时 (第二次输入): {:?}", hot_time);
+        println!("性能差距: {:.2} 倍", cold_time.as_secs_f64() / hot_time.as_secs_f64());
+
+        println!("\n[Bench] 正在检测内存占用...");
+        if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
+            for line in status.lines() {
+                if line.starts_with("VmRSS:") || line.starts_with("VmSize:") || line.starts_with("VmHWM:") {
+                    println!("  {}", line);
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
     if args.len() > 1 && args[1] == "--compile-only" {
         println!("[Main] 正在强制编译词库...");
         let _ = engine::compiler::check_and_compile_all();

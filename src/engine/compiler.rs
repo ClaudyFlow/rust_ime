@@ -28,30 +28,15 @@ pub fn check_and_compile_all() -> Result<(), Box<dyn std::error::Error>> {
                     let start = std::time::Instant::now();
                     compile_dict_for_path(&src_path, &format!("{}/trie", out_dir), is_english)?;
                     println!("[Compiler] 方案 [{}] 编译完成，耗时 {:?}", dir_name, start.elapsed());
+                    
+                    // 编译后立即更新该方案的音节表
+                    let syllables_path = format!("{}/syllables.txt", src_path);
+                    println!("[Compiler] 更新方案 [{}] 的音节表...", dir_name);
+                    extract_syllables_from_compiled_data(&src_path, &syllables_path)?;
                 } else {
                     println!("[Compiler] 方案 [{}] 已是最新，跳过。", dir_name);
                 }
             }
-        }
-    } else {
-        println!("[Compiler] 错误：无法读取 dicts 目录！");
-    }
-    
-    if Path::new("dicts/chinese/chars.json").exists() {
-        let src = Path::new("dicts/chinese/chars.json");
-        let dst = Path::new("dicts/chinese/syllables.txt");
-        if should_update_syllables(src, dst) {
-            println!("[Compiler] 更新拼音音节表...");
-            extract_syllables_to_file("dicts/chinese/chars.json", "dicts/chinese/syllables.txt")?;
-        }
-    }
-    
-    if Path::new("dicts/stroke/words/stroke_char.json").exists() {
-        let src = Path::new("dicts/stroke/words/stroke_char.json");
-        let dst = Path::new("dicts/stroke/syllables.txt");
-        if should_update_syllables(src, dst) {
-            println!("[Compiler] 更新笔画编码表...");
-            extract_syllables_to_file("dicts/stroke/words/stroke_char.json", "dicts/stroke/syllables.txt")?;
         }
     }
     Ok(())
@@ -127,11 +112,12 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
     let json: Value = serde_json::from_reader(file)?;
     if let Some(obj) = json.as_object() {
         for (key, val) in obj {
-            // 不再转为小写，保留原始 Key
+            // 强制转为小写，确保搜索一致性
+            let normalized_key = key.to_lowercase();
             if let Some(arr) = val.as_array() {
                 if is_english {
                     let en_hint = arr.iter().filter_map(|v| v.as_str()).next().unwrap_or("").to_string();
-                    entries.entry(key.clone()).or_default().push(DictEntry {
+                    entries.entry(normalized_key.clone()).or_default().push(DictEntry {
                         word: key.clone(),
                         trad: key.clone(),
                         tone: String::new(),
@@ -142,7 +128,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                 } else {
                     for v in arr {
                         if let Some(s) = v.as_str() { 
-                            entries.entry(key.clone()).or_default().push(DictEntry {
+                            entries.entry(normalized_key.clone()).or_default().push(DictEntry {
                                 word: s.to_string(),
                                 trad: s.to_string(),
                                 tone: String::new(),
@@ -162,7 +148,7 @@ fn process_json_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                                     .unwrap_or("");
                                 let weight = o.get("weight").and_then(|w| w.as_u64()).unwrap_or(0) as u32;
                                 
-                                entries.entry(key.clone()).or_default().push(DictEntry {
+                                entries.entry(normalized_key.clone()).or_default().push(DictEntry {
                                     word: c.to_string(),
                                     trad: trad.to_string(),
                                     tone: tone_hint.to_string(),
@@ -190,8 +176,8 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 2 {
             let word = parts[0].to_string();
-            // 不再转为小写，保留原始拼音大小写
-            let pinyin = parts[1].replace(' ', "");
+            // 强制转为小写并移除空格
+            let pinyin = parts[1].replace(' ', "").to_lowercase();
             let weight = if parts.len() >= 3 { parts[2].parse::<u32>().unwrap_or(0) } else { 0 };
             entries.entry(pinyin).or_default().push(DictEntry {
                 word: word.clone(),
@@ -202,6 +188,28 @@ fn process_yaml_file(path: &Path, entries: &mut BTreeMap<String, Vec<DictEntry>>
                 weight,
             });
         }
+    }
+    Ok(())
+}
+
+fn extract_syllables_from_compiled_data(src_dir: &str, out_txt: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut entries: BTreeMap<String, Vec<DictEntry>> = BTreeMap::new();
+    for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "json") {
+            if path.file_name().and_then(|n| n.to_str()) == Some("punctuation.json") { continue; }
+            process_json_file(path, &mut entries, false)?;
+        } else if path.extension().is_some_and(|ext| ext == "yaml") {
+            process_yaml_file(path, &mut entries)?;
+        }
+    }
+    
+    let mut syllables: Vec<_> = entries.keys().cloned().collect();
+    syllables.sort();
+    
+    let mut f = File::create(out_txt)?;
+    for s in syllables {
+        writeln!(f, "{}", s)?;
     }
     Ok(())
 }
