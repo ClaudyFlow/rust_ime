@@ -38,7 +38,7 @@ impl InputSession {
             cursor_pos: 0,
             joined_sentence: String::new(),
             last_lookup_pinyin: String::new(),
-            state: ImeState::Direct,
+            state: ImeState::Idle,
             nav_mode: false,
             switch_mode: false,
             aux_filter: String::new(),
@@ -71,7 +71,8 @@ impl InputSession {
         self.joined_sentence.clear();
         self.selected = 0;
         self.page = 0;
-        self.state = ImeState::Direct;
+        self.state = ImeState::Idle;
+
         self.phantom_text.clear();
         self.preview_selected_candidate = false;
         self.cursor_pos = 0;
@@ -83,7 +84,7 @@ impl InputSession {
 
     pub fn push_char(&mut self, c: char) {
         self.buffer.push(c);
-        if self.state == ImeState::Direct {
+        if self.state == ImeState::Idle {
             self.state = ImeState::Composing;
         }
         self.preview_selected_candidate = false;
@@ -174,13 +175,9 @@ impl InputSession {
 
     pub fn update_state(&mut self) {
         if self.buffer.is_empty() {
-            self.state = if self.candidates.is_empty() { ImeState::Direct } else { ImeState::Multi };
-        } else {
-            self.state = match self.candidates.len() {
-                0 => ImeState::NoMatch,
-                1 => ImeState::Single,
-                _ => ImeState::Multi,
-            };
+            self.state = ImeState::Idle;
+        } else if self.state == ImeState::Idle {
+            self.state = ImeState::Composing;
         }
     }
 }
@@ -193,7 +190,7 @@ mod tests {
     #[test]
     fn test_session_basic_ops() {
         let mut session = InputSession::new();
-        assert_eq!(session.state, ImeState::Direct);
+        assert_eq!(session.state, ImeState::Idle);
 
         session.push_char('n');
         assert_eq!(session.buffer, "n");
@@ -201,31 +198,19 @@ mod tests {
 
         session.pop_char();
         assert_eq!(session.buffer, "");
-        assert_eq!(session.state, ImeState::Direct);
+        assert_eq!(session.state, ImeState::Idle);
     }
 
     #[test]
     fn test_session_state_updates() {
         let mut session = InputSession::new();
         session.buffer = "nh".to_string();
-        
-        // 模拟无匹配
-        session.candidates = vec![];
         session.update_state();
-        assert_eq!(session.state, ImeState::NoMatch);
+        assert_eq!(session.state, ImeState::Composing);
 
-        // 模拟单匹配
-        session.candidates = vec![crate::engine::pipeline::Candidate {
-            text: "男孩".into(), simplified: "男孩".into(), traditional: "男孩".into(),
-            hint: "".into(), source: "test".into(), weight: 0.0
-        }];
+        session.buffer.clear();
         session.update_state();
-        assert_eq!(session.state, ImeState::Single);
-
-        // 模拟多匹配
-        session.candidates.push(session.candidates[0].clone());
-        session.update_state();
-        assert_eq!(session.state, ImeState::Multi);
+        assert_eq!(session.state, ImeState::Idle);
     }
 
     #[test]
@@ -236,6 +221,6 @@ mod tests {
         session.reset();
         assert!(session.buffer.is_empty());
         assert!(!session.nav_mode);
-        assert_eq!(session.state, ImeState::Direct);
+        assert_eq!(session.state, ImeState::Idle);
     }
 }

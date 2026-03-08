@@ -258,7 +258,7 @@ impl InputMethodHost for EvdevHost {
                     if (key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT) && !has_mod
                         && val == 1 {
                             if let Ok(mut p) = self.processor.lock() {
-                                if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Direct {
+                                if p.chinese_enabled && p.session.state != crate::engine::processor::ImeState::Idle {
                                     p.start_global_filter();
                                     drop(p);
                                     self.update_gui();
@@ -340,7 +340,7 @@ impl InputMethodHost for EvdevHost {
                                 drop(p);
                             }
                         } else {
-                            if has_mod && p.session.state != crate::engine::processor::ImeState::Direct { 
+                            if has_mod && p.session.state != crate::engine::processor::ImeState::Idle { 
                                 let del = p.session.phantom_text.chars().count(); 
                                 p.reset(); 
                                 if del > 0 { 

@@ -35,7 +35,7 @@ impl Compositor {
 
     pub fn get_phantom_text(p: &Processor) -> String {
         use crate::config::PhantomType;
-        if p.session.state == ImeState::Direct || p.config.phantom_type == PhantomType::None { 
+        if p.session.state == ImeState::Idle || p.config.phantom_type == PhantomType::None { 
             return String::new(); 
         }
         

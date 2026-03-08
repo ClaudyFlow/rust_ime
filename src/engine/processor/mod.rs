@@ -3,6 +3,7 @@ pub mod punctuation;
 pub mod intents;
 pub mod commands;
 pub mod handlers;
+pub mod fsm;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -14,15 +15,7 @@ use crate::engine::{Command, ModifierState, InputEvent};
 use crate::config::Config;
 
 pub use utils::*;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ImeState {
-    Direct,
-    Composing,
-    NoMatch,
-    Single,
-    Multi,
-}
+pub use fsm::ImeState;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
@@ -211,7 +204,7 @@ impl Processor {
             return Action::PassThrough;
         }
 
-        // 1. 处理 Ctrl + 标点 -> 强制输出原始标点
+        // 1. 处理控制键意图 (保持原有逻辑)
         if is_press && ctrl_pressed && !alt_pressed {
             if let Some(p_key) = get_punctuation_key(key, shift_pressed) {
                 let mut commit_text = if !self.session.joined_sentence.is_empty() { 
@@ -232,28 +225,71 @@ impl Processor {
         if let Some(action) = intents::process_modifiers(self, key, is_press, is_release) {
             return action;
         }
-
         if let Some(action) = intents::process_intent(self, key, val, shift_pressed, now) {
             return action;
         }
-
         if key == VirtualKey::Grave {
             return Action::PassThrough;
         }
-
         if let Some(action) = intents::process_switch_mode(self, key, is_press, is_release) {
             return action;
         }
 
-        if !self.session.buffer.is_empty() { return self.handle_composing(key, shift_pressed, perform_lookup); }
-        match self.session.state {
-            ImeState::Direct => self.handle_direct(key, shift_pressed, perform_lookup),
-            _ => self.handle_composing(key, shift_pressed, perform_lookup)
+        // 2. FSM 驱动：获取副作用
+        let input = fsm::FsmInput {
+            key,
+            mods: ModifierState { shift: shift_pressed, ctrl: ctrl_pressed, alt: alt_pressed, meta: false },
+            buffer_empty: self.session.buffer.is_empty(),
+            has_candidates: !self.session.candidates.is_empty(),
+        };
+
+        let (new_state, effect) = fsm::StateMachine::transition(self.session.state, &input);
+        self.session.state = new_state;
+
+        // 3. 执行副作用并映射为 Action
+        match effect {
+            fsm::FsmEffect::PassThrough => {
+                if self.session.state == ImeState::Idle {
+                    self.handle_idle(key, shift_pressed, perform_lookup)
+                } else {
+                    Action::PassThrough
+                }
+            }
+            fsm::FsmEffect::UpdateLookup => {
+                self.handle_composing(key, shift_pressed, perform_lookup)
+            }
+            fsm::FsmEffect::Commit首选 => {
+                self.execute_command(Command::Commit)
+            }
+            fsm::FsmEffect::CommitRaw => {
+                self.execute_command(Command::CommitRaw)
+            }
+            fsm::FsmEffect::NextCandidate => {
+                self.execute_command(Command::NextCandidate)
+            }
+            fsm::FsmEffect::PrevCandidate => {
+                self.execute_command(Command::PrevCandidate)
+            }
+            fsm::FsmEffect::NextPage => {
+                self.execute_command(Command::NextPage)
+            }
+            fsm::FsmEffect::PrevPage => {
+                self.execute_command(Command::PrevPage)
+            }
+            fsm::FsmEffect::Clear => {
+                self.execute_command(Command::Clear)
+            }
+            fsm::FsmEffect::Consume => {
+                // 对于 Consume，我们仍然需要处理一些特殊的组合键逻辑（如辅助码）
+                // 暂时回退到 handle_composing 处理这些复杂情况
+                self.handle_composing(key, shift_pressed, perform_lookup)
+            }
+            fsm::FsmEffect::Alert => Action::Alert,
         }
     }
 
-    pub fn handle_direct(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
-        handlers::handle_direct(self, key, shift_pressed, perform_lookup)
+    pub fn handle_idle(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
+        handlers::handle_idle(self, key, shift_pressed, perform_lookup)
     }
 
     pub fn handle_composing(&mut self, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
@@ -400,7 +436,7 @@ impl Processor {
 
     pub fn clear_composing(&mut self) { self.session.clear_composing(); }
     pub fn start_global_filter(&mut self) {
-        if self.session.state == ImeState::Direct { return; }
+        if self.session.state == ImeState::Idle { return; }
         if self.session.filter_mode != FilterMode::Global {
             self.session.filter_mode = FilterMode::Global;
             self.session.aux_filter.clear();
@@ -409,7 +445,7 @@ impl Processor {
 
     pub fn inject_text(&mut self, text: &str) -> Action {
         self.session.buffer.push_str(text);
-        if self.session.state == ImeState::Direct { self.session.state = ImeState::Composing; }
+        if self.session.state == ImeState::Idle { self.session.state = ImeState::Composing; }
         self.session.preview_selected_candidate = false;
         if let Some(act) = self.lookup() { return act; }
         if let Some(act) = self.check_auto_commit() { return act; }
@@ -431,7 +467,7 @@ impl Processor {
     }
 
     pub fn check_auto_commit(&mut self) -> Option<Action> {
-        if !self.config.auto_commit_unique_full_match || self.session.candidates.len() != 1 || !self.session.has_dict_match || self.session.state == ImeState::NoMatch { return None; }
+        if !self.config.auto_commit_unique_full_match || self.session.candidates.len() != 1 || !self.session.has_dict_match { return None; }
         let raw_input = &self.session.buffer;
         let mut total_longer = 0;
         for p in &self.active_profiles { if self.engine.has_longer_match(p, raw_input) { total_longer += 1; break; } }
