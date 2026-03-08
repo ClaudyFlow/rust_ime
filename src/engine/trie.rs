@@ -174,9 +174,12 @@ impl Trie {
 
         let first_seg = &segments[0];
         
-        // 尝试从 key 的当前位置切分出一个合法音节
-        for len in (1..=6).rev() {
-            if len <= key.len() {
+        // 安全地按字符边界尝试切分
+        // 拼音音节最长通常为 6 字节（如 chuang），
+        // 但为了 Unicode 安全，我们遍历实际的字符索引
+        for (char_count, (byte_idx, _)) in key.char_indices().enumerate() {
+            let len = byte_idx;
+            if len > 0 && len <= 10 { // 适当放宽长度限制以处理带声调的 Unicode
                 let syl = &key[..len];
                 if syllables.contains(syl) {
                     // 声母必须匹配
@@ -188,7 +191,14 @@ impl Trie {
                     }
                 }
             }
+            if char_count > 8 { break; } // 一个音节不可能超过 8 个字符
         }
+
+        // 兜底：尝试全量匹配最后一个或唯一一个音节
+        if syllables.contains(key) && key.starts_with(first_seg) && segments.len() == 1 {
+            return true;
+        }
+
         false
     }
 
