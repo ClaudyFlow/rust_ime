@@ -6,7 +6,6 @@ fn main() {
 
     // 为 Wayland 协议生成 Rust 绑定
     if cfg!(target_os = "linux") {
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         let protocols_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("protocols");
 
         // 生成 virtual-keyboard-v1

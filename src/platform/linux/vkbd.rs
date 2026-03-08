@@ -270,10 +270,18 @@ impl Vkbd {
     fn do_send_via_ydotool(text: &str) -> bool {
         let mut cmd = Command::new("ydotool");
         
-        // 自动检测常见的 Socket 路径并设置环境变量
-        let socket_paths = ["/tmp/.ydotool_socket", "/run/ydotool.socket"];
+        // 自动检测常见的 Socket 路径
+        let mut socket_paths = vec![
+            "/tmp/.ydotool_socket".to_string(),
+            "/run/ydotool.socket".to_string(),
+        ];
+
+        // 动态添加当前用户的标准运行目录路径
+        let uid = users::get_current_uid();
+        socket_paths.push(format!("/run/user/{}/.ydotool_socket", uid));
+
         for path in socket_paths {
-            if std::path::Path::new(path).exists() {
+            if std::path::Path::new(&path).exists() {
                 cmd.env("YDOTOOL_SOCKET", path);
                 break;
             }
