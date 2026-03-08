@@ -28,7 +28,6 @@ pub struct Vkbd {
     pub dev: Arc<Mutex<VirtualDevice>>,
     pub paste_mode: Arc<Mutex<PasteMode>>,
     pub clipboard_delay_ms: Arc<Mutex<u64>>,
-    pub is_wayland: bool,
     task_tx: Sender<VkbdTask>,
 }
 
@@ -95,7 +94,6 @@ impl Vkbd {
             dev,
             paste_mode,
             clipboard_delay_ms,
-            is_wayland,
             task_tx,
         })
     }
@@ -143,17 +141,9 @@ impl Vkbd {
     fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
         if text.is_empty() { return; }
 
-        // 0. PRIORITY PATH: wtype (Wayland Protocol)
-        if is_wayland && !highlight {
-            if Self::do_send_via_wtype(text) {
-                return;
-            }
-        }
-
-        // 1. SECONDARY PATH: ydotool (uinput based, works globally)
+        // 1. PRIORITY PATH: ydotool (uinput based, works globally)
         if !highlight {
             if Self::do_send_via_ydotool(text) {
-                // println!("[Vkbd] ydotool 注入成功");
                 return;
             }
         }
@@ -275,13 +265,6 @@ impl Vkbd {
         if let Some(ref conn) = dbus {
             conn.call_method(Some("org.fcitx.Fcitx5"), "/controller", Some("org.fcitx.Fcitx.Controller1"), "CommitString", &(text)).is_ok()
         } else { false }
-    }
-
-    fn do_send_via_wtype(text: &str) -> bool {
-        Command::new("wtype")
-            .arg(text)
-            .status()
-            .is_ok_and(|s| s.success())
     }
 
     fn do_send_via_ydotool(text: &str) -> bool {
