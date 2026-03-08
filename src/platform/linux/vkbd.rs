@@ -141,14 +141,8 @@ impl Vkbd {
     fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
         if text.is_empty() { return; }
 
-        // 1. PRIORITY PATH: ydotool (uinput based, works globally)
-        if !highlight {
-            if Self::do_send_via_ydotool(text) {
-                return;
-            }
-        }
-
-        // FAST PATH: Only for supported lowercase, digits and basic punctuation
+        // 1. FAST PATH: Only for supported lowercase, digits and basic punctuation
+        // 这部分不走剪贴板，性能最高
         if !highlight && text.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || " /'.,;[]\\-=`".contains(c)) {
             for c in text.chars() {
                 if let Some(key) = char_to_key(c) {
@@ -159,7 +153,7 @@ impl Vkbd {
             return;
         }
 
-        println!("[Vkbd BG] 正在通过重型路径发送文字: {text} (模式={mode:?})");
+        println!("[Vkbd BG] 正在通过剪贴板路径发送文字: {text} (模式={mode:?})");
 
         if mode == PasteMode::UnicodeHex {
             for c in text.chars() {
@@ -171,12 +165,18 @@ impl Vkbd {
         if mode == PasteMode::Fcitx5
             && Self::do_send_via_fcitx(dbus, text) { return; }
 
+        // 优先使用命令行工具 wl-copy/xclip，解决库调用超时问题
         if Self::do_send_via_clipboard_cmd(dev, is_wayland, mode, delay, text) {
             return;
         }
 
-        // 最后的兜底：尝试使用 arboard 库
-        let _ = Self::do_send_via_clipboard_lib(dev, mode, delay, text);
+        // 兜底 1: 尝试使用 arboard 库
+        if Self::do_send_via_clipboard_lib(dev, mode, delay, text) {
+            return;
+        }
+
+        // 兜底 2: ydotool (最后手段)
+        let _ = Self::do_send_via_ydotool(text);
     }
 
     /// 使用命令行工具 wl-copy 或 xclip (更稳定)
