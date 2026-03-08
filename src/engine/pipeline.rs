@@ -225,16 +225,14 @@ impl Filter for AdaptiveFilter {
         let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
             if let Some(history_entries) = profile_dict.get(query) {
-                // 为历史词汇赋予“降维打击”级的超高分，彻底无视词库权重
-                for c in candidates.iter_mut() {
-                    if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
-                        // 根据在历史记录中的排名赋予固定档位的超级权重
-                        // 排名越靠前，档位越高
-                        let rank_bonus = (history_entries.len() - pos) as f64 * 1_000_000_000.0;
-                        c.weight = 10_000_000_000.0 + rank_bonus;
-                        if !c.source.contains("(Hist)") {
-                            c.source = format!("{} (Hist)", c.source).into();
+                // 物理挪动：从后往前遍历历史记录，依次插入到第 0 位
+                for (word, _) in history_entries.iter().rev() {
+                    if let Some(pos) = candidates.iter().position(|c| c.simplified.as_ref() == word) {
+                        let mut cand = candidates.remove(pos);
+                        if !cand.source.contains("(Hist)") {
+                            cand.source = format!("{} (Hist)", cand.source).into();
                         }
+                        candidates.insert(0, cand);
                     }
                 }
             }
@@ -247,14 +245,10 @@ pub struct SortFilter;
 impl Filter for SortFilter {
     fn filter(&self, candidates: &mut Vec<Candidate>, config: &Config, _query: &str) {
         let ranking = &config.input.ranking;
-        // 核心排序逻辑
+        // 纯粹基于质量的排序：词库分 + 长度惩罚
         candidates.sort_by(|a, b| {
             let mut score_a = a.weight;
             let mut score_b = b.weight;
-
-            // 用户自造词或历史常用词获得额外加成
-            if a.source.contains("User") || a.source.contains("Hist") { score_a += ranking.user_dict_bonus; }
-            if b.source.contains("User") || b.source.contains("Hist") { score_b += ranking.user_dict_bonus; }
 
             // 针对拼音输入优化：单字加成
             if a.text.chars().count() == 1 { score_a += ranking.single_char_bonus; }
@@ -267,7 +261,7 @@ impl Filter for SortFilter {
             score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
         });
         
-        // 去重逻辑：保留最高分的那一个
+        // 去重逻辑
         let mut seen = std::collections::HashSet::new();
         candidates.retain(|c| seen.insert(c.simplified.clone()));
     }
@@ -411,11 +405,11 @@ impl SearchEngine {
             trie: Arc::new(trie),
             syllables: self.syllables.clone(),
         }));
+        pipeline.add_filter(Box::new(SortFilter));
         pipeline.add_filter(Box::new(AdaptiveFilter {
             usage_history: self.usage_history.clone(),
             profile: profile.to_string()
         }));
-        pipeline.add_filter(Box::new(SortFilter));
         pipeline.add_filter(Box::new(TraditionalFilter));
 
         let arc_p = Arc::new(pipeline);

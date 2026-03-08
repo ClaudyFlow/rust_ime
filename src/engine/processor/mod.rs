@@ -507,12 +507,17 @@ impl Processor {
             self.config.usage_history.rcu(|hist| {
                 let mut hist_clone = (**hist).clone();
                 let entries = hist_clone.entry(profile.clone()).or_default().entry(pinyin.to_string()).or_default();
+                
+                // MRU 逻辑
                 if let Some(pos) = entries.iter().position(|(w, _)| w == word) {
-                    entries[pos].1 += 1;
+                    let old_count = entries[pos].1;
+                    entries.remove(pos);
+                    entries.insert(0, (word.to_string(), old_count + 1));
                 } else {
-                    entries.push((word.to_string(), 1));
+                    entries.insert(0, (word.to_string(), 1));
                 }
-                entries.sort_by(|a, b| b.1.cmp(&a.1));
+                if entries.len() > 10 { entries.truncate(10); }
+                
                 updated_entries = entries.clone();
                 Arc::new(hist_clone)
             });
