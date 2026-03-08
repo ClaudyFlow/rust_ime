@@ -224,31 +224,17 @@ impl Filter for AdaptiveFilter {
         if !config.input.enable_auto_reorder { return; }
         let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
-            // 获取当前拼音下的历史
-            let empty_vec = Vec::new();
-            let history_entries = profile_dict.get(query).unwrap_or(&empty_vec);
-
-            for c in candidates.iter_mut() {
-                let mut bonus = 0.0;
-                
-                // 1. 精准匹配加成 (大幅度提升，确保打过就有效)
-                if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
-                    let freq = history_entries[pos].1;
-                    // 指数级初期加成：前 5 次输入提升最快
-                    let factor = if freq <= 5 { (freq as f64) * 20_000_000.0 } else { 100_000_000.0 + (freq as f64) * 1_000_000.0 };
-                    bonus += factor;
-                }
-                
-                // 2. 检查该词是否为该拼音下的“最后一次使用”
-                // (此处逻辑简化：如果在历史列表中排第一，且频率 > 0，给予额外热点加成)
-                if !history_entries.is_empty() && history_entries[0].0 == c.simplified.as_ref() {
-                    bonus += 50_000_000.0; // 热点置顶加成
-                }
-
-                if bonus > 0.0 {
-                    c.weight += bonus;
-                    if !c.source.contains("(Hist)") {
-                        c.source = format!("{} (Hist)", c.source).into();
+            if let Some(history_entries) = profile_dict.get(query) {
+                // 为历史词汇赋予“降维打击”级的超高分，彻底无视词库权重
+                for c in candidates.iter_mut() {
+                    if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
+                        // 根据在历史记录中的排名赋予固定档位的超级权重
+                        // 排名越靠前，档位越高
+                        let rank_bonus = (history_entries.len() - pos) as f64 * 1_000_000_000.0;
+                        c.weight = 10_000_000_000.0 + rank_bonus;
+                        if !c.source.contains("(Hist)") {
+                            c.source = format!("{} (Hist)", c.source).into();
+                        }
                     }
                 }
             }
