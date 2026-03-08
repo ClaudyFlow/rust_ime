@@ -224,15 +224,35 @@ impl Filter for AdaptiveFilter {
         if !config.input.enable_auto_reorder { return; }
         let dict = self.usage_history.load();
         if let Some(profile_dict) = dict.get(&self.profile) {
-            // 精准调频：只查找当前输入拼音下的历史
-            if let Some(history_entries) = profile_dict.get(query) {
-                for c in candidates.iter_mut() {
-                    if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
-                        let freq = history_entries[pos].1;
-                        // 强效加成：使用百万级系数，确保用户常用词置顶
-                        c.weight += (freq as f64) * 1000000.0;
-                        c.source = format!("{} (Hist)", c.source).into();
-                    }
+            // 1. 建立当前 Profile 下所有词的全局计数表 (优化简拼匹配)
+            let mut global_counts = HashMap::new();
+            for entries in profile_dict.values() {
+                for (word, count) in entries {
+                    let e = global_counts.entry(word.as_str()).or_insert(0u32);
+                    if *count > *e { *e = *count; }
+                }
+            }
+
+            // 2. 获取精准匹配拼音下的历史
+            let empty_vec = Vec::new();
+            let history_entries = profile_dict.get(query).unwrap_or(&empty_vec);
+
+            for c in candidates.iter_mut() {
+                let mut bonus = 0.0;
+                
+                // 路径 A: 精准拼音匹配加成 (最高权重)
+                if let Some(pos) = history_entries.iter().position(|(w, _)| w.as_str() == c.simplified.as_ref()) {
+                    bonus += (history_entries[pos].1 as f64) * 10_000_000.0;
+                }
+                
+                // 路径 B: 全局词频加成 (解决简拼、拼写变体问题)
+                if let Some(&count) = global_counts.get(c.simplified.as_ref()) {
+                    bonus += (count as f64) * 2_000_000.0;
+                }
+
+                if bonus > 0.0 {
+                    c.weight += bonus;
+                    c.source = format!("{} (Hist)", c.source).into();
                 }
             }
         }
