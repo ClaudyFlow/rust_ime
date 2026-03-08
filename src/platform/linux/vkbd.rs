@@ -28,6 +28,7 @@ pub struct Vkbd {
     pub dev: Arc<Mutex<VirtualDevice>>,
     pub paste_mode: Arc<Mutex<PasteMode>>,
     pub clipboard_delay_ms: Arc<Mutex<u64>>,
+    pub is_wayland: bool,
     task_tx: Sender<VkbdTask>,
 }
 
@@ -68,6 +69,7 @@ impl Vkbd {
         let dbus_conn = Connection::session().ok();
 
         let (task_tx, task_rx) = mpsc::channel::<VkbdTask>();
+        let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
 
         // 启动后台工作线程
         let dev_bg = dev.clone();
@@ -80,7 +82,7 @@ impl Vkbd {
                     VkbdTask::SendText(text, highlight) => {
                         let p_mode = match paste_mode_bg.lock() { Ok(m) => *m, Err(_) => PasteMode::ShiftInsert };
                         let delay = match delay_bg.lock() { Ok(d) => *d, Err(_) => 50 };
-                        Self::do_send_text(&dev_bg, p_mode, delay, &dbus_conn, &text, highlight);
+                        Self::do_send_text(&dev_bg, is_wayland, p_mode, delay, &dbus_conn, &text, highlight);
                     }
                     VkbdTask::Backspace(count) => {
                         Self::do_backspace(&dev_bg, count);
@@ -93,6 +95,7 @@ impl Vkbd {
             dev,
             paste_mode,
             clipboard_delay_ms,
+            is_wayland,
             task_tx,
         })
     }
@@ -137,8 +140,15 @@ impl Vkbd {
 
     // --- 同步工作逻辑 (由后台线程调用) ---
 
-    fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
+    fn do_send_text(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, dbus: &Option<Connection>, text: &str, highlight: bool) {
         if text.is_empty() { return; }
+
+        // 0. PRIORITY PATH: wtype for Wayland Unicode
+        if is_wayland && !highlight {
+            if Self::do_send_via_wtype(text) {
+                return;
+            }
+        }
 
         // FAST PATH: Only for supported lowercase, digits and basic punctuation
         if !highlight && text.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || " /'.,;[]\\-=`".contains(c)) {
@@ -226,6 +236,13 @@ impl Vkbd {
         if let Some(ref conn) = dbus {
             conn.call_method(Some("org.fcitx.Fcitx5"), "/controller", Some("org.fcitx.Fcitx.Controller1"), "CommitString", &(text)).is_ok()
         } else { false }
+    }
+
+    fn do_send_via_wtype(text: &str) -> bool {
+        Command::new("wtype")
+            .arg(text)
+            .status()
+            .is_ok_and(|s| s.success())
     }
 
     fn do_send_via_ydotool(text: &str) -> bool {
