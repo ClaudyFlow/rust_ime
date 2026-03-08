@@ -182,7 +182,7 @@ impl Vkbd {
     /// 使用命令行工具 wl-copy 或 xclip (更稳定)
     fn do_send_via_clipboard_cmd(dev: &Arc<Mutex<VirtualDevice>>, is_wayland: bool, mode: PasteMode, delay: u64, text: &str) -> bool {
         let cmd = if is_wayland { "wl-copy" } else { "xclip" };
-        let mut child = if is_wayland {
+        let child = if is_wayland {
             Command::new(cmd).arg(text).spawn()
         } else {
             Command::new(cmd).arg("-selection").arg("clipboard").spawn()
