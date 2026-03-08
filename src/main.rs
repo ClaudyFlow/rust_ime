@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         syllables.insert("mian".to_string());
         syllables.insert("zhuomian".to_string());
 
-        let start_load = std::time::Instant::now();
+        let _start_load = std::time::Instant::now();
         let mut processor = Processor::new(trie_paths, syllables);
         processor.apply_config(&Config::load());
         processor.active_profiles = vec!["chinese".to_string()];
@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("平均单次按键处理延迟: {:?} (约 {:.2} 微秒)", avg_latency, avg_latency.as_micros() as f64);
 
         println!("[Bench] 正在测试吞吐量 (Throughput)...");
-        let start_thru = std::time::Instant::now();
+        let _start_thru = std::time::Instant::now();
         let thru_iterations = 5000;
         for _ in 0..thru_iterations {
             processor.reset();

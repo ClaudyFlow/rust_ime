@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use crate::engine::Trie;
 use crate::engine::config_manager::UserDictData;
 use lru::LruCache;
-use std::num::NonZeroUsize;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct SearchCacheKey {
