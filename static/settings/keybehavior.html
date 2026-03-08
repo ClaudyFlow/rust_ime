@@ -50,18 +50,6 @@
         <h2>按键功能开关</h2>
         <div class="card">
             <div class="setting-item">
-                <div class="info"><div class="title">翻页按键: 方向键 (上下)</div><div class="desc">使用 ↑ ↓ 进行翻页 (支持在设置中与左右交换)</div></div>
-                <label class="switch"><input type="checkbox" id="flip-arrow"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">翻页按键: 减号/等号 (- =)</div><div class="desc">使用键盘顶部的 - 和 = 键进行翻页</div></div>
-                <label class="switch"><input type="checkbox" id="flip-minus-equal"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
-                <div class="info"><div class="title">翻页按键: 逗号/句号 (, .)</div><div class="desc">使用 , 和 . 键进行翻页 (仅在输入拼音时)</div></div>
-                <label class="switch"><input type="checkbox" id="flip-comma-dot"><span class="slider"></span></label>
-            </div>
-            <div class="setting-item">
                 <div class="info"><div class="title">Shift 筛选模式</div><div class="desc">输入拼音时按 Shift 进入英文/全局筛选</div></div>
                 <label class="switch"><input type="checkbox" id="enable_english_filter"><span class="slider"></span></label>
             </div>
@@ -92,23 +80,6 @@
             bindInput('enable_english_filter', 'input');
             bindInput('enable_number_selection', 'input');
             bindInput('phantom_type', 'input');
-
-            bindPaging('flip-arrow', 'arrow');
-            bindPaging('flip-minus-equal', 'minus_equal');
-            bindPaging('flip-comma-dot', 'comma_dot');
-        }
-
-        function bindPaging(id, value) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.checked = config.input.page_flipping_keys.includes(value);
-            el.onchange = () => {
-                if (el.checked) {
-                    if (!config.input.page_flipping_keys.includes(value)) config.input.page_flipping_keys.push(value);
-                } else {
-                    config.input.page_flipping_keys = config.input.page_flipping_keys.filter(k => k !== value);
-                }
-            };
         }
 
         async function save() {

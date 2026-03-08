@@ -24,10 +24,6 @@ pub enum FsmEffect {
     UpdateLookup,
     Commit首选,
     CommitRaw,
-    NextCandidate,
-    PrevCandidate,
-    NextPage,
-    PrevPage,
     Clear,
 }
 
@@ -124,13 +120,7 @@ impl StateMachine {
         )
     }
 
-    fn map_selection_effect(key: VirtualKey) -> FsmEffect {
-        match key {
-            VirtualKey::Up | VirtualKey::Left => FsmEffect::PrevCandidate,
-            VirtualKey::Down | VirtualKey::Right => FsmEffect::NextCandidate,
-            VirtualKey::PageUp | VirtualKey::Minus | VirtualKey::Comma => FsmEffect::PrevPage,
-            VirtualKey::PageDown | VirtualKey::Equal | VirtualKey::Dot => FsmEffect::NextPage,
-            _ => FsmEffect::Consume,
-        }
+    fn map_selection_effect(_key: VirtualKey) -> FsmEffect {
+        FsmEffect::Consume
     }
 }

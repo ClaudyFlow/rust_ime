@@ -20,4 +20,32 @@ impl VirtualKey {
     pub fn to_u32(self) -> u32 {
         self as u32
     }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "a" => Some(Self::A), "b" => Some(Self::B), "c" => Some(Self::C), "d" => Some(Self::D),
+            "e" => Some(Self::E), "f" => Some(Self::F), "g" => Some(Self::G), "h" => Some(Self::H),
+            "i" => Some(Self::I), "j" => Some(Self::J), "k" => Some(Self::K), "l" => Some(Self::L),
+            "m" => Some(Self::M), "n" => Some(Self::N), "o" => Some(Self::O), "p" => Some(Self::P),
+            "q" => Some(Self::Q), "r" => Some(Self::R), "s" => Some(Self::S), "t" => Some(Self::T),
+            "u" => Some(Self::U), "v" => Some(Self::V), "w" => Some(Self::W), "x" => Some(Self::X),
+            "y" => Some(Self::Y), "z" => Some(Self::Z),
+            "0" | "digit0" => Some(Self::Digit0), "1" | "digit1" => Some(Self::Digit1),
+            "2" | "digit2" => Some(Self::Digit2), "3" | "digit3" => Some(Self::Digit3),
+            "4" | "digit4" => Some(Self::Digit4), "5" | "digit5" => Some(Self::Digit5),
+            "6" | "digit6" => Some(Self::Digit6), "7" | "digit7" => Some(Self::Digit7),
+            "8" | "digit8" => Some(Self::Digit8), "9" | "digit9" => Some(Self::Digit9),
+            "space" => Some(Self::Space), "enter" => Some(Self::Enter), "tab" => Some(Self::Tab),
+            "backspace" => Some(Self::Backspace), "esc" => Some(Self::Esc), "capslock" => Some(Self::CapsLock),
+            "shift" => Some(Self::Shift), "control" | "ctrl" => Some(Self::Control), "alt" => Some(Self::Alt),
+            "left" => Some(Self::Left), "right" => Some(Self::Right), "up" => Some(Self::Up), "down" => Some(Self::Down),
+            "pageup" => Some(Self::PageUp), "pagedown" => Some(Self::PageDown), "home" => Some(Self::Home), "end" => Some(Self::End), "delete" => Some(Self::Delete),
+            "grave" | "`" => Some(Self::Grave), "minus" | "-" => Some(Self::Minus), "equal" | "=" => Some(Self::Equal),
+            "leftbrace" | "[" => Some(Self::LeftBrace), "rightbrace" | "]" => Some(Self::RightBrace),
+            "backslash" | "\\" => Some(Self::Backslash), "semicolon" | ";" => Some(Self::Semicolon),
+            "apostrophe" | "'" => Some(Self::Apostrophe), "comma" | "," => Some(Self::Comma),
+            "dot" | "." => Some(Self::Dot), "slash" | "/" => Some(Self::Slash),
+            _ => None,
+        }
+    }
 }

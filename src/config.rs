@@ -121,7 +121,6 @@ pub struct Input {
     pub filter_proper_nouns_by_case: bool,
     pub active_profiles: Vec<String>,
     pub profile_keys: Vec<ProfileKey>,
-    pub page_flipping_keys: Vec<String>,
     pub swap_arrow_keys: bool,
     pub enable_error_sound: bool,
     pub enable_english_filter: bool,
@@ -198,9 +197,22 @@ pub struct ProfileKey {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Hotkeys {
     pub switch_language: Hotkey,
+    #[serde(default = "default_page_up")]
+    pub page_up: Vec<String>,
+    #[serde(default = "default_page_down")]
+    pub page_down: Vec<String>,
+    #[serde(default = "default_prev_candidate")]
+    pub prev_candidate: Vec<String>,
+    #[serde(default = "default_next_candidate")]
+    pub next_candidate: Vec<String>,
     pub enable_tab_toggle: bool,
     pub enable_ctrl_space_toggle: bool,
 }
+
+fn default_page_up() -> Vec<String> { vec!["Up".into(), "PageUp".into(), "-".into(), ",".into(), "[".into()] }
+fn default_page_down() -> Vec<String> { vec!["Down".into(), "PageDown".into(), "=".into(), ".".into(), "]".into()] }
+fn default_prev_candidate() -> Vec<String> { vec!["Left".into()] }
+fn default_next_candidate() -> Vec<String> { vec!["Right".into()] }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Hotkey {
@@ -229,7 +241,7 @@ impl Config {
         }
     }
 
-    fn get_config_dir() -> std::path::PathBuf {
+    pub fn get_config_dir() -> std::path::PathBuf {
         let mut curr = std::env::current_exe().ok()
             .and_then(|p| p.parent().map(|parent| parent.to_path_buf()))
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
@@ -375,7 +387,6 @@ impl Config {
                     ProfileKey { key: "b".into(), profile: "stroke".into() },
                     ProfileKey { key: "m".into(), profile: "chinese,english,japanese".into() },
                 ],
-                page_flipping_keys: vec!["arrow".to_string(), "minus_equal".to_string(), "comma_dot".to_string()],
                 swap_arrow_keys: false,
                 enable_error_sound: true,
                 enable_english_filter: true,
@@ -412,6 +423,10 @@ impl Config {
             },
             hotkeys: Hotkeys {
                 switch_language: Hotkey { key: "tab".to_string(), description: "核心: 切换中/英文模式".to_string() },
+                page_up: vec!["Up".into(), "PageUp".into(), "-".into(), ",".into(), "[".into()],
+                page_down: vec!["Down".into(), "PageDown".into(), "=".into(), ".".into(), "]".into()],
+                prev_candidate: vec!["Left".into()],
+                next_candidate: vec!["Right".into()],
                 enable_tab_toggle: true,
                 enable_ctrl_space_toggle: false,
             },

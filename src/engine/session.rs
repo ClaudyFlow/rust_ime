@@ -134,15 +134,6 @@ impl InputSession {
         self.selected = self.page;
     }
 
-    pub fn toggle_nav_mode(&mut self, page_size: usize) {
-        self.nav_mode = !self.nav_mode;
-        if self.nav_mode
-            && self.page + page_size < self.candidates.len() {
-                self.page += page_size;
-                self.selected = self.page;
-            }
-    }
-
     pub fn handle_filter_char(&mut self, c: char) {
         if self.filter_mode == FilterMode::None {
             self.filter_mode = FilterMode::Page;

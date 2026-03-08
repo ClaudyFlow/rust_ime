@@ -291,6 +291,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--foreground" => { should_daemonize = false; }
             "--test" => {
                 println!("[Test] 进入测试模式 (无 UI)...");
+                let config_dir = crate::config::Config::get_config_dir();
+                println!("[Test] 配置加载目录: {:?}", config_dir);
                 let root = find_project_root();
                 let syllables = load_syllables(&root);
                 let mut trie_paths = HashMap::new();
@@ -362,8 +364,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else if input == "BACKSPACE" {
                         let action = processor.handle_key(engine::keys::VirtualKey::Backspace, 1, false, false, false);
                         println!("动作反馈: {action:?}");
+                    } else if input == "UP" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Up, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "DOWN" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Down, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "LEFT" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Left, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "RIGHT" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Right, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "CTRL_SPACE" {
+                        let action = processor.handle_key_ext(engine::keys::VirtualKey::Space, 1, false, true, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "CAPSLOCK" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::CapsLock, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "TAB" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::Tab, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "[" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::LeftBrace, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input == "]" {
+                        let action = processor.handle_key(engine::keys::VirtualKey::RightBrace, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
                     } else if line.starts_with(' ') {
                         let action = processor.handle_key(engine::keys::VirtualKey::Space, 1, false, false, false);
+                        println!("动作反馈: {action:?}");
+                    } else if input.len() == 1 && input.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+                        let digit = input.chars().next().unwrap().to_digit(10).unwrap();
+                        let vk = match digit {
+                            0 => engine::keys::VirtualKey::Digit0,
+                            1 => engine::keys::VirtualKey::Digit1,
+                            2 => engine::keys::VirtualKey::Digit2,
+                            3 => engine::keys::VirtualKey::Digit3,
+                            4 => engine::keys::VirtualKey::Digit4,
+                            5 => engine::keys::VirtualKey::Digit5,
+                            6 => engine::keys::VirtualKey::Digit6,
+                            7 => engine::keys::VirtualKey::Digit7,
+                            8 => engine::keys::VirtualKey::Digit8,
+                            9 => engine::keys::VirtualKey::Digit9,
+                            _ => engine::keys::VirtualKey::Digit0,
+                        };
+                        let action = processor.handle_key(vk, 1, false, false, false);
                         println!("动作反馈: {action:?}");
                     } else {
                         // 允许直接设置 buffer 进行快捷测试
@@ -372,7 +418,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     
                     let display_preedit = engine::compositor::Compositor::get_preedit(&processor);
+                    println!("中英文状态: {}", if processor.chinese_enabled { "开启" } else { "关闭" });
                     println!("预编辑: {display_preedit}");
+                    println!("当前选中: {}", processor.session.selected);
+                    println!("分页: {}/{}", processor.session.page, processor.session.candidates.len());
                     println!("辅助码过滤: {}", processor.session.aux_filter);
                     println!("切分: {:?}", processor.session.best_segmentation);
                     println!("候选词 (前 10 条):");
@@ -547,7 +596,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     #[cfg(target_os = "linux")]
                     {
-                        let _ = std::process::Command::new("xdg-open").arg("http://127.0.0.1:18765").spawn();
                         let _ = open::that("http://127.0.0.1:18765");
                     }
                     #[cfg(target_os = "windows")]
@@ -601,11 +649,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             host.run()?;
         } else if force_evdev {
             println!("[Main] 强制启动 Evdev 拦截模式...");
-            let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &dev_path, Some(gui_tx), config.clone(), tray_tx)?;
+            let mut host = platform::linux::evdev_host::EvdevHost::new(processor, &dev_path, Some(gui_tx), tray_tx)?;
             host.run()?;
         } else {
             // 自动逻辑
-            match platform::linux::evdev_host::EvdevHost::new(processor.clone(), &dev_path, Some(gui_tx.clone()), config.clone(), tray_tx.clone()) {
+            match platform::linux::evdev_host::EvdevHost::new(processor.clone(), &dev_path, Some(gui_tx.clone()), tray_tx.clone()) {
                 Ok(mut host) => {
                     println!("[Main] 成功启动 Evdev 拦截模式。");
                     host.run()?;

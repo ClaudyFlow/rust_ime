@@ -3,7 +3,7 @@ use crate::engine::keys::VirtualKey;
 use crate::engine::processor::{Processor, Action, Command, FilterMode};
 use crate::engine::processor::utils::*;
 
-pub fn handle_direct(processor: &mut Processor, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
+pub fn handle_idle(processor: &mut Processor, key: VirtualKey, shift_pressed: bool, perform_lookup: bool) -> Action {
     if key == VirtualKey::Enter || key == VirtualKey::Space {
         return Action::PassThrough;
     }
@@ -149,9 +149,18 @@ pub fn handle_composing(processor: &mut Processor, key: VirtualKey, shift_presse
         processor.dispatcher.last_tap_time = None;
     }
 
-    let styles = &processor.config.page_flipping_styles;
-    let flip_me = styles.contains(&"minus_equal".to_string());
-    let flip_cd = styles.contains(&"comma_dot".to_string());
+    if processor.config.page_up_keys.contains(&key) && has_cand {
+        return processor.execute_command(Command::PrevPage);
+    }
+    if processor.config.page_down_keys.contains(&key) && has_cand {
+        return processor.execute_command(Command::NextPage);
+    }
+    if processor.config.prev_candidate_keys.contains(&key) && has_cand {
+        return processor.execute_command(Command::PrevCandidate);
+    }
+    if processor.config.next_candidate_keys.contains(&key) && has_cand {
+        return processor.execute_command(Command::NextCandidate);
+    }
 
     if key == VirtualKey::Semicolon && !shift_pressed {
         processor.session.push_char(';');
@@ -188,10 +197,6 @@ pub fn handle_composing(processor: &mut Processor, key: VirtualKey, shift_presse
                 processor.update_phantom_action() 
             }
         }
-        VirtualKey::Minus if flip_me && has_cand => processor.execute_command(Command::PrevPage),
-        VirtualKey::Equal if flip_me && has_cand => processor.execute_command(Command::NextPage),
-        VirtualKey::Comma if flip_cd && has_cand => processor.execute_command(Command::PrevPage),
-        VirtualKey::Dot if flip_cd && has_cand => processor.execute_command(Command::NextPage),
 
         VirtualKey::Home => { if shift_pressed { processor.session.selected = 0; processor.session.page = 0; } else { processor.session.selected = processor.session.page; } Action::Consume }
         VirtualKey::End => { if has_cand { if shift_pressed { processor.session.selected = processor.session.candidates.len() - 1; processor.session.page = (processor.session.selected / processor.config.page_size) * processor.config.page_size; } else { processor.session.selected = (processor.session.page + processor.config.page_size - 1).min(processor.session.candidates.len() - 1); } } Action::Consume }

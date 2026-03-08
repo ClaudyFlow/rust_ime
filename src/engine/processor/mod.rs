@@ -47,6 +47,7 @@ pub struct Processor {
     // 连续选词记忆
     pub commit_history: Vec<(String, String)>, // 最近上屏的 (拼音, 词组)
     pub last_commit_time: Instant,
+    pub capslock_pending: bool, // CapsLock 快速切换方案预备状态
 }
 
 impl Processor {
@@ -82,6 +83,7 @@ impl Processor {
             chinese_enabled: true,
             commit_history: Vec::new(),
             last_commit_time: Instant::now(),
+            capslock_pending: false,
         }
     }
 
@@ -204,6 +206,38 @@ impl Processor {
         let is_press = val == 1;
         let is_release = val == 0;
 
+        // 1. 全局快捷键拦截 (无论中英文是否开启)
+        if is_press {
+            // A. Ctrl + Space 中英文切换
+            if key == VirtualKey::Space && ctrl_pressed && self.config.master_config.hotkeys.enable_ctrl_space_toggle {
+                self.chinese_enabled = !self.chinese_enabled;
+                return Action::Consume;
+            }
+
+            // B. Tab 中英文切换 (仅当缓冲区为空且启用时)
+            if key == VirtualKey::Tab && self.session.buffer.is_empty() && self.config.master_config.hotkeys.enable_tab_toggle {
+                self.chinese_enabled = !self.chinese_enabled;
+                return Action::Consume;
+            }
+
+            // C. CapsLock 方案切换准备
+            if key == VirtualKey::CapsLock && self.session.buffer.is_empty() {
+                self.capslock_pending = true;
+                // 完全拦截，防止触发系统大写锁定
+                return Action::Consume; 
+            } else if self.capslock_pending && self.session.buffer.is_empty() {
+                // 检查是否命中了方案映射
+                let key_char = crate::engine::processor::utils::key_to_char(key, false).unwrap_or('\0').to_string();
+                if let Some(profile) = self.config.profile_keys.iter().find(|(k, _)| k == &key_char).map(|(_, p)| p.clone()) {
+                    self.active_profiles = profile.split(',').map(|s| s.to_string()).collect();
+                    self.reset();
+                    self.capslock_pending = false;
+                    return Action::Consume;
+                }
+                self.capslock_pending = false;
+            }
+        }
+
         if !self.chinese_enabled {
             return Action::PassThrough;
         }
@@ -267,18 +301,6 @@ impl Processor {
             }
             fsm::FsmEffect::CommitRaw => {
                 self.execute_command(Command::CommitRaw)
-            }
-            fsm::FsmEffect::NextCandidate => {
-                self.execute_command(Command::NextCandidate)
-            }
-            fsm::FsmEffect::PrevCandidate => {
-                self.execute_command(Command::PrevCandidate)
-            }
-            fsm::FsmEffect::NextPage => {
-                self.execute_command(Command::NextPage)
-            }
-            fsm::FsmEffect::PrevPage => {
-                self.execute_command(Command::PrevPage)
             }
             fsm::FsmEffect::Clear => {
                 self.execute_command(Command::Clear)
@@ -496,7 +518,6 @@ impl Processor {
 
     pub fn record_usage(&mut self, pinyin: &str, word: &str) {
         if pinyin.is_empty() || word.is_empty() { return; }
-        if std::env::args().any(|a| a == "--test") { return; }
         
         let profile = self.active_profiles.first().cloned().unwrap_or_else(|| "chinese".to_string());
         let word_len = word.chars().count();
@@ -523,6 +544,8 @@ impl Processor {
             });
             // 增量持久化到数据库
             self.config.insert_usage(&profile, pinyin, &updated_entries);
+            // 清理缓存以确保下一次查询能看到调频结果
+            self.engine.clear_cache();
         }
 
         // 2. 记录造词记录 (Learned Words)

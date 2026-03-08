@@ -226,7 +226,7 @@ impl Filter for AdaptiveFilter {
             if let Some(history_entries) = profile_dict.get(query) {
                 // 物理挪动：从后往前遍历历史记录，依次插入到第 0 位
                 for (word, _) in history_entries.iter().rev() {
-                    if let Some(pos) = candidates.iter().position(|c| c.simplified.as_ref() == word) {
+                    if let Some(pos) = candidates.iter().position(|c| c.simplified.as_ref() == word || c.traditional.as_ref() == word) {
                         let mut cand = candidates.remove(pos);
                         if !cand.source.contains("(Hist)") {
                             cand.source = format!("{} (Hist)", cand.source).into();

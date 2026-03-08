@@ -3,6 +3,7 @@ use std::sync::Arc;
 use arc_swap::ArcSwap;
 use std::time::Duration;
 use crate::config::{Config, AuxMode, AntiTypoMode, PhantomType, DoublePinyinScheme, FuzzyPinyinConfig, PunctuationEntry};
+use crate::engine::keys::VirtualKey;
 
 pub type UserDictData = HashMap<String, HashMap<String, Vec<(String, u32)>>>;
 
@@ -26,7 +27,10 @@ pub struct ConfigManager {
     pub filter_proper_nouns_by_case: bool,
     pub profile_keys: Vec<(String, String)>,
     
-    pub page_flipping_styles: Vec<String>,
+    pub page_up_keys: std::collections::HashSet<crate::engine::keys::VirtualKey>,
+    pub page_down_keys: std::collections::HashSet<crate::engine::keys::VirtualKey>,
+    pub prev_candidate_keys: std::collections::HashSet<crate::engine::keys::VirtualKey>,
+    pub next_candidate_keys: std::collections::HashSet<crate::engine::keys::VirtualKey>,
     pub swap_arrow_keys: bool,
     
     pub enable_english_filter: bool,
@@ -92,7 +96,10 @@ impl ConfigManager {
             enable_abbreviation_matching: master.input.enable_abbreviation_matching,
             filter_proper_nouns_by_case: master.input.filter_proper_nouns_by_case,
             profile_keys: master.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect(),
-            page_flipping_styles: master.input.page_flipping_keys.iter().map(|s| s.to_lowercase()).collect(),
+            page_up_keys: master.hotkeys.page_up.iter().filter_map(|s| VirtualKey::from_str(s)).collect(),
+            page_down_keys: master.hotkeys.page_down.iter().filter_map(|s| VirtualKey::from_str(s)).collect(),
+            prev_candidate_keys: master.hotkeys.prev_candidate.iter().filter_map(|s| VirtualKey::from_str(s)).collect(),
+            next_candidate_keys: master.hotkeys.next_candidate.iter().filter_map(|s| VirtualKey::from_str(s)).collect(),
             swap_arrow_keys: master.input.swap_arrow_keys,
             enable_english_filter: master.input.enable_english_filter,
             enable_caps_selection: master.input.enable_caps_selection,
@@ -162,7 +169,10 @@ impl ConfigManager {
         self.filter_proper_nouns_by_case = conf.input.filter_proper_nouns_by_case;
         self.profile_keys = conf.input.profile_keys.iter().map(|pk| (pk.key.to_lowercase(), pk.profile.to_lowercase())).collect();
         
-        self.page_flipping_styles = conf.input.page_flipping_keys.iter().map(|s| s.to_lowercase()).collect();
+        self.page_up_keys = conf.hotkeys.page_up.iter().filter_map(|s| VirtualKey::from_str(s)).collect();
+        self.page_down_keys = conf.hotkeys.page_down.iter().filter_map(|s| VirtualKey::from_str(s)).collect();
+        self.prev_candidate_keys = conf.hotkeys.prev_candidate.iter().filter_map(|s| VirtualKey::from_str(s)).collect();
+        self.next_candidate_keys = conf.hotkeys.next_candidate.iter().filter_map(|s| VirtualKey::from_str(s)).collect();
         self.swap_arrow_keys = conf.input.swap_arrow_keys;
         
         self.enable_english_filter = conf.input.enable_english_filter;

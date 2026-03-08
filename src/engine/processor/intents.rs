@@ -9,7 +9,6 @@ pub fn process_modifiers(processor: &mut Processor, key: VirtualKey, is_press: b
     }
 
     if is_release {
-        if key == VirtualKey::CapsLock { return Some(Action::Consume); }
         if key == VirtualKey::Shift {
             if !processor.session.buffer.is_empty() {
                 if !processor.session.shift_used_as_modifier {
@@ -25,17 +24,8 @@ pub fn process_modifiers(processor: &mut Processor, key: VirtualKey, is_press: b
     }
 
     if key == VirtualKey::CapsLock && is_press {
-        if processor.session.buffer.is_empty() {
-            processor.session.switch_mode = !processor.session.switch_mode;
-            return Some(if processor.session.switch_mode { 
-                Action::Notify("快捷切换".into(), "已进入方案切换模式".into()) 
-            } else { 
-                Action::Notify("快捷切换".into(), "已退出".into()) 
-            });
-        }
-        let page_size = processor.config.page_size;
-        processor.session.toggle_nav_mode(page_size);
-        return Some(Action::Consume);
+        // CapsLock 的按下逻辑已移至 handle_key_ext
+        return None;
     }
     
     None
